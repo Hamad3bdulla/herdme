@@ -1127,18 +1127,13 @@ final class AppModel: ObservableObject {
             refreshCertificateTrust()
             return
         }
-        let process = Process()
-        let pipe = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
-        process.arguments = ["-nP", "-iTCP:80", "-sTCP:LISTEN"]
-        process.standardOutput = pipe
-        process.standardError = Pipe()
         do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8) ?? ""
-            if output.contains("Herd") || output.contains("nginx") {
+            let result = try ProcessRunner.run(
+                URL(fileURLWithPath: "/usr/sbin/lsof"),
+                arguments: ["-nP", "-iTCP:80", "-sTCP:LISTEN"],
+                timeout: 10
+            )
+            if result.output.contains("Herd") || result.output.contains("nginx") {
                 environmentStatus = .conflict
             } else {
                 environmentStatus = .stopped

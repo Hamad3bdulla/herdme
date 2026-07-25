@@ -3,8 +3,9 @@ import Network
 
 final class SMTPServer: @unchecked Sendable {
     private let queue = DispatchQueue(label: "app.herdme.smtp", qos: .userInitiated)
+    private let sessionsLock = NSLock()
     private var listener: NWListener?
-    private var sessions: [SMTPSession] = []
+    private var sessions: [UUID: SMTPSession] = [:]
 
     var isRunning: Bool { listener != nil }
 
@@ -22,8 +23,16 @@ final class SMTPServer: @unchecked Sendable {
         parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: networkPort)
         let listener = try NWListener(using: parameters)
         listener.newConnectionHandler = { [weak self] connection in
-            let session = SMTPSession(connection: connection, onMessage: onMessage)
-            self?.sessions.append(session)
+            guard let self else { return }
+            let identifier = UUID()
+            let session = SMTPSession(
+                connection: connection,
+                onMessage: onMessage,
+                onStop: { [weak self] in self?.removeSession(identifier) }
+            )
+            self.sessionsLock.lock()
+            self.sessions[identifier] = session
+            self.sessionsLock.unlock()
             session.start()
         }
         listener.stateUpdateHandler = { [weak self] state in
@@ -47,37 +56,98 @@ final class SMTPServer: @unchecked Sendable {
     func stop() {
         listener?.cancel()
         listener = nil
-        sessions.forEach { $0.stop() }
+        sessionsLock.lock()
+        let activeSessions = Array(sessions.values)
         sessions.removeAll()
+        sessionsLock.unlock()
+        activeSessions.forEach { $0.stop() }
+    }
+
+    private func removeSession(_ identifier: UUID) {
+        sessionsLock.lock()
+        sessions.removeValue(forKey: identifier)
+        sessionsLock.unlock()
+    }
+}
+
+struct SMTPMessageBuffer {
+    static let maximumBytes = 50 * 1_024 * 1_024
+
+    private let limit: Int
+    private(set) var byteCount = 0
+    private(set) var isTooLarge = false
+    private var lines: [String] = []
+
+    init(maximumBytes: Int = Self.maximumBytes) {
+        limit = max(maximumBytes, 0)
+    }
+
+    mutating func append(_ line: String) -> Bool {
+        let lineBytes = line.utf8.count + 2
+        guard !isTooLarge,
+              lineBytes <= limit,
+              byteCount <= limit - lineBytes else {
+            isTooLarge = true
+            return false
+        }
+        lines.append(line)
+        byteCount += lineBytes
+        return true
+    }
+
+    mutating func reset() {
+        byteCount = 0
+        isTooLarge = false
+        lines.removeAll(keepingCapacity: true)
+    }
+
+    var rawMessage: String {
+        lines.map { $0.hasPrefix("..") ? String($0.dropFirst()) : $0 }
+            .joined(separator: "\r\n")
     }
 }
 
 private final class SMTPSession: @unchecked Sendable {
+    private static let maximumLineBytes = 1 * 1_024 * 1_024
+
     private let connection: NWConnection
     private let queue = DispatchQueue(label: "app.herdme.smtp.session")
     private let onMessage: @Sendable (CapturedMail) -> Void
+    private let onStop: @Sendable () -> Void
     private var buffer = Data()
     private var sender = "Unknown sender"
     private var recipients: [String] = []
-    private var dataLines: [String] = []
+    private var messageBuffer = SMTPMessageBuffer()
     private var readingData = false
 
-    init(connection: NWConnection, onMessage: @escaping @Sendable (CapturedMail) -> Void) {
+    init(
+        connection: NWConnection,
+        onMessage: @escaping @Sendable (CapturedMail) -> Void,
+        onStop: @escaping @Sendable () -> Void
+    ) {
         self.connection = connection
         self.onMessage = onMessage
+        self.onStop = onStop
     }
 
     func start() {
         connection.stateUpdateHandler = { [weak self] state in
-            guard case .ready = state else { return }
-            self?.send("220 HerdMe SMTP ready\r\n")
-            self?.receive()
+            switch state {
+            case .ready:
+                self?.send("220 HerdMe SMTP ready\r\n")
+                self?.receive()
+            case .failed, .cancelled:
+                self?.onStop()
+            default:
+                break
+            }
         }
         connection.start(queue: queue)
     }
 
     func stop() {
         connection.cancel()
+        onStop()
     }
 
     private func receive() {
@@ -85,8 +155,14 @@ private final class SMTPSession: @unchecked Sendable {
             guard let self else { return }
             if let data { self.buffer.append(data) }
             self.processBuffer()
+            if self.buffer.count > Self.maximumLineBytes {
+                self.connection.cancel()
+                self.onStop()
+                return
+            }
             if complete || error != nil {
                 self.connection.cancel()
+                self.onStop()
             } else {
                 self.receive()
             }
@@ -106,16 +182,20 @@ private final class SMTPSession: @unchecked Sendable {
         if readingData {
             if line == "." {
                 readingData = false
-                let message = CapturedMail.parse(
-                    sender: sender,
-                    recipients: recipients,
-                    raw: dataLines.map { $0.hasPrefix("..") ? String($0.dropFirst()) : $0 }.joined(separator: "\r\n")
-                )
-                onMessage(message)
-                dataLines.removeAll()
-                send("250 2.0.0 Message accepted\r\n")
+                if messageBuffer.isTooLarge {
+                    send("552 5.3.4 Message size exceeds fixed maximum message size\r\n")
+                } else {
+                    let message = CapturedMail.parse(
+                        sender: sender,
+                        recipients: recipients,
+                        raw: messageBuffer.rawMessage
+                    )
+                    onMessage(message)
+                    send("250 2.0.0 Message accepted\r\n")
+                }
+                messageBuffer.reset()
             } else {
-                dataLines.append(line)
+                _ = messageBuffer.append(line)
             }
             return
         }
@@ -132,12 +212,12 @@ private final class SMTPSession: @unchecked Sendable {
             send("250 2.1.5 Recipient accepted\r\n")
         } else if uppercased == "DATA" {
             readingData = true
-            dataLines.removeAll()
+            messageBuffer.reset()
             send("354 End data with <CR><LF>.<CR><LF>\r\n")
         } else if uppercased == "RSET" {
             sender = "Unknown sender"
             recipients.removeAll()
-            dataLines.removeAll()
+            messageBuffer.reset()
             readingData = false
             send("250 2.0.0 Reset\r\n")
         } else if uppercased == "NOOP" {

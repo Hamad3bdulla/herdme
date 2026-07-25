@@ -28,6 +28,14 @@ retain their upstream licenses.
 
 Downloaded binaries are stored only in HerdMe-owned application data and are
 not copied into source distributions or relicensed under HerdMe's MIT license.
+On macOS, PHP and managed services are installed from Homebrew formulae. HerdMe
+accepts only its documented formula names and uses Homebrew's own HTTPS,
+repository, bottle, and formula verification chain. Node.js archives are
+downloaded from the official Node.js release directory and must match the exact
+filename and SHA-256 digest published in that release's `SHASUMS256.txt` before
+they are unpacked. The Composer installer must match Composer's separately
+published SHA-384 signature before it is executed.
+
 Windows service packages require their published SHA-256 digest when available.
 The MySQL Windows ZIP is the explicit exception: Oracle currently publishes MD5
 and a detached signature, so HerdMe pins the exact filename, release, official

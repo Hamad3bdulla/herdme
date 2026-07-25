@@ -844,20 +844,14 @@ final class ServiceProcessManager: @unchecked Sendable {
         arguments: [String],
         environment: [String: String]? = nil
     ) throws -> (status: Int32, output: String) {
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = executable
-        process.arguments = arguments
-        process.environment = environment
-        process.standardOutput = output
-        process.standardError = output
-        try process.run()
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
+        let result = try ProcessRunner.run(
+            executable,
+            arguments: arguments,
+            environment: environment
+        )
         return (
-            process.terminationStatus,
-            String(decoding: data, as: UTF8.self)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            result.status,
+            result.output.trimmingCharacters(in: .whitespacesAndNewlines)
         )
     }
 }

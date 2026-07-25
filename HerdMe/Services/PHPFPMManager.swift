@@ -174,17 +174,13 @@ final class PHPFPMManager: @unchecked Sendable {
     }
 
     private static func command(for pid: Int32) -> String {
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/bin/ps")
-        process.arguments = ["-p", String(pid), "-o", "command="]
-        process.standardOutput = output
-        process.standardError = Pipe()
         do {
-            try process.run()
-            let data = output.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            return process.terminationStatus == 0 ? String(decoding: data, as: UTF8.self) : ""
+            let result = try ProcessRunner.run(
+                URL(fileURLWithPath: "/bin/ps"),
+                arguments: ["-p", String(pid), "-o", "command="],
+                timeout: 10
+            )
+            return result.status == 0 ? result.output : ""
         } catch {
             return ""
         }

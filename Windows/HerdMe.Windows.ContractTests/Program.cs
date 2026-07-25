@@ -999,6 +999,29 @@ static async Task TestLocalHttpSiteServerAsync(string supportRoot)
     await File.WriteAllTextAsync(Path.Combine(publicRoot, "index.html"), "HerdMe static site");
     await File.WriteAllTextAsync(Path.Combine(siteRoot, "private.txt"), "must not be served");
 
+    var occupiedReservation = new TcpListener(IPAddress.Loopback, 0);
+    occupiedReservation.Start();
+    var occupiedPort = ((IPEndPoint)occupiedReservation.LocalEndpoint).Port;
+    var fallbackReservation = new TcpListener(IPAddress.Loopback, 0);
+    fallbackReservation.Start();
+    var fallbackPort = ((IPEndPoint)fallbackReservation.LocalEndpoint).Port;
+    fallbackReservation.Stop();
+    try
+    {
+        await using var fallbackServer = new LocalHttpSiteServer();
+        var selectedFallback = await fallbackServer.StartAsync(
+            [new LocalSiteDefinition("fallback.local-test", siteRoot)],
+            phpFastCgiPort: 1,
+            preferredPort: occupiedPort,
+            fallbackPort: fallbackPort
+        );
+        Check(selectedFallback == fallbackPort, "local HTTP falls back to the configured high port");
+    }
+    finally
+    {
+        occupiedReservation.Stop();
+    }
+
     var reservation = new TcpListener(IPAddress.Loopback, 0);
     reservation.Start();
     var preferredPort = ((IPEndPoint)reservation.LocalEndpoint).Port;

@@ -1,0 +1,63 @@
+name: macOS
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-package:
+    name: Build, test, and package
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Select the latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+
+      - name: Run macOS tests
+        run: |
+          xcodebuild \
+            -project HerdMe.xcodeproj \
+            -scheme HerdMe \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/macos-tests \
+            test
+
+      - name: Build and test the portable core
+        run: |
+          cmake -S Core -B build/core-ci -DBUILD_TESTING=ON
+          cmake --build build/core-ci --config Release
+          ctest --test-dir build/core-ci --output-on-failure
+
+      - name: Package the universal macOS application
+        run: ./scripts/package-macos.sh Release
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: HerdMe-${{ github.run_number }}-macOS
+          path: |
+            dist/HerdMe-*-macOS.zip
+            dist/HerdMe-*-macOS.dmg
+          if-no-files-found: error
+          retention-days: 14

@@ -228,20 +228,14 @@ actor ProjectCreator {
         let arguments = [laravel.path] + Self.laravelArguments(for: request)
 
         await progress(.creatingLaravelProject)
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = php
-        process.currentDirectoryURL = request.parentDirectory
-        process.arguments = arguments
-        process.environment = managedEnvironment
-        process.standardOutput = output
-        process.standardError = output
-        try process.run()
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        let text = String(data: data, encoding: .utf8) ?? ""
-        guard process.terminationStatus == 0 else {
-            throw ProjectCreationError.commandFailed(text)
+        let creation = try ProcessRunner.run(
+            php,
+            arguments: arguments,
+            currentDirectory: request.parentDirectory,
+            environment: managedEnvironment
+        )
+        guard creation.status == 0 else {
+            throw ProjectCreationError.commandFailed(creation.output)
         }
 
         if request.installBoost {
@@ -345,20 +339,14 @@ actor ProjectCreator {
         at directory: URL,
         fallbackError: String
     ) throws {
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = executable
-        process.currentDirectoryURL = directory
-        process.arguments = arguments
-        process.environment = managedEnvironment
-        process.standardOutput = output
-        process.standardError = output
-        try process.run()
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            let text = String(data: data, encoding: .utf8) ?? ""
-            throw ProjectCreationError.commandFailed(text.isEmpty ? fallbackError : text)
+        let result = try ProcessRunner.run(
+            executable,
+            arguments: arguments,
+            currentDirectory: directory,
+            environment: managedEnvironment
+        )
+        guard result.status == 0 else {
+            throw ProjectCreationError.commandFailed(result.output.isEmpty ? fallbackError : result.output)
         }
     }
 
@@ -369,22 +357,19 @@ actor ProjectCreator {
               FileManager.default.isReadableFile(atPath: composer.path) else {
             throw ProjectCreationError.commandFailed("HerdMe Composer is not installed.")
         }
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = php
-        process.currentDirectoryURL = destination
-        process.arguments = [
-            composer.path,
-            "require", "laravel/boost", "--dev", "--no-interaction", "--no-progress", "--no-ansi"
-        ]
-        process.environment = managedEnvironment
-        process.standardOutput = output
-        process.standardError = output
-        try process.run()
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            throw ProjectCreationError.commandFailed(String(data: data, encoding: .utf8) ?? "Laravel Boost installation failed.")
+        let result = try ProcessRunner.run(
+            php,
+            arguments: [
+                composer.path,
+                "require", "laravel/boost", "--dev", "--no-interaction", "--no-progress", "--no-ansi"
+            ],
+            currentDirectory: destination,
+            environment: managedEnvironment
+        )
+        guard result.status == 0 else {
+            throw ProjectCreationError.commandFailed(
+                result.output.isEmpty ? "Laravel Boost installation failed." : result.output
+            )
         }
     }
 
@@ -394,20 +379,16 @@ actor ProjectCreator {
             throw ProjectCreationError.commandFailed("Git is not available on this Mac.")
         }
 
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = git
-        process.currentDirectoryURL = destination
-        process.arguments = ["init"]
-        process.environment = managedEnvironment
-        process.standardOutput = output
-        process.standardError = output
-        try process.run()
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
+        let result = try ProcessRunner.run(
+            git,
+            arguments: ["init"],
+            currentDirectory: destination,
+            environment: managedEnvironment,
+            timeout: 30
+        )
+        guard result.status == 0 else {
             throw ProjectCreationError.commandFailed(
-                String(data: data, encoding: .utf8) ?? "Git repository initialization failed."
+                result.output.isEmpty ? "Git repository initialization failed." : result.output
             )
         }
     }

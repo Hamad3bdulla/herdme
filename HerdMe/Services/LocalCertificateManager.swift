@@ -210,17 +210,9 @@ final class LocalCertificateManager {
     }
 
     private func run(_ executable: URL, arguments: [String]) -> (status: Int32, output: String) {
-        let process = Process()
-        let pipe = Pipe()
-        process.executableURL = executable
-        process.arguments = arguments
-        process.standardOutput = pipe
-        process.standardError = pipe
         do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            return (process.terminationStatus, String(decoding: data, as: UTF8.self)
+            let result = try ProcessRunner.run(executable, arguments: arguments, timeout: 30)
+            return (result.status, result.output
                 .trimmingCharacters(in: .whitespacesAndNewlines))
         } catch {
             return (-1, error.localizedDescription)

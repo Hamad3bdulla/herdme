@@ -104,7 +104,8 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
                 await httpsServer.StartAsync(
                     definitions,
                     phpFastCgiPort: ports.Values.First(),
-                    preferredPort: 8_443,
+                    preferredPort: 443,
+                    fallbackPort: 8_443,
                     serverCertificate: certificate,
                     cancellationToken: cancellationToken
                 );

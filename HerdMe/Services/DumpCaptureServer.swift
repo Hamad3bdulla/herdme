@@ -3,8 +3,9 @@ import Network
 
 final class DumpCaptureServer: @unchecked Sendable {
     private let queue = DispatchQueue(label: "app.herdme.dumps", qos: .userInitiated)
+    private let sessionsLock = NSLock()
     private var listener: NWListener?
-    private var sessions: [DumpSession] = []
+    private var sessions: [UUID: DumpSession] = [:]
 
     var isRunning: Bool { listener != nil }
 
@@ -22,8 +23,16 @@ final class DumpCaptureServer: @unchecked Sendable {
         parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: networkPort)
         let listener = try NWListener(using: parameters)
         listener.newConnectionHandler = { [weak self] connection in
-            let session = DumpSession(connection: connection, onDump: onDump)
-            self?.sessions.append(session)
+            guard let self else { return }
+            let identifier = UUID()
+            let session = DumpSession(
+                connection: connection,
+                onDump: onDump,
+                onStop: { [weak self] in self?.removeSession(identifier) }
+            )
+            self.sessionsLock.lock()
+            self.sessions[identifier] = session
+            self.sessionsLock.unlock()
             session.start()
         }
         listener.stateUpdateHandler = { [weak self] state in
@@ -46,8 +55,39 @@ final class DumpCaptureServer: @unchecked Sendable {
     func stop() {
         listener?.cancel()
         listener = nil
-        sessions.forEach { $0.stop() }
+        sessionsLock.lock()
+        let activeSessions = Array(sessions.values)
         sessions.removeAll()
+        sessionsLock.unlock()
+        activeSessions.forEach { $0.stop() }
+    }
+
+    private func removeSession(_ identifier: UUID) {
+        sessionsLock.lock()
+        sessions.removeValue(forKey: identifier)
+        sessionsLock.unlock()
+    }
+}
+
+struct DumpLineBuffer {
+    static let maximumBytes = 4 * 1_024 * 1_024
+
+    private var data = Data()
+
+    mutating func append(_ chunk: Data) -> Bool {
+        guard chunk.count <= Self.maximumBytes,
+              data.count <= Self.maximumBytes - chunk.count else {
+            return false
+        }
+        data.append(chunk)
+        return true
+    }
+
+    mutating func nextLine() -> Data? {
+        guard let range = data.range(of: Data("\n".utf8)) else { return nil }
+        let line = data.subdata(in: data.startIndex..<range.lowerBound)
+        data.removeSubrange(data.startIndex..<range.upperBound)
+        return line
     }
 }
 
@@ -55,31 +95,50 @@ private final class DumpSession: @unchecked Sendable {
     private let connection: NWConnection
     private let queue = DispatchQueue(label: "app.herdme.dumps.session")
     private let onDump: @Sendable (CapturedDump) -> Void
-    private var buffer = Data()
+    private let onStop: @Sendable () -> Void
+    private var buffer = DumpLineBuffer()
 
-    init(connection: NWConnection, onDump: @escaping @Sendable (CapturedDump) -> Void) {
+    init(
+        connection: NWConnection,
+        onDump: @escaping @Sendable (CapturedDump) -> Void,
+        onStop: @escaping @Sendable () -> Void
+    ) {
         self.connection = connection
         self.onDump = onDump
+        self.onStop = onStop
     }
 
     func start() {
         connection.stateUpdateHandler = { [weak self] state in
-            if case .ready = state { self?.receive() }
+            switch state {
+            case .ready:
+                self?.receive()
+            case .failed, .cancelled:
+                self?.onStop()
+            default:
+                break
+            }
         }
         connection.start(queue: queue)
     }
 
     func stop() {
         connection.cancel()
+        onStop()
     }
 
     private func receive() {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 1_048_576) { [weak self] data, _, complete, error in
             guard let self else { return }
-            if let data { self.buffer.append(data) }
+            if let data, !self.buffer.append(data) {
+                self.connection.cancel()
+                self.onStop()
+                return
+            }
             self.processBuffer()
             if complete || error != nil {
                 self.connection.cancel()
+                self.onStop()
             } else {
                 self.receive()
             }
@@ -87,10 +146,7 @@ private final class DumpSession: @unchecked Sendable {
     }
 
     private func processBuffer() {
-        let delimiter = Data("\n".utf8)
-        while let range = buffer.range(of: delimiter) {
-            let lineData = buffer.subdata(in: buffer.startIndex..<range.lowerBound)
-            buffer.removeSubrange(buffer.startIndex..<range.upperBound)
+        while let lineData = buffer.nextLine() {
             let payload = (String(data: lineData, encoding: .utf8) ?? "")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if !payload.isEmpty { onDump(CapturedDump.decode(payload: payload)) }

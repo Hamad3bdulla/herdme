@@ -40,18 +40,10 @@ struct PHPRuntimeValidator: Sendable {
     ]
 
     func report(executable: URL) throws -> PHPExtensionReport {
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = executable
-        process.arguments = ["-m"]
-        process.standardOutput = output
-        process.standardError = output
-        try process.run()
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        let text = String(decoding: data, as: UTF8.self)
+        let result = try ProcessRunner.run(executable, arguments: ["-m"], timeout: 30)
+        let text = result.output
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard process.terminationStatus == 0 else {
+        guard result.status == 0 else {
             throw PHPRuntimeValidationError.inspectionFailed(text)
         }
 

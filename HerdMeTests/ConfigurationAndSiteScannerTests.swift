@@ -1052,6 +1052,56 @@ final class ConfigurationAndSiteScannerTests: XCTestCase {
         XCTAssertEqual(selected?.version, "v24.1.0")
     }
 
+    func testNodeChecksumSelectsOnlyTheExactArchive() {
+        let manifest = """
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  node-v24.1.0-darwin-x64.tar.gz
+        BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB *node-v24.1.0-darwin-arm64.tar.gz
+        """
+
+        XCTAssertEqual(
+            RuntimeInstaller.nodeChecksum(
+                for: "node-v24.1.0-darwin-arm64.tar.gz",
+                in: manifest
+            ),
+            String(repeating: "b", count: 64)
+        )
+        XCTAssertNil(RuntimeInstaller.nodeChecksum(for: "node-v24.1.0.tar.gz", in: manifest))
+        XCTAssertNil(RuntimeInstaller.nodeChecksum(
+            for: "node-v24.1.0-darwin-arm64.tar.gz",
+            in: "not-a-sha256  node-v24.1.0-darwin-arm64.tar.gz"
+        ))
+    }
+
+    func testNodeSHA256MatchesKnownFixture() {
+        XCTAssertEqual(
+            RuntimeInstaller.sha256(of: Data("HerdMe".utf8)),
+            "d0b0eeb2adcea192313b048f6b6cf8a04937c4e7f9cb98eda291aba97fc47296"
+        )
+    }
+
+    func testProcessRunnerDrainsOutputLargerThanAPipeBuffer() throws {
+        let result = try ProcessRunner.run(
+            URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "dd if=/dev/zero bs=1024 count=128 2>/dev/null"],
+            timeout: 5
+        )
+
+        XCTAssertEqual(result.status, 0)
+        XCTAssertEqual(result.output.utf8.count, 128 * 1_024)
+    }
+
+    func testProcessRunnerTerminatesCommandsAfterTimeout() {
+        XCTAssertThrowsError(try ProcessRunner.run(
+            URL(fileURLWithPath: "/bin/sleep"),
+            arguments: ["2"],
+            timeout: 0.05
+        )) { error in
+            guard case ProcessRunnerError.timedOut = error else {
+                return XCTFail("Expected a timeout, received \(error)")
+            }
+        }
+    }
+
     func testRuntimeUpdateComparisonOnlyAcceptsNewerStableVersions() {
         XCTAssertTrue(RuntimeInstaller.isNewerVersion("v22.24.0", than: "22.23.1"))
         XCTAssertFalse(RuntimeInstaller.isNewerVersion("22.23.1", than: "22.23.1"))
@@ -1338,6 +1388,49 @@ final class ConfigurationAndSiteScannerTests: XCTestCase {
 
         XCTAssertTrue(rendered.contains("value: 42"))
         XCTAssertTrue(rendered.contains("name: \"HerdMe\""))
+    }
+
+    func testPHPSerializationParserRejectsOversizedCollections() {
+        var parser = PHPSerializationParser(data: Data("a:10001:{}".utf8))
+
+        XCTAssertThrowsError(try parser.parse()) { error in
+            guard case PHPSerializationError.resourceLimit = error else {
+                return XCTFail("Expected the parser resource limit, received \(error)")
+            }
+        }
+    }
+
+    func testPHPSerializationParserRejectsExcessiveNesting() {
+        var serialized = "N;"
+        for _ in 0..<33 {
+            serialized = "a:1:{i:0;\(serialized)}"
+        }
+        var parser = PHPSerializationParser(data: Data(serialized.utf8))
+
+        XCTAssertThrowsError(try parser.parse()) { error in
+            guard case PHPSerializationError.resourceLimit = error else {
+                return XCTFail("Expected the parser resource limit, received \(error)")
+            }
+        }
+    }
+
+    func testSMTPMessageBufferRejectsMessagesAboveAdvertisedLimit() {
+        var buffer = SMTPMessageBuffer(maximumBytes: 32)
+        XCTAssertTrue(buffer.append("Subject: HerdMe"))
+        XCTAssertFalse(buffer.append(String(repeating: "x", count: 32)))
+        XCTAssertTrue(buffer.isTooLarge)
+
+        buffer.reset()
+        XCTAssertTrue(buffer.append("..dot-stuffed"))
+        XCTAssertEqual(buffer.rawMessage, ".dot-stuffed")
+    }
+
+    func testDumpLineBufferEnforcesConnectionLimitAndReturnsCompleteLines() throws {
+        var buffer = DumpLineBuffer()
+        XCTAssertTrue(buffer.append(Data("first\npartial".utf8)))
+        XCTAssertEqual(String(decoding: try XCTUnwrap(buffer.nextLine()), as: UTF8.self), "first")
+        XCTAssertNil(buffer.nextLine())
+        XCTAssertFalse(buffer.append(Data(repeating: 0x61, count: DumpLineBuffer.maximumBytes)))
     }
 
     func testRuntimeErrorsIdentifyTheRequestedRuntime() {

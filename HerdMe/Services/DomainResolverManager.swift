@@ -125,20 +125,13 @@ struct DomainResolverManager {
     }
 
     func isNetworkHelperRunning() -> Bool {
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        process.arguments = ["print", "system/" + Self.helperLabel]
-        process.standardOutput = output
-        process.standardError = Pipe()
         do {
-            try process.run()
-            process.waitUntilExit()
-            let text = String(
-                decoding: output.fileHandleForReading.readDataToEndOfFile(),
-                as: UTF8.self
+            let result = try ProcessRunner.run(
+                URL(fileURLWithPath: "/bin/launchctl"),
+                arguments: ["print", "system/" + Self.helperLabel],
+                timeout: 10
             )
-            return process.terminationStatus == 0 && text.contains("state = running")
+            return result.status == 0 && result.output.contains("state = running")
         } catch {
             return false
         }

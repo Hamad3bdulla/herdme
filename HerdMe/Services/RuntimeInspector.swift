@@ -63,19 +63,15 @@ struct RuntimeInspector {
     }
 
     private func commandOutput(executable: String, arguments: [String]) -> String? {
-        let process = Process()
-        let pipe = Pipe()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.standardOutput = pipe
-        process.standardError = Pipe()
         do {
-            try process.run()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return nil }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let value = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            return value?.isEmpty == false ? value : nil
+            let result = try ProcessRunner.run(
+                URL(fileURLWithPath: executable),
+                arguments: arguments,
+                timeout: 10
+            )
+            guard result.status == 0 else { return nil }
+            let value = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value.isEmpty ? nil : value
         } catch {
             return nil
         }

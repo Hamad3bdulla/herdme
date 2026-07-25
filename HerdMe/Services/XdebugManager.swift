@@ -291,17 +291,12 @@ actor XdebugManager {
         currentDirectory: URL? = nil,
         environment: [String: String]? = nil
     ) throws -> (status: Int32, output: String) {
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = executable
-        process.arguments = arguments
-        process.currentDirectoryURL = currentDirectory
-        process.environment = environment
-        process.standardOutput = output
-        process.standardError = output
-        try process.run()
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return (process.terminationStatus, String(decoding: data, as: UTF8.self))
+        let result = try ProcessRunner.run(
+            executable,
+            arguments: arguments,
+            currentDirectory: currentDirectory,
+            environment: environment
+        )
+        return (result.status, result.output)
     }
 }

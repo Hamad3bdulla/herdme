@@ -100,7 +100,7 @@ enum RuntimeInstallationError: LocalizedError {
     case archiveFailed(String)
     case runtimeNotInstalled(name: String, cycle: String)
     case packageManagerMissing
-    case integrityCheckFailed
+    case integrityCheckFailed(component: String)
     case commandFailed(String)
 
     var errorDescription: String? {
@@ -117,8 +117,8 @@ enum RuntimeInstallationError: LocalizedError {
             name + " " + cycle + " is not installed by HerdMe."
         case .packageManagerMissing:
             "Homebrew is required to install PHP on macOS."
-        case .integrityCheckFailed:
-            "The Composer installer did not match its official checksum."
+        case let .integrityCheckFailed(component):
+            component + " did not match its official checksum."
         case let .commandFailed(output):
             output.isEmpty ? "The runtime package manager failed." : output
         }
@@ -157,9 +157,24 @@ actor RuntimeInstaller {
             let platform = archiveKey.hasPrefix("osx-arm64") ? "darwin-arm64" : "darwin-x64"
             let archiveName = "node-\(release.version)-\(platform).tar.gz"
             let downloadURL = URL(string: "https://nodejs.org/dist/\(release.version)/\(archiveName)")!
-            let (temporaryArchive, downloadResponse) = try await URLSession.shared.download(from: downloadURL)
-            guard (downloadResponse as? HTTPURLResponse)?.statusCode == 200 else {
+            let checksumsURL = URL(string: "https://nodejs.org/dist/\(release.version)/SHASUMS256.txt")!
+            async let archiveRequest = URLSession.shared.download(from: downloadURL)
+            async let checksumsRequest = URLSession.shared.data(from: checksumsURL)
+            let ((temporaryArchive, downloadResponse), (checksumsData, checksumsResponse)) = try await (
+                archiveRequest,
+                checksumsRequest
+            )
+            guard (downloadResponse as? HTTPURLResponse)?.statusCode == 200,
+                  (checksumsResponse as? HTTPURLResponse)?.statusCode == 200,
+                  let checksums = String(data: checksumsData, encoding: .utf8),
+                  let expectedChecksum = Self.nodeChecksum(
+                      for: archiveName,
+                      in: checksums
+                  ) else {
                 throw RuntimeInstallationError.invalidResponse
+            }
+            guard try Self.sha256(of: temporaryArchive) == expectedChecksum else {
+                throw RuntimeInstallationError.integrityCheckFailed(component: "Node.js archive")
             }
             try unpack(archive: temporaryArchive, into: staging)
             try fileManager.moveItem(at: staging, to: destination)
@@ -507,6 +522,26 @@ actor RuntimeInstaller {
         }
     }
 
+    nonisolated static func nodeChecksum(for archiveName: String, in manifest: String) -> String? {
+        for line in manifest.split(whereSeparator: \Character.isNewline) {
+            let fields = line.split(whereSeparator: \Character.isWhitespace)
+            guard fields.count == 2 else { continue }
+            let listedName = fields[1].hasPrefix("*") ? fields[1].dropFirst() : fields[1][...]
+            let checksum = String(fields[0]).lowercased()
+            guard listedName == archiveName,
+                  checksum.count == 64,
+                  checksum.allSatisfy({ $0.isHexDigit }) else {
+                continue
+            }
+            return checksum
+        }
+        return nil
+    }
+
+    nonisolated static func sha256(of data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
     nonisolated static func phpVersions(
         fromHomebrewInfoOutput output: String,
         cycles: Set<String>
@@ -637,7 +672,7 @@ actor RuntimeInstaller {
             .map { String(format: "%02x", $0) }
             .joined()
         guard actualSignature.caseInsensitiveCompare(expectedSignature) == .orderedSame else {
-            throw RuntimeInstallationError.integrityCheckFailed
+            throw RuntimeInstallationError.integrityCheckFailed(component: "Composer installer")
         }
 
         let managedBin = rootURL.appendingPathComponent("bin", isDirectory: true)
@@ -685,6 +720,16 @@ actor RuntimeInstaller {
 #endif
     }
 
+    private nonisolated static func sha256(of fileURL: URL) throws -> String {
+        let handle = try FileHandle(forReadingFrom: fileURL)
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while let chunk = try handle.read(upToCount: 1_048_576), !chunk.isEmpty {
+            hasher.update(data: chunk)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
     private func brewURL() -> URL? {
         ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
             .map { URL(fileURLWithPath: $0) }
@@ -708,31 +753,22 @@ actor RuntimeInstaller {
         arguments: [String],
         environment: [String: String]? = nil
     ) throws -> (status: Int32, output: String) {
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = executable
-        process.arguments = arguments
-        process.environment = environment
-        process.standardOutput = output
-        process.standardError = output
-        try process.run()
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return (process.terminationStatus, String(data: data, encoding: .utf8) ?? "")
+        let result = try ProcessRunner.run(
+            executable,
+            arguments: arguments,
+            environment: environment
+        )
+        return (result.status, result.output)
     }
 
     private func unpack(archive: URL, into destination: URL) throws {
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
-        process.arguments = ["-xzf", archive.path, "-C", destination.path, "--strip-components", "1"]
-        process.standardOutput = output
-        process.standardError = output
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            let data = output.fileHandleForReading.readDataToEndOfFile()
-            throw RuntimeInstallationError.archiveFailed(String(data: data, encoding: .utf8) ?? "")
+        let result = try ProcessRunner.run(
+            URL(fileURLWithPath: "/usr/bin/tar"),
+            arguments: ["-xzf", archive.path, "-C", destination.path, "--strip-components", "1"],
+            timeout: 2 * 60
+        )
+        guard result.status == 0 else {
+            throw RuntimeInstallationError.archiveFailed(result.output)
         }
     }
 }

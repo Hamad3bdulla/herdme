@@ -32,7 +32,8 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     public Task<int> StartAsync(
         IEnumerable<LocalSiteDefinition> sites,
         int phpFastCgiPort,
-        int preferredPort = 8_080,
+        int preferredPort = 80,
+        int fallbackPort = 8_080,
         X509Certificate2? serverCertificate = null,
         CancellationToken cancellationToken = default
     )
@@ -45,7 +46,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         );
         if (normalized.Count == 0) throw new InvalidOperationException("No local sites were provided.");
 
-        var selectedPort = AvailablePort(preferredPort);
+        var selectedPort = AvailablePort(preferredPort, fallbackPort);
         routes = normalized;
         fastCgiPort = phpFastCgiPort;
         certificate = serverCertificate;
@@ -515,25 +516,33 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         return host.Trim().TrimEnd('.').ToLowerInvariant();
     }
 
-    private static int AvailablePort(int preferredPort)
+    private static int AvailablePort(int preferredPort, int fallbackPort)
     {
-        for (var port = preferredPort; port < preferredPort + 100; port++)
+        if (CanListen(preferredPort)) return preferredPort;
+        for (var port = fallbackPort; port < fallbackPort + 100; port++)
         {
-            var listener = new TcpListener(IPAddress.Loopback, port);
-            try
-            {
-                listener.Start();
-                return port;
-            }
-            catch (SocketException)
-            {
-            }
-            finally
-            {
-                listener.Stop();
-            }
+            if (port != preferredPort && CanListen(port)) return port;
         }
         throw new InvalidOperationException("No local HTTP port is available.");
+    }
+
+    private static bool CanListen(int port)
+    {
+        if (port is <= 0 or > 65_535) return false;
+        var listener = new TcpListener(IPAddress.Loopback, port);
+        try
+        {
+            listener.Start();
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
+        finally
+        {
+            listener.Stop();
+        }
     }
 
     private static int IndexOf(ReadOnlySpan<byte> data, ReadOnlySpan<byte> value)

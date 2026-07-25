@@ -105,7 +105,7 @@ The tracked parity target and Windows architecture are in
 
 ## Validation
 
-The current macOS suite executes 78 tests: 77 pass and the optional live
+The current macOS suite executes 86 tests: 85 pass and the optional live
 Laravel-project test is skipped unless a project path or temporary-creation flag
 is supplied. A live run created Laravel 13.22.0 with the React starter kit
 through HerdMe's managed installer, installed its npm packages, built and

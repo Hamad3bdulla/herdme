@@ -21,18 +21,22 @@ final class HerdMeApplicationDelegate: NSObject, NSApplicationDelegate {
 struct HerdMeApp: App {
     @NSApplicationDelegateAdaptor(HerdMeApplicationDelegate.self) private var applicationDelegate
     @StateObject private var model: AppModel
-    private let singleInstanceGuard: SingleInstanceGuard
+    private let singleInstanceGuard: SingleInstanceGuard?
 
     init() {
         let configurationStore = ConfigurationStore()
-        let guardInstance = SingleInstanceGuard(
-            lockURL: configurationStore.rootURL.appendingPathComponent("herdme.lock")
-        )
-        guard guardInstance.acquired else {
-            Self.activateExistingInstance()
-            exit(EXIT_SUCCESS)
+        if Self.isRunningUnitTests {
+            singleInstanceGuard = nil
+        } else {
+            let guardInstance = SingleInstanceGuard(
+                lockURL: configurationStore.rootURL.appendingPathComponent("herdme.lock")
+            )
+            guard guardInstance.acquired else {
+                Self.activateExistingInstance()
+                exit(EXIT_SUCCESS)
+            }
+            singleInstanceGuard = guardInstance
         }
-        singleInstanceGuard = guardInstance
         _model = StateObject(wrappedValue: AppModel(configurationStore: configurationStore))
     }
 
@@ -77,5 +81,11 @@ struct HerdMeApp: App {
         NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
             .first { $0.processIdentifier != getpid() }?
             .activate(options: [.activateAllWindows])
+    }
+
+    private static var isRunningUnitTests: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["XCTestConfigurationFilePath"] != nil
+            || environment["XCTestBundlePath"] != nil
     }
 }

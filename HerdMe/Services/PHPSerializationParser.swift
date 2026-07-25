@@ -65,25 +65,38 @@ indirect enum PHPSerializedValue: Sendable {
 
 enum PHPSerializationError: LocalizedError {
     case malformed
+    case resourceLimit
     case unsupported(Character)
 
     var errorDescription: String? {
         switch self {
         case .malformed: "Malformed PHP serialized value."
+        case .resourceLimit: "The PHP serialized value exceeds HerdMe's safety limits."
         case let .unsupported(type): "Unsupported PHP serialized type: " + String(type)
         }
     }
 }
 
 struct PHPSerializationParser {
+    private static let maximumInputBytes = 4 * 1_024 * 1_024
+    private static let maximumDepth = 32
+    private static let maximumCollectionItems = 10_000
+
     private let bytes: [UInt8]
     private var index = 0
+    private var remainingCollectionItems = Self.maximumCollectionItems
 
     init(data: Data) {
         bytes = Array(data)
     }
 
     mutating func parse() throws -> PHPSerializedValue {
+        guard bytes.count <= Self.maximumInputBytes else { throw PHPSerializationError.resourceLimit }
+        return try parseValue(depth: 0)
+    }
+
+    private mutating func parseValue(depth: Int) throws -> PHPSerializedValue {
+        guard depth <= Self.maximumDepth else { throw PHPSerializationError.resourceLimit }
         guard index < bytes.count else { throw PHPSerializationError.malformed }
         let marker = Character(UnicodeScalar(bytes[index]))
         index += 1
@@ -107,11 +120,15 @@ struct PHPSerializationParser {
             return .string(try readString())
         case "a":
             try expect(":")
-            guard let count = Int(try readNumber(until: ":")) else { throw PHPSerializationError.malformed }
+            guard let count = Int(try readNumber(until: ":")), count >= 0 else {
+                throw PHPSerializationError.malformed
+            }
+            try reserveCollectionItems(count)
             try expect("{")
             var values: [(PHPSerializedValue, PHPSerializedValue)] = []
+            values.reserveCapacity(count)
             for _ in 0..<count {
-                values.append((try parse(), try parse()))
+                values.append((try parseValue(depth: depth + 1), try parseValue(depth: depth + 1)))
             }
             try expect("}")
             return .array(values)
@@ -122,11 +139,15 @@ struct PHPSerializationParser {
             let name = try readStringBytes(length: nameLength)
             try expect("\"")
             try expect(":")
-            guard let count = Int(try readNumber(until: ":")) else { throw PHPSerializationError.malformed }
+            guard let count = Int(try readNumber(until: ":")), count >= 0 else {
+                throw PHPSerializationError.malformed
+            }
+            try reserveCollectionItems(count)
             try expect("{")
             var properties: [(PHPSerializedValue, PHPSerializedValue)] = []
+            properties.reserveCapacity(count)
             for _ in 0..<count {
-                properties.append((try parse(), try parse()))
+                properties.append((try parseValue(depth: depth + 1), try parseValue(depth: depth + 1)))
             }
             try expect("}")
             return .object(name: name, properties: properties)
@@ -150,7 +171,7 @@ struct PHPSerializationParser {
     }
 
     private mutating func readStringBytes(length: Int) throws -> String {
-        guard length >= 0, index + length <= bytes.count else { throw PHPSerializationError.malformed }
+        guard length >= 0, length <= bytes.count - index else { throw PHPSerializationError.malformed }
         let value = String(decoding: bytes[index..<(index + length)], as: UTF8.self)
         index += length
         return value
@@ -172,5 +193,10 @@ struct PHPSerializationParser {
             throw PHPSerializationError.malformed
         }
         index += 1
+    }
+
+    private mutating func reserveCollectionItems(_ count: Int) throws {
+        guard count <= remainingCollectionItems else { throw PHPSerializationError.resourceLimit }
+        remainingCollectionItems -= count
     }
 }
