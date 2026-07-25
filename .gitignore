@@ -1,0 +1,13 @@
+.DS_Store
+build/
+Core/build/
+DerivedData/
+dist/
+*.xcuserstate
+xcuserdata/
+HerdMe.xcodeproj/
+Windows/HerdMe.Windows/bin/
+Windows/HerdMe.Windows/obj/
+Windows/HerdMe.Windows.ContractTests/bin/
+Windows/HerdMe.Windows.ContractTests/obj/
+Windows/HerdMe.Windows/Runtime/

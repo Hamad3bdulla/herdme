@@ -1,0 +1,197 @@
+import AppKit
+import Foundation
+
+struct MailMIMEContent: Equatable {
+    var plainText: String?
+    var html: String?
+}
+
+enum MailMIMEParser {
+    static func parse(_ raw: String) -> MailMIMEContent {
+        parsePart(raw.replacingOccurrences(of: "\r\n", with: "\n"))
+    }
+
+    static func decodedHeader(_ value: String) -> String {
+        let pattern = #"=\?([^?]+)\?([bBqQ])\?([^?]*)\?="#
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return value }
+        let source = value as NSString
+        let matches = expression.matches(
+            in: value,
+            range: NSRange(location: 0, length: source.length)
+        )
+        guard !matches.isEmpty else { return value }
+        var output = value
+        for match in matches.reversed() {
+            guard let range = Range(match.range, in: output),
+                  let charsetRange = Range(match.range(at: 1), in: value),
+                  let encodingRange = Range(match.range(at: 2), in: value),
+                  let payloadRange = Range(match.range(at: 3), in: value) else { continue }
+            let charset = String(value[charsetRange])
+            let encoding = String(value[encodingRange]).lowercased()
+            let payload = String(value[payloadRange])
+            let data = encoding == "b"
+                ? Data(base64Encoded: payload, options: .ignoreUnknownCharacters)
+                : decodeQuotedPrintable(payload.replacingOccurrences(of: "_", with: " "))
+            guard let data, let decoded = decode(data, charset: charset) else { continue }
+            output.replaceSubrange(range, with: decoded)
+        }
+        return output.replacingOccurrences(of: "?= =?", with: "?==?")
+    }
+
+    static func plainText(fromHTML html: String) -> String {
+        guard let data = html.data(using: .utf8),
+              let attributed = try? NSAttributedString(
+                data: data,
+                options: [
+                    .documentType: NSAttributedString.DocumentType.html,
+                    .characterEncoding: String.Encoding.utf8.rawValue
+                ],
+                documentAttributes: nil
+              ) else {
+            return html.replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
+        }
+        return attributed.string
+            .replacingOccurrences(of: "[ \t]+", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func safeHTMLDocument(_ html: String) -> String {
+        let policy = "default-src 'none'; img-src data: cid:; style-src 'unsafe-inline'; font-src data:"
+        return """
+        <!doctype html><html><head><meta charset="utf-8">
+        <meta http-equiv="Content-Security-Policy" content="\(policy)">
+        <meta name="color-scheme" content="light dark">
+        <style>body{font:14px -apple-system;margin:18px;line-height:1.45;overflow-wrap:anywhere}img{max-width:100%;height:auto}</style>
+        </head><body>\(html)</body></html>
+        """
+    }
+
+    static func escapedHTML(_ text: String) -> String {
+        text.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&#39;")
+    }
+
+    private static func parsePart(_ raw: String) -> MailMIMEContent {
+        let (headers, body) = split(raw)
+        let contentType = headers["content-type"] ?? "text/plain; charset=utf-8"
+        let mediaType = contentType.split(separator: ";", maxSplits: 1).first?
+            .trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "text/plain"
+        if mediaType.hasPrefix("multipart/"), let boundary = parameter("boundary", in: contentType) {
+            var content = MailMIMEContent()
+            for part in multipartParts(body, boundary: boundary) {
+                let parsed = parsePart(part)
+                if content.plainText == nil, let plain = parsed.plainText { content.plainText = plain }
+                if content.html == nil, let html = parsed.html { content.html = html }
+            }
+            return content
+        }
+        if (headers["content-disposition"] ?? "").lowercased().hasPrefix("attachment") {
+            return MailMIMEContent()
+        }
+        guard mediaType == "text/plain" || mediaType == "text/html" else {
+            return MailMIMEContent()
+        }
+        let transferEncoding = (headers["content-transfer-encoding"] ?? "").lowercased()
+        let data: Data
+        if transferEncoding == "base64" {
+            data = Data(base64Encoded: body, options: .ignoreUnknownCharacters) ?? Data()
+        } else if transferEncoding == "quoted-printable" {
+            data = decodeQuotedPrintable(body)
+        } else {
+            data = Data(body.utf8)
+        }
+        let decoded = decode(data, charset: parameter("charset", in: contentType) ?? "utf-8")
+            ?? String(decoding: data, as: UTF8.self)
+        return mediaType == "text/html"
+            ? MailMIMEContent(html: decoded)
+            : MailMIMEContent(plainText: decoded)
+    }
+
+    private static func split(_ raw: String) -> ([String: String], String) {
+        let separator = raw.range(of: "\n\n")
+        let headerText = separator.map { String(raw[..<$0.lowerBound]) } ?? raw
+        let body = separator.map { String(raw[$0.upperBound...]) } ?? ""
+        var headers: [String: String] = [:]
+        var currentKey: String?
+        for line in headerText.components(separatedBy: "\n") {
+            if line.first?.isWhitespace == true, let currentKey {
+                headers[currentKey, default: ""] += " " + line.trimmingCharacters(in: .whitespaces)
+                continue
+            }
+            guard let colon = line.firstIndex(of: ":") else { continue }
+            let key = line[..<colon].trimmingCharacters(in: .whitespaces).lowercased()
+            headers[key] = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            currentKey = key
+        }
+        return (headers, body)
+    }
+
+    private static func parameter(_ name: String, in header: String) -> String? {
+        let escaped = NSRegularExpression.escapedPattern(for: name)
+        let pattern = "(?:^|;)\\s*\(escaped)\\s*=\\s*(?:\"([^\"]*)\"|([^;\\s]*))"
+        guard let expression = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+              let match = expression.firstMatch(
+                in: header,
+                range: NSRange(header.startIndex..., in: header)
+              ) else { return nil }
+        for index in 1...2 where match.range(at: index).location != NSNotFound {
+            if let range = Range(match.range(at: index), in: header) { return String(header[range]) }
+        }
+        return nil
+    }
+
+    private static func multipartParts(_ body: String, boundary: String) -> [String] {
+        let marker = "--" + boundary
+        return body.components(separatedBy: marker).dropFirst().compactMap { section in
+            var value = section
+            if value.hasPrefix("--") { return nil }
+            value = value.trimmingCharacters(in: .newlines)
+            return value.isEmpty ? nil : value
+        }
+    }
+
+    private static func decodeQuotedPrintable(_ value: String) -> Data {
+        let bytes = Array(value.utf8)
+        var output = Data()
+        var index = 0
+        while index < bytes.count {
+            if bytes[index] == 61 {
+                if index + 1 < bytes.count, bytes[index + 1] == 10 {
+                    index += 2
+                    continue
+                }
+                if index + 2 < bytes.count,
+                   let high = hex(bytes[index + 1]), let low = hex(bytes[index + 2]) {
+                    output.append(high << 4 | low)
+                    index += 3
+                    continue
+                }
+            }
+            output.append(bytes[index])
+            index += 1
+        }
+        return output
+    }
+
+    private static func decode(_ data: Data, charset: String) -> String? {
+        switch charset.lowercased().replacingOccurrences(of: "_", with: "-") {
+        case "utf-8", "utf8", "us-ascii": String(data: data, encoding: .utf8)
+        case "iso-8859-1", "latin1", "latin-1": String(data: data, encoding: .isoLatin1)
+        case "windows-1252", "cp1252": String(data: data, encoding: .windowsCP1252)
+        default: String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1)
+        }
+    }
+
+    private static func hex(_ byte: UInt8) -> UInt8? {
+        switch byte {
+        case 48...57: byte - 48
+        case 65...70: byte - 55
+        case 97...102: byte - 87
+        default: nil
+        }
+    }
+}

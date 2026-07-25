@@ -1,0 +1,55 @@
+<Application
+    x:Class="HerdMe.Windows.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:tb="using:H.NotifyIcon">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <XamlUICommand x:Key="OpenHerdMeCommand" Label="Open HerdMe">
+                <XamlUICommand.IconSource>
+                    <SymbolIconSource Symbol="OpenPane" />
+                </XamlUICommand.IconSource>
+            </XamlUICommand>
+            <XamlUICommand x:Key="QuitHerdMeCommand" Label="Quit HerdMe">
+                <XamlUICommand.IconSource>
+                    <SymbolIconSource Symbol="ClosePane" />
+                </XamlUICommand.IconSource>
+            </XamlUICommand>
+            <XamlUICommand x:Key="StartAllCommand" Label="Start all">
+                <XamlUICommand.IconSource>
+                    <SymbolIconSource Symbol="Play" />
+                </XamlUICommand.IconSource>
+            </XamlUICommand>
+            <XamlUICommand x:Key="StopAllCommand" Label="Stop all">
+                <XamlUICommand.IconSource>
+                    <SymbolIconSource Symbol="Stop" />
+                </XamlUICommand.IconSource>
+            </XamlUICommand>
+            <tb:TaskbarIcon
+                x:Key="TrayIcon"
+                Visibility="Visible"
+                ToolTipText="HerdMe"
+                ContextMenuMode="SecondWindow"
+                LeftClickCommand="{StaticResource OpenHerdMeCommand}"
+                NoLeftClickDelay="True">
+                <tb:TaskbarIcon.GeneratedIcon>
+                    <tb:GeneratedIcon Text="H" Foreground="#E31B23" />
+                </tb:TaskbarIcon.GeneratedIcon>
+                <tb:TaskbarIcon.ContextFlyout>
+                    <MenuFlyout AreOpenCloseAnimationsEnabled="False">
+                        <MenuFlyoutItem Command="{StaticResource OpenHerdMeCommand}" Text="Open HerdMe" />
+                        <MenuFlyoutSeparator />
+                        <MenuFlyoutItem Command="{StaticResource StartAllCommand}" Text="Start all" />
+                        <MenuFlyoutItem Command="{StaticResource StopAllCommand}" Text="Stop all" />
+                        <MenuFlyoutSeparator />
+                        <MenuFlyoutItem Command="{StaticResource QuitHerdMeCommand}" Text="Quit HerdMe" />
+                    </MenuFlyout>
+                </tb:TaskbarIcon.ContextFlyout>
+            </tb:TaskbarIcon>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

@@ -1,0 +1,69 @@
+<Page
+    x:Class="HerdMe.Windows.Pages.LogsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:HerdMe.Windows.Models"
+    Loaded="Page_Loaded"
+    Unloaded="Page_Unloaded">
+    <Grid Padding="32" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid>
+            <TextBlock Text="Logs" Style="{StaticResource TitleTextBlockStyle}" />
+            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                <ToggleSwitch
+                    x:Name="LiveRefreshToggle"
+                    IsOn="True"
+                    OnContent="Live"
+                    OffContent="Paused" />
+                <TextBox
+                    x:Name="SearchBox"
+                    Width="220"
+                    PlaceholderText="Search current log"
+                    TextChanged="SearchBox_TextChanged" />
+                <Button Click="OpenFolder_Click" ToolTipService.ToolTip="Open log folder">
+                    <SymbolIcon Symbol="Folder" />
+                </Button>
+                <Button Click="Refresh_Click" ToolTipService.ToolTip="Refresh logs">
+                    <SymbolIcon Symbol="Refresh" />
+                </Button>
+            </StackPanel>
+        </Grid>
+        <Grid Grid.Row="1" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12">
+                <ListView x:Name="LogList" ItemsSource="{x:Bind Logs}" SelectionChanged="LogList_SelectionChanged">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="models:LogFileRecord">
+                            <Grid Padding="6" ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="1" Text="{x:Bind SizeText}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Border>
+            <Border Grid.Column="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock x:Name="LogTitleText" Text="Select a log" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <ScrollViewer Grid.Row="1">
+                        <TextBlock x:Name="LogContentText" FontFamily="Consolas" FontSize="13" TextWrapping="NoWrap" IsTextSelectionEnabled="True" />
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

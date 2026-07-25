@@ -1,0 +1,11 @@
+{
+  "releases": [
+    {
+      "version": "0.1.0",
+      "build": 1,
+      "channel": "stable",
+      "notes": "Initial open-source development release.",
+      "downloadURL": null
+    }
+  ]
+}

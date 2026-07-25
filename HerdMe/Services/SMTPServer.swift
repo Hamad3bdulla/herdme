@@ -1,0 +1,163 @@
+import Foundation
+import Network
+
+final class SMTPServer: @unchecked Sendable {
+    private let queue = DispatchQueue(label: "app.herdme.smtp", qos: .userInitiated)
+    private var listener: NWListener?
+    private var sessions: [SMTPSession] = []
+
+    var isRunning: Bool { listener != nil }
+
+    func start(
+        port: Int,
+        onStateChange: @escaping @Sendable (Bool, String?) -> Void,
+        onMessage: @escaping @Sendable (CapturedMail) -> Void
+    ) throws {
+        guard listener == nil else { return }
+        guard let rawPort = UInt16(exactly: port), rawPort > 0,
+              let networkPort = NWEndpoint.Port(rawValue: rawPort) else {
+            throw LocalListenerError.invalidPort(service: "SMTP")
+        }
+        let parameters = NWParameters.tcp
+        parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: networkPort)
+        let listener = try NWListener(using: parameters)
+        listener.newConnectionHandler = { [weak self] connection in
+            let session = SMTPSession(connection: connection, onMessage: onMessage)
+            self?.sessions.append(session)
+            session.start()
+        }
+        listener.stateUpdateHandler = { [weak self] state in
+            switch state {
+            case .ready:
+                onStateChange(true, nil)
+            case let .failed(error):
+                NSLog("HerdMe SMTP listener failed: %@", error.localizedDescription)
+                self?.listener = nil
+                onStateChange(false, error.localizedDescription)
+            case .cancelled:
+                onStateChange(false, nil)
+            default:
+                break
+            }
+        }
+        listener.start(queue: queue)
+        self.listener = listener
+    }
+
+    func stop() {
+        listener?.cancel()
+        listener = nil
+        sessions.forEach { $0.stop() }
+        sessions.removeAll()
+    }
+}
+
+private final class SMTPSession: @unchecked Sendable {
+    private let connection: NWConnection
+    private let queue = DispatchQueue(label: "app.herdme.smtp.session")
+    private let onMessage: @Sendable (CapturedMail) -> Void
+    private var buffer = Data()
+    private var sender = "Unknown sender"
+    private var recipients: [String] = []
+    private var dataLines: [String] = []
+    private var readingData = false
+
+    init(connection: NWConnection, onMessage: @escaping @Sendable (CapturedMail) -> Void) {
+        self.connection = connection
+        self.onMessage = onMessage
+    }
+
+    func start() {
+        connection.stateUpdateHandler = { [weak self] state in
+            guard case .ready = state else { return }
+            self?.send("220 HerdMe SMTP ready\r\n")
+            self?.receive()
+        }
+        connection.start(queue: queue)
+    }
+
+    func stop() {
+        connection.cancel()
+    }
+
+    private func receive() {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, complete, error in
+            guard let self else { return }
+            if let data { self.buffer.append(data) }
+            self.processBuffer()
+            if complete || error != nil {
+                self.connection.cancel()
+            } else {
+                self.receive()
+            }
+        }
+    }
+
+    private func processBuffer() {
+        let delimiter = Data("\r\n".utf8)
+        while let range = buffer.range(of: delimiter) {
+            let lineData = buffer.subdata(in: buffer.startIndex..<range.lowerBound)
+            buffer.removeSubrange(buffer.startIndex..<range.upperBound)
+            handle(String(data: lineData, encoding: .utf8) ?? "")
+        }
+    }
+
+    private func handle(_ line: String) {
+        if readingData {
+            if line == "." {
+                readingData = false
+                let message = CapturedMail.parse(
+                    sender: sender,
+                    recipients: recipients,
+                    raw: dataLines.map { $0.hasPrefix("..") ? String($0.dropFirst()) : $0 }.joined(separator: "\r\n")
+                )
+                onMessage(message)
+                dataLines.removeAll()
+                send("250 2.0.0 Message accepted\r\n")
+            } else {
+                dataLines.append(line)
+            }
+            return
+        }
+
+        let uppercased = line.uppercased()
+        if uppercased.hasPrefix("EHLO") || uppercased.hasPrefix("HELO") {
+            send("250-HerdMe\r\n250-8BITMIME\r\n250 SIZE 52428800\r\n")
+        } else if uppercased.hasPrefix("MAIL FROM:") {
+            sender = Self.address(from: line)
+            recipients.removeAll()
+            send("250 2.1.0 Sender accepted\r\n")
+        } else if uppercased.hasPrefix("RCPT TO:") {
+            recipients.append(Self.address(from: line))
+            send("250 2.1.5 Recipient accepted\r\n")
+        } else if uppercased == "DATA" {
+            readingData = true
+            dataLines.removeAll()
+            send("354 End data with <CR><LF>.<CR><LF>\r\n")
+        } else if uppercased == "RSET" {
+            sender = "Unknown sender"
+            recipients.removeAll()
+            dataLines.removeAll()
+            readingData = false
+            send("250 2.0.0 Reset\r\n")
+        } else if uppercased == "NOOP" {
+            send("250 2.0.0 OK\r\n")
+        } else if uppercased == "QUIT" {
+            connection.send(content: Data("221 2.0.0 Bye\r\n".utf8), completion: .contentProcessed { [weak self] _ in
+                self?.connection.cancel()
+            })
+        } else {
+            send("502 5.5.1 Command not implemented\r\n")
+        }
+    }
+
+    private func send(_ text: String) {
+        connection.send(content: Data(text.utf8), completion: .contentProcessed { _ in })
+    }
+
+    private static func address(from command: String) -> String {
+        guard let colon = command.firstIndex(of: ":") else { return command }
+        return command[command.index(after: colon)...]
+            .trimmingCharacters(in: CharacterSet(charactersIn: " <>"))
+    }
+}

@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../HerdMe.Windows/Models/CoreModels.cs" Link="Models/CoreModels.cs" />
+    <Compile Include="../HerdMe.Windows/Models/DumpModels.cs" Link="Models/DumpModels.cs" />
+    <Compile Include="../HerdMe.Windows/Models/LogModels.cs" Link="Models/LogModels.cs" />
+    <Compile Include="../HerdMe.Windows/Models/MailModels.cs" Link="Models/MailModels.cs" />
+    <Compile Include="../HerdMe.Windows/Models/ManagedServiceModels.cs" Link="Models/ManagedServiceModels.cs" />
+    <Compile Include="../HerdMe.Windows/Models/NodeRuntimeModels.cs" Link="Models/NodeRuntimeModels.cs" />
+    <Compile Include="../HerdMe.Windows/Models/PhpRuntimeModels.cs" Link="Models/PhpRuntimeModels.cs" />
+    <Compile Include="../HerdMe.Windows/Models/ProjectCreationModels.cs" Link="Models/ProjectCreationModels.cs" />
+    <Compile Include="../HerdMe.Windows/Models/SiteSettingsModels.cs" Link="Models/SiteSettingsModels.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ComposerToolManager.cs" Link="Services/ComposerToolManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/MailMimeParser.cs" Link="Services/MailMimeParser.cs" />
+    <Compile Include="../HerdMe.Windows/Services/MailCaptureService.cs" Link="Services/MailCaptureService.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ServicePackageInstaller.cs" Link="Services/ServicePackageInstaller.cs" />
+    <Compile Include="../HerdMe.Windows/Services/WindowsJobObject.cs" Link="Services/WindowsJobObject.cs" />
+    <Compile Include="../HerdMe.Windows/Services/WindowsServiceManager.cs" Link="Services/WindowsServiceManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/DumpCaptureService.cs" Link="Services/DumpCaptureService.cs" />
+    <Compile Include="../HerdMe.Windows/Services/FastCgiClient.cs" Link="Services/FastCgiClient.cs" />
+    <Compile Include="../HerdMe.Windows/Services/LaravelProjectCreator.cs" Link="Services/LaravelProjectCreator.cs" />
+    <Compile Include="../HerdMe.Windows/Services/LocalHttpSiteServer.cs" Link="Services/LocalHttpSiteServer.cs" />
+    <Compile Include="../HerdMe.Windows/Services/NodeRuntimeInstaller.cs" Link="Services/NodeRuntimeInstaller.cs" />
+    <Compile Include="../HerdMe.Windows/Services/PhpFastCgiProcess.cs" Link="Services/PhpFastCgiProcess.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SiteConfigurationStore.cs" Link="Services/SiteConfigurationStore.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SitePresentation.cs" Link="Services/SitePresentation.cs" />
+    <Compile Include="../HerdMe.Windows/Services/LogPresentation.cs" Link="Services/LogPresentation.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SiteRuntimeStore.cs" Link="Services/SiteRuntimeStore.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SingleInstanceCoordinator.cs" Link="Services/SingleInstanceCoordinator.cs" />
+    <Compile Include="../HerdMe.Windows/Services/WindowsHostsManager.cs" Link="Services/WindowsHostsManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/AppUpdateManager.cs" Link="Services/AppUpdateManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/CoreClient.cs" Link="Services/CoreClient.cs" />
+    <Compile Include="../HerdMe.Windows/Services/PhpRuntimeInstaller.cs" Link="Services/PhpRuntimeInstaller.cs" />
+    <Compile Include="../HerdMe.Windows/Services/PhpRuntimePolicy.cs" Link="Services/PhpRuntimePolicy.cs" />
+    <Compile Include="../HerdMe.Windows/Services/RuntimeVersionComparison.cs" Link="Services/RuntimeVersionComparison.cs" />
+    <Compile Include="../HerdMe.Windows/Services/WindowsCertificateManager.cs" Link="Services/WindowsCertificateManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/WindowsLocalEnvironment.cs" Link="Services/WindowsLocalEnvironment.cs" />
+    <Compile Include="../HerdMe.Windows/Services/WindowsStartupManager.cs" Link="Services/WindowsStartupManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/XdebugManager.cs" Link="Services/XdebugManager.cs" />
+  </ItemGroup>
+</Project>

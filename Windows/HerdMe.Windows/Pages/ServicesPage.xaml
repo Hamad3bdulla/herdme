@@ -1,0 +1,154 @@
+<Page
+    x:Class="HerdMe.Windows.Pages.ServicesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:HerdMe.Windows.Models"
+    Loaded="Page_Loaded">
+    <Grid Padding="32" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <StackPanel>
+                <TextBlock Text="Services" Style="{StaticResource TitleTextBlockStyle}" />
+                <TextBlock Text="Checksum-verified open-source Windows service runtimes" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                <ProgressRing x:Name="OperationProgress" Width="18" Height="18" />
+                <TextBlock x:Name="OperationStatusText" VerticalAlignment="Center" />
+                <Button Click="Refresh_Click" ToolTipService.ToolTip="Refresh service status">
+                    <SymbolIcon Symbol="Refresh" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
+            <Grid ColumnSpacing="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="180" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="130" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ComboBox
+                    x:Name="ServiceTypeBox"
+                    Header="Service"
+                    ItemsSource="{x:Bind Definitions}"
+                    DisplayMemberPath="Name"
+                    SelectionChanged="ServiceType_SelectionChanged" />
+                <TextBox x:Name="ServiceNameBox" Grid.Column="1" Header="Name" />
+                <NumberBox x:Name="ServicePortBox" Grid.Column="2" Header="Port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Compact" />
+                <Button
+                    x:Name="AddServiceButton"
+                    Grid.Column="3"
+                    VerticalAlignment="Bottom"
+                    Click="Add_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <SymbolIcon Symbol="Add" />
+                        <TextBlock Text="Add" />
+                    </StackPanel>
+                </Button>
+                <TextBlock
+                    x:Name="ServiceAvailabilityText"
+                    Grid.Row="1"
+                    Grid.ColumnSpan="4"
+                    Margin="0,10,0,0"
+                    Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                    TextWrapping="Wrap"
+                    Visibility="Collapsed" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12">
+            <Grid>
+                <ListView x:Name="ServiceList" ItemsSource="{x:Bind Rows}">
+                    <ListView.Header>
+                        <Grid Padding="10,6" ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="100" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Service" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="1" Text="Port" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="2" Text="Version" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="3" Text="Status" FontWeight="SemiBold" />
+                        </Grid>
+                    </ListView.Header>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="models:ManagedServiceRow">
+                            <Grid Padding="10,8" ColumnSpacing="14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170" />
+                                    <ColumnDefinition Width="100" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{x:Bind DefinitionId}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{x:Bind Port}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Text="{x:Bind Version}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="3" Text="{x:Bind Status}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="4" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="6">
+                                    <ToggleSwitch
+                                        Tag="{x:Bind Id}"
+                                        IsOn="{x:Bind StartAutomatically, Mode=OneWay}"
+                                        Toggled="AutomaticStart_Toggled"
+                                        OnContent="Auto"
+                                        OffContent="Auto" />
+                                    <Button
+                                        Tag="{x:Bind Id}"
+                                        Click="Install_Click"
+                                        Visibility="{x:Bind CanInstallOrUpdate}"
+                                        ToolTipService.ToolTip="Install or update runtime">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <SymbolIcon Symbol="Download" />
+                                            <TextBlock Text="{x:Bind InstallLabel}" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Tag="{x:Bind Id}" Click="Toggle_Click" IsEnabled="{x:Bind CanToggle}">
+                                        <TextBlock Text="{x:Bind ToggleLabel}" />
+                                    </Button>
+                                    <Button Tag="{x:Bind Id}" Click="OpenData_Click" ToolTipService.ToolTip="Open data directory">
+                                        <SymbolIcon Symbol="Folder" />
+                                    </Button>
+                                    <Button
+                                        Tag="{x:Bind Id}"
+                                        Click="OpenConsole_Click"
+                                        Visibility="{x:Bind CanOpenConsole}"
+                                        ToolTipService.ToolTip="Open service console">
+                                        <TextBlock Text="Console" />
+                                    </Button>
+                                    <Button Tag="{x:Bind Id}" Click="Delete_Click" ToolTipService.ToolTip="Delete service instance">
+                                        <SymbolIcon Symbol="Delete" />
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+                <StackPanel
+                    x:Name="EmptyState"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="8"
+                    Visibility="Collapsed">
+                    <SymbolIcon Symbol="Library" />
+                    <TextBlock Text="No services added" Style="{StaticResource SubtitleTextBlockStyle}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

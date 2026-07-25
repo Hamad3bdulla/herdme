@@ -1,0 +1,97 @@
+<Page
+    x:Class="HerdMe.Windows.Pages.PhpPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Loaded="Page_Loaded">
+    <ScrollViewer>
+        <StackPanel Padding="32" Spacing="16" MaxWidth="900" HorizontalAlignment="Left">
+            <Grid>
+                <TextBlock Text="PHP" Style="{StaticResource TitleTextBlockStyle}" />
+                <Button HorizontalAlignment="Right" Click="Refresh_Click" ToolTipService.ToolTip="Refresh PHP status">
+                    <SymbolIcon Symbol="Refresh" />
+                </Button>
+            </Grid>
+
+            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Laravel runtime" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <ComboBox
+                            x:Name="PhpCycleBox"
+                            Width="120"
+                            SelectedIndex="1"
+                            SelectionChanged="PhpCycle_SelectionChanged">
+                            <x:String>8.5</x:String>
+                            <x:String>8.4</x:String>
+                            <x:String>8.3</x:String>
+                            <x:String>8.2</x:String>
+                            <x:String>8.1</x:String>
+                            <x:String>8.0</x:String>
+                        </ComboBox>
+                        <Button x:Name="InstallPhpButton" Click="InstallPhp_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <SymbolIcon Symbol="Download" />
+                                <TextBlock x:Name="InstallPhpButtonText" Text="Install" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock x:Name="PhpPathText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ProgressRing x:Name="RuntimeProgress" Width="16" Height="16" />
+                        <TextBlock x:Name="RuntimeStatusText" Text="Checking" FontWeight="SemiBold" />
+                    </StackPanel>
+                    <TextBlock x:Name="ExtensionDetailText" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="Composer and Laravel Installer" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <TextBlock x:Name="ComposerVersionText" Text="Composer: Not installed" />
+                        <TextBlock x:Name="LaravelInstallerVersionText" Text="Laravel Installer: Not installed" />
+                    </StackPanel>
+                    <Button x:Name="InstallToolsButton" Grid.Column="1" VerticalAlignment="Center" Click="InstallTools_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <SymbolIcon Symbol="Download" />
+                            <TextBlock x:Name="InstallToolsButtonText" Text="Install" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Request limits" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="140" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Memory limit (MB)" VerticalAlignment="Center" />
+                        <NumberBox x:Name="MemoryLimitBox" Grid.Column="1" Minimum="16" Maximum="100000" SpinButtonPlacementMode="Compact" />
+                    </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="140" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Maximum upload (MB)" VerticalAlignment="Center" />
+                        <NumberBox x:Name="UploadLimitBox" Grid.Column="1" Minimum="1" Maximum="100000" SpinButtonPlacementMode="Compact" />
+                    </Grid>
+                    <Button x:Name="SaveButton" HorizontalAlignment="Left" Click="Save_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <SymbolIcon Symbol="Save" />
+                            <TextBlock Text="Save" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock x:Name="SaveStatusText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

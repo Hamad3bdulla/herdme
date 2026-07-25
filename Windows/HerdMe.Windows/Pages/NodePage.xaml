@@ -1,0 +1,70 @@
+<Page
+    x:Class="HerdMe.Windows.Pages.NodePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:HerdMe.Windows.Models"
+    Loaded="Page_Loaded">
+    <Grid Padding="32" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid>
+            <StackPanel>
+                <TextBlock Text="Node.js" Style="{StaticResource TitleTextBlockStyle}" />
+                <TextBlock Text="Official Windows runtimes managed by HerdMe" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                <ProgressRing x:Name="OperationProgress" Width="18" Height="18" />
+                <TextBlock x:Name="OperationStatusText" VerticalAlignment="Center" />
+                <Button Click="Refresh_Click" ToolTipService.ToolTip="Refresh Node.js versions">
+                    <SymbolIcon Symbol="Refresh" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12">
+            <ListView ItemsSource="{x:Bind Rows}">
+                <ListView.Header>
+                    <Grid Padding="10,6" ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140" />
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Major" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="Status" FontWeight="SemiBold" />
+                    </Grid>
+                </ListView.Header>
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="models:NodeRuntimeRow">
+                        <Grid Padding="10,8" ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Bind Major}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{x:Bind Status}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="2" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                                <Button
+                                    Tag="{x:Bind Major}"
+                                    Click="Install_Click"
+                                    Visibility="{x:Bind CanInstallOrUpdate}"
+                                    ToolTipService.ToolTip="Install or update">
+                                    <SymbolIcon Symbol="Download" />
+                                </Button>
+                                <Button Tag="{x:Bind Major}" Click="Use_Click" IsEnabled="{x:Bind IsInstalled}" ToolTipService.ToolTip="Use this version">
+                                    <SymbolIcon Symbol="Play" />
+                                </Button>
+                                <Button Tag="{x:Bind Major}" Click="Delete_Click" IsEnabled="{x:Bind IsInstalled}" ToolTipService.ToolTip="Delete this version">
+                                    <SymbolIcon Symbol="Delete" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Border>
+    </Grid>
+</Page>

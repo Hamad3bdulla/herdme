@@ -1,0 +1,48 @@
+name: Windows x64
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-x64-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    name: Build, test, package, and run
+    runs-on: windows-2022
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Show toolchain
+        shell: pwsh
+        run: |
+          dotnet --info
+          cmake --version
+
+      - name: Run automated Windows x64 acceptance
+        shell: pwsh
+        run: ./Windows/acceptance.ps1 -Configuration Release
+
+      - name: Upload portable Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HerdMe-${{ github.run_number }}-win-x64-portable
+          path: |
+            dist/HerdMe-*-win-x64-portable.zip
+            dist/HerdMe-*-win-x64-portable.zip.sha256
+          if-no-files-found: error
+          retention-days: 14

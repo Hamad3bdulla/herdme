@@ -1,0 +1,82 @@
+name: HerdMe
+options:
+  bundleIdPrefix: app.herdme
+  deploymentTarget:
+    macOS: "13.0"
+  xcodeVersion: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 0.1.0
+targets:
+  HerdMe:
+    type: application
+    platform: macOS
+    info:
+      path: HerdMe/Info.plist
+      properties:
+        CFBundleDisplayName: HerdMe
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.developer-tools
+        NSPrincipalClass: NSApplication
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoadsInWebContent: true
+          NSAllowsLocalNetworking: true
+    sources:
+      - path: HerdMe
+      - path: LICENSE
+        buildPhase: resources
+      - path: docs/THIRD_PARTY.md
+        buildPhase: resources
+    dependencies:
+      - sdk: Network.framework
+      - sdk: Security.framework
+      - sdk: ServiceManagement.framework
+      - sdk: WebKit.framework
+    postCompileScripts:
+      - name: Build Local Network Helper
+        script: |
+          set -euo pipefail
+          helper_directory="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
+          mkdir -p "$helper_directory"
+          xcrun --sdk macosx clang \
+            -std=c17 -Os -Wall -Wextra -Werror \
+            -arch arm64 -arch x86_64 \
+            -mmacosx-version-min="$MACOSX_DEPLOYMENT_TARGET" \
+            "$SRCROOT/Tools/NetworkHelper/main.c" \
+            -o "$helper_directory/herdme-network-helper"
+          chmod 0755 "$helper_directory/herdme-network-helper"
+          signing_identity="${EXPANDED_CODE_SIGN_IDENTITY:--}"
+          codesign --force --sign "$signing_identity" --identifier app.herdme.network-helper --timestamp=none \
+            "$helper_directory/herdme-network-helper"
+        inputFiles:
+          - $(SRCROOT)/Tools/NetworkHelper/main.c
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/herdme-network-helper
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.herdme.desktop
+        PRODUCT_NAME: HerdMe
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: NO
+    scheme:
+      testTargets:
+        - HerdMeTests
+      environmentVariables:
+        HERDME_CREATE_LARAVEL_INTEGRATION: "$(HERDME_CREATE_LARAVEL_INTEGRATION)"
+        HERDME_LARAVEL_PROJECT: "$(HERDME_LARAVEL_PROJECT)"
+  HerdMeTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: HerdMeTests
+    dependencies:
+      - target: HerdMe
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
