@@ -15,4 +15,6 @@ public sealed class WindowsSiteSettings
     public bool AutomaticUpdates { get; set; } = true;
 
     public string UpdateChannel { get; set; } = "Stable";
+
+    public bool OnboardingCompleted { get; set; }
 }

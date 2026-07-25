@@ -17,6 +17,13 @@ until their Vite manifest exists.
 When the managed Composer and Laravel Installer files are present, project creation
 runs the installed Laravel Installer immediately without a version probe or package
 update. The automatic installer path is used only when those managed files are absent.
+On a new Windows user profile, HerdMe opens a native setup wizard before the
+navigation or background listeners. The user explicitly starts setup; the
+wizard then prepares `.test` routing through UAC, trusts the local HTTPS CA,
+installs and validates PHP 8.4, installs Composer and Laravel Installer, and
+installs Node.js 22. A failed step remains visible and can be retried safely.
+Settings written by a release from before this wizard are treated as completed,
+so an update does not interrupt an existing installation.
 Custom starter kits accept a validated `vendor/package` Composer identifier and
 are passed to Laravel Installer through its official `--using` option.
 The PHP page refuses to mark a runtime ready until every required module is
@@ -102,6 +109,10 @@ The runtime probe covers PHP 8.0-8.5 NTS x64, Node.js 20/22/24/26, Composer,
 Laravel Installer, and the matching Xdebug archives. Xdebug uses the official
 GitHub release, verifies its published SHA-256 digest, and extracts only the
 expected DLL. The native `acceptance.ps1` gate runs both probes automatically.
+The automated listener gate launches with the reserved `--acceptance` argument
+so it can test background protocols without modifying first-launch state. This
+argument is for the repository's hardware gate; interactive acceptance must
+still verify the real wizard on a clean Windows user profile.
 
 The script builds `herdme-core.exe`, copies it into the WinUI runtime folder,
 and builds the unpackaged self-contained desktop application. HerdMe stores its

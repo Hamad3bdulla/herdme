@@ -30,6 +30,7 @@ the same behavior.
 | Area | macOS | Windows | Next milestone |
 | --- | --- | --- | --- |
 | Native shell and navigation | Implemented | Implemented | Verify WinUI rendering on Windows hardware |
+| First-launch setup | Native staged wizard installs local domains, CA, PHP 8.4, Composer, Laravel Installer, and Node.js 22 | Equivalent native WinUI wizard with UAC and delayed background startup | Verify cancellation, retry, and completion on Windows hardware |
 | Single-instance process guard | File lock implemented and process-tested | Named mutex and activation signal implemented | Verify existing-window activation on Windows hardware |
 | Menu bar/system tray | Implemented | Implemented | Verify tray interactions on Windows hardware |
 | Site scan and link | Search, desktop-width HTTP preview, persistent roots, arbitrary links, runtime editing, and safe unlink implemented | Search, fitted desktop-width live preview, persistent roots, arbitrary links, runtime editing, and unlink implemented | Verify picker, preview, and unlink flow on Windows hardware |
@@ -87,7 +88,7 @@ before the 99% acceptance target can be declared complete.
 
 ## Current validation snapshot
 
-On July 25, 2026, the macOS Swift 6 suite executed 73 tests: 72 passed with zero
+On July 25, 2026, the macOS Swift 6 suite executed 78 tests: 77 passed with zero
 failures, and the optional live Laravel-project test was skipped in the default
 run. A separate live gate created Laravel 13.22.0 with the React starter kit
 through HerdMe's managed installer, restored its npm dependencies, built and
@@ -140,7 +141,7 @@ endpoint now use locale-independent, ungrouped digits such as `9003` instead of
 `9,003`.
 
 The portable C++20 tests, expanded Windows C# service-contract fixtures, and all
-12 WinUI XAML XML checks also pass on macOS. The contract project now compiles
+13 WinUI XAML XML checks also pass on macOS. The contract project now compiles
 every non-UI Windows model and service and runs the local HTTP server against
 static GET/HEAD, host isolation, method rejection, and encoded traversal in
 origin-form and absolute-form targets. It also cross-publishes as a

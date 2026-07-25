@@ -25,10 +25,23 @@ public sealed class SiteConfigurationStore
         {
             if (File.Exists(SettingsPath))
             {
+                var json = File.ReadAllText(SettingsPath);
                 var settings = JsonSerializer.Deserialize<WindowsSiteSettings>(
-                    File.ReadAllText(SettingsPath)
+                    json
                 );
-                if (settings is not null) return Normalize(settings);
+                if (settings is not null)
+                {
+                    using var document = JsonDocument.Parse(json);
+                    if (!document.RootElement.TryGetProperty(
+                        nameof(WindowsSiteSettings.OnboardingCompleted),
+                        out _
+                    ))
+                    {
+                        // Settings written before the wizard belong to an existing installation.
+                        settings.OnboardingCompleted = true;
+                    }
+                    return Normalize(settings);
+                }
             }
         }
         catch (Exception error) when (error is IOException or JsonException)
@@ -124,7 +137,8 @@ public sealed class SiteConfigurationStore
             AutomaticUpdates = settings.AutomaticUpdates,
             UpdateChannel = settings.UpdateChannel.Equals("Beta", StringComparison.OrdinalIgnoreCase)
                 ? "Beta"
-                : "Stable"
+                : "Stable",
+            OnboardingCompleted = settings.OnboardingCompleted
         };
     }
 

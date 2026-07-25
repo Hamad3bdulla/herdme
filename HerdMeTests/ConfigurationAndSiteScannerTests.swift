@@ -4,6 +4,37 @@ import XCTest
 @testable import HerdMe
 
 final class ConfigurationAndSiteScannerTests: XCTestCase {
+    func testOnboardingIsRequiredOnlyForNewInstallations() throws {
+        XCTAssertFalse(AppConfiguration.default.onboardingCompleted)
+
+        let legacy = try JSONDecoder().decode(
+            AppConfiguration.self,
+            from: Data("{}".utf8)
+        )
+        XCTAssertTrue(legacy.onboardingCompleted)
+
+        let explicitIncomplete = try JSONDecoder().decode(
+            AppConfiguration.self,
+            from: Data(#"{"onboardingCompleted":false}"#.utf8)
+        )
+        XCTAssertFalse(explicitIncomplete.onboardingCompleted)
+
+        var completed = AppConfiguration.default
+        completed.onboardingCompleted = true
+        let restored = try JSONDecoder().decode(
+            AppConfiguration.self,
+            from: JSONEncoder().encode(completed)
+        )
+        XCTAssertTrue(restored.onboardingCompleted)
+    }
+
+    func testOnboardingStagesKeepDependencyOrder() {
+        XCTAssertEqual(
+            OnboardingStage.installationStages,
+            [.localDomains, .certificate, .php, .composer, .node, .finishing]
+        )
+    }
+
     func testSingleInstanceGuardRejectsASecondLock() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let lockURL = root.appendingPathComponent("herdme.lock")
@@ -831,6 +862,53 @@ final class ConfigurationAndSiteScannerTests: XCTestCase {
         )
     }
 
+    func testTablePlusConnectionUsesManagedLoopbackCredentials() throws {
+        func instance(_ definitionID: String, port: Int) -> ServiceInstance {
+            ServiceInstance(
+                id: UUID(),
+                definitionID: definitionID,
+                name: definitionID,
+                version: "test",
+                port: port,
+                isRunning: true
+            )
+        }
+
+        let mysql = try XCTUnwrap(TablePlusConnection.url(for: instance("mysql", port: 3_306)))
+        XCTAssertEqual(mysql.scheme, "mysql")
+        XCTAssertEqual(mysql.user, "root")
+        XCTAssertEqual(mysql.host, "127.0.0.1")
+        XCTAssertEqual(mysql.port, 3_306)
+        XCTAssertEqual(mysql.path, "/mysql")
+
+        let mariaDB = try XCTUnwrap(TablePlusConnection.url(for: instance("mariadb", port: 3_307)))
+        XCTAssertEqual(mariaDB.scheme, "mariadb")
+        XCTAssertEqual(mariaDB.user, "root")
+        XCTAssertEqual(mariaDB.path, "/mysql")
+
+        let postgreSQL = try XCTUnwrap(TablePlusConnection.url(
+            for: instance("postgresql", port: 5_432),
+            postgreSQLUsername: "developer"
+        ))
+        XCTAssertEqual(postgreSQL.scheme, "postgresql")
+        XCTAssertEqual(postgreSQL.user, "developer")
+        XCTAssertEqual(postgreSQL.path, "/postgres")
+
+        let mongoDB = try XCTUnwrap(TablePlusConnection.url(for: instance("mongodb", port: 27_017)))
+        XCTAssertEqual(mongoDB.scheme, "mongodb")
+        XCTAssertEqual(mongoDB.path, "/admin")
+
+        let redis = try XCTUnwrap(TablePlusConnection.url(for: instance("redis", port: 6_379)))
+        XCTAssertEqual(redis.scheme, "redis")
+        XCTAssertEqual(redis.path, "/0")
+
+        let valkey = try XCTUnwrap(TablePlusConnection.url(for: instance("valkey", port: 6_380)))
+        XCTAssertEqual(valkey.scheme, "redis")
+        XCTAssertEqual(valkey.path, "/0")
+        XCTAssertNil(TablePlusConnection.url(for: instance("minio", port: 9_000)))
+        XCTAssertNil(TablePlusConnection.url(for: instance("mysql", port: 65_536)))
+    }
+
     func testServiceFormulaTrustTargetIsLimitedToExpectedFormula() {
         let output = """
         Error: Refusing to load formula typesense/tap/typesense-server@30.2 from untrusted tap.
@@ -850,6 +928,32 @@ final class ConfigurationAndSiteScannerTests: XCTestCase {
                 expectedFormula: "someone/else/formula"
             )
         )
+    }
+
+    func testPHPFormulaTrustTargetIsLimitedToTheExpectedVersionAndTap() {
+        let output = """
+        Error: Refusing to load formula shivammathur/php/php@7.4 from untrusted tap shivammathur/php.
+        Run `brew trust --formula shivammathur/php/php@7.4` to trust it.
+        """
+
+        XCTAssertEqual(
+            RuntimeInstaller.phpFormulaTrustTarget(from: output, cycle: "7.4"),
+            "shivammathur/php/php@7.4"
+        )
+        XCTAssertNil(RuntimeInstaller.phpFormulaTrustTarget(from: output, cycle: "8.0"))
+        XCTAssertNil(RuntimeInstaller.phpFormulaTrustTarget(from: output, cycle: "../7.4"))
+
+        let unrelatedTap = """
+        Error: Refusing to load formula example/php/php@7.4 from untrusted tap example/php.
+        Run `brew trust --formula example/php/php@7.4` to trust it.
+        """
+        XCTAssertNil(RuntimeInstaller.phpFormulaTrustTarget(from: unrelatedTap, cycle: "7.4"))
+
+        let suffixedFormula = """
+        Error: Refusing to load formula shivammathur/php/php@7.4@preview from untrusted tap shivammathur/php.
+        Run `brew trust --formula shivammathur/php/php@7.4@preview` to trust it.
+        """
+        XCTAssertNil(RuntimeInstaller.phpFormulaTrustTarget(from: suffixedFormula, cycle: "7.4"))
     }
 
     func testDatabaseFormulaConflictRecoveryOnlyAllowsMySQLAndMariaDBPair() throws {
@@ -954,6 +1058,35 @@ final class ConfigurationAndSiteScannerTests: XCTestCase {
         XCTAssertFalse(RuntimeInstaller.isNewerVersion("5.30.0", than: "5.31.0"))
         XCTAssertTrue(RuntimeInstaller.isStableVersion("v5.31.0"))
         XCTAssertFalse(RuntimeInstaller.isStableVersion("v5.32.0-beta.1"))
+    }
+
+    func testComposerVersionParsingAndPHPCompatibilitySelection() throws {
+        XCTAssertEqual(
+            RuntimeInstaller.composerVersion(
+                from: "Composer version 2.10.2 2026-07-01 11:24:45"
+            ),
+            "2.10.2"
+        )
+        XCTAssertNil(RuntimeInstaller.composerVersion(from: "PHP 8.5.8"))
+
+        let index = Data("""
+        {
+          "stable": [
+            { "version": "2.10.0", "min-php": 80400 },
+            { "version": "2.9.9", "min-php": 70205 },
+            { "version": "2.11.0-beta.1", "min-php": 70205 }
+          ]
+        }
+        """.utf8)
+
+        XCTAssertEqual(
+            try RuntimeInstaller.compatibleComposerVersion(from: index, phpVersionID: 70433),
+            "2.9.9"
+        )
+        XCTAssertEqual(
+            try RuntimeInstaller.compatibleComposerVersion(from: index, phpVersionID: 80500),
+            "2.10.0"
+        )
     }
 
     func testHomebrewPHPInfoSelectsRequestedStableVersions() throws {

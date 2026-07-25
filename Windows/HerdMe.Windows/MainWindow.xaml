@@ -2,16 +2,18 @@
     x:Class="HerdMe.Windows.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="using:HerdMe.Windows.Views"
     Title="HerdMe">
-    <NavigationView
-        x:Name="Navigation"
-        IsBackButtonVisible="Collapsed"
-        IsSettingsVisible="False"
-        IsTitleBarAutoPaddingEnabled="True"
-        OpenPaneLength="220"
-        PaneDisplayMode="Left"
-        SelectionChanged="Navigation_SelectionChanged">
-        <NavigationView.MenuItems>
+    <Grid>
+        <NavigationView
+            x:Name="Navigation"
+            IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="False"
+            IsTitleBarAutoPaddingEnabled="True"
+            OpenPaneLength="220"
+            PaneDisplayMode="Left"
+            SelectionChanged="Navigation_SelectionChanged">
+            <NavigationView.MenuItems>
             <NavigationViewItem Content="General" Tag="general">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></NavigationViewItem.Icon>
             </NavigationViewItem>
@@ -43,7 +45,11 @@
             <NavigationViewItem Content="About" Tag="about">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Help" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-        </NavigationView.MenuItems>
-        <Frame x:Name="ContentFrame" />
-    </NavigationView>
+            </NavigationView.MenuItems>
+            <Frame x:Name="ContentFrame" />
+        </NavigationView>
+        <views:OnboardingView
+            x:Name="Onboarding"
+            SetupCompleted="Onboarding_SetupCompleted" />
+    </Grid>
 </Window>

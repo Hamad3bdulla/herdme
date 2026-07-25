@@ -34,6 +34,14 @@ changing package-manager configuration; memory, upload, and post limits are
 also applied to the active FPM pool. Its service catalog includes MariaDB,
 MySQL, PostgreSQL, MongoDB, Redis, Valkey, Meilisearch, Typesense, MinIO, and
 RustFS on Apple Silicon.
+Running MySQL, MariaDB, PostgreSQL, MongoDB, Redis, and Valkey instances can be
+opened directly in TablePlus with their managed loopback connection settings.
+On a new installation, a native first-launch wizard prepares local domains,
+trusts HerdMe's HTTPS certificate, installs PHP 8.4, verifies Laravel's required
+extensions, and installs Composer, Laravel Installer, and Node.js 22. Every
+stage is visible and retryable; completion is persisted only after all stages
+succeed. Configurations created by an older HerdMe release are migrated as
+already completed, so existing users are not interrupted after an update.
 
 The x64-only Windows WinUI 3 application includes isolated PHP, Xdebug,
 Composer, Laravel Installer, and Node runtime management; persistent site
@@ -44,6 +52,9 @@ MinIO, and RustFS services. Valkey and Typesense are also visible in the Windows
 catalog with installation disabled and an explicit reason until their upstream
 projects publish official native Windows x64 packages. Both native
 applications reject a second process before it can start duplicate listeners.
+The Windows app uses the same first-launch stages in native WinUI and delays
+background listeners until setup succeeds. Its local-domain stage uses the
+normal Windows UAC prompt without opening a console.
 Stable and beta update checks are implemented on both platforms, with a local
 feed for development and an overridable HTTPS feed for releases. Both
 applications also expose the MIT license and third-party acknowledgements
@@ -94,7 +105,7 @@ The tracked parity target and Windows architecture are in
 
 ## Validation
 
-The current macOS suite executes 73 tests: 72 pass and the optional live
+The current macOS suite executes 78 tests: 77 pass and the optional live
 Laravel-project test is skipped unless a project path or temporary-creation flag
 is supplied. A live run created Laravel 13.22.0 with the React starter kit
 through HerdMe's managed installer, installed its npm packages, built and
@@ -105,7 +116,7 @@ custom starter kits accept a validated `vendor/package` Composer identifier and
 use Laravel Installer's official `--using` workflow. Both native applications
 keep the creation result visible and report each completed, active, or failed stage.
 The portable C++20 tests, expanded Windows C# cross-platform contracts, and all
-12 WinUI XAML XML checks pass on macOS. The Windows contract gate compiles every
+13 WinUI XAML XML checks pass on macOS. The Windows contract gate compiles every
 non-UI model and service, exercises static HTTP routing and traversal rejection,
 and cross-publishes as a self-contained PE32+ x86-64 executable. Debug builds
 pass for both Apple Silicon and

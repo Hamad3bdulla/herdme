@@ -34,12 +34,18 @@ final class AppModel: ObservableObject {
     @Published var phpRequestSettings = PHPRequestSettings.load()
     @Published var xdebugInstallation: XdebugInstallation?
     @Published var debuggerOperation: String?
+    @Published var composerVersion: String?
+    @Published var latestComposerVersion: String?
     @Published var laravelInstallerVersion: String?
     @Published var latestLaravelInstallerVersion: String?
     @Published var latestPHPVersions: [String: String] = [:]
     @Published var latestNodeVersions: [String: String] = [:]
     @Published var isCheckingForUpdates = false
     @Published var updateNotice: AppUpdateNotice?
+    @Published private(set) var isPresentingOnboarding = false
+    @Published private(set) var onboardingStage: OnboardingStage = .welcome
+    @Published private(set) var isRunningInitialSetup = false
+    @Published private(set) var onboardingError: String?
 
     let configurationStore: ConfigurationStore
     private let siteScanner = SiteScanner()
@@ -61,6 +67,7 @@ final class AppModel: ObservableObject {
     private let serviceProcessManager: ServiceProcessManager
     private let logStore: LogStore
     private let appUpdateManager: AppUpdateManager?
+    private var didStartApplicationServices = false
 
     init(configurationStore: ConfigurationStore = ConfigurationStore()) {
         self.configurationStore = configurationStore
@@ -86,6 +93,7 @@ final class AppModel: ObservableObject {
         }
         let resolverManager = DomainResolverManager(rootURL: configurationStore.rootURL)
         configuration = loadedConfiguration
+        isPresentingOnboarding = !loadedConfiguration.onboardingCompleted
         self.resolverManager = resolverManager
         domainResolverState = resolverManager.state(tld: loadedConfiguration.tld)
         certificateTrustState = certificateManager.trustState()
@@ -102,12 +110,26 @@ final class AppModel: ObservableObject {
         refresh()
         refreshServiceStates()
         if Self.isRunningUnitTests { return }
+        if configuration.onboardingCompleted {
+            startApplicationServices()
+        }
+    }
+
+    private func startApplicationServices() {
+        guard !didStartApplicationServices else { return }
+        didStartApplicationServices = true
         Task {
             try? await runtimeInstaller.activatePHP(cycle: configuration.selectedPHP)
             phpVersions = runtimeInspector.phpVersions(activeCycle: configuration.selectedPHP)
             xdebugInstallation = await xdebugManager.installed(
                 cycle: configuration.selectedPHP,
                 php: managedPHPExecutable(cycle: configuration.selectedPHP)
+            )
+            composerVersion = await runtimeInstaller.composerVersion(
+                cycle: configuration.selectedPHP
+            )
+            latestComposerVersion = try? await runtimeInstaller.latestComposerVersion(
+                cycle: configuration.selectedPHP
             )
             laravelInstallerVersion = await runtimeInstaller.laravelInstallerVersion(
                 cycle: configuration.selectedPHP
@@ -180,6 +202,19 @@ final class AppModel: ObservableObject {
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    func beginInitialSetup() {
+        guard !isRunningInitialSetup else { return }
+        isRunningInitialSetup = true
+        onboardingError = nil
+        onboardingStage = .localDomains
+        Task { await runInitialSetup() }
+    }
+
+    func finishOnboarding() {
+        guard onboardingStage == .completed else { return }
+        isPresentingOnboarding = false
     }
 
     func setAutomaticUpdates(_ enabled: Bool) {
@@ -274,21 +309,13 @@ final class AppModel: ObservableObject {
     }
 
     func installDomainResolver() {
-        do {
-            privilegedOperation = "domains"
-            guard try resolverManager.install(
-                tld: configuration.tld,
-                replacingExternal: domainResolverState == .external
-            ) else {
-                privilegedOperation = nil
-                refreshDomainResolver()
-                startManagedDNSServer()
-                return
+        guard privilegedOperation == nil else { return }
+        Task {
+            do {
+                try await prepareDomainResolver()
+            } catch {
+                lastError = error.localizedDescription
             }
-            Task { await waitForDomainResolver() }
-        } catch {
-            privilegedOperation = nil
-            lastError = error.localizedDescription
         }
     }
 
@@ -302,17 +329,13 @@ final class AppModel: ObservableObject {
     }
 
     func installCertificateAuthority() {
-        do {
-            privilegedOperation = "certificate"
-            guard try certificateManager.installAuthority(tld: configuration.tld) else {
-                privilegedOperation = nil
-                refreshCertificateTrust()
-                return
+        guard privilegedOperation == nil else { return }
+        Task {
+            do {
+                try await prepareCertificateAuthority()
+            } catch {
+                lastError = error.localizedDescription
             }
-            Task { await waitForCertificateTrust() }
-        } catch {
-            privilegedOperation = nil
-            lastError = error.localizedDescription
         }
     }
 
@@ -356,6 +379,10 @@ final class AppModel: ObservableObject {
                     cycle: cycle,
                     php: managedPHPExecutable(cycle: cycle)
                 )
+                composerVersion = await runtimeInstaller.composerVersion(cycle: cycle)
+                latestComposerVersion = try? await runtimeInstaller.latestComposerVersion(cycle: cycle)
+                laravelInstallerVersion = await runtimeInstaller.laravelInstallerVersion(cycle: cycle)
+                latestLaravelInstallerVersion = try? await runtimeInstaller.latestLaravelInstallerVersion()
                 restartEnvironmentForRuntimeSettingsIfNeeded()
             } catch {
                 lastError = error.localizedDescription
@@ -377,6 +404,10 @@ final class AppModel: ObservableObject {
                     cycle: cycle,
                     php: managedPHPExecutable(cycle: cycle)
                 )
+                composerVersion = await runtimeInstaller.composerVersion(cycle: cycle)
+                latestComposerVersion = try? await runtimeInstaller.latestComposerVersion(cycle: cycle)
+                laravelInstallerVersion = await runtimeInstaller.laravelInstallerVersion(cycle: cycle)
+                latestLaravelInstallerVersion = try? await runtimeInstaller.latestLaravelInstallerVersion()
                 refresh()
                 restartEnvironmentForRuntimeSettingsIfNeeded()
             } catch {
@@ -409,6 +440,14 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func refreshComposer() {
+        let cycle = configuration.selectedPHP
+        Task {
+            composerVersion = await runtimeInstaller.composerVersion(cycle: cycle)
+            latestComposerVersion = try? await runtimeInstaller.latestComposerVersion(cycle: cycle)
+        }
+    }
+
     func refreshNodeUpdates() {
         let cycles = nodeVersions.map(\.cycle)
         Task {
@@ -426,6 +465,12 @@ final class AppModel: ObservableObject {
     var isLaravelInstallerUpdateAvailable: Bool {
         guard let installed = laravelInstallerVersion,
               let latest = latestLaravelInstallerVersion else { return false }
+        return RuntimeInstaller.isNewerVersion(latest, than: installed)
+    }
+
+    var isComposerUpdateAvailable: Bool {
+        guard let installed = composerVersion,
+              let latest = latestComposerVersion else { return false }
         return RuntimeInstaller.isNewerVersion(latest, than: installed)
     }
 
@@ -449,6 +494,21 @@ final class AppModel: ObservableObject {
             do {
                 laravelInstallerVersion = try await runtimeInstaller.updateLaravelInstaller(cycle: cycle)
                 latestLaravelInstallerVersion = laravelInstallerVersion
+            } catch {
+                lastError = error.localizedDescription
+            }
+            runtimeOperation = nil
+        }
+    }
+
+    func updateComposer() {
+        guard runtimeOperation == nil else { return }
+        let cycle = configuration.selectedPHP
+        runtimeOperation = "composer"
+        Task {
+            do {
+                composerVersion = try await runtimeInstaller.updateComposer(cycle: cycle)
+                latestComposerVersion = composerVersion
             } catch {
                 lastError = error.localizedDescription
             }
@@ -839,6 +899,36 @@ final class AppModel: ObservableObject {
             && serviceProcessManager.consoleURL(for: instance) != nil
     }
 
+    func canOpenServiceInTablePlus(_ instance: ServiceInstance) -> Bool {
+        serviceState(for: instance) == .running
+            && TablePlusConnection.url(for: instance) != nil
+    }
+
+    func openServiceInTablePlus(_ instance: ServiceInstance) {
+        guard serviceState(for: instance) == .running else {
+            lastError = "Start this database service before opening it in TablePlus."
+            return
+        }
+        guard let connectionURL = TablePlusConnection.url(for: instance) else {
+            lastError = "TablePlus connections are not available for \(instance.name)."
+            return
+        }
+        guard let applicationURL = NSWorkspace.shared.urlForApplication(
+            withBundleIdentifier: TablePlusConnection.bundleIdentifier
+        ) else {
+            lastError = "Install TablePlus before opening this database service."
+            return
+        }
+
+        let openConfiguration = NSWorkspace.OpenConfiguration()
+        openConfiguration.activates = true
+        NSWorkspace.shared.open(
+            [connectionURL],
+            withApplicationAt: applicationURL,
+            configuration: openConfiguration
+        )
+    }
+
     func toggleEnvironment() {
         if environmentStatus == .running {
             configuration.startAutomatically = false
@@ -1177,34 +1267,87 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func waitForCertificateTrust() async {
+    private func runInitialSetup() async {
+        do {
+            try await prepareDomainResolver()
+
+            onboardingStage = .certificate
+            try await prepareCertificateAuthority()
+
+            let phpCycle = AppConfiguration.default.selectedPHP
+            onboardingStage = .php
+            let phpRuntime = runtimeInspector.phpVersions(activeCycle: phpCycle)
+                .first { $0.cycle == phpCycle }
+            if phpRuntime?.isInstalled == true {
+                try await runtimeInstaller.activatePHP(cycle: phpCycle)
+            } else {
+                latestPHPVersions[phpCycle] = try await runtimeInstaller.installPHP(cycle: phpCycle)
+            }
+            try PHPRuntimeValidator().validate(executable: managedPHPExecutable(cycle: phpCycle))
+            configuration.selectedPHP = phpCycle
+            try configurationStore.save(configuration)
+
+            onboardingStage = .composer
+            try await runtimeInstaller.prepareLaravelInstallerForProjectCreation(cycle: phpCycle)
+            composerVersion = await runtimeInstaller.composerVersion(cycle: phpCycle)
+            laravelInstallerVersion = await runtimeInstaller.laravelInstallerVersion(cycle: phpCycle)
+
+            let nodeCycle = "22"
+            onboardingStage = .node
+            let nodeRuntime = runtimeInspector.nodeVersions().first { $0.cycle == nodeCycle }
+            if nodeRuntime?.isInstalled == true {
+                try await runtimeInstaller.activateNode(cycle: nodeCycle)
+            } else {
+                latestNodeVersions[nodeCycle] = try await runtimeInstaller.installNode(cycle: nodeCycle)
+            }
+
+            onboardingStage = .finishing
+            refresh()
+            var completedConfiguration = configuration
+            completedConfiguration.onboardingCompleted = true
+            try configurationStore.save(completedConfiguration)
+            configuration = completedConfiguration
+            onboardingStage = .completed
+            startApplicationServices()
+        } catch {
+            onboardingError = ErrorPresentation(error.localizedDescription).message
+        }
+        isRunningInitialSetup = false
+    }
+
+    private func prepareCertificateAuthority() async throws {
+        privilegedOperation = "certificate"
+        defer { privilegedOperation = nil }
+        _ = try certificateManager.installAuthority(tld: configuration.tld)
         for _ in 0..<120 {
-            try? await Task.sleep(for: .milliseconds(500))
+            try await Task.sleep(for: .milliseconds(500))
             refreshCertificateTrust()
             if certificateTrustState == .trusted {
-                privilegedOperation = nil
                 return
             }
         }
-        privilegedOperation = nil
-        lastError = "Certificate trust was not completed."
+        throw LocalCertificateError.authorizationFailed("Certificate trust was not completed.")
     }
 
-    private func waitForDomainResolver() async {
+    private func prepareDomainResolver() async throws {
+        privilegedOperation = "domains"
+        defer { privilegedOperation = nil }
+        _ = try resolverManager.install(
+            tld: configuration.tld,
+            replacingExternal: domainResolverState == .external
+        )
         for _ in 0..<120 {
-            try? await Task.sleep(for: .milliseconds(500))
+            try await Task.sleep(for: .milliseconds(500))
             refreshDomainResolver()
             if Self.domainResolverIsReady(
                 state: domainResolverState,
                 helperRunning: isDNSServerRunning,
                 helperNeedsUpdate: networkHelperNeedsUpdate
             ) {
-                privilegedOperation = nil
                 startManagedDNSServer()
                 return
             }
         }
-        privilegedOperation = nil
-        lastError = "Local domain setup was not completed."
+        throw DomainResolverError.authorizationFailed("Local domain setup was not completed.")
     }
 }

@@ -199,6 +199,7 @@ struct AppConfiguration: Codable {
     var sitePreviews: Bool
     var serviceInstances: [ServiceInstance]
     var independenceMigrationVersion: Int
+    var onboardingCompleted: Bool
 
     init(
         parkPaths: [String],
@@ -214,7 +215,8 @@ struct AppConfiguration: Codable {
         dumpPort: Int,
         sitePreviews: Bool,
         serviceInstances: [ServiceInstance],
-        independenceMigrationVersion: Int
+        independenceMigrationVersion: Int,
+        onboardingCompleted: Bool = true
     ) {
         self.parkPaths = parkPaths
         self.tld = tld
@@ -230,6 +232,7 @@ struct AppConfiguration: Codable {
         self.sitePreviews = sitePreviews
         self.serviceInstances = serviceInstances
         self.independenceMigrationVersion = independenceMigrationVersion
+        self.onboardingCompleted = onboardingCompleted
     }
 
     init(from decoder: Decoder) throws {
@@ -252,6 +255,11 @@ struct AppConfiguration: Codable {
             Int.self,
             forKey: .independenceMigrationVersion
         ) ?? 0
+        // A missing key belongs to an installation created before onboarding existed.
+        onboardingCompleted = try values.decodeIfPresent(
+            Bool.self,
+            forKey: .onboardingCompleted
+        ) ?? true
     }
 
     static var `default`: AppConfiguration {
@@ -270,8 +278,63 @@ struct AppConfiguration: Codable {
             dumpPort: 9912,
             sitePreviews: true,
             serviceInstances: [],
-            independenceMigrationVersion: ConfigurationStore.currentIndependenceMigrationVersion
+            independenceMigrationVersion: ConfigurationStore.currentIndependenceMigrationVersion,
+            onboardingCompleted: false
         )
+    }
+}
+
+enum OnboardingStage: String, CaseIterable, Equatable {
+    case welcome
+    case localDomains
+    case certificate
+    case php
+    case composer
+    case node
+    case finishing
+    case completed
+
+    static let installationStages: [OnboardingStage] = [
+        .localDomains,
+        .certificate,
+        .php,
+        .composer,
+        .node,
+        .finishing
+    ]
+
+    var title: String {
+        switch self {
+        case .welcome: "Welcome to HerdMe"
+        case .localDomains: "Setting up local .test domains"
+        case .certificate: "Trusting the local HTTPS certificate"
+        case .php: "Installing PHP 8.4"
+        case .composer: "Installing Composer and Laravel Installer"
+        case .node: "Installing Node.js 22"
+        case .finishing: "Finishing setup"
+        case .completed: "HerdMe is ready"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .welcome:
+            "HerdMe needs to prepare the local development environment. macOS may ask for administrator approval."
+        case .localDomains:
+            "Preparing private routing for projects that use the .test domain."
+        case .certificate:
+            "Adding the HerdMe local certificate authority to the system keychain."
+        case .php:
+            "Installing the default runtime and checking every extension required by Laravel."
+        case .composer:
+            "Preparing the managed PHP tools used to create Laravel projects."
+        case .node:
+            "Preparing the default JavaScript runtime and npm."
+        case .finishing:
+            "Saving the verified setup and refreshing the local environment."
+        case .completed:
+            "The default local development environment has been installed successfully."
+        }
     }
 }
 

@@ -11,6 +11,7 @@ public partial class App : Application
     private readonly SingleInstanceCoordinator singleInstance = null!;
     private TaskbarIcon? trayIcon;
     private volatile bool exitRequested;
+    private int backgroundServicesStarted;
 
     public App()
     {
@@ -35,9 +36,15 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         InitializeTrayIcon();
-        MainWindow = new MainWindow();
+        var acceptanceRun = Environment.GetCommandLineArgs().Contains(
+            "--acceptance",
+            StringComparer.OrdinalIgnoreCase
+        );
+        MainWindow = new MainWindow(skipOnboarding: acceptanceRun);
+        MainWindow.InitialSetupCompleted += (_, _) => _ = StartBackgroundServicesOnceAsync();
         MainWindow.Closed += MainWindow_Closed;
-        if (Environment.GetCommandLineArgs().Contains("--background", StringComparer.OrdinalIgnoreCase))
+        if (!MainWindow.RequiresOnboarding
+            && Environment.GetCommandLineArgs().Contains("--background", StringComparer.OrdinalIgnoreCase))
         {
             MainWindow.AppWindow.Hide();
         }
@@ -46,7 +53,7 @@ public partial class App : Application
             MainWindow.Activate();
         }
         _ = ListenForActivationAsync();
-        _ = StartBackgroundServicesAsync();
+        if (!MainWindow.RequiresOnboarding) _ = StartBackgroundServicesOnceAsync();
     }
 
     private Task ListenForActivationAsync()
@@ -156,6 +163,13 @@ public partial class App : Application
         await StartAndLogAsync("dump capture", () => AppServices.Dumps.StartAsync());
         await StartAndLogAsync("managed services", () => AppServices.Services.StartEnabledAsync());
         await StartConfiguredEnvironmentAsync();
+    }
+
+    private Task StartBackgroundServicesOnceAsync()
+    {
+        return Interlocked.Exchange(ref backgroundServicesStarted, 1) == 0
+            ? StartBackgroundServicesAsync()
+            : Task.CompletedTask;
     }
 
     private static async Task StartAndLogAsync(string component, Func<Task> operation)

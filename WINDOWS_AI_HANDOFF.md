@@ -51,13 +51,13 @@ paid gates, or upgrade screens.
 
 ## Current verified state
 
-The macOS app has passed 73 tests: 72 passed, one optional live Laravel test was
+The macOS app has passed 78 tests: 77 passed, one optional live Laravel test was
 skipped, and there were zero failures. Its live Laravel site works over trusted
 HTTPS without a visible port, and forced second-launch testing leaves one app
 process and one network helper.
 
 The Windows non-UI C# contracts build with zero warnings and pass on macOS. All
-12 WinUI XAML files parse, every PowerShell script parses, and the contract
+13 WinUI XAML files parse, every PowerShell script parses, and the contract
 project cross-publishes as PE32+ x86-64. Live release probes currently pass for
 supported services, PHP 8.0-8.5, Node 20/22/24/26, Composer, Laravel Installer,
 and matching Xdebug archives. The native WinUI build was not completed on
@@ -127,6 +127,10 @@ The full gate must:
 - Complete live SMTP and VarDumper exchanges without leaving test records.
 - Probe every supported service/runtime release and verify Xdebug SHA-256 data.
 
+The automated gate uses HerdMe's reserved `--acceptance` launch argument to
+start protocol listeners without consuming the real first-launch state. Do not
+use that argument for the interactive wizard check.
+
 If the gate succeeds, keep the app running because `-LeaveRunning` is present.
 
 ## Phase 3: inspect the generated artifact
@@ -162,33 +166,41 @@ Read `Windows/ACCEPTANCE.md` completely and work through every applicable item.
 Record concrete results in that checklist or a dated Windows acceptance report.
 At minimum, verify these workflows on the real display:
 
-1. General, Sites, PHP, Node, Services, Mail, Dumps, Debugger, Logs, and About
+1. On a clean Windows user profile, verify the first-launch wizard waits for the
+   user, then installs local domains, the trusted CA, PHP 8.4 with all required
+   extensions, Composer, Laravel Installer, and Node.js 22 in order. Cancel one
+   step, verify its retry state, finish, restart, and confirm it does not return.
+2. General, Sites, PHP, Node, Services, Mail, Dumps, Debugger, Logs, and About
    render without clipping at 100%, 125%, and 150% scaling.
-2. The tray can reopen a closed window and quit the application.
-3. Launch-at-login starts in the background without a black console window.
-4. Install PHP 8.4 and verify all 13 Laravel extensions before it becomes
+3. The tray can reopen a closed window and quit the application.
+4. Launch-at-login starts in the background without a black console window.
+5. Install PHP 8.4 and verify all 13 Laravel extensions before it becomes
    selectable.
-5. Install Node, Composer, and Laravel Installer; current versions must not show
+6. Install Node, Composer, and Laravel Installer; current versions must not show
    an Update action.
-6. Create a Laravel 13 project through the installed Laravel Installer. Keep
+7. Create a Laravel 13 project through the installed Laravel Installer. Keep
    visible progress for validation, installer preparation, project creation,
    optional Boost/Git, Node/npm/Vite, verification, registration, and result.
-7. Open the created site as `https://project.test/` without a port and verify
+8. Open the created site as `https://project.test/` without a port and verify
    static content, Laravel routes, POST, and a large request body.
-8. Trust HerdMe's local CA and install local-domain entries through GUI/UAC
+9. Trust HerdMe's local CA and install local-domain entries through GUI/UAC
    without a visible terminal. Preserve unrelated hosts-file entries.
-9. Send plain-text and multipart HTML email to port `2525` and inspect it.
-10. Send a Symfony VarDumper payload to port `9912` and inspect it.
-11. Install and trigger Xdebug for a selected site and verify the configured IDE
+10. Send plain-text and multipart HTML email to port `2525` and inspect it.
+11. Send a Symfony VarDumper payload to port `9912` and inspect it.
+12. Install and trigger Xdebug for a selected site and verify the configured IDE
     endpoint.
-12. Add MariaDB, MySQL, PostgreSQL, MongoDB, Redis, Meilisearch, MinIO, and
+13. Add MariaDB, MySQL, PostgreSQL, MongoDB, Redis, Meilisearch, MinIO, and
     RustFS. Verify automatic install, checksums, start/stop, persistence,
     loopback bindings, logs, and automatic startup.
-13. Confirm MySQL does not listen on `33060`, and MinIO/RustFS API and console
+14. For each running TablePlus-compatible database service, verify `Open in
+    TablePlus` launches TablePlus with the loopback host, configured port, and
+    managed default credentials. Hide the action while the service is stopped
+    and show a clear install message when TablePlus is unavailable.
+15. Confirm MySQL does not listen on `33060`, and MinIO/RustFS API and console
     listeners are loopback-only.
-14. Confirm newest PHP, Node, application, and service versions hide their
+16. Confirm newest PHP, Node, application, and service versions hide their
     Update actions.
-15. Confirm About shows MIT and third-party notices with no commercial gates.
+17. Confirm About shows MIT and third-party notices with no commercial gates.
 
 Use screenshots for visual failures. Before finishing each page, check long
 text, empty states, loading states, errors, disabled controls, and narrow window
@@ -224,4 +236,3 @@ The final response must state:
 Leave the verified application open for the user. Do not push code changes
 without the user's confirmation, but show `git status --short` and propose a
 focused commit containing only HerdMe changes made during Windows acceptance.
-

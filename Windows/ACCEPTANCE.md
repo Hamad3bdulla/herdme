@@ -20,6 +20,18 @@ Windows hardware.
 
 ## Native shell
 
+- [ ] On a clean Windows user profile, launch HerdMe and confirm the welcome
+  wizard appears before navigation and does not begin installing until `Set up
+  HerdMe` is pressed.
+- [ ] Run the wizard and confirm it shows local domains, HTTPS certificate, PHP
+  8.4 plus Laravel extension validation, Composer/Laravel Installer, Node.js 22,
+  and finishing in order. Approve the native UAC/trust prompts and confirm no
+  Command Prompt or PowerShell window appears.
+- [ ] Cancel one approval or disconnect the network, confirm the exact failed
+  step stays visible, then restore the prerequisite and retry successfully.
+- [ ] After success, restart HerdMe and confirm the wizard does not return.
+  Also open an installation upgraded from an older settings file and confirm it
+  goes directly to the normal application.
 - [ ] Verify General, Sites, PHP, Node, Services, Mail, Dumps, Debugger, Logs,
   and About render without clipping at 100%, 125%, and 150% display scaling.
 - [ ] Close the window, reopen it from the tray, and quit from the tray.

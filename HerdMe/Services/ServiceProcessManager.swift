@@ -761,18 +761,7 @@ final class ServiceProcessManager: @unchecked Sendable {
     }
 
     static func formulaTrustTarget(from output: String, expectedFormula: String) -> String? {
-        guard output.localizedCaseInsensitiveContains("untrusted tap"),
-              let match = output.range(
-                of: #"brew trust --formula [`']?([A-Za-z0-9._+/@-]+)"#,
-                options: .regularExpression
-              ) else { return nil }
-        let command = String(output[match])
-        guard let target = command.split(separator: " ").last.map(String.init)?
-            .trimmingCharacters(in: CharacterSet(charactersIn: "`'")),
-              target == expectedFormula || target.hasPrefix(expectedFormula + "@") else {
-            return nil
-        }
-        return target
+        HomebrewFormulaTrust.target(from: output, expectedFormula: expectedFormula)
     }
 
     static func databaseConflictRecoveryPlan(

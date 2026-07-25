@@ -23,6 +23,30 @@ var supportRoot = Path.Combine(
 );
 try
 {
+    var freshStore = new SiteConfigurationStore(Path.Combine(supportRoot, "fresh"));
+    Check(!freshStore.Load().OnboardingCompleted, "new installations require initial setup");
+    var legacyStore = new SiteConfigurationStore(Path.Combine(supportRoot, "legacy"));
+    Directory.CreateDirectory(Path.GetDirectoryName(legacyStore.SettingsPath)!);
+    File.WriteAllText(
+        legacyStore.SettingsPath,
+        """{"Roots":[],"LinkedSites":[],"Tld":"test"}"""
+    );
+    Check(
+        legacyStore.Load().OnboardingCompleted,
+        "settings created before onboarding remain completed"
+    );
+    Check(
+        InitialSetupStages.Installation.SequenceEqual([
+            InitialSetupStage.LocalDomains,
+            InitialSetupStage.Certificate,
+            InitialSetupStage.Php,
+            InitialSetupStage.Composer,
+            InitialSetupStage.Node,
+            InitialSetupStage.Finishing
+        ]),
+        "initial setup stages keep dependency order"
+    );
+
     var store = new SiteConfigurationStore(supportRoot);
     var root = Path.Combine(supportRoot, "Sites");
     var linked = Path.Combine(supportRoot, "Linked");
@@ -34,7 +58,8 @@ try
         StartAutomatically = true,
         ShowPreviews = false,
         AutomaticUpdates = false,
-        UpdateChannel = "beta"
+        UpdateChannel = "beta",
+        OnboardingCompleted = true
     });
     var settings = store.Load();
     Check(settings.Roots.SequenceEqual([Path.GetFullPath(root)]), "site roots are normalized");
@@ -44,6 +69,7 @@ try
     Check(!settings.ShowPreviews, "preview preference is persisted");
     Check(!settings.AutomaticUpdates, "automatic update preference is persisted");
     Check(settings.UpdateChannel == "Beta", "update channel is normalized");
+    Check(settings.OnboardingCompleted, "completed initial setup is persisted");
     var independentHome = Path.Combine(supportRoot, "independent-home");
     var otherHerd = Path.Combine(independentHome, "Herd");
     var otherHerdProject = Path.Combine(otherHerd, "project");

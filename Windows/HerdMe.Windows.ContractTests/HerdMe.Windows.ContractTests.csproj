@@ -11,6 +11,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="../HerdMe.Windows/Models/CoreModels.cs" Link="Models/CoreModels.cs" />
     <Compile Include="../HerdMe.Windows/Models/DumpModels.cs" Link="Models/DumpModels.cs" />
+    <Compile Include="../HerdMe.Windows/Models/InitialSetupModels.cs" Link="Models/InitialSetupModels.cs" />
     <Compile Include="../HerdMe.Windows/Models/LogModels.cs" Link="Models/LogModels.cs" />
     <Compile Include="../HerdMe.Windows/Models/MailModels.cs" Link="Models/MailModels.cs" />
     <Compile Include="../HerdMe.Windows/Models/ManagedServiceModels.cs" Link="Models/ManagedServiceModels.cs" />
@@ -18,7 +19,9 @@
     <Compile Include="../HerdMe.Windows/Models/PhpRuntimeModels.cs" Link="Models/PhpRuntimeModels.cs" />
     <Compile Include="../HerdMe.Windows/Models/ProjectCreationModels.cs" Link="Models/ProjectCreationModels.cs" />
     <Compile Include="../HerdMe.Windows/Models/SiteSettingsModels.cs" Link="Models/SiteSettingsModels.cs" />
+    <Compile Include="../HerdMe.Windows/Services/AppServices.cs" Link="Services/AppServices.cs" />
     <Compile Include="../HerdMe.Windows/Services/ComposerToolManager.cs" Link="Services/ComposerToolManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/InitialSetupManager.cs" Link="Services/InitialSetupManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/MailMimeParser.cs" Link="Services/MailMimeParser.cs" />
     <Compile Include="../HerdMe.Windows/Services/MailCaptureService.cs" Link="Services/MailCaptureService.cs" />
     <Compile Include="../HerdMe.Windows/Services/ServicePackageInstaller.cs" Link="Services/ServicePackageInstaller.cs" />

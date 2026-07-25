@@ -70,6 +70,11 @@ struct ServicesView: View {
                                         }
                                     case .running:
                                         Button("Stop") { model.stopService(instance) }
+                                        if model.canOpenServiceInTablePlus(instance) {
+                                            Button("Open in TablePlus") {
+                                                model.openServiceInTablePlus(instance)
+                                            }
+                                        }
                                         if model.canOpenServiceConsole(instance) {
                                             Button("Open Console") { model.openServiceConsole(instance) }
                                         }

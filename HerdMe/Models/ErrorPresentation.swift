@@ -23,6 +23,9 @@ struct ErrorPresentation: Equatable {
             || normalized.contains("network is unreachable")
             || normalized.contains("connection timed out") {
             message = "The download server could not be reached. Check the network connection and try again."
+        } else if normalized.contains("untrusted tap")
+            && normalized.contains("brew trust --formula") {
+            message = "Homebrew blocked the verified runtime formula. HerdMe could not approve it automatically; review Logs/homebrew.log and try again."
         } else if Self.isPlainMessage(cleaned) {
             message = cleaned
         } else {

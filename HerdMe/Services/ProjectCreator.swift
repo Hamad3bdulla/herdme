@@ -414,8 +414,13 @@ actor ProjectCreator {
 
     private var managedEnvironment: [String: String] {
         var environment = ProcessInfo.processInfo.environment
+        let temporaryDirectory = rootURL.appendingPathComponent("Cache/tmp", isDirectory: true)
+        try? FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
         environment["COMPOSER_HOME"] = rootURL.appendingPathComponent("Composer", isDirectory: true).path
         environment["COMPOSER_CACHE_DIR"] = rootURL.appendingPathComponent("Cache/composer", isDirectory: true).path
+        environment["TMPDIR"] = temporaryDirectory.path + "/"
+        environment["TMP"] = temporaryDirectory.path
+        environment["TEMP"] = temporaryDirectory.path
         environment["PATH"] = [
             rootURL.appendingPathComponent("bin", isDirectory: true).path,
             "/usr/bin", "/bin", "/usr/sbin", "/sbin"

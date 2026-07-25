@@ -1,4 +1,5 @@
 using HerdMe.Windows.Pages;
+using HerdMe.Windows.Services;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -10,12 +11,20 @@ namespace HerdMe.Windows;
 
 public sealed partial class MainWindow : Window
 {
-    public MainWindow()
+    public MainWindow(bool skipOnboarding = false)
     {
         InitializeComponent();
         ResizeWindow();
+        RequiresOnboarding = !skipOnboarding
+            && !AppServices.SiteSettings.Load().OnboardingCompleted;
+        Navigation.Visibility = RequiresOnboarding ? Visibility.Collapsed : Visibility.Visible;
+        Onboarding.Visibility = RequiresOnboarding ? Visibility.Visible : Visibility.Collapsed;
         Navigation.SelectedItem = Navigation.MenuItems[0];
     }
+
+    public bool RequiresOnboarding { get; private set; }
+
+    public event EventHandler? InitialSetupCompleted;
 
     private void ResizeWindow()
     {
@@ -70,5 +79,13 @@ public sealed partial class MainWindow : Window
                 ContentFrame.Navigate(typeof(GeneralPage));
                 break;
         }
+    }
+
+    private void Onboarding_SetupCompleted(object sender, EventArgs e)
+    {
+        RequiresOnboarding = false;
+        Onboarding.Visibility = Visibility.Collapsed;
+        Navigation.Visibility = Visibility.Visible;
+        InitialSetupCompleted?.Invoke(this, EventArgs.Empty);
     }
 }

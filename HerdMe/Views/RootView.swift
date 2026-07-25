@@ -5,12 +5,18 @@ struct RootView: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        HStack(spacing: 0) {
-            SidebarView()
-            Divider()
-            page
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(nsColor: .windowBackgroundColor))
+        Group {
+            if model.isPresentingOnboarding {
+                OnboardingView()
+            } else {
+                HStack(spacing: 0) {
+                    SidebarView()
+                    Divider()
+                    page
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                }
+            }
         }
         .herdTheme(model.configuration.theme)
         .background(WindowSizeController(page: model.selectedPage))

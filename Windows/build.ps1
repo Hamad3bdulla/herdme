@@ -55,7 +55,7 @@ if (-not $SkipTests) {
     if ($LASTEXITCODE -ne 0) { throw "The Windows contract tests failed." }
 
     $xamlFiles = @(Get-ChildItem (Join-Path $PSScriptRoot "HerdMe.Windows") -Recurse -Filter "*.xaml")
-    if ($xamlFiles.Count -lt 12) {
+    if ($xamlFiles.Count -lt 13) {
         throw "The native Windows project is missing expected XAML files."
     }
     $xmlSettings = [System.Xml.XmlReaderSettings]::new()

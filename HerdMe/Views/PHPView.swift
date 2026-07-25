@@ -55,6 +55,25 @@ struct PHPView: View {
 
             SettingsPanel {
                 VStack(spacing: 8) {
+                    SettingRow("Composer") {
+                        HStack(spacing: 8) {
+                            if model.runtimeOperation == "composer" {
+                                ProgressView().controlSize(.small)
+                                Text("Updating")
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text(model.composerVersion.map { "v\($0)" } ?? "Not installed")
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                if model.composerVersion == nil {
+                                    Button("Install") { model.updateComposer() }
+                                } else if model.isComposerUpdateAvailable {
+                                    Button("Update") { model.updateComposer() }
+                                }
+                            }
+                        }
+                    }
+                    PanelDivider()
                     SettingRow("Laravel Installer") {
                         HStack(spacing: 8) {
                             if model.runtimeOperation == "laravel-installer" {
@@ -99,6 +118,7 @@ struct PHPView: View {
         .onAppear {
             model.refresh()
             model.refreshPHPUpdates()
+            model.refreshComposer()
             model.refreshLaravelInstaller()
         }
     }

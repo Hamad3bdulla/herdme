@@ -224,7 +224,7 @@ function Assert-DumpCapture {
 $startedBySuite = $false
 $processes = @(Get-HerdMeProcesses)
 if ($processes.Count -eq 0) {
-    Start-Process -FilePath $executable | Out-Null
+    Start-Process -FilePath $executable -ArgumentList "--acceptance" | Out-Null
     $startedBySuite = $true
 }
 
