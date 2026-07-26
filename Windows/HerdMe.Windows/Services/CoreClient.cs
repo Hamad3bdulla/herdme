@@ -6,16 +6,20 @@ namespace HerdMe.Windows.Services;
 
 public sealed class CoreClient
 {
+    private static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(2);
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public string ExecutablePath { get; } = Path.Combine(
-        AppContext.BaseDirectory,
-        "Runtime",
-        "herdme-core.exe"
-    );
+    public CoreClient(string? executablePath = null)
+    {
+        ExecutablePath = string.IsNullOrWhiteSpace(executablePath)
+            ? Path.Combine(AppContext.BaseDirectory, "Runtime", "herdme-core.exe")
+            : Path.GetFullPath(executablePath);
+    }
+
+    public string ExecutablePath { get; }
 
     public async Task<DoctorResponse> DoctorAsync(CancellationToken cancellationToken = default)
     {
@@ -119,23 +123,40 @@ public sealed class CoreClient
 
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException($"{Path.GetFileName(executable)} could not be started.");
-        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        if (standardInput is not null)
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(OperationTimeout);
+        var outputTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
+        var errorTask = process.StandardError.ReadToEndAsync(timeout.Token);
+        try
         {
-            await process.StandardInput.WriteAsync(standardInput.AsMemory(), cancellationToken);
-            process.StandardInput.Close();
+            if (standardInput is not null)
+            {
+                await process.StandardInput.WriteAsync(standardInput.AsMemory(), timeout.Token);
+                process.StandardInput.Close();
+            }
+            await process.WaitForExitAsync(timeout.Token);
+            var output = await outputTask;
+            var error = await errorTask;
+            if (process.ExitCode != 0)
+            {
+                throw new InvalidOperationException(
+                    string.IsNullOrWhiteSpace(error) ? "HerdMe Core failed." : error.Trim()
+                );
+            }
+            return output;
         }
-        await process.WaitForExitAsync(cancellationToken);
-        var output = await outputTask;
-        var error = await errorTask;
-        if (process.ExitCode != 0)
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
-            throw new InvalidOperationException(
-                string.IsNullOrWhiteSpace(error) ? "HerdMe Core failed." : error.Trim()
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync(CancellationToken.None);
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new TimeoutException(
+                $"{Path.GetFileName(executable)} did not finish within {OperationTimeout.TotalSeconds:0} seconds."
             );
         }
-        return output;
     }
 
     private static T Deserialize<T>(string json)

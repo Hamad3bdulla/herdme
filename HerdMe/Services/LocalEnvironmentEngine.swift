@@ -5,6 +5,7 @@ enum LocalEnvironmentError: LocalizedError {
     case phpMissing
     case noSites
     case noAvailablePort
+    case unhealthy
     case processFailed(String)
 
     var errorDescription: String? {
@@ -15,6 +16,8 @@ enum LocalEnvironmentError: LocalizedError {
             "No local sites were found to start."
         case .noAvailablePort:
             "HerdMe could not find an available local development port."
+        case .unhealthy:
+            "The local site environment did not become healthy in time."
         case let .processFailed(site):
             "The local server for " + site + " could not be started."
         }
@@ -33,6 +36,7 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
     private(set) var ports: [String: Int] = [:]
     private(set) var proxyPort: Int?
     private(set) var httpsProxyPort: Int?
+    private(set) var httpsStartupError: String?
 
     init(rootURL: URL, certificateManager: LocalCertificateManager? = nil) {
         self.rootURL = rootURL
@@ -41,7 +45,18 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
     }
 
     var isRunning: Bool {
-        fpmManager.isRunning && gateways.values.contains(where: \.isRunning)
+        fpmManager.isHealthy
+            && !gateways.isEmpty
+            && gateways.values.allSatisfy(\.isHealthy)
+            && httpProxy.isHealthy
+            && (httpsProxyPort == nil || httpsProxy.isHealthy)
+    }
+
+    var hasManagedState: Bool {
+        fpmManager.isRunning
+            || !gateways.isEmpty
+            || proxyPort != nil
+            || httpsProxyPort != nil
     }
 
     func start(
@@ -50,13 +65,17 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
         defaultPHPCycle: String? = nil,
         tld: String,
         debuggerSettings: DebuggerSettings = .disabled,
-        phpRequestSettings: PHPRequestSettings = .default
-    ) throws -> [String: Int] {
+        phpRequestSettings: PHPRequestSettings = .default,
+        enableHTTPS: Bool = true
+    ) async throws -> [String: Int] {
         guard !sites.isEmpty else { throw LocalEnvironmentError.noSites }
         guard let defaultPHP, fileManager.isExecutableFile(atPath: defaultPHP.path) else {
             throw LocalEnvironmentError.phpMissing
         }
+        _ = Self.removeLegacyRouterArtifacts(rootURL: rootURL, fileManager: fileManager)
         if isRunning { return ports }
+        if hasManagedState { await stopAll() }
+        httpsStartupError = nil
 
         let logsDirectory = rootURL.appendingPathComponent("Log/sites", isDirectory: true)
         try fileManager.createDirectory(at: logsDirectory, withIntermediateDirectories: true)
@@ -84,7 +103,7 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
                         debugger: debuggerSettings,
                         request: phpRequestSettings
                     )
-                    fpmPort = try fpmManager.start(
+                    fpmPort = try await fpmManager.start(
                         executable: fpm,
                         identifier: "runtime-\(fpmPorts.count + 1)",
                         preferredPort: 9_070 + fpmPorts.count * 20,
@@ -94,6 +113,7 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
                 }
                 let documentRoot = Self.documentRoot(for: site)
                 let logURL = logsDirectory.appendingPathComponent(Self.safeName(site.name) + ".log")
+                try LogRotation.rotateIfNeeded(logURL)
                 if !fileManager.fileExists(atPath: logURL.path) {
                     fileManager.createFile(atPath: logURL.path, contents: nil)
                 }
@@ -114,29 +134,56 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
                 routes[site.domain(tld: tld)] = port
             }
             proxyPort = try httpProxy.start(routes: routes)
-            let identity = try certificateManager.prepareIdentity(tld: tld, domains: Array(routes.keys))
-            httpsProxyPort = try httpsProxy.start(
-                routes: routes,
-                identity: identity,
-                preferredPort: 443,
-                fallbackPort: 8_443
-            )
+            if enableHTTPS {
+                do {
+                    let identity = try certificateManager.prepareIdentity(
+                        tld: tld,
+                        domains: Array(routes.keys),
+                        allowKeychainInteraction: false
+                    )
+                    httpsProxyPort = try httpsProxy.start(
+                        routes: routes,
+                        identity: identity,
+                        preferredPort: 443,
+                        fallbackPort: 8_443
+                    )
+                } catch {
+                    httpsProxyPort = nil
+                    httpsStartupError = error.localizedDescription
+                }
+            } else {
+                httpsProxyPort = nil
+                httpsStartupError = "HTTPS is waiting for explicit Keychain approval."
+            }
+            guard try await waitUntilHealthy() else { throw LocalEnvironmentError.unhealthy }
             return ports
         } catch {
-            stopAll()
+            await stopAll()
             throw error
         }
     }
 
-    func stopAll() {
+    func stopAll() async {
         httpProxy.stop()
         httpsProxy.stop()
         proxyPort = nil
         httpsProxyPort = nil
         gateways.values.forEach { $0.stop() }
         gateways.removeAll()
-        fpmManager.stopAll()
+        await fpmManager.stopAll()
         ports.removeAll()
+    }
+
+    func stopAllImmediately() {
+        httpProxy.stop()
+        httpsProxy.stop()
+        proxyPort = nil
+        httpsProxyPort = nil
+        gateways.values.forEach { $0.stop() }
+        gateways.removeAll()
+        fpmManager.stopAllImmediately()
+        ports.removeAll()
+        httpsStartupError = nil
     }
 
     static func documentRoot(for site: SiteProject) -> URL {
@@ -148,24 +195,19 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
         return site.path
     }
 
-    static func routerScript(documentRoot: URL) -> String {
-        let escapedRoot = documentRoot.path
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-        return """
-        <?php
-        $public = '\(escapedRoot)';
-        $path = urldecode(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
-        if ($path !== '/' && is_file($public . $path)) {
-            return false;
+    @discardableResult
+    static func removeLegacyRouterArtifacts(
+        rootURL: URL,
+        fileManager: FileManager = .default
+    ) -> Bool {
+        let legacyRouters = rootURL.appendingPathComponent("Runtime/routers", isDirectory: true)
+        guard fileManager.fileExists(atPath: legacyRouters.path) else { return true }
+        do {
+            try fileManager.removeItem(at: legacyRouters)
+            return true
+        } catch {
+            return false
         }
-        $frontController = $public . '/index.php';
-        if (is_file($frontController)) {
-            require $frontController;
-            return true;
-        }
-        return false;
-        """
     }
 
     private func phpExecutable(for site: SiteProject) -> URL? {
@@ -186,10 +228,10 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
         return String(mapped)
     }
 
-    static func availablePort(startingAt start: Int) -> Int? {
+    static func availablePort(startingAt start: Int, excluding reserved: Set<Int> = []) -> Int? {
         guard start > 0, start <= 65_535 else { return nil }
         let end = min(start + 199, 65_535)
-        for port in start...end where canBind(port: port) {
+        for port in start...end where !reserved.contains(port) && canBind(port: port) {
             return port
         }
         return nil
@@ -219,5 +261,31 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
                 Darwin.bind(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0
             }
         }
+    }
+
+    static func canConnect(port: Int) -> Bool {
+        guard port > 0, port <= 65_535 else { return false }
+        let descriptor = socket(AF_INET, SOCK_STREAM, 0)
+        guard descriptor >= 0 else { return false }
+        defer { Darwin.close(descriptor) }
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = in_port_t(UInt16(port).bigEndian)
+        address.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
+        return withUnsafePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0
+            }
+        }
+    }
+
+    private func waitUntilHealthy() async throws -> Bool {
+        for _ in 0..<200 {
+            try Task.checkCancellation()
+            if isRunning { return true }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        return false
     }
 }

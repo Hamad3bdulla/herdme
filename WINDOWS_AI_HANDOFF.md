@@ -36,6 +36,9 @@ paid gates, or upgrade screens.
   Laravel-required extensions before enabling a runtime: `ctype`, `curl`,
   `dom`, `fileinfo`, `filter`, `hash`, `mbstring`, `openssl`, `pcre`, `pdo`,
   `session`, `tokenizer`, and `xml`.
+- New PHP installs and release checks accept only cycles 8.0 through 8.5. Keep
+  an older cycle such as 7.4 visible and selectable only when it is already
+  installed; never offer Install, Update, or Repair for that legacy cycle.
 - Adding a supported managed service must download, verify, install, and create
   it automatically. Do not show an Update action when the installed version is
   already the newest release.
@@ -51,21 +54,39 @@ paid gates, or upgrade screens.
 
 ## Current verified state
 
-The macOS app has passed 78 tests: 77 passed, one optional live Laravel test was
-skipped, and there were zero failures. Its live Laravel site works over trusted
-HTTPS without a visible port, and forced second-launch testing leaves one app
-process and one network helper.
+As of 2026-07-26, the current macOS source passes 151 XCTest cases: 149 pass,
+zero fail, and two optional integrations skip. The live Laravel and database
+gates have also passed separately. A fresh universal Release package, ZIP, and
+DMG pass signature, architecture, archive, and SHA-256 checks. The three
+installed sites return HTTP 200 without a visible port, with exactly one
+HerdMe process running. The latest Apple Development-signed Universal Release
+containing semantic update ordering was installed and reverified at 21:43
+Asia/Bahrain. Its ZIP and DMG signatures, archives, and SHA-256 sidecar pass.
+The current macOS source retries HTTPS non-interactively
+whenever the CA is trusted, including profiles with a stale approval marker. Do
+not record HTTPS as active until the newly installed build starts a listener
+and a live TLS request succeeds; credentials that still require Keychain
+interaction must continue to fall back to HTTP.
 
-The Windows non-UI C# contracts build with zero warnings and pass on macOS. All
-13 WinUI XAML files parse, every PowerShell script parses, and the contract
-project cross-publishes as PE32+ x86-64. Live release probes currently pass for
-supported services, PHP 8.0-8.5, Node 20/22/24/26, Composer, Laravel Installer,
-and matching Xdebug archives. The native WinUI build was not completed on
-macOS because the Windows App SDK invokes `XamlCompiler.exe`, which requires
-Windows. Do not treat the contract-test EXE as the application.
+The Windows non-UI C# contracts build with zero warnings and pass on macOS
+against the real C++ executable. They also prove semantic application-update
+ordering for stable, prerelease, numeric prerelease, and build-metadata cases.
+All 13 WinUI XAML files parse. The latest
+PowerShell acceptance changes must still be parsed and executed on Windows.
+The native WinUI build cannot complete on macOS because the Windows App SDK
+invokes `XamlCompiler.exe`, which requires Windows. Do not treat the contract
+test executable as the application.
 
-There was no Windows application ZIP before this handoff. The Windows machine
-must produce and test it.
+The hosted Windows x64 run for commit
+`66621e86b34674132577ea100b222dd9e6b68d3e` failed before producing an accepted
+artifact. The current worktree installs Inno Setup in CI, tests the Setup
+installer, and makes the public release gate install, verify, uninstall, and
+run the same Authenticode-signed artifacts that it publishes. Make sure these
+worktree changes are committed and pushed before using the hosted result as
+evidence.
+
+There is still no native Windows application ZIP proven by this macOS session.
+The Windows machine must produce and test it.
 
 ## Phase 1: inspect and prepare
 

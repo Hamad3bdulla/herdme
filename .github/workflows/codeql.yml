@@ -1,0 +1,81 @@
+name: CodeQL
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "23 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze ${{ matrix.language }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: swift
+            os: macos-15
+          - language: c-cpp
+            os: ubuntu-latest
+          - language: csharp
+            os: windows-2022
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: manual
+
+      - name: Install XcodeGen
+        if: matrix.language == 'swift'
+        run: brew install xcodegen
+
+      - name: Build Swift application
+        if: matrix.language == 'swift'
+        run: |
+          xcodegen generate
+          xcodebuild \
+            -project HerdMe.xcodeproj \
+            -scheme HerdMe \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/codeql-swift \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Build portable C++ core
+        if: matrix.language == 'c-cpp'
+        run: |
+          cmake -S Core -B build/codeql-core -DBUILD_TESTING=ON
+          cmake --build build/codeql-core --config Release
+
+      - name: Install .NET 8
+        if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build Windows application and contracts
+        if: matrix.language == 'csharp'
+        shell: pwsh
+        run: ./Windows/build.ps1 -Architecture x64 -Configuration Release
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
+        with:
+          category: /language:${{ matrix.language }}

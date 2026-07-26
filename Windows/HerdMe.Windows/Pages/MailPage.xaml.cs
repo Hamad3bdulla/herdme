@@ -6,12 +6,16 @@ using Microsoft.UI.Xaml.Controls;
 using Windows.ApplicationModel.DataTransfer;
 using System.Net;
 using System.Runtime.InteropServices;
+using Microsoft.Web.WebView2.Core;
 
 namespace HerdMe.Windows.Pages;
 
 public sealed partial class MailPage : Page
 {
     private readonly MailCaptureService mail = AppServices.Mail;
+    private readonly List<CapturedMail> allMessages = [];
+    private bool previewConfigured;
+    private Guid? previewMessageId;
 
     public ObservableCollection<CapturedMail> Messages { get; } = [];
 
@@ -36,8 +40,8 @@ public sealed partial class MailPage : Page
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            Messages.Insert(0, message);
-            MessageList.SelectedItem = message;
+            allMessages.Insert(0, message);
+            ApplyFilter(message.MatchesSearch(SearchBox.Text) ? message.Id : null);
         });
     }
 
@@ -72,27 +76,45 @@ public sealed partial class MailPage : Page
         ShowMessage(MessageList.SelectedItem as CapturedMail);
     }
 
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        ApplyFilter();
+    }
+
     private void Delete_Click(object sender, RoutedEventArgs e)
     {
         if (MessageList.SelectedItem is not CapturedMail message) return;
         mail.Delete(message);
-        Messages.Remove(message);
-        MessageList.SelectedItem = Messages.FirstOrDefault();
-        ShowMessage(MessageList.SelectedItem as CapturedMail);
+        allMessages.Remove(message);
+        ApplyFilter();
     }
 
     private void Clear_Click(object sender, RoutedEventArgs e)
     {
         mail.Clear();
+        allMessages.Clear();
         Messages.Clear();
         ShowMessage(null);
     }
 
     private void Reload()
     {
+        allMessages.Clear();
+        allMessages.AddRange(mail.Load());
+        ApplyFilter();
+    }
+
+    private void ApplyFilter(Guid? preferredMessageId = null)
+    {
+        var selectedId = preferredMessageId ?? (MessageList.SelectedItem as CapturedMail)?.Id;
         Messages.Clear();
-        foreach (var message in mail.Load()) Messages.Add(message);
-        MessageList.SelectedItem = Messages.FirstOrDefault();
+        foreach (var message in allMessages.Where(message => message.MatchesSearch(SearchBox.Text)))
+        {
+            Messages.Add(message);
+        }
+        MessageList.SelectedItem = Messages.FirstOrDefault(message => message.Id == selectedId)
+            ?? Messages.FirstOrDefault();
+        ShowMessage(MessageList.SelectedItem as CapturedMail);
     }
 
     private void ShowMessage(CapturedMail? message)
@@ -108,20 +130,118 @@ public sealed partial class MailPage : Page
 
     private async Task UpdatePreviewAsync(CapturedMail? message)
     {
+        MailPreviewFailureState.Visibility = Visibility.Collapsed;
+        HtmlPreview.Visibility = Visibility.Visible;
         try
         {
             await HtmlPreview.EnsureCoreWebView2Async();
-            HtmlPreview.CoreWebView2.Settings.IsScriptEnabled = false;
-            HtmlPreview.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = false;
-            HtmlPreview.CoreWebView2.Settings.IsWebMessageEnabled = false;
-            HtmlPreview.CoreWebView2.Settings.AreDevToolsEnabled = false;
+            if (!IsSelected(message)) return;
+            ConfigurePreviewOnce();
             var html = message?.HtmlBody
-                ?? $"<pre style=\"white-space:pre-wrap\">{WebUtility.HtmlEncode(message?.Body ?? string.Empty)}</pre>";
+                ?? $"<pre>{WebUtility.HtmlEncode(message?.Body ?? string.Empty)}</pre>";
+            previewMessageId = message?.Id;
             HtmlPreview.NavigateToString(MailMimeParser.SafeHtmlDocument(html));
         }
         catch (Exception error) when (error is InvalidOperationException or COMException)
         {
+            await ReportPreviewFailureAsync("initialization", message, error.ToString());
+            if (IsSelected(message)) ShowMailPreviewFailure();
         }
+    }
+
+    private async void HtmlPreview_NavigationCompleted(
+        WebView2 sender,
+        CoreWebView2NavigationCompletedEventArgs args
+    )
+    {
+        if (!IsCurrentPreviewSelection()) return;
+        if (args.IsSuccess)
+        {
+            MailPreviewFailureState.Visibility = Visibility.Collapsed;
+            HtmlPreview.Visibility = Visibility.Visible;
+            return;
+        }
+        await ReportPreviewFailureAsync(
+            "navigation",
+            MessageList.SelectedItem as CapturedMail,
+            $"WebView2 status: {args.WebErrorStatus}"
+        );
+        ShowMailPreviewFailure();
+    }
+
+    private void RetryMailPreview_Click(object sender, RoutedEventArgs e)
+    {
+        _ = UpdatePreviewAsync(MessageList.SelectedItem as CapturedMail);
+    }
+
+    private void ShowMailPreviewFailure()
+    {
+        HtmlPreview.Visibility = Visibility.Collapsed;
+        MailPreviewFailureState.Visibility = Visibility.Visible;
+    }
+
+    private bool IsSelected(CapturedMail? message)
+    {
+        return (MessageList.SelectedItem as CapturedMail)?.Id == message?.Id;
+    }
+
+    private bool IsCurrentPreviewSelection()
+    {
+        return (MessageList.SelectedItem as CapturedMail)?.Id == previewMessageId;
+    }
+
+    private static Task<bool> ReportPreviewFailureAsync(
+        string stage,
+        CapturedMail? message,
+        string details
+    )
+    {
+        return DiagnosticLog.WriteFailureAsync(
+            "mail-preview",
+            stage,
+            message is null
+                ? "The empty mail preview failed."
+                : $"The preview for message {message.Id:D} failed.",
+            details
+        );
+    }
+
+    private void ConfigurePreviewOnce()
+    {
+        if (previewConfigured) return;
+        var core = HtmlPreview.CoreWebView2;
+        core.Settings.IsScriptEnabled = false;
+        core.Settings.AreDefaultScriptDialogsEnabled = false;
+        core.Settings.IsWebMessageEnabled = false;
+        core.Settings.AreDevToolsEnabled = false;
+        core.NavigationStarting += Preview_NavigationStarting;
+        core.NewWindowRequested += Preview_NewWindowRequested;
+        core.DownloadStarting += Preview_DownloadStarting;
+        previewConfigured = true;
+    }
+
+    private static void Preview_NavigationStarting(
+        CoreWebView2 sender,
+        CoreWebView2NavigationStartingEventArgs args
+    )
+    {
+        if (!MailMimeParser.IsPreviewNavigationAllowed(args.Uri)) args.Cancel = true;
+    }
+
+    private static void Preview_NewWindowRequested(
+        CoreWebView2 sender,
+        CoreWebView2NewWindowRequestedEventArgs args
+    )
+    {
+        args.Handled = true;
+    }
+
+    private static void Preview_DownloadStarting(
+        CoreWebView2 sender,
+        CoreWebView2DownloadStartingEventArgs args
+    )
+    {
+        args.Cancel = true;
     }
 
     private void UpdateServerState()

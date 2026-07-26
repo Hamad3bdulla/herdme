@@ -27,7 +27,7 @@ struct RuntimeInspector {
                 ) ?? cycle
                 result[cycle] = version
             }
-        let known = Set(["8.5", "8.4", "8.3", "8.2", "8.1", "8.0", "7.4"] + installed.keys)
+        let known = Set(PHPRuntimeSupport.installableCycles + installed.keys)
         return known.sorted { $0.compare($1, options: .numeric) == .orderedDescending }.map { cycle in
             RuntimeVersion(
                 cycle: cycle,

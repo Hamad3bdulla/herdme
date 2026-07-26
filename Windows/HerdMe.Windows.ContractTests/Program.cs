@@ -2,10 +2,25 @@ using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
+
+if (args.SequenceEqual(["-m"], StringComparer.Ordinal))
+{
+    Console.WriteLine("[PHP Modules]");
+    foreach (var module in new[]
+    {
+        "ctype", "curl", "dom", "fileinfo", "filter", "hash", "mbstring",
+        "openssl", "pcre", "pdo", "session", "tokenizer", "xml"
+    })
+    {
+        Console.WriteLine(module);
+    }
+    return;
+}
 
 var verifyLiveServices = args.Contains("--live-service-releases", StringComparer.Ordinal);
 var verifyLiveRuntimes = args.Contains("--live-runtime-releases", StringComparer.Ordinal);
@@ -17,23 +32,309 @@ if (verifyLiveServices || verifyLiveRuntimes)
     return;
 }
 
+var repositoryRoot = FindRepositoryRoot();
+VerifyReleaseAndInstallerContracts(repositoryRoot);
+
 var supportRoot = Path.Combine(
     Path.GetTempPath(),
     "herdme-windows-contracts-" + Guid.NewGuid().ToString("N")
 );
 try
 {
+    var coreExecutable = Environment.GetEnvironmentVariable("HERDME_CORE_TEST_EXECUTABLE");
+    if (!string.IsNullOrWhiteSpace(coreExecutable))
+    {
+        await VerifyCoreClientAsync(coreExecutable, supportRoot);
+    }
+
+    using (var downloadClient = ManagedDownloadClient.Create())
+    {
+        Check(
+            downloadClient.Timeout == TimeSpan.FromMinutes(10),
+            "managed downloads use an explicit bounded timeout"
+        );
+        Check(
+            downloadClient.DefaultRequestHeaders.UserAgent.Any(value =>
+                value.Product?.Name == "HerdMe"),
+            "managed downloads identify HerdMe to upstream servers"
+        );
+    }
+    var transientDownloadHandler = new SequenceHttpMessageHandler(
+        _ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
+        _ => new HttpResponseMessage(HttpStatusCode.TooManyRequests),
+        _ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("recovered")
+        }
+    );
+    using (var retryingClient = ManagedDownloadClient.Create(
+        transientDownloadHandler,
+        maximumAttempts: 3,
+        delayFactory: _ => TimeSpan.Zero
+    ))
+    {
+        Check(
+            await retryingClient.GetStringAsync("https://downloads.example.test/runtime")
+                == "recovered"
+                && transientDownloadHandler.CallCount == 3,
+            "managed downloads retry 429 and 5xx responses before succeeding"
+        );
+    }
+    var networkFailureHandler = new SequenceHttpMessageHandler(
+        _ => throw new HttpRequestException("temporary connection failure"),
+        _ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("connected")
+        }
+    );
+    using (var retryingClient = ManagedDownloadClient.Create(
+        networkFailureHandler,
+        maximumAttempts: 3,
+        delayFactory: _ => TimeSpan.Zero
+    ))
+    {
+        Check(
+            await retryingClient.GetStringAsync("https://downloads.example.test/network")
+                == "connected"
+                && networkFailureHandler.CallCount == 2,
+            "managed downloads retry transient connection failures"
+        );
+    }
+    var permanentFailureHandler = new SequenceHttpMessageHandler(
+        _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+        _ => new HttpResponseMessage(HttpStatusCode.OK)
+    );
+    using (var retryingClient = ManagedDownloadClient.Create(
+        permanentFailureHandler,
+        maximumAttempts: 3,
+        delayFactory: _ => TimeSpan.Zero
+    ))
+    {
+        using var response = await retryingClient.GetAsync(
+            "https://downloads.example.test/missing"
+        );
+        Check(
+            response.StatusCode == HttpStatusCode.NotFound
+                && permanentFailureHandler.CallCount == 1,
+            "managed downloads do not retry permanent HTTP failures"
+        );
+    }
+    var unsafeRequestHandler = new SequenceHttpMessageHandler(
+        _ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
+        _ => new HttpResponseMessage(HttpStatusCode.OK)
+    );
+    using (var retryingClient = ManagedDownloadClient.Create(
+        unsafeRequestHandler,
+        maximumAttempts: 3,
+        delayFactory: _ => TimeSpan.Zero
+    ))
+    {
+        using var response = await retryingClient.PostAsync(
+            "https://downloads.example.test/mutate",
+            new StringContent("payload")
+        );
+        Check(
+            response.StatusCode == HttpStatusCode.ServiceUnavailable
+                && unsafeRequestHandler.CallCount == 1,
+            "managed downloads never retry non-idempotent requests"
+        );
+    }
+    var cancelledDownloadHandler = new SequenceHttpMessageHandler(
+        _ => throw new TaskCanceledException("cancelled fixture"),
+        _ => new HttpResponseMessage(HttpStatusCode.OK)
+    );
+    using (var retryingClient = ManagedDownloadClient.Create(
+        cancelledDownloadHandler,
+        maximumAttempts: 3,
+        delayFactory: _ => TimeSpan.Zero
+    ))
+    {
+        await ThrowsAsync<TaskCanceledException>(
+            () => retryingClient.GetAsync("https://downloads.example.test/cancelled"),
+            "managed downloads propagate cancellation without retrying"
+        );
+        Check(
+            cancelledDownloadHandler.CallCount == 1,
+            "managed downloads issue no request after cancellation"
+        );
+    }
+
+    var maintenanceRoot = Path.Combine(supportRoot, "storage-maintenance");
+    var boundedLogPath = Path.Combine(maintenanceRoot, "app.log");
+    Directory.CreateDirectory(maintenanceRoot);
+    File.WriteAllBytes(boundedLogPath, Enumerable.Repeat((byte)'A', 64).ToArray());
+    BoundedLog.AppendLine(boundedLogPath, "new entry", maximumBytes: 32, archiveCount: 2);
+    Check(File.ReadAllBytes(boundedLogPath + ".1").Length == 64, "oversized Windows logs are rotated");
+    Check(File.ReadAllText(boundedLogPath) == "new entry" + Environment.NewLine, "logging continues after rotation");
+    Check(
+        await DiagnosticLog.WriteFailureAsync(
+            "contracts",
+            "fixture-failure",
+            "The contract fixture failed.",
+            "fixture details",
+            maintenanceRoot
+        ),
+        "structured Windows diagnostics can be persisted"
+    );
+    var diagnosticLine = File.ReadAllLines(
+        Path.Combine(maintenanceRoot, "Log", "diagnostics.jsonl")
+    ).Single();
+    using (var diagnostic = JsonDocument.Parse(diagnosticLine))
+    {
+        Check(
+            diagnostic.RootElement.GetProperty("level").GetString() == "error"
+                && diagnostic.RootElement.GetProperty("area").GetString() == "contracts"
+                && diagnostic.RootElement.GetProperty("event").GetString() == "fixture-failure"
+                && diagnostic.RootElement.GetProperty("exception").GetString() == "fixture details",
+            "structured Windows diagnostics preserve searchable fields"
+        );
+    }
+    await DiagnosticLog.WriteFailureAsync(
+        "contracts",
+        "fixture-failure",
+        "The contract fixture failed.",
+        "fixture details",
+        maintenanceRoot
+    );
+    Check(
+        File.ReadAllLines(Path.Combine(maintenanceRoot, "Log", "diagnostics.jsonl")).Length == 1,
+        "identical Windows diagnostic failures are recorded only once"
+    );
+    Check(
+        UnhandledExceptionPolicy.CanRecover(new InvalidOperationException("recoverable"))
+            && !UnhandledExceptionPolicy.CanRecover(new OutOfMemoryException())
+            && !UnhandledExceptionPolicy.CanRecover(new AccessViolationException()),
+        "the Windows unhandled-error boundary continues only after recoverable failures"
+    );
+    Check(
+        UnhandledExceptionPolicy.UserMessage(new InvalidOperationException("Visible failure"))
+            == "Visible failure"
+            && UnhandledExceptionPolicy.UserMessage(new Exception(string.Empty)).Contains(
+                "HerdMe's logs",
+                StringComparison.Ordinal
+            ),
+        "the Windows unhandled-error boundary always provides actionable user text"
+    );
+
+    var zipPolicyRoot = Path.Combine(supportRoot, "safe-zip");
+    Directory.CreateDirectory(zipPolicyRoot);
+    var validZip = Path.Combine(zipPolicyRoot, "valid.zip");
+    using (var archive = ZipFile.Open(validZip, ZipArchiveMode.Create))
+    {
+        var directory = archive.CreateEntry("runtime/");
+        directory.ExternalAttributes = 0x10;
+        var executable = archive.CreateEntry("runtime/tool.exe");
+        await using var output = executable.Open();
+        await output.WriteAsync(new byte[] { 1, 2, 3, 4 });
+    }
+    var validExtraction = Path.Combine(zipPolicyRoot, "valid-output");
+    await SafeZipExtractor.ExtractAsync(validZip, validExtraction);
+    Check(
+        File.ReadAllBytes(Path.Combine(validExtraction, "runtime", "tool.exe"))
+            .SequenceEqual(new byte[] { 1, 2, 3, 4 }),
+        "safe ZIP extraction preserves regular files inside the destination"
+    );
+
+    var traversalZip = Path.Combine(zipPolicyRoot, "traversal.zip");
+    using (var archive = ZipFile.Open(traversalZip, ZipArchiveMode.Create))
+    {
+        archive.CreateEntry("../outside.exe");
+    }
+    await ThrowsAsync<InvalidDataException>(
+        () => SafeZipExtractor.ExtractAsync(
+            traversalZip,
+            Path.Combine(zipPolicyRoot, "traversal-output")
+        ),
+        "safe ZIP extraction rejects parent traversal"
+    );
+
+    var symbolicLinkZip = Path.Combine(zipPolicyRoot, "symbolic-link.zip");
+    using (var archive = ZipFile.Open(symbolicLinkZip, ZipArchiveMode.Create))
+    {
+        var link = archive.CreateEntry("runtime-link");
+        link.ExternalAttributes = unchecked((int)0xA1FF0000);
+        await using var output = link.Open();
+        await output.WriteAsync(Encoding.UTF8.GetBytes("../outside"));
+    }
+    await ThrowsAsync<InvalidDataException>(
+        () => SafeZipExtractor.ExtractAsync(
+            symbolicLinkZip,
+            Path.Combine(zipPolicyRoot, "symbolic-link-output")
+        ),
+        "safe ZIP extraction rejects symbolic links"
+    );
+
+    await ThrowsAsync<InvalidDataException>(
+        () => SafeZipExtractor.ExtractAsync(
+            validZip,
+            Path.Combine(zipPolicyRoot, "entry-limit-output"),
+            maximumEntries: 1
+        ),
+        "safe ZIP extraction enforces the entry-count limit"
+    );
+    await ThrowsAsync<InvalidDataException>(
+        () => SafeZipExtractor.ExtractAsync(
+            validZip,
+            Path.Combine(zipPolicyRoot, "size-limit-output"),
+            maximumExpandedBytes: 3
+        ),
+        "safe ZIP extraction enforces the expanded-size limit"
+    );
+
+    var captureDirectory = Path.Combine(maintenanceRoot, "captures");
+    Directory.CreateDirectory(captureDirectory);
+    var retentionNow = new DateTimeOffset(2026, 7, 26, 0, 0, 0, TimeSpan.Zero);
+    foreach (var (name, age) in new[]
+    {
+        ("expired", TimeSpan.FromDays(40)),
+        ("oldest", TimeSpan.FromDays(3)),
+        ("middle", TimeSpan.FromDays(2)),
+        ("newest", TimeSpan.FromDays(1))
+    })
+    {
+        var path = Path.Combine(captureDirectory, name + ".json");
+        File.WriteAllText(path, "{}");
+        File.SetLastWriteTimeUtc(path, (retentionNow - age).UtcDateTime);
+    }
+    CaptureRetention.Prune(
+        captureDirectory,
+        itemLimit: 2,
+        maximumAge: TimeSpan.FromDays(30),
+        now: retentionNow
+    );
+    Check(
+        Directory.EnumerateFiles(captureDirectory, "*.json")
+            .Select(Path.GetFileName)
+            .Order(StringComparer.Ordinal)
+            .SequenceEqual(["middle.json", "newest.json"]),
+        "Windows capture retention removes expired and excess files"
+    );
+
     var freshStore = new SiteConfigurationStore(Path.Combine(supportRoot, "fresh"));
-    Check(!freshStore.Load().OnboardingCompleted, "new installations require initial setup");
+    var freshSettings = freshStore.Load();
+    Check(!freshSettings.OnboardingCompleted, "new installations require initial setup");
+    Check(
+        freshSettings.SchemaVersion == SiteConfigurationStore.CurrentSchemaVersion,
+        "new Windows site settings use the current schema"
+    );
     var legacyStore = new SiteConfigurationStore(Path.Combine(supportRoot, "legacy"));
     Directory.CreateDirectory(Path.GetDirectoryName(legacyStore.SettingsPath)!);
     File.WriteAllText(
         legacyStore.SettingsPath,
         """{"Roots":[],"LinkedSites":[],"Tld":"test"}"""
     );
+    var migratedLegacySettings = legacyStore.Load();
     Check(
-        legacyStore.Load().OnboardingCompleted,
+        migratedLegacySettings.OnboardingCompleted,
         "settings created before onboarding remain completed"
+    );
+    Check(
+        migratedLegacySettings.SchemaVersion == SiteConfigurationStore.CurrentSchemaVersion
+            && File.ReadAllText(legacyStore.SettingsPath).Contains(
+                $"\"SchemaVersion\": {SiteConfigurationStore.CurrentSchemaVersion}",
+                StringComparison.Ordinal
+            ),
+        "legacy Windows site settings are migrated and persisted"
     );
     Check(
         InitialSetupStages.Installation.SequenceEqual([
@@ -45,6 +346,52 @@ try
             InitialSetupStage.Finishing
         ]),
         "initial setup stages keep dependency order"
+    );
+
+    var corruptSiteStore = new SiteConfigurationStore(Path.Combine(supportRoot, "corrupt-sites"));
+    Directory.CreateDirectory(Path.GetDirectoryName(corruptSiteStore.SettingsPath)!);
+    const string corruptSiteJson = "{ invalid site settings";
+    File.WriteAllText(corruptSiteStore.SettingsPath, corruptSiteJson);
+    var recoveredSiteSettings = corruptSiteStore.Load();
+    Check(!recoveredSiteSettings.OnboardingCompleted, "corrupt site settings fall back without completing setup");
+    Check(!File.Exists(corruptSiteStore.SettingsPath), "corrupt site settings are not left to be overwritten");
+    Check(
+        corruptSiteStore.LastBackupPath is { } siteBackup
+            && File.ReadAllText(siteBackup) == corruptSiteJson
+            && corruptSiteStore.LastLoadWarning?.Contains(siteBackup, StringComparison.Ordinal) == true,
+        "corrupt site settings are preserved and reported"
+    );
+
+    var futureSiteStore = new SiteConfigurationStore(Path.Combine(supportRoot, "future-sites"));
+    Directory.CreateDirectory(Path.GetDirectoryName(futureSiteStore.SettingsPath)!);
+    var futureSchemaVersion = SiteConfigurationStore.CurrentSchemaVersion + 1;
+    var futureSiteJson =
+        $"{{\"SchemaVersion\":{futureSchemaVersion},\"Roots\":[\"future\"],\"FutureOnly\":\"preserve\"}}";
+    File.WriteAllText(futureSiteStore.SettingsPath, futureSiteJson);
+    var futureFallback = futureSiteStore.Load();
+    Check(
+        futureFallback.SchemaVersion == SiteConfigurationStore.CurrentSchemaVersion,
+        "future Windows site settings fall back to the supported schema"
+    );
+    Check(
+        !File.Exists(futureSiteStore.SettingsPath)
+            && futureSiteStore.LastBackupPath is { } futureBackup
+            && File.ReadAllText(futureBackup) == futureSiteJson
+            && futureSiteStore.LastLoadWarning?.Contains("newer release", StringComparison.Ordinal) == true,
+        "future Windows site settings are preserved and never replaced"
+    );
+
+    var corruptServices = new WindowsServiceManager(Path.Combine(supportRoot, "corrupt-services"));
+    Directory.CreateDirectory(Path.GetDirectoryName(corruptServices.ConfigurationPath)!);
+    const string corruptServicesJson = "{ invalid service settings";
+    File.WriteAllText(corruptServices.ConfigurationPath, corruptServicesJson);
+    Check(corruptServices.LoadInstances().Count == 0, "corrupt service settings fall back to an empty list");
+    Check(!File.Exists(corruptServices.ConfigurationPath), "corrupt service settings are not left to be overwritten");
+    Check(
+        corruptServices.LastBackupPath is { } serviceBackup
+            && File.ReadAllText(serviceBackup) == corruptServicesJson
+            && corruptServices.LastLoadWarning?.Contains(serviceBackup, StringComparison.Ordinal) == true,
+        "corrupt service settings are preserved and reported"
     );
 
     var store = new SiteConfigurationStore(supportRoot);
@@ -70,6 +417,23 @@ try
     Check(!settings.AutomaticUpdates, "automatic update preference is persisted");
     Check(settings.UpdateChannel == "Beta", "update channel is normalized");
     Check(settings.OnboardingCompleted, "completed initial setup is persisted");
+    Check(
+        settings.SchemaVersion == SiteConfigurationStore.CurrentSchemaVersion,
+        "saved Windows site settings use the current schema"
+    );
+    var refusedFutureSave = false;
+    try
+    {
+        store.Save(new WindowsSiteSettings
+        {
+            SchemaVersion = SiteConfigurationStore.CurrentSchemaVersion + 1
+        });
+    }
+    catch (InvalidOperationException)
+    {
+        refusedFutureSave = true;
+    }
+    Check(refusedFutureSave, "Windows refuses to overwrite settings with a future schema");
     var independentHome = Path.Combine(supportRoot, "independent-home");
     var otherHerd = Path.Combine(independentHome, "Herd");
     var otherHerdProject = Path.Combine(otherHerd, "project");
@@ -146,6 +510,190 @@ try
         Path = Path.Combine(root, "store"),
         Framework = "Node.js"
     };
+    var routingKey = WindowsLocalEnvironment.ConfigurationKey([site, other], "8.4");
+    Check(
+        routingKey == WindowsLocalEnvironment.ConfigurationKey([other, site], "8.4"),
+        "site environment configuration is independent of scan order"
+    );
+    var equivalentSite = new SiteRecord
+    {
+        Name = site.Name,
+        Domain = "DEMO-API.LOCAL-TEST.",
+        Path = site.Path.ToUpperInvariant(),
+        Framework = site.Framework,
+        Linked = site.Linked,
+        PhpVersion = site.PhpVersion,
+        NodeVersion = site.NodeVersion
+    };
+    Check(
+        routingKey == WindowsLocalEnvironment.ConfigurationKey([equivalentSite, other], "8.4"),
+        "site environment configuration normalizes Windows domains and paths"
+    );
+    var differentPhpSite = new SiteRecord
+    {
+        Name = site.Name,
+        Domain = site.Domain,
+        Path = site.Path,
+        Framework = site.Framework,
+        Linked = site.Linked,
+        PhpVersion = "8.3",
+        NodeVersion = site.NodeVersion
+    };
+    Check(
+        routingKey != WindowsLocalEnvironment.ConfigurationKey([differentPhpSite, other], "8.4"),
+        "site environment configuration changes with the selected PHP runtime"
+    );
+    Check(
+        routingKey != WindowsLocalEnvironment.ConfigurationKey([site, other], "8.3"),
+        "site environment configuration changes with the default PHP runtime"
+    );
+    Check(
+        WindowsCertificateManager.NormalizeDomains([
+            " B.TEST. ",
+            "a.test",
+            "b.test",
+            "not a domain"
+        ]).SequenceEqual(["a.test", "b.test"]),
+        "Windows certificate domains are validated, normalized, and sorted"
+    );
+    Check(
+        WindowsCertificateManager.ServerCertificateCacheKey(["b.test", "A.TEST."])
+            == WindowsCertificateManager.ServerCertificateCacheKey(["a.test", "b.test"]),
+        "Windows server certificate reuse is independent of domain order and case"
+    );
+    Check(
+        WindowsCertificateManager.ServerCertificateCacheKey(["a.test"])
+            != WindowsCertificateManager.ServerCertificateCacheKey(["a.test", "b.test"]),
+        "Windows server certificates are renewed when the domain set changes"
+    );
+    Check(
+        WindowsCredentialStore.BuildTarget(
+            "ManagedServices/v1",
+            "67de23e7-a688-4402-818f-37149b45ff86"
+        ) == "HerdMe/ManagedServices/v1/67de23e7-a688-4402-818f-37149b45ff86",
+        "the shared Windows credential store preserves managed-service target names"
+    );
+    Throws<ArgumentException>(
+        () => WindowsCredentialStore.BuildTarget("Certificates/v1", "../authority"),
+        "Windows credential account names reject separators and traversal"
+    );
+    var authorityAccount = WindowsCertificateManager.PasswordAccount(
+        WindowsCertificateManager.AuthorityCredentialKind,
+        new byte[] { 1, 2, 3, 4 }
+    );
+    Check(
+        authorityAccount.StartsWith("authority-pfx-password-", StringComparison.Ordinal)
+            && authorityAccount.Length == "authority-pfx-password-".Length + 64
+            && authorityAccount == WindowsCertificateManager.PasswordAccount(
+                WindowsCertificateManager.AuthorityCredentialKind,
+                new byte[] { 1, 2, 3, 4 }
+            )
+            && authorityAccount != WindowsCertificateManager.PasswordAccount(
+                WindowsCertificateManager.AuthorityCredentialKind,
+                new byte[] { 1, 2, 3, 5 }
+            ),
+        "certificate credential accounts are deterministic and bound to PFX contents"
+    );
+
+    var credentialMigrationRoot = Path.Combine(supportRoot, "credential-migration");
+    Directory.CreateDirectory(credentialMigrationRoot);
+    var credentialBackend = new MemoryCredentialBackend();
+    var certificateCredentialStore = new WindowsCredentialStore(
+        WindowsCertificateManager.CredentialScope,
+        credentialBackend
+    );
+    var legacyAuthorityPassword = Path.Combine(credentialMigrationRoot, "authority.password");
+    File.WriteAllText(legacyAuthorityPassword, "  legacy-authority-password  \n");
+    Check(
+        certificateCredentialStore.ReadOrMigrate(authorityAccount, legacyAuthorityPassword)
+            == "legacy-authority-password"
+            && !File.Exists(legacyAuthorityPassword)
+            && credentialBackend.Secrets[
+                WindowsCredentialStore.BuildTarget(
+                    WindowsCertificateManager.CredentialScope,
+                    authorityAccount
+                )
+            ] == "legacy-authority-password",
+        "legacy certificate passwords are verified in Credential Manager before plaintext deletion"
+    );
+
+    var failedMigrationPath = Path.Combine(credentialMigrationRoot, "server.password");
+    File.WriteAllText(failedMigrationPath, "server-password-that-must-remain");
+    credentialBackend.FailWrites = true;
+    Throws<IOException>(
+        () => certificateCredentialStore.ReadOrMigrate(
+            WindowsCertificateManager.PasswordAccount(
+                WindowsCertificateManager.ServerCredentialKind,
+                new byte[] { 9, 8, 7, 6 }
+            ),
+            failedMigrationPath
+        ),
+        "failed Windows credential migration is reported"
+    );
+    credentialBackend.FailWrites = false;
+    Check(
+        File.ReadAllText(failedMigrationPath) == "server-password-that-must-remain",
+        "failed Windows credential migration keeps the plaintext recovery source"
+    );
+
+    var invalidProtectedPath = Path.Combine(credentialMigrationRoot, "invalid-protected.password");
+    File.WriteAllText(invalidProtectedPath, "plaintext-recovery-password");
+    var invalidProtectedAccount = WindowsCertificateManager.PasswordAccount(
+        WindowsCertificateManager.ServerCredentialKind,
+        new byte[] { 5, 6, 7, 8 }
+    );
+    credentialBackend.Secrets[
+        WindowsCredentialStore.BuildTarget(
+            WindowsCertificateManager.CredentialScope,
+            invalidProtectedAccount
+        )
+    ] = string.Empty;
+    Throws<InvalidDataException>(
+        () => certificateCredentialStore.ReadOrMigrate(
+            invalidProtectedAccount,
+            invalidProtectedPath
+        ),
+        "invalid protected Windows credentials are reported"
+    );
+    Check(
+        File.ReadAllText(invalidProtectedPath) == "plaintext-recovery-password",
+        "invalid protected credentials never delete a valid plaintext recovery source"
+    );
+
+    var rejectedUnlockPath = Path.Combine(credentialMigrationRoot, "rejected-unlock.password");
+    File.WriteAllText(rejectedUnlockPath, "legacy-unlock-password");
+    var rejectedUnlockAccount = WindowsCertificateManager.PasswordAccount(
+        WindowsCertificateManager.ServerCredentialKind,
+        new byte[] { 4, 3, 2, 1 }
+    );
+    Throws<InvalidDataException>(
+        () => certificateCredentialStore.ReadOrMigrate(
+            rejectedUnlockAccount,
+            rejectedUnlockPath,
+            validator: _ => false
+        ),
+        "certificate migration rejects credentials that cannot unlock their PFX"
+    );
+    Check(
+        File.ReadAllText(rejectedUnlockPath) == "legacy-unlock-password"
+            && !credentialBackend.Secrets.ContainsKey(
+                WindowsCredentialStore.BuildTarget(
+                    WindowsCertificateManager.CredentialScope,
+                    rejectedUnlockAccount
+                )
+            ),
+        "failed PFX validation preserves plaintext and rolls back the protected credential"
+    );
+
+    var redundantLegacyPath = Path.Combine(credentialMigrationRoot, "redundant.password");
+    File.WriteAllText(redundantLegacyPath, "obsolete-plaintext");
+    certificateCredentialStore.Write(authorityAccount, "protected-authority-password");
+    Check(
+        certificateCredentialStore.ReadOrMigrate(authorityAccount, redundantLegacyPath)
+            == "protected-authority-password"
+            && !File.Exists(redundantLegacyPath),
+        "verified protected credentials remove leftover plaintext password files"
+    );
     Check(SitePresentation.Filter([site, other], "laravel").SequenceEqual([site]), "site search includes framework");
     Check(SitePresentation.Filter([site, other], "STORE").SequenceEqual([other]), "site search is case-insensitive");
     Check(SitePresentation.Filter([site, other], " ").Count == 2, "empty site search returns every site");
@@ -202,6 +750,11 @@ try
         LogPresentation.FilterLines(logContent, " ") == logContent,
         "an empty log search preserves the original content"
     );
+    Check(
+        LogPresentation.SiteLogRoot(Path.Combine(supportRoot, "demo"))
+            == Path.Combine(supportRoot, "demo", "storage", "logs"),
+        "Laravel logs resolve inside the selected site's storage directory"
+    );
 
     Check(ManagedServiceCatalog.Get("mongodb").DefaultPort == 27_017, "Windows service catalog includes MongoDB");
     Check(ManagedServiceCatalog.Get("mysql").DefaultPort == 3_306, "Windows service catalog includes MySQL");
@@ -222,6 +775,136 @@ try
         !string.IsNullOrWhiteSpace(typesenseDefinition.UnavailableReason),
         "Typesense explains why native Windows installation is unavailable"
     );
+    Check(
+        WindowsServiceManager.AvailablePort(
+            3_306,
+            new HashSet<int> { 3_306, 3_307 },
+            port => port != 3_308
+        ) == 3_309,
+        "service port selection skips configured and externally unavailable ports"
+    );
+    Check(
+        WindowsServiceManager.AvailablePort(
+            65_535,
+            new HashSet<int> { 65_535, 1_024 },
+            _ => true
+        ) == 1_025,
+        "service port selection wraps safely after the final TCP port"
+    );
+    var externalServiceListener = new TcpListener(IPAddress.Loopback, 0);
+    externalServiceListener.Start();
+    try
+    {
+        var externalPort = ((IPEndPoint)externalServiceListener.LocalEndpoint).Port;
+        var suggestedPort = WindowsServiceManager.AvailablePort(externalPort);
+        Check(
+            suggestedPort is not null
+                && suggestedPort != externalPort
+                && WindowsServiceManager.IsPortAvailable(suggestedPort.Value),
+            "service port selection proposes a free loopback port after an external conflict"
+        );
+        using var externalProbe = new TcpClient();
+        await externalProbe.ConnectAsync(IPAddress.Loopback, externalPort)
+            .WaitAsync(TimeSpan.FromSeconds(2));
+        Check(
+            externalProbe.Connected,
+            "service port recovery never terminates the external port owner"
+        );
+    }
+    finally
+    {
+        externalServiceListener.Stop();
+    }
+
+    var environmentProject = Path.Combine(supportRoot, "environment-project");
+    Directory.CreateDirectory(environmentProject);
+    await File.WriteAllTextAsync(
+        Path.Combine(environmentProject, ".env.example"),
+        "APP_NAME=Example\r\n# Keep this comment\r\nDB_HOST=localhost\r\n"
+    );
+    var environmentInstance = new ManagedServiceInstance
+    {
+        DefinitionId = "mysql",
+        Name = "Local MySQL",
+        Port = 3_306
+    };
+    var environmentCredentials = new ServiceCredentials(
+        "herdme_testuser",
+        "test_secret_0123456789_ABCDEFGHIJKLMNOP"
+    );
+    var firstEnvironmentUpdate = ServiceEnvironmentFile.Update(
+        environmentProject,
+        environmentInstance,
+        environmentCredentials
+    );
+    Check(firstEnvironmentUpdate.CreatedFile, "service .env updates start from .env.example");
+    Check(
+        firstEnvironmentUpdate.UpdatedKeys == 1 && firstEnvironmentUpdate.AddedKeys == 5,
+        "service .env updates report replaced and appended variables"
+    );
+    environmentInstance.Port = 3_307;
+    var secondEnvironmentUpdate = ServiceEnvironmentFile.Update(
+        environmentProject,
+        environmentInstance,
+        environmentCredentials
+    );
+    var environmentContents = await File.ReadAllTextAsync(
+        Path.Combine(environmentProject, ".env")
+    );
+    Check(
+        !secondEnvironmentUpdate.CreatedFile
+            && secondEnvironmentUpdate.UpdatedKeys == 6
+            && secondEnvironmentUpdate.AddedKeys == 0,
+        "service .env updates replace existing variables without appending duplicates"
+    );
+    Check(
+        environmentContents.Contains("# Keep this comment\r\n", StringComparison.Ordinal)
+            && environmentContents.Contains("DB_PORT=3307\r\n", StringComparison.Ordinal),
+        "service .env updates preserve CRLF and unrelated comments"
+    );
+    Check(
+        environmentContents.Split("\r\n").Count(line => line.StartsWith("DB_HOST=", StringComparison.Ordinal)) == 1,
+        "service .env updates keep one effective assignment per managed key"
+    );
+    var rustFsEnvironment = ServiceEnvironmentConfiguration.Variables(
+        new ManagedServiceInstance
+        {
+            DefinitionId = "rustfs",
+            Name = "RustFS",
+            Port = 9_000
+        },
+        environmentCredentials
+    ).ToDictionary(variable => variable.Key, variable => variable.Value);
+    Check(
+        rustFsEnvironment["AWS_ACCESS_KEY_ID"] == environmentCredentials.Username
+            && rustFsEnvironment["AWS_SECRET_ACCESS_KEY"] == environmentCredentials.Secret
+            && rustFsEnvironment["AWS_ENDPOINT"] == "http://127.0.0.1:9000",
+        "RustFS .env variables match its managed local credentials"
+    );
+    var mysqlEnvironment = ServiceEnvironmentConfiguration.Variables(
+        environmentInstance,
+        environmentCredentials
+    ).ToDictionary(variable => variable.Key, variable => variable.Value);
+    Check(
+        mysqlEnvironment["DB_USERNAME"] == environmentCredentials.Username
+            && mysqlEnvironment["DB_PASSWORD"] == environmentCredentials.Secret,
+        "database .env variables use the managed credentials"
+    );
+    foreach (var definition in ManagedServiceCatalog.All)
+    {
+        Check(
+            ServiceEnvironmentConfiguration.Variables(
+                new ManagedServiceInstance
+                {
+                    DefinitionId = definition.Id,
+                    Name = definition.Name,
+                    Port = definition.DefaultPort
+                },
+                environmentCredentials
+            ).Count > 0,
+            $"service catalog exposes .env variables for {definition.Id}"
+        );
+    }
     var unsupportedInstaller = new ServicePackageInstaller();
     foreach (var definition in new[] { valkeyDefinition, typesenseDefinition })
     {
@@ -397,6 +1080,7 @@ try
     var mysqlRuntime = Directory.GetParent(Path.GetDirectoryName(mysqlExecutable)!)!.FullName;
     var mysqlLaunch = WindowsServiceManager.BuildLaunchSpec(mysqlInstance, mysqlExecutable, mysqlData);
     Check(mysqlLaunch.Arguments.SequenceEqual([
+        "--no-defaults",
         "--console",
         "--basedir=" + mysqlRuntime,
         "--datadir=" + mysqlData,
@@ -456,11 +1140,22 @@ try
         Port = 9_001
     };
     var rustFsData = Path.Combine("C:\\HerdMe", "Services", "rustfs", "data");
+    var rustFsCredentials = ServiceCredentialGenerator.Create(rustFsInstance.Id);
+    var otherCredentials = ServiceCredentialGenerator.Create(Guid.NewGuid());
+    Check(
+        rustFsCredentials.IsValid
+            && otherCredentials.IsValid
+            && rustFsCredentials.Secret != otherCredentials.Secret
+            && rustFsCredentials.Username != otherCredentials.Username
+            && !rustFsCredentials.Secret.Contains("herdme-local-service", StringComparison.Ordinal),
+        "managed service credentials are random, valid, and unique per instance"
+    );
     var rustFsLaunch = WindowsServiceManager.BuildLaunchSpec(
         rustFsInstance,
         Path.Combine("C:\\HerdMe", "rustfs", "rustfs.exe"),
         rustFsData,
-        9_002
+        9_002,
+        rustFsCredentials
     );
     Check(
         rustFsLaunch.Arguments.SequenceEqual([
@@ -469,6 +1164,137 @@ try
             "--console-address", "127.0.0.1:9002"
         ]),
         "RustFS launch binds its API and console to loopback"
+    );
+    Check(
+        rustFsLaunch.Environment["RUSTFS_ACCESS_KEY"] == rustFsCredentials.Username
+            && rustFsLaunch.Environment["RUSTFS_SECRET_KEY"] == rustFsCredentials.Secret,
+        "RustFS launch credentials match generated .env values"
+    );
+    var rustFsLaunchEnvironment = ServiceEnvironmentConfiguration.Variables(
+        rustFsInstance,
+        rustFsCredentials
+    ).ToDictionary(variable => variable.Key, variable => variable.Value);
+    Check(
+        rustFsLaunch.Environment["RUSTFS_ACCESS_KEY"]
+                == rustFsLaunchEnvironment["AWS_ACCESS_KEY_ID"]
+            && rustFsLaunch.Environment["RUSTFS_SECRET_KEY"]
+                == rustFsLaunchEnvironment["AWS_SECRET_ACCESS_KEY"],
+        "RustFS launch and .env export use exactly the same managed credentials"
+    );
+    var tablePlusMySql = TablePlusConnection.UriFor(
+        new ManagedServiceInstance
+        {
+            DefinitionId = "mysql",
+            Name = "MySQL",
+            Port = 3_307
+        },
+        environmentCredentials
+    );
+    var tablePlusPostgreSql = TablePlusConnection.UriFor(
+        new ManagedServiceInstance
+        {
+            DefinitionId = "postgresql",
+            Name = "PostgreSQL",
+            Port = 5_433
+        },
+        environmentCredentials
+    );
+    var tablePlusRedis = TablePlusConnection.UriFor(new ManagedServiceInstance
+    {
+        DefinitionId = "valkey",
+        Name = "Valkey",
+        Port = 6_380
+    });
+    Check(
+        tablePlusMySql is not null
+            && tablePlusMySql.Scheme == "mysql"
+            && tablePlusMySql.UserInfo.Contains(environmentCredentials.Username, StringComparison.Ordinal)
+            && tablePlusMySql.UserInfo.Contains(environmentCredentials.Secret, StringComparison.Ordinal)
+            && tablePlusMySql.Host == "127.0.0.1"
+            && tablePlusMySql.Port == 3_307
+            && tablePlusMySql.AbsolutePath == "/mysql",
+        "Windows TablePlus MySQL links use the managed loopback connection"
+    );
+    Check(
+        TablePlusConnection.DisplayAddress(new ManagedServiceInstance
+        {
+            DefinitionId = "mysql",
+            Name = "MySQL",
+            Port = 3_307
+        }) == "mysql://127.0.0.1:3307/mysql"
+            && !TablePlusConnection.DisplayAddress(new ManagedServiceInstance
+            {
+                DefinitionId = "mysql",
+                Name = "MySQL",
+                Port = 3_307
+            })!.Contains(environmentCredentials.Secret, StringComparison.Ordinal),
+        "Windows service rows reveal a password-free database connection address"
+    );
+    Check(
+        tablePlusPostgreSql is not null
+            && tablePlusPostgreSql.Scheme == "postgresql"
+            && tablePlusPostgreSql.UserInfo.Contains(environmentCredentials.Username, StringComparison.Ordinal)
+            && tablePlusPostgreSql.UserInfo.Contains(environmentCredentials.Secret, StringComparison.Ordinal)
+            && tablePlusPostgreSql.Port == 5_433
+            && tablePlusPostgreSql.AbsolutePath == "/postgres",
+        "Windows TablePlus PostgreSQL links preserve the managed username"
+    );
+    Check(
+        tablePlusRedis is not null
+            && tablePlusRedis.Scheme == "redis"
+            && tablePlusRedis.Port == 6_380
+            && tablePlusRedis.AbsolutePath == "/0"
+            && TablePlusConnection.UriFor(new ManagedServiceInstance
+            {
+                DefinitionId = "minio",
+                Name = "MinIO",
+                Port = 9_000
+            }) is null,
+        "Windows TablePlus links cover cache services and reject unsupported services"
+    );
+    Check(
+        TablePlusConnection.DisplayAddress(new ManagedServiceInstance
+        {
+            DefinitionId = "minio",
+            Name = "MinIO",
+            Port = 9_000
+        }) is null,
+        "Windows service rows hide connection addresses for unsupported services"
+    );
+    Check(
+        TablePlusConnection.UriFor(new ManagedServiceInstance
+        {
+            DefinitionId = "mysql",
+            Name = "MySQL",
+            Port = 3_306
+        }) is null,
+        "database TablePlus links require managed credentials"
+    );
+    var mysqlProvisioningSql = DatabaseServiceAuthenticator.MySqlProvisioningSql(
+        environmentCredentials
+    );
+    Check(
+        mysqlProvisioningSql.Contains(
+            $"'{environmentCredentials.Username}'@'127.0.0.1'",
+            StringComparison.Ordinal
+        )
+            && mysqlProvisioningSql.Contains(
+                $"IDENTIFIED BY '{environmentCredentials.Secret}'",
+                StringComparison.Ordinal
+            )
+            && mysqlProvisioningSql.Contains("ALTER USER 'root'@'localhost'", StringComparison.Ordinal)
+            && mysqlProvisioningSql.Contains("DELETE FROM mysql.user WHERE User = ''", StringComparison.Ordinal),
+        "MySQL provisioning creates managed credentials and removes passwordless accounts"
+    );
+    var securedHba = DatabaseServiceAuthenticator.SecurePostgreSqlHba(
+        "# keep\r\nlocal all all trust\r\nhost all all 127.0.0.1/32 trust # loopback\r\nhostssl all all ::1/128 scram-sha-256\r\n"
+    );
+    Check(
+        securedHba.Changed
+            && !securedHba.Contents.Contains(" all trust", StringComparison.Ordinal)
+            && securedHba.Contents.Contains("scram-sha-256 # loopback", StringComparison.Ordinal)
+            && securedHba.Contents.Contains("# keep\r\n", StringComparison.Ordinal),
+        "PostgreSQL migration replaces trust rules while preserving comments and CRLF"
     );
     var currentServiceRow = new ManagedServiceRow
     {
@@ -482,6 +1308,7 @@ try
         IsUpdateAvailable = false
     };
     Check(!currentServiceRow.CanInstallOrUpdate, "current service releases hide the update button");
+    Check(!currentServiceRow.CanOpenInTablePlus, "stopped databases hide the TablePlus action");
     var outdatedServiceRow = new ManagedServiceRow
     {
         Id = Guid.NewGuid(),
@@ -508,6 +1335,18 @@ try
     };
     Check(runningStorageRow.CanOpenConsole, "running storage services expose their console action");
     Check(!currentServiceRow.CanOpenConsole, "services without a console hide the console action");
+    var runningDatabaseRow = new ManagedServiceRow
+    {
+        Id = Guid.NewGuid(),
+        DefinitionId = "mongodb",
+        Name = "MongoDB",
+        Port = 27_017,
+        Version = "8.0.28",
+        State = ManagedServiceState.Running,
+        StartAutomatically = false,
+        IsUpdateAvailable = false
+    };
+    Check(runningDatabaseRow.CanOpenInTablePlus, "running databases expose the TablePlus action");
 
     var hosts = WindowsHostsManager.Render(
         "127.0.0.1 localhost\n"
@@ -586,17 +1425,36 @@ try
     );
     Check(message.Subject == "مرحبا", "mail headers decode RFC 2047 text");
     Check(message.Body == "Hello mail", "mail quoted-printable text decodes");
+    Check(message.MatchesSearch(""), "empty mail searches keep every message");
+    Check(message.MatchesSearch("SENDER@EXAMPLE.TEST"), "mail searches match senders without case sensitivity");
+    Check(message.MatchesSearch("مرحبا"), "mail searches match decoded subjects");
+    Check(message.MatchesSearch("recipient@example.test"), "mail searches match recipients");
+    Check(!message.MatchesSearch("Hello mail"), "mail searches do not inspect private message bodies");
+    Check(!message.MatchesSearch("does-not-exist"), "mail searches reject unrelated metadata");
     var htmlBody = message.HtmlBody ?? throw new InvalidOperationException("Failed contract: mail HTML is present");
     Check(htmlBody == "<b>Hello mail</b>", "mail Base64 HTML decodes");
+    var safeMailPreview = MailMimeParser.SafeHtmlDocument(htmlBody);
+    Check(safeMailPreview.Contains("default-src 'none'"), "mail HTML preview blocks external content");
+    Check(safeMailPreview.Contains("form-action 'none'"), "mail HTML preview blocks forms");
+    Check(safeMailPreview.Contains("frame-src 'none'"), "mail HTML preview blocks frames");
     Check(
-        MailMimeParser.SafeHtmlDocument(htmlBody).Contains("default-src 'none'"),
-        "mail HTML preview includes its restrictive CSP"
+        safeMailPreview.Contains("style-src 'sha256-48hOXKVM1rwpXip/9XRIr0XijcrNP/RHiD+a7aSGrzg='")
+            && !safeMailPreview.Contains("unsafe-inline"),
+        "mail HTML preview allows only HerdMe's hashed stylesheet"
+    );
+    Check(
+        MailMimeParser.IsPreviewNavigationAllowed("about:blank")
+            && MailMimeParser.IsPreviewNavigationAllowed("about:blank#message")
+            && !MailMimeParser.IsPreviewNavigationAllowed("https://example.test")
+            && !MailMimeParser.IsPreviewNavigationAllowed("data:text/html,unsafe"),
+        "mail HTML preview navigation remains inside its generated document"
     );
 
     await TestMailCaptureAsync(supportRoot);
     await TestDumpCaptureAsync(supportRoot);
     await TestFastCgiClientAsync();
     await TestLocalHttpSiteServerAsync(supportRoot);
+    await TestCancelledCommandKillsTreeAsync(supportRoot);
 
     var laravelArguments = LaravelProjectCreator.BuildLaravelArguments(
         new LaravelProjectRequest(
@@ -629,6 +1487,13 @@ try
         ]),
         "Laravel custom starter kits use the official package option"
     );
+    var stagingFixture = Path.Combine(supportRoot, ".herdme-create-contract");
+    Directory.CreateDirectory(Path.Combine(stagingFixture, "partial", "vendor"));
+    var readOnlyFixture = Path.Combine(stagingFixture, "partial", "artisan");
+    await File.WriteAllTextAsync(readOnlyFixture, "fixture");
+    File.SetAttributes(readOnlyFixture, File.GetAttributes(readOnlyFixture) | FileAttributes.ReadOnly);
+    LaravelProjectCreator.DeleteStagingDirectory(stagingFixture);
+    Check(!Directory.Exists(stagingFixture), "Laravel project staging cleanup removes read-only partial trees");
     var installerFailure = CommandErrorPresenter.Present(
         """
         {"success":false,"directory":"C:\\\\Users\\\\Demo\\\\HerdMe\\\\demo-app","log":"C:\\\\Temp\\\\laravel-installer.log","tail":"UnexpectedValueException at vendor/monolog/monolog/src/Monolog/Handler/StreamHandler.php:164: The stream could not be opened in append mode."}
@@ -787,9 +1652,9 @@ try
         """
         {
           "releases": [
-            { "version": "1.0.0", "build": 10, "channel": "stable", "notes": "Current", "downloadURL": null },
-            { "version": "1.0.1", "build": 1, "channel": "beta", "notes": "Beta", "downloadURL": "https://example.test/beta" },
-            { "version": "1.0.0", "build": 11, "channel": "stable", "notes": "Build update", "downloadURL": null }
+            { "version": "1.0.0", "build": 10, "channel": "stable", "notes": "Current", "downloadURLs": { "macOS": "https://example.test/current-macos", "windowsX64": "https://example.test/current-windows" } },
+            { "version": "1.0.1", "build": 1, "channel": "beta", "notes": "Beta", "downloadURLs": { "macOS": "https://example.test/beta-macos", "windowsX64": "https://example.test/beta-windows" } },
+            { "version": "1.0.0", "build": 11, "channel": "stable", "notes": "Build update", "downloadURLs": { "macOS": "https://example.test/build-macos", "windowsX64": "https://example.test/build-windows" } }
           ]
         }
         """
@@ -799,8 +1664,142 @@ try
     Check(stableUpdate.AvailableRelease?.Build == 11, "equal versions compare release builds");
     var betaUpdate = await updateManager.CheckAsync("Beta");
     Check(betaUpdate.AvailableRelease?.Version == "1.0.1", "beta channel includes beta releases");
+    Check(
+        betaUpdate.AvailableRelease?.PlatformDownloadUrl == "https://example.test/beta-windows",
+        "Windows update checks select the Windows x64 artifact"
+    );
     var currentManager = new AppUpdateManager(updateFeed, "1.0.1", 1);
     Check(!(await currentManager.CheckAsync("Beta")).IsAvailable, "current beta release is up to date");
+
+    var semanticUpdateFeed = Path.Combine(supportRoot, "semantic-release-manifest.json");
+    await File.WriteAllTextAsync(
+        semanticUpdateFeed,
+        """
+        {
+          "releases": [
+            { "version": "1.0.0-beta.10", "build": 99, "channel": "beta", "notes": "Prerelease", "downloadURLs": { "macOS": "https://example.test/prerelease-macos", "windowsX64": "https://example.test/prerelease-windows" } },
+            { "version": "1.0.0", "build": 1, "channel": "stable", "notes": "Stable", "downloadURLs": { "macOS": "https://example.test/stable-macos", "windowsX64": "https://example.test/stable-windows" } }
+          ]
+        }
+        """
+    );
+    var semanticUpdateManager = new AppUpdateManager(
+        semanticUpdateFeed,
+        "1.0.0-beta.9",
+        100
+    );
+    Check(
+        (await semanticUpdateManager.CheckAsync("Beta")).AvailableRelease?.Version == "1.0.0",
+        "stable application releases outrank prereleases regardless of build number"
+    );
+    Check(
+        RuntimeVersionComparison.Compare("1.0.0-beta.10", "1.0.0-beta.2") > 0,
+        "application prerelease identifiers use semantic numeric precedence"
+    );
+    Check(
+        RuntimeVersionComparison.Compare("1.0.0+macos", "1.0.0+windows") == 0,
+        "application build metadata does not affect semantic precedence"
+    );
+
+    var signedUpdateFeed = Path.Combine(supportRoot, "signed-release-manifest.json");
+    var updatePayload = await File.ReadAllBytesAsync(updateFeed);
+    using var updateSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+    var updateParameters = updateSigner.ExportParameters(false);
+    var updatePublicKey = new byte[65];
+    updatePublicKey[0] = 4;
+    updateParameters.Q.X!.CopyTo(updatePublicKey, 1);
+    updateParameters.Q.Y!.CopyTo(updatePublicKey, 33);
+    var updateSignature = updateSigner.SignData(
+        updatePayload,
+        HashAlgorithmName.SHA256,
+        DSASignatureFormat.Rfc3279DerSequence
+    );
+    await File.WriteAllTextAsync(
+        signedUpdateFeed,
+        JsonSerializer.Serialize(new
+        {
+            algorithm = "ECDSA_P256_SHA256",
+            payload = Convert.ToBase64String(updatePayload),
+            signature = Convert.ToBase64String(updateSignature)
+        })
+    );
+    var signedUpdateManager = new AppUpdateManager(
+        signedUpdateFeed,
+        "1.0.0",
+        10,
+        Convert.ToBase64String(updatePublicKey)
+    );
+    Check(
+        (await signedUpdateManager.CheckAsync("Stable")).AvailableRelease?.Build == 11,
+        "signed update feeds verify with the bundled public key"
+    );
+
+    updateSignature[^1] ^= 1;
+    await File.WriteAllTextAsync(
+        signedUpdateFeed,
+        JsonSerializer.Serialize(new
+        {
+            algorithm = "ECDSA_P256_SHA256",
+            payload = Convert.ToBase64String(updatePayload),
+            signature = Convert.ToBase64String(updateSignature)
+        })
+    );
+    await ThrowsAsync<InvalidDataException>(
+        async () => { _ = await signedUpdateManager.CheckAsync("Stable"); },
+        "tampered update feeds are rejected"
+    );
+
+    var legacyUpdatePayload = Encoding.UTF8.GetBytes(
+        """
+        { "releases": [
+          { "version": "1.0.1", "build": 2, "channel": "stable", "notes": "Legacy", "downloadURL": "https://example.test/herdme.zip" }
+        ] }
+        """
+    );
+    var legacyUpdateSignature = updateSigner.SignData(
+        legacyUpdatePayload,
+        HashAlgorithmName.SHA256,
+        DSASignatureFormat.Rfc3279DerSequence
+    );
+    await File.WriteAllTextAsync(
+        signedUpdateFeed,
+        JsonSerializer.Serialize(new
+        {
+            algorithm = "ECDSA_P256_SHA256",
+            payload = Convert.ToBase64String(legacyUpdatePayload),
+            signature = Convert.ToBase64String(legacyUpdateSignature)
+        })
+    );
+    await ThrowsAsync<InvalidDataException>(
+        async () => { _ = await signedUpdateManager.CheckAsync("Stable"); },
+        "signed feeds without both platform artifacts are rejected"
+    );
+
+    var sharedArtifactPayload = Encoding.UTF8.GetBytes(
+        """
+        { "releases": [
+          { "version": "1.0.1", "build": 2, "channel": "stable", "notes": "Invalid shared artifact", "downloadURLs": { "macOS": "https://example.test/herdme.zip", "windowsX64": "https://example.test/herdme.zip" } }
+        ] }
+        """
+    );
+    var sharedArtifactSignature = updateSigner.SignData(
+        sharedArtifactPayload,
+        HashAlgorithmName.SHA256,
+        DSASignatureFormat.Rfc3279DerSequence
+    );
+    await File.WriteAllTextAsync(
+        signedUpdateFeed,
+        JsonSerializer.Serialize(new
+        {
+            algorithm = "ECDSA_P256_SHA256",
+            payload = Convert.ToBase64String(sharedArtifactPayload),
+            signature = Convert.ToBase64String(sharedArtifactSignature)
+        })
+    );
+    await ThrowsAsync<InvalidDataException>(
+        async () => { _ = await signedUpdateManager.CheckAsync("Stable"); },
+        "signed feeds cannot reuse one artifact for both platforms"
+    );
     Check(RuntimeVersionComparison.IsNewer("v22.24.0", "22.23.1"), "runtime updates detect newer versions");
     Check(!RuntimeVersionComparison.IsNewer("5.31.0", "v5.31.0"), "current runtimes do not show updates");
     Check(
@@ -851,8 +1850,27 @@ try
         """
     );
     var phpInspector = new PhpRuntimeInstaller(supportRoot: phpSupportRoot);
+    Check(
+        PhpRuntimeInstaller.SupportedCycles.SequenceEqual(
+            new[] { "8.5", "8.4", "8.3", "8.2", "8.1", "8.0" }
+        ),
+        "PHP install policy matches the supported UI cycles"
+    );
+    Check(!PhpRuntimeInstaller.IsSupportedCycle("7.4"), "PHP 7.4 is not offered for new installs");
+    await ThrowsAsync<ArgumentOutOfRangeException>(
+        async () => { _ = await phpInspector.ResolveReleaseAsync("7.4"); },
+        "unsupported PHP release checks fail before network access"
+    );
     Check(phpInspector.IsInstalled("8.4"), "managed PHP requires both CLI and CGI executables");
     Check(phpInspector.InstalledVersion("8.4") == "8.4.14", "managed PHP reads its release manifest");
+    var legacyPhpRuntime = Path.Combine(phpSupportRoot, "Runtimes", "php", "7.4");
+    Directory.CreateDirectory(legacyPhpRuntime);
+    await File.WriteAllBytesAsync(Path.Combine(legacyPhpRuntime, "php.exe"), []);
+    await File.WriteAllBytesAsync(Path.Combine(legacyPhpRuntime, "php-cgi.exe"), []);
+    Check(
+        phpInspector.InstalledCycles().Contains("7.4", StringComparer.Ordinal),
+        "installed legacy PHP remains visible and selectable"
+    );
 }
 finally
 {
@@ -860,6 +1878,183 @@ finally
 }
 
 Console.WriteLine("HerdMe Windows cross-platform contract tests passed");
+
+static string FindRepositoryRoot()
+{
+    foreach (var seed in new[] { Environment.CurrentDirectory, AppContext.BaseDirectory })
+    {
+        for (var directory = new DirectoryInfo(seed); directory is not null; directory = directory.Parent)
+        {
+            if (
+                File.Exists(Path.Combine(directory.FullName, "VERSION"))
+                && File.Exists(Path.Combine(directory.FullName, "Windows", "installer.iss"))
+            ) {
+                return directory.FullName;
+            }
+        }
+    }
+    throw new DirectoryNotFoundException("The HerdMe repository root could not be located.");
+}
+
+static void VerifyReleaseAndInstallerContracts(string repositoryRoot)
+{
+    var version = File.ReadAllText(Path.Combine(repositoryRoot, "VERSION")).Trim();
+    var versionParts = version.Split('.');
+    Check(
+        versionParts.Length == 3
+            && versionParts.All(part =>
+                uint.TryParse(part, out var value) && value <= ushort.MaxValue),
+        "release version components fit Windows four-part file versions"
+    );
+    var buildText = File.ReadAllText(Path.Combine(repositoryRoot, "BUILD_NUMBER")).Trim();
+    Check(
+        uint.TryParse(buildText, out var buildNumber)
+            && buildNumber is > 0 and <= ushort.MaxValue,
+        "release build number fits Windows four-part file versions"
+    );
+
+    var installerPath = Path.Combine(repositoryRoot, "Windows", "installer.iss");
+    var installerText = File.ReadAllText(installerPath);
+    var setup = ParseInnoSection(installerText, "Setup");
+    Check(
+        setup.GetValueOrDefault("PrivilegesRequired") == "lowest"
+            && setup.GetValueOrDefault("DefaultDirName") == @"{localappdata}\Programs\HerdMe",
+        "the Windows installer remains per-user and does not require elevation"
+    );
+    Check(
+        setup.GetValueOrDefault("ArchitecturesAllowed") == "x64compatible"
+            && setup.GetValueOrDefault("ArchitecturesInstallIn64BitMode") == "x64compatible",
+        "the Windows installer preserves its x64 architecture contract"
+    );
+    Check(
+        setup.GetValueOrDefault("MinVersion") == "10.0.19041"
+            && setup.GetValueOrDefault("AppMutex") == SingleInstanceCoordinator.MutexName,
+        "the Windows installer matches the supported OS and runtime mutex"
+    );
+    Check(
+        setup.GetValueOrDefault("CloseApplications") == "yes"
+            && setup.GetValueOrDefault("CloseApplicationsFilter") == "HerdMe.Windows.exe"
+            && setup.GetValueOrDefault("RestartApplications") == "no",
+        "the Windows installer closes HerdMe safely without restarting it during upgrades"
+    );
+    Check(
+        installerText.Contains(
+            """Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs""",
+            StringComparison.Ordinal
+        ),
+        "the Windows installer includes the complete validated portable payload"
+    );
+    Check(
+        installerText.Contains(
+            """ValueName: "HerdMe"; Flags: uninsdeletevalue""",
+            StringComparison.Ordinal
+        ),
+        "the Windows uninstaller removes HerdMe's launch-at-login value"
+    );
+    var icon = setup.GetValueOrDefault("SetupIconFile");
+    Check(
+        !string.IsNullOrWhiteSpace(icon)
+            && File.Exists(Path.Combine(repositoryRoot, "Windows", icon.Replace('\\', Path.DirectorySeparatorChar))),
+        "the Windows installer icon exists at its declared path"
+    );
+
+    var portableScript = File.ReadAllText(
+        Path.Combine(repositoryRoot, "Windows", "package-portable.ps1")
+    );
+    var portableCleanup = portableScript.IndexOf(
+        """foreach ($oldOutput in @($archive, $checksumFile))""",
+        StringComparison.Ordinal
+    );
+    var portableBuild = portableScript.IndexOf(
+        """& (Join-Path $PSScriptRoot "build.ps1")""",
+        StringComparison.Ordinal
+    );
+    Check(
+        portableCleanup >= 0 && portableCleanup < portableBuild,
+        "portable packaging removes stale ZIP and checksum candidates before building"
+    );
+
+    var setupScript = File.ReadAllText(
+        Path.Combine(repositoryRoot, "Windows", "package-installer.ps1")
+    );
+    var setupCleanup = setupScript.IndexOf(
+        """foreach ($oldOutput in @($installerPath, $checksumFile))""",
+        StringComparison.Ordinal
+    );
+    var portableInvocation = setupScript.IndexOf(
+        """& (Join-Path $PSScriptRoot "package-portable.ps1")""",
+        StringComparison.Ordinal
+    );
+    Check(
+        setupCleanup >= 0 && setupCleanup < portableInvocation,
+        "Setup packaging removes stale installer and checksum candidates before building"
+    );
+}
+
+static Dictionary<string, string> ParseInnoSection(string contents, string requestedSection)
+{
+    var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    var inSection = false;
+    foreach (var rawLine in contents.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+    {
+        var line = rawLine.Trim();
+        if (line.StartsWith('[') && line.EndsWith(']'))
+        {
+            inSection = line[1..^1].Equals(requestedSection, StringComparison.OrdinalIgnoreCase);
+            continue;
+        }
+        if (!inSection || line.Length == 0 || line.StartsWith(';') || line.StartsWith('#')) continue;
+        var separator = line.IndexOf('=');
+        if (separator <= 0) continue;
+        result[line[..separator].Trim()] = line[(separator + 1)..].Trim();
+    }
+    return result;
+}
+
+static async Task VerifyCoreClientAsync(string coreExecutable, string supportRoot)
+{
+    Check(File.Exists(coreExecutable), "CoreClient test executable exists");
+    var client = new CoreClient(coreExecutable);
+    var doctor = await client.DoctorAsync();
+    Check(
+        doctor.Runtimes.Select(runtime => runtime.Name).SequenceEqual(
+            new[] { "php", "composer", "node", "npm", "nginx", "dnsmasq" }
+        ),
+        "CoreClient deserializes the real doctor process response"
+    );
+    Check(!string.IsNullOrWhiteSpace(doctor.SupportPath), "CoreClient preserves the support path");
+
+    var root = Path.Combine(supportRoot, "Core Client Sites");
+    var laravel = Path.Combine(root, "Laravel App");
+    var linked = Path.Combine(supportRoot, "Core Client Linked Node");
+    Directory.CreateDirectory(laravel);
+    Directory.CreateDirectory(linked);
+    File.WriteAllText(Path.Combine(laravel, "artisan"), "#!/usr/bin/env php\n");
+    File.WriteAllText(Path.Combine(laravel, ".herdme-php"), "8.4\n");
+    File.WriteAllText(Path.Combine(linked, "package.json"), "{}\n");
+
+    var sites = await client.ScanAsync([root], "unit-test", [linked]);
+    var laravelSite = sites.Single(site => site.Name == "Laravel App");
+    var linkedSite = sites.Single(site => site.Name == "Core Client Linked Node");
+    Check(
+        laravelSite.Framework == "Laravel"
+            && laravelSite.PhpVersion == "8.4"
+            && laravelSite.Domain.EndsWith(".unit-test", StringComparison.Ordinal),
+        "CoreClient scans and deserializes a real Laravel site"
+    );
+    Check(
+        linkedSite.Framework == "Node.js" && linkedSite.Linked,
+        "CoreClient preserves linked-site metadata across the process boundary"
+    );
+
+    var contractExecutable = Environment.ProcessPath
+        ?? throw new InvalidOperationException("The contract executable path is unavailable.");
+    var extensions = await client.ValidatePhpAsync(contractExecutable);
+    Check(
+        extensions.Compatible && extensions.Missing.Count == 0,
+        "CoreClient pipes PHP module output through the real core executable"
+    );
+}
 
 static void Check(bool condition, string contract)
 {
@@ -871,6 +2066,19 @@ static void Throws<TException>(Action action, string contract) where TException 
     try
     {
         action();
+    }
+    catch (TException)
+    {
+        return;
+    }
+    throw new InvalidOperationException("Failed contract: " + contract);
+}
+
+static async Task ThrowsAsync<TException>(Func<Task> action, string contract) where TException : Exception
+{
+    try
+    {
+        await action();
     }
     catch (TException)
     {
@@ -997,7 +2205,57 @@ static async Task TestLocalHttpSiteServerAsync(string supportRoot)
     var publicRoot = Path.Combine(siteRoot, "public");
     Directory.CreateDirectory(publicRoot);
     await File.WriteAllTextAsync(Path.Combine(publicRoot, "index.html"), "HerdMe static site");
+    await File.WriteAllTextAsync(Path.Combine(publicRoot, "stream.php"), "<?php // FastCGI fixture");
+    var largeCharacters = new char[2 * 1_024 * 1_024];
+    for (var index = 0; index < largeCharacters.Length; index++)
+    {
+        largeCharacters[index] = (char)('A' + index % 26);
+    }
+    var largeAsset = new string(largeCharacters);
+    await File.WriteAllTextAsync(
+        Path.Combine(publicRoot, "large.bin"),
+        largeAsset,
+        new UTF8Encoding(false)
+    );
     await File.WriteAllTextAsync(Path.Combine(siteRoot, "private.txt"), "must not be served");
+    var externalRoot = Path.Combine(supportRoot, "http-site-external");
+    Directory.CreateDirectory(externalRoot);
+    await File.WriteAllTextAsync(Path.Combine(externalRoot, "secret.txt"), "external secret must not be served");
+    var externalLink = Path.Combine(publicRoot, "external-link");
+    try
+    {
+        Directory.CreateSymbolicLink(externalLink, externalRoot);
+    }
+    catch (Exception error) when (
+        OperatingSystem.IsWindows()
+        && error is IOException or UnauthorizedAccessException or PlatformNotSupportedException
+    )
+    {
+        using var junction = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            ArgumentList =
+            {
+                "/d",
+                "/s",
+                "/c",
+                $"mklink /J \"{externalLink}\" \"{externalRoot}\""
+            }
+        }) ?? throw new InvalidOperationException("Windows could not start mklink for the junction contract.");
+        var junctionOutput = await junction.StandardOutput.ReadToEndAsync();
+        var junctionError = await junction.StandardError.ReadToEndAsync();
+        await junction.WaitForExitAsync();
+        if (junction.ExitCode != 0 || !Directory.Exists(externalLink))
+        {
+            throw new InvalidOperationException(
+                $"Windows could not create the junction contract (exit {junction.ExitCode}): "
+                + junctionOutput + junctionError
+            );
+        }
+    }
 
     var occupiedReservation = new TcpListener(IPAddress.Loopback, 0);
     occupiedReservation.Start();
@@ -1055,6 +2313,68 @@ static async Task TestLocalHttpSiteServerAsync(string supportRoot)
     Check(head.StartsWith("HTTP/1.1 200 OK\r\n", StringComparison.Ordinal), "local HTTP serves HEAD requests");
     Check(!head.EndsWith("HerdMe static site", StringComparison.Ordinal), "local HTTP omits bodies for HEAD requests");
 
+    var largeGet = await SendHttpRequestAsync(
+        port,
+        "GET /large.bin HTTP/1.1\r\nHost: demo.local-test\r\nConnection: close\r\n\r\n"
+    );
+    var largeBodyOffset = largeGet.IndexOf("\r\n\r\n", StringComparison.Ordinal) + 4;
+    Check(largeBodyOffset >= 4, "large static response contains complete HTTP headers");
+    Check(largeGet.StartsWith("HTTP/1.1 200 OK\r\n", StringComparison.Ordinal), "large static GET succeeds");
+    Check(largeGet.Contains($"Content-Length: {largeAsset.Length}\r\n", StringComparison.Ordinal), "large static GET reports its full length");
+    Check(largeGet.Contains("Accept-Ranges: bytes\r\n", StringComparison.Ordinal), "static responses advertise byte ranges");
+    Check(largeGet[largeBodyOffset..] == largeAsset, "large static files stream without truncation");
+
+    const int rangeStart = 1_048_570;
+    const int rangeEnd = 1_048_633;
+    var partial = await SendHttpRequestAsync(
+        port,
+        $"GET /large.bin HTTP/1.1\r\nHost: demo.local-test\r\nRange: bytes={rangeStart}-{rangeEnd}\r\nConnection: close\r\n\r\n"
+    );
+    var partialBodyOffset = partial.IndexOf("\r\n\r\n", StringComparison.Ordinal) + 4;
+    Check(partial.StartsWith("HTTP/1.1 206 Partial Content\r\n", StringComparison.Ordinal), "static byte ranges return 206");
+    Check(
+        partial.Contains($"Content-Range: bytes {rangeStart}-{rangeEnd}/{largeAsset.Length}\r\n", StringComparison.Ordinal),
+        "static byte ranges report the selected interval"
+    );
+    Check(
+        partial[partialBodyOffset..] == largeAsset[rangeStart..(rangeEnd + 1)],
+        "static byte ranges return only the selected bytes"
+    );
+
+    var openStart = largeAsset.Length - 37;
+    var openEnded = await SendHttpRequestAsync(
+        port,
+        $"GET /large.bin HTTP/1.1\r\nHost: demo.local-test\r\nRange: bytes={openStart}-\r\nConnection: close\r\n\r\n"
+    );
+    var openBodyOffset = openEnded.IndexOf("\r\n\r\n", StringComparison.Ordinal) + 4;
+    Check(openEnded[openBodyOffset..] == largeAsset[^37..], "open-ended static ranges reach the end of the file");
+
+    var suffix = await SendHttpRequestAsync(
+        port,
+        "GET /large.bin HTTP/1.1\r\nHost: demo.local-test\r\nRange: bytes=-64\r\nConnection: close\r\n\r\n"
+    );
+    var suffixBodyOffset = suffix.IndexOf("\r\n\r\n", StringComparison.Ordinal) + 4;
+    Check(suffix[suffixBodyOffset..] == largeAsset[^64..], "suffix static ranges return the requested tail");
+
+    var rangeHead = await SendHttpRequestAsync(
+        port,
+        "HEAD /large.bin HTTP/1.1\r\nHost: demo.local-test\r\nRange: bytes=10-19\r\nConnection: close\r\n\r\n"
+    );
+    Check(rangeHead.StartsWith("HTTP/1.1 206 Partial Content\r\n", StringComparison.Ordinal), "HEAD honors static byte ranges");
+    Check(rangeHead.Contains("Content-Length: 10\r\n", StringComparison.Ordinal), "ranged HEAD reports the selected length");
+    Check(rangeHead.EndsWith("\r\n\r\n", StringComparison.Ordinal), "ranged HEAD omits the response body");
+
+    var unsatisfiable = await SendHttpRequestAsync(
+        port,
+        $"GET /large.bin HTTP/1.1\r\nHost: demo.local-test\r\nRange: bytes={largeAsset.Length}-\r\nConnection: close\r\n\r\n"
+    );
+    Check(unsatisfiable.StartsWith("HTTP/1.1 416 Range Not Satisfiable\r\n", StringComparison.Ordinal), "out-of-bounds static ranges return 416");
+    Check(
+        unsatisfiable.Contains($"Content-Range: bytes */{largeAsset.Length}\r\n", StringComparison.Ordinal),
+        "out-of-bounds static ranges report the file length"
+    );
+    Check(unsatisfiable.EndsWith("\r\n\r\n", StringComparison.Ordinal), "416 static responses do not send a body");
+
     var traversal = await SendHttpRequestAsync(
         port,
         "GET /%2e%2e/private.txt HTTP/1.1\r\nHost: demo.local-test\r\nConnection: close\r\n\r\n"
@@ -1067,6 +2387,19 @@ static async Task TestLocalHttpSiteServerAsync(string supportRoot)
     );
     Check(absoluteTraversal.StartsWith("HTTP/1.1 403 Forbidden\r\n", StringComparison.Ordinal), "local HTTP blocks traversal in absolute proxy targets");
 
+    var reparseEscape = await SendHttpRequestAsync(
+        port,
+        "GET /external-link/secret.txt HTTP/1.1\r\nHost: demo.local-test\r\nConnection: close\r\n\r\n"
+    );
+    Check(
+        reparseEscape.StartsWith("HTTP/1.1 403 Forbidden\r\n", StringComparison.Ordinal),
+        "local HTTP blocks symlink and junction escapes outside the document root"
+    );
+    Check(
+        !reparseEscape.Contains("external secret must not be served", StringComparison.Ordinal),
+        "local HTTP never leaks files through symlinks or junctions"
+    );
+
     var unknownHost = await SendHttpRequestAsync(
         port,
         "GET / HTTP/1.1\r\nHost: unknown.local-test\r\nConnection: close\r\n\r\n"
@@ -1078,6 +2411,118 @@ static async Task TestLocalHttpSiteServerAsync(string supportRoot)
         "POST / HTTP/1.1\r\nHost: demo.local-test\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     );
     Check(staticPost.StartsWith("HTTP/1.1 405 Method Not Allowed\r\n", StringComparison.Ordinal), "local HTTP rejects writes to static files");
+
+    var streamingFastCgiListener = new TcpListener(IPAddress.Loopback, 0);
+    streamingFastCgiListener.Start(1);
+    var streamingFastCgiPort = ((IPEndPoint)streamingFastCgiListener.LocalEndpoint).Port;
+    var allowFastCgiCompletion = new TaskCompletionSource<bool>(
+        TaskCreationOptions.RunContinuationsAsynchronously
+    );
+    var streamingFixture = HandleStreamingFastCgiFixtureAsync(
+        streamingFastCgiListener,
+        allowFastCgiCompletion.Task
+    );
+    try
+    {
+        var httpReservation = new TcpListener(IPAddress.Loopback, 0);
+        httpReservation.Start();
+        var streamingHttpPort = ((IPEndPoint)httpReservation.LocalEndpoint).Port;
+        httpReservation.Stop();
+        await using var streamingServer = new LocalHttpSiteServer();
+        await streamingServer.StartAsync(
+            [new LocalSiteDefinition("stream.local-test", siteRoot)],
+            phpFastCgiPort: streamingFastCgiPort,
+            preferredPort: streamingHttpPort
+        );
+
+        using var streamingClient = new TcpClient();
+        await streamingClient.ConnectAsync(IPAddress.Loopback, streamingHttpPort);
+        await using var streamingResponse = streamingClient.GetStream();
+        await streamingResponse.WriteAsync(Encoding.ASCII.GetBytes(
+            "GET /stream.php HTTP/1.1\r\nHost: stream.local-test\r\nConnection: close\r\n\r\n"
+        ));
+        streamingClient.Client.Shutdown(SocketShutdown.Send);
+        using var received = new MemoryStream();
+        using (var firstChunkTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(2)))
+        {
+            await ReadHttpUntilAsync(
+                streamingResponse,
+                received,
+                "\r\n\r\nfirst-",
+                firstChunkTimeout.Token
+            );
+        }
+        var firstResponse = Encoding.UTF8.GetString(received.ToArray());
+        var responseHeaderEnd = firstResponse.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+        Check(
+            firstResponse.StartsWith("HTTP/1.1 200 OK\r\n", StringComparison.Ordinal)
+                && firstResponse.EndsWith("first-", StringComparison.Ordinal),
+            "local HTTP streams FastCGI output before END_REQUEST"
+        );
+        var responseHeader = firstResponse[..responseHeaderEnd];
+        Check(
+            !responseHeader.Contains("Transfer-Encoding:", StringComparison.OrdinalIgnoreCase),
+            "local HTTP strips FastCGI hop-by-hop response headers"
+        );
+        Check(
+            !responseHeader.Contains("Content-Length:", StringComparison.OrdinalIgnoreCase),
+            "local HTTP does not invent Content-Length for streaming FastCGI responses"
+        );
+
+        allowFastCgiCompletion.TrySetResult(true);
+        await streamingResponse.CopyToAsync(received).WaitAsync(TimeSpan.FromSeconds(3));
+        var completeResponse = Encoding.UTF8.GetString(received.ToArray());
+        Check(
+            completeResponse[(responseHeaderEnd + 4)..] == "first-second",
+            "local HTTP preserves every streamed FastCGI body record"
+        );
+        await streamingFixture.WaitAsync(TimeSpan.FromSeconds(3));
+    }
+    finally
+    {
+        allowFastCgiCompletion.TrySetResult(true);
+        streamingFastCgiListener.Stop();
+    }
+}
+
+static async Task TestCancelledCommandKillsTreeAsync(string supportRoot)
+{
+    var marker = Path.Combine(supportRoot, "cancelled-command-finished");
+    string executable;
+    string[] arguments;
+    if (OperatingSystem.IsWindows())
+    {
+        executable = "cmd.exe";
+        arguments = [
+            "/d", "/s", "/c",
+            $"ping 127.0.0.1 -n 3 >nul & echo completed>\"{marker}\""
+        ];
+    }
+    else
+    {
+        executable = "/bin/sh";
+        arguments = ["-c", $"sleep 2; touch '{marker.Replace("'", "'\\''")}'"];
+    }
+
+    using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
+    var wasCancelled = false;
+    try
+    {
+        await ComposerToolManager.RunAsync(
+            executable,
+            arguments,
+            supportRoot,
+            new Dictionary<string, string>(),
+            cancellation.Token
+        );
+    }
+    catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+    {
+        wasCancelled = true;
+    }
+    await Task.Delay(TimeSpan.FromSeconds(2.3));
+    Check(wasCancelled, "managed commands propagate cancellation");
+    Check(!File.Exists(marker), "managed command cancellation terminates the process tree");
 }
 
 static async Task<string> SendHttpRequestAsync(int port, string request)
@@ -1092,11 +2537,27 @@ static async Task<string> SendHttpRequestAsync(int port, string request)
     return Encoding.UTF8.GetString(response.ToArray());
 }
 
+static async Task ReadHttpUntilAsync(
+    Stream source,
+    MemoryStream destination,
+    string expected,
+    CancellationToken cancellationToken
+)
+{
+    var buffer = new byte[4 * 1_024];
+    while (!Encoding.UTF8.GetString(destination.ToArray()).Contains(expected, StringComparison.Ordinal))
+    {
+        var count = await source.ReadAsync(buffer, cancellationToken);
+        if (count == 0) throw new EndOfStreamException("The HTTP streaming fixture closed early.");
+        await destination.WriteAsync(buffer.AsMemory(0, count), cancellationToken);
+    }
+}
+
 static async Task VerifyLiveServiceReleasesAsync()
 {
     using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
     using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
-    probe.DefaultRequestHeaders.UserAgent.ParseAdd("HerdMe/1.0 (+https://github.com/herdme)");
+    probe.DefaultRequestHeaders.UserAgent.ParseAdd("HerdMe/1.0 (+https://github.com/Hamad3bdulla/herdme)");
     var installer = new ServicePackageInstaller();
 
     foreach (var definition in ManagedServiceCatalog.All.Where(definition => definition.IsInstallable))
@@ -1124,10 +2585,10 @@ static async Task VerifyLiveRuntimeReleasesAsync()
 {
     using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
     using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
-    probe.DefaultRequestHeaders.UserAgent.ParseAdd("HerdMe/1.0 (+https://github.com/herdme)");
+    probe.DefaultRequestHeaders.UserAgent.ParseAdd("HerdMe/1.0 (+https://github.com/Hamad3bdulla/herdme)");
 
     var phpInstaller = new PhpRuntimeInstaller();
-    foreach (var cycle in new[] { "8.5", "8.4", "8.3", "8.2", "8.1", "8.0" })
+    foreach (var cycle in PhpRuntimeInstaller.SupportedCycles)
     {
         var release = await phpInstaller.ResolveReleaseAsync(cycle, timeout.Token);
         Check(release.Cycle == cycle, $"PHP {cycle} release metadata preserves its cycle");
@@ -1176,7 +2637,7 @@ static async Task VerifyLiveRuntimeReleasesAsync()
     Directory.CreateDirectory(xdebugRoot);
     try
     {
-        foreach (var cycle in new[] { "8.5", "8.4", "8.3", "8.2", "8.1", "8.0" })
+        foreach (var cycle in PhpRuntimeInstaller.SupportedCycles)
         {
             var release = XdebugManager.SelectWindowsRelease(xdebugMetadata, cycle, "nts", "x86_64");
             Check(Version.TryParse(release.Version, out _), $"Xdebug for PHP {cycle} includes a stable version");
@@ -1277,6 +2738,38 @@ RequestComplete:
     await WriteFastCgiRecordAsync(stream, 3, new byte[8]);
 }
 
+static async Task HandleStreamingFastCgiFixtureAsync(
+    TcpListener listener,
+    Task allowCompletion
+)
+{
+    using var client = await listener.AcceptTcpClientAsync();
+    await using var stream = client.GetStream();
+    while (true)
+    {
+        var header = new byte[8];
+        await ReadExactlyAsync(stream, header);
+        var length = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(4, 2));
+        if (length > 0) await ReadExactlyAsync(stream, new byte[length]);
+        if (header[6] > 0) await ReadExactlyAsync(stream, new byte[header[6]]);
+        if (header[1] == 5 && length == 0) break;
+    }
+
+    await WriteFastCgiRecordAsync(
+        stream,
+        6,
+        Encoding.UTF8.GetBytes("Status: 200 OK\r\nContent-Type: text/plain")
+    );
+    await WriteFastCgiRecordAsync(
+        stream,
+        6,
+        Encoding.UTF8.GetBytes("\r\nTransfer-Encoding: chunked\r\n\r\nfirst-")
+    );
+    await allowCompletion.WaitAsync(TimeSpan.FromSeconds(5));
+    await WriteFastCgiRecordAsync(stream, 6, Encoding.UTF8.GetBytes("second"));
+    await WriteFastCgiRecordAsync(stream, 3, new byte[8]);
+}
+
 static Dictionary<string, string> DecodeFastCgiParameters(byte[] content)
 {
     var output = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -1330,5 +2823,50 @@ static async Task ReadExactlyAsync(Stream stream, Memory<byte> buffer)
         var count = await stream.ReadAsync(buffer[offset..]);
         if (count == 0) throw new EndOfStreamException("Fixture connection closed early.");
         offset += count;
+    }
+}
+
+sealed class SequenceHttpMessageHandler(
+    params Func<HttpRequestMessage, HttpResponseMessage>[] responses
+) : HttpMessageHandler
+{
+    private readonly Queue<Func<HttpRequestMessage, HttpResponseMessage>> remaining = new(responses);
+
+    public int CallCount { get; private set; }
+
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        CallCount++;
+        if (!remaining.TryDequeue(out var response))
+        {
+            throw new InvalidOperationException("No HTTP fixture response remains.");
+        }
+        return Task.FromResult(response(request));
+    }
+}
+
+sealed class MemoryCredentialBackend : IWindowsCredentialBackend
+{
+    public Dictionary<string, string> Secrets { get; } = new(StringComparer.Ordinal);
+    public bool FailWrites { get; set; }
+
+    public bool TryRead(string target, out string secret)
+    {
+        return Secrets.TryGetValue(target, out secret!);
+    }
+
+    public void Write(string target, string username, string secret)
+    {
+        if (FailWrites) throw new IOException("Fixture credential write failed.");
+        Secrets[target] = secret;
+    }
+
+    public void Delete(string target)
+    {
+        Secrets.Remove(target);
     }
 }

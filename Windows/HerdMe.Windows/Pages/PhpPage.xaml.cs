@@ -20,7 +20,16 @@ public sealed partial class PhpPage : Page
         runtimePolicy = new PhpRuntimePolicy(coreClient);
         runtimeInstaller = new PhpRuntimeInstaller(coreClient);
         settings = runtimePolicy.Load();
-        PhpCycleBox.SelectedItem = settings.PhpCycle;
+        var availableCycles = PhpRuntimeInstaller.SupportedCycles
+            .Concat(runtimeInstaller.InstalledCycles().Where(cycle =>
+                !PhpRuntimeInstaller.IsSupportedCycle(cycle)
+            ))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        foreach (var cycle in availableCycles) PhpCycleBox.Items.Add(cycle);
+        PhpCycleBox.SelectedItem = availableCycles.Contains(settings.PhpCycle, StringComparer.Ordinal)
+            ? settings.PhpCycle
+            : "8.4";
         MemoryLimitBox.Value = settings.MemoryLimitMegabytes;
         UploadLimitBox.Value = settings.MaxUploadMegabytes;
     }
@@ -84,7 +93,9 @@ public sealed partial class PhpPage : Page
 
             PhpPathText.Text = phpPath;
             var contract = await runtimePolicy.PrepareLaunchAsync(phpPath);
-            RuntimeStatusText.Text = "Ready for Laravel 13";
+            RuntimeStatusText.Text = PhpRuntimeInstaller.IsSupportedCycle(selectedCycle)
+                ? "Ready for Laravel projects"
+                : "Legacy PHP runtime";
             ExtensionDetailText.Text = string.Join(", ", contract.Extensions.Required);
             var toolVersions = await toolManager.InstalledVersionsAsync(selectedCycle);
             ComposerVersionText.Text = "Composer: " + (toolVersions.Composer is null ? "Not installed" : $"v{toolVersions.Composer}");
@@ -98,11 +109,13 @@ public sealed partial class PhpPage : Page
                     var composerReleaseTask = toolManager.ResolveComposerReleaseAsync();
                     var laravelReleaseTask = toolManager.LatestLaravelInstallerVersionAsync();
                     await Task.WhenAll(composerReleaseTask, laravelReleaseTask);
+                    var composerRelease = await composerReleaseTask;
+                    var laravelRelease = await laravelReleaseTask;
                     updateAvailable = RuntimeVersionComparison.IsNewer(
-                        composerReleaseTask.Result.Version,
+                        composerRelease.Version,
                         toolVersions.Composer!
                     ) || RuntimeVersionComparison.IsNewer(
-                        laravelReleaseTask.Result,
+                        laravelRelease,
                         toolVersions.Laravel!
                     );
                 }
@@ -119,7 +132,8 @@ public sealed partial class PhpPage : Page
             RuntimeStatusText.Text = "Blocked";
             ExtensionDetailText.Text = error.Message;
             var selectedCycle = PhpCycleBox.SelectedItem?.ToString() ?? settings.PhpCycle;
-            if (runtimeInstaller.IsInstalled(selectedCycle))
+            if (runtimeInstaller.IsInstalled(selectedCycle)
+                && PhpRuntimeInstaller.IsSupportedCycle(selectedCycle))
             {
                 InstallPhpButtonText.Text = "Repair";
                 InstallPhpButton.Visibility = Visibility.Visible;

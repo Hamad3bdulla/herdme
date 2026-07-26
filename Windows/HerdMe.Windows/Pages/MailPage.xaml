@@ -46,6 +46,7 @@
                 <Grid RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <Grid>
@@ -54,9 +55,15 @@
                             <SymbolIcon Symbol="Delete" />
                         </Button>
                     </Grid>
+                    <TextBox
+                        x:Name="SearchBox"
+                        Grid.Row="1"
+                        PlaceholderText="Search messages"
+                        TextChanged="SearchBox_TextChanged"
+                        AutomationProperties.Name="Search messages" />
                     <ListView
                         x:Name="MessageList"
-                        Grid.Row="1"
+                        Grid.Row="2"
                         ItemsSource="{x:Bind Messages}"
                         SelectionChanged="MessageList_SelectionChanged">
                         <ListView.ItemTemplate>
@@ -89,7 +96,27 @@
                     <TextBlock x:Name="RecipientText" Grid.Row="2" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                     <TabView Grid.Row="3" Margin="0,8,0,0" IsAddTabButtonVisible="False">
                         <TabViewItem Header="Preview" IsClosable="False">
-                            <WebView2 x:Name="HtmlPreview" />
+                            <Grid>
+                                <WebView2
+                                    x:Name="HtmlPreview"
+                                    NavigationCompleted="HtmlPreview_NavigationCompleted" />
+                                <StackPanel
+                                    x:Name="MailPreviewFailureState"
+                                    Visibility="Collapsed"
+                                    Spacing="8"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                                    <SymbolIcon Symbol="Important" />
+                                    <TextBlock Text="Preview unavailable" FontWeight="SemiBold" />
+                                    <Button
+                                        HorizontalAlignment="Center"
+                                        Click="RetryMailPreview_Click"
+                                        ToolTipService.ToolTip="Retry preview"
+                                        AutomationProperties.Name="Retry message preview">
+                                        <SymbolIcon Symbol="Refresh" />
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
                         </TabViewItem>
                         <TabViewItem Header="Text" IsClosable="False">
                             <ScrollViewer>

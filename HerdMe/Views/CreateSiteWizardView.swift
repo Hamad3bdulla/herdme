@@ -14,10 +14,18 @@ struct CreateSiteWizardView: View {
     @State private var initializeGit = false
     @State private var existingURL: URL?
     @State private var isCreating = false
+    @State private var isCancelling = false
+    @State private var creationTask: Task<Void, Never>?
     @State private var creationStage: ProjectCreationStage?
     @State private var creationError: ProjectCreationFailure?
     @State private var isShowingCreationDetails = false
     @State private var createdSiteURL: URL?
+    @FocusState private var focusedField: FocusedField?
+
+    private enum FocusedField {
+        case customStarterKit
+        case projectName
+    }
 
     private enum SiteTemplate: String, CaseIterable, Identifiable {
         case laravel = "New Laravel Project"
@@ -50,6 +58,7 @@ struct CreateSiteWizardView: View {
                     creationFooter
                 } else {
                     Button("Cancel") { closeWindow() }
+                        .keyboardShortcut(.cancelAction)
                     Spacer()
                     if step > 0 && !(step == 1 && template == .existing) {
                         Button("Previous") { step -= 1 }
@@ -57,6 +66,7 @@ struct CreateSiteWizardView: View {
                     if step == 0 || (step == 1 && template == .laravel) {
                         Button("Next") { step += 1 }
                             .buttonStyle(.borderedProminent)
+                            .keyboardShortcut(.defaultAction)
                             .disabled(
                                 template == .existing && existingURL == nil
                                     || step == 1 && starterKit == .custom
@@ -67,10 +77,12 @@ struct CreateSiteWizardView: View {
                     } else if template == .existing {
                         Button("Link Project") { linkExisting() }
                             .buttonStyle(.borderedProminent)
+                            .keyboardShortcut(.defaultAction)
                             .disabled(existingURL == nil)
                     } else {
                         Button("Create") { createProject() }
                             .buttonStyle(.borderedProminent)
+                            .keyboardShortcut(.defaultAction)
                             .disabled(projectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
@@ -83,6 +95,9 @@ struct CreateSiteWizardView: View {
                 withIntermediateDirectories: true
             )
         }
+        .onDisappear { creationTask?.cancel() }
+        .onChange(of: step) { _ in updateFocusedField() }
+        .onChange(of: starterKit) { _ in updateFocusedField() }
     }
 
     private var templateStep: some View {
@@ -125,6 +140,7 @@ struct CreateSiteWizardView: View {
                             .frame(width: 150, alignment: .trailing)
                         TextField("vendor/package", text: $customStarterKit)
                             .textFieldStyle(.roundedBorder)
+                            .focused($focusedField, equals: .customStarterKit)
                     }
                     .frame(maxWidth: 520)
                     .frame(maxWidth: .infinity)
@@ -161,6 +177,7 @@ struct CreateSiteWizardView: View {
                 labeledField("Project Name") {
                     TextField("What is the name of your project?", text: $projectName)
                         .textFieldStyle(.roundedBorder)
+                        .focused($focusedField, equals: .projectName)
                 }
                 labeledField("Project Path") {
                     HStack {
@@ -282,8 +299,14 @@ struct CreateSiteWizardView: View {
 
     @ViewBuilder
     private var creationFooter: some View {
-        Button(createdSiteURL == nil ? "Cancel" : "Close") { closeWindow() }
-            .disabled(isCreating)
+        Button(isCreating ? (isCancelling ? "Cancelling..." : "Cancel") : (createdSiteURL == nil ? "Cancel" : "Close")) {
+            if isCreating {
+                cancelCreation()
+            } else {
+                closeWindow()
+            }
+        }
+        .disabled(isCancelling)
         Spacer()
 
         if isCreating {
@@ -327,16 +350,30 @@ struct CreateSiteWizardView: View {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        projectParent = url
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            projectParent = url
+        }
     }
 
     private func chooseExistingProject() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
-        guard panel.runModal() == .OK else { return }
-        existingURL = panel.url
+        panel.begin { response in
+            guard response == .OK else { return }
+            existingURL = panel.url
+        }
+    }
+
+    private func updateFocusedField() {
+        if step == 1, template == .laravel, starterKit == .custom {
+            focusedField = .customStarterKit
+        } else if step >= 2, template == .laravel {
+            focusedField = .projectName
+        } else {
+            focusedField = nil
+        }
     }
 
     private func linkExisting() {
@@ -351,6 +388,7 @@ struct CreateSiteWizardView: View {
 
     private func createProject() {
         isCreating = true
+        isCancelling = false
         creationError = nil
         isShowingCreationDetails = false
         createdSiteURL = nil
@@ -364,7 +402,8 @@ struct CreateSiteWizardView: View {
             installBoost: installBoost,
             initializeGit: initializeGit
         )
-        Task { @MainActor in
+        creationTask?.cancel()
+        creationTask = Task { @MainActor in
             do {
                 let url = try await model.createProject(request) { stage in
                     creationStage = stage
@@ -377,6 +416,8 @@ struct CreateSiteWizardView: View {
                 creationError = ProjectCreationFailure(error)
             }
             isCreating = false
+            isCancelling = false
+            creationTask = nil
         }
     }
 
@@ -429,6 +470,9 @@ struct CreateSiteWizardView: View {
 
     private func resetCreationState() {
         isCreating = false
+        isCancelling = false
+        creationTask?.cancel()
+        creationTask = nil
         creationStage = nil
         creationError = nil
         isShowingCreationDetails = false
@@ -437,5 +481,11 @@ struct CreateSiteWizardView: View {
 
     private func closeWindow() {
         NSApplication.shared.keyWindow?.close()
+    }
+
+    private func cancelCreation() {
+        guard isCreating, !isCancelling else { return }
+        isCancelling = true
+        creationTask?.cancel()
     }
 }

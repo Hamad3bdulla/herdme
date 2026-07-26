@@ -7,6 +7,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
     MACOSX_DEPLOYMENT_TARGET: "13.0"
     CURRENT_PROJECT_VERSION: 1
     MARKETING_VERSION: 0.1.0
@@ -50,33 +51,58 @@ targets:
             -o "$helper_directory/herdme-network-helper"
           chmod 0755 "$helper_directory/herdme-network-helper"
           signing_identity="${EXPANDED_CODE_SIGN_IDENTITY:--}"
-          codesign --force --sign "$signing_identity" --identifier app.herdme.network-helper --timestamp=none \
-            "$helper_directory/herdme-network-helper"
+          if [ "$CONFIGURATION" = "Release" ] && [ "${HERDME_RELEASE_MODE:-local}" = "public" ]; then
+            codesign --force --sign "$signing_identity" --identifier app.herdme.network-helper \
+              --options runtime --timestamp "$helper_directory/herdme-network-helper"
+          elif [ "$CONFIGURATION" = "Release" ]; then
+            codesign --force --sign "$signing_identity" --identifier app.herdme.network-helper \
+              --options runtime --timestamp=none "$helper_directory/herdme-network-helper"
+          else
+            codesign --force --sign "$signing_identity" --identifier app.herdme.network-helper \
+              --timestamp=none "$helper_directory/herdme-network-helper"
+          fi
+          daemon_source="$SRCROOT/HerdMe/Resources/app.herdme.network-service.plist"
+          daemon_directory="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchDaemons"
+          mkdir -p "$daemon_directory"
+          /usr/bin/install -m 0644 "$daemon_source" \
+            "$daemon_directory/app.herdme.network-service.plist"
         inputFiles:
           - $(SRCROOT)/Tools/NetworkHelper/main.c
+          - $(SRCROOT)/HerdMe/Resources/app.herdme.network-service.plist
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/herdme-network-helper
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchDaemons/app.herdme.network-service.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.herdme.desktop
         PRODUCT_NAME: HerdMe
         CODE_SIGN_STYLE: Automatic
-        CODE_SIGN_IDENTITY: "-"
-        ENABLE_HARDENED_RUNTIME: NO
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY: "-"
+          ENABLE_HARDENED_RUNTIME: NO
+        Release:
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+          ENABLE_HARDENED_RUNTIME: YES
     scheme:
       testTargets:
         - HerdMeTests
       environmentVariables:
         HERDME_CREATE_LARAVEL_INTEGRATION: "$(HERDME_CREATE_LARAVEL_INTEGRATION)"
+        HERDME_DATABASE_AUTH_INTEGRATION: "$(HERDME_DATABASE_AUTH_INTEGRATION)"
         HERDME_LARAVEL_PROJECT: "$(HERDME_LARAVEL_PROJECT)"
   HerdMeTests:
     type: bundle.unit-test
     platform: macOS
     sources:
       - path: HerdMeTests
+      - path: Core/tests/fixtures/php-modules
+        buildPhase: resources
     dependencies:
       - target: HerdMe
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_IDENTITY: "-"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"

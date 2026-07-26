@@ -7,6 +7,10 @@ struct MailMIMEContent: Equatable {
 }
 
 enum MailMIMEParser {
+    private static let maximumPreviewCharacters = 4 * 1_024 * 1_024
+    private static let previewStyle = "body{font:14px system-ui;margin:18px;line-height:1.45;overflow-wrap:anywhere}img{max-width:100%;height:auto}pre{white-space:pre-wrap}"
+    private static let previewStyleHash = "48hOXKVM1rwpXip/9XRIr0XijcrNP/RHiD+a7aSGrzg="
+
     static func parse(_ raw: String) -> MailMIMEContent {
         parsePart(raw.replacingOccurrences(of: "\r\n", with: "\n"))
     }
@@ -57,13 +61,16 @@ enum MailMIMEParser {
     }
 
     static func safeHTMLDocument(_ html: String) -> String {
-        let policy = "default-src 'none'; img-src data: cid:; style-src 'unsafe-inline'; font-src data:"
+        let policy = "default-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; object-src 'none'; img-src data: cid:; font-src 'none'; style-src 'sha256-\(previewStyleHash)'; sandbox"
+        let preview = html.count <= maximumPreviewCharacters
+            ? html
+            : String(html.prefix(maximumPreviewCharacters)) + "<p>[Preview truncated]</p>"
         return """
         <!doctype html><html><head><meta charset="utf-8">
         <meta http-equiv="Content-Security-Policy" content="\(policy)">
         <meta name="color-scheme" content="light dark">
-        <style>body{font:14px -apple-system;margin:18px;line-height:1.45;overflow-wrap:anywhere}img{max-width:100%;height:auto}</style>
-        </head><body>\(html)</body></html>
+        <style>\(previewStyle)</style>
+        </head><body>\(preview)</body></html>
         """
     }
 

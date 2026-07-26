@@ -4,12 +4,15 @@ using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace HerdMe.Windows.Pages;
 
 public sealed partial class ServicesPage : Page
 {
     private readonly WindowsServiceManager manager = AppServices.Services;
+    private readonly CoreClient coreClient = new();
+    private readonly SiteConfigurationStore siteSettings = AppServices.SiteSettings;
     private bool refreshing;
 
     public IReadOnlyList<ManagedServiceDefinition> Definitions { get; } = ManagedServiceCatalog.All;
@@ -30,7 +33,10 @@ public sealed partial class ServicesPage : Page
     {
         if (ServiceTypeBox.SelectedItem is not ManagedServiceDefinition definition) return;
         ServiceNameBox.Text = definition.Name;
-        ServicePortBox.Value = definition.DefaultPort;
+        ServicePortBox.Value = WindowsServiceManager.AvailablePort(
+            definition.DefaultPort,
+            manager.LoadInstances().Select(instance => instance.Port)
+        ) ?? definition.DefaultPort;
         AddServiceButton.IsEnabled = definition.IsInstallable;
         ServiceAvailabilityText.Text = definition.UnavailableReason ?? string.Empty;
         ServiceAvailabilityText.Visibility = definition.IsInstallable
@@ -51,9 +57,19 @@ public sealed partial class ServicesPage : Page
         }
         var port = double.IsNaN(ServicePortBox.Value) ? definition.DefaultPort : (int)ServicePortBox.Value;
         var instances = manager.LoadInstances().ToList();
-        if (instances.Any(instance => instance.Port == port))
+        var assignedToHerdMe = instances.Any(instance => instance.Port == port);
+        if (assignedToHerdMe || !WindowsServiceManager.IsPortAvailable(port))
         {
-            await ShowErrorAsync($"Port {port} is already assigned to another HerdMe service.");
+            var suggestion = WindowsServiceManager.AvailablePort(
+                port == 65_535 ? 1_024 : port + 1,
+                instances.Select(instance => instance.Port)
+            );
+            if (suggestion is not null) ServicePortBox.Value = suggestion.Value;
+            var owner = assignedToHerdMe ? "another HerdMe service" : "another application";
+            var nextStep = suggestion is null
+                ? " No alternative loopback port is currently available."
+                : $" Suggested port {suggestion.Value} is now selected; press Add again to use it.";
+            await ShowErrorAsync($"Port {port} is already used by {owner}.{nextStep}");
             return;
         }
         var instance = new ManagedServiceInstance
@@ -150,6 +166,74 @@ public sealed partial class ServicesPage : Page
         Process.Start(startInfo);
     }
 
+    private async void AddToEnvironment_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetInstance(sender, out var instance)) return;
+        try
+        {
+            var settings = siteSettings.Load();
+            var sites = await coreClient.ScanAsync(
+                settings.Roots,
+                settings.Tld,
+                settings.LinkedSites
+            );
+            if (sites.Count == 0)
+            {
+                await ShowErrorAsync("Add or link a site before updating a .env file.");
+                return;
+            }
+
+            var siteBox = new ComboBox
+            {
+                Header = "Site",
+                ItemsSource = sites,
+                DisplayMemberPath = nameof(SiteRecord.Name),
+                SelectedIndex = 0,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            var pathText = new TextBlock
+            {
+                Text = Path.Combine(sites[0].Path, ".env"),
+                TextWrapping = TextWrapping.Wrap,
+                Opacity = 0.7
+            };
+            siteBox.SelectionChanged += (_, _) =>
+            {
+                if (siteBox.SelectedItem is SiteRecord site)
+                {
+                    pathText.Text = Path.Combine(site.Path, ".env");
+                }
+            };
+            var content = new StackPanel { Spacing = 10 };
+            content.Children.Add(siteBox);
+            content.Children.Add(pathText);
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = $"Add {instance.Name} to .env",
+                Content = content,
+                PrimaryButtonText = "Add to .env",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary
+            };
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary
+                || siteBox.SelectedItem is not SiteRecord selectedSite)
+            {
+                return;
+            }
+
+            var update = manager.AddToEnvironment(selectedSite.Path, instance);
+            await ShowMessageAsync(
+                "Updated .env",
+                $"Added {update.AddedKeys} and updated {update.UpdatedKeys} variables in {selectedSite.Name}."
+            );
+        }
+        catch (Exception error)
+        {
+            await ShowErrorAsync(error.Message);
+        }
+    }
+
     private async void OpenConsole_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetInstance(sender, out var instance)) return;
@@ -164,6 +248,50 @@ public sealed partial class ServicesPage : Page
             Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
         }
         catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            await ShowErrorAsync(error.Message);
+        }
+    }
+
+    private async void OpenTablePlus_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetInstance(sender, out var instance)) return;
+        if (manager.State(instance.Id, instance.DefinitionId) != ManagedServiceState.Running)
+        {
+            await ShowErrorAsync("Start this database service before opening it in TablePlus.");
+            return;
+        }
+        try
+        {
+            manager.OpenInTablePlus(instance);
+        }
+        catch (Exception error) when (
+            error is FileNotFoundException
+                or InvalidOperationException
+                or NotSupportedException
+        )
+        {
+            await ShowErrorAsync(error.Message);
+        }
+    }
+
+    private async void CopyConnection_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetInstance(sender, out var instance)) return;
+        if (manager.State(instance.Id, instance.DefinitionId) != ManagedServiceState.Running)
+        {
+            await ShowErrorAsync("Start this database service before copying its connection URL.");
+            return;
+        }
+        try
+        {
+            var package = new DataPackage();
+            package.SetText(manager.ConnectionUri(instance).AbsoluteUri);
+            Clipboard.SetContent(package);
+            Clipboard.Flush();
+            OperationStatusText.Text = $"{instance.Name} connection URL copied";
+        }
+        catch (Exception error)
         {
             await ShowErrorAsync(error.Message);
         }
@@ -227,6 +355,7 @@ public sealed partial class ServicesPage : Page
         {
             var installedVersion = manager.InstalledVersion(instance.DefinitionId);
             latestVersions.TryGetValue(instance.DefinitionId, out var latestVersion);
+            var state = manager.State(instance.Id, instance.DefinitionId);
             Rows.Add(new ManagedServiceRow
             {
                 Id = instance.Id,
@@ -234,11 +363,14 @@ public sealed partial class ServicesPage : Page
                 Name = instance.Name,
                 Port = instance.Port,
                 Version = installedVersion,
-                State = manager.State(instance.Id, instance.DefinitionId),
+                State = state,
                 StartAutomatically = instance.StartAutomatically,
                 IsUpdateAvailable = latestVersion is not null
                     && RuntimeVersionComparison.IsNewer(latestVersion, installedVersion),
-                ConsolePort = manager.ConsolePort(instance.Id)
+                ConsolePort = manager.ConsolePort(instance.Id),
+                ConnectionDisplay = state == ManagedServiceState.Running
+                    ? TablePlusConnection.DisplayAddress(instance)
+                    : null
             });
         }
         ServiceList.Visibility = Rows.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
@@ -263,10 +395,15 @@ public sealed partial class ServicesPage : Page
 
     private async Task ShowErrorAsync(string message)
     {
+        await ShowMessageAsync("HerdMe", message);
+    }
+
+    private async Task ShowMessageAsync(string title, string message)
+    {
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
-            Title = "HerdMe",
+            Title = title,
             Content = message,
             CloseButtonText = "OK"
         };

@@ -1,0 +1,406 @@
+name: Public release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sign-feed:
+    name: Validate tag and sign update feed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Validate release identity
+        shell: bash
+        env:
+          UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.HERDME_UPDATE_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          version=$(tr -d '[:space:]' < VERSION)
+          [[ "$GITHUB_REF_NAME" == "v$version" ]] || {
+            echo "Tag $GITHUB_REF_NAME does not match VERSION $version." >&2
+            exit 1
+          }
+          [[ -n "$UPDATE_SIGNING_PRIVATE_KEY" ]] || {
+            echo "HERDME_UPDATE_SIGNING_PRIVATE_KEY is not configured." >&2
+            exit 1
+          }
+          ./scripts/check-version.sh
+          umask 077
+          private_key="$RUNNER_TEMP/update-signing-private-key.pem"
+          generated_public_key="$RUNNER_TEMP/release-public-key.txt"
+          printf '%s\n' "$UPDATE_SIGNING_PRIVATE_KEY" > "$private_key"
+          mkdir -p release-assets
+          ./scripts/sign-update-manifest.sh \
+            HerdMe/Resources/release-manifest.json \
+            "$private_key" \
+            release-assets/release-manifest.signed.json \
+            "$generated_public_key"
+          cmp HerdMe/Resources/release-public-key.txt "$generated_public_key" || {
+            echo "The update signing secret does not match the bundled public key." >&2
+            exit 1
+          }
+          ./scripts/verify-signed-update-manifest.sh \
+            release-assets/release-manifest.signed.json \
+            HerdMe/Resources/release-public-key.txt \
+            HerdMe/Resources/release-manifest.json
+
+      - name: Upload signed feed
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: signed-update-feed
+          path: release-assets/release-manifest.signed.json
+          if-no-files-found: error
+          retention-days: 7
+
+  macos:
+    name: Sign, notarize, and package macOS
+    needs: sign-feed
+    runs-on: macos-15
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Select the latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install .NET 8 for SBOM generation
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Import Apple release identity and notarization profile
+        shell: bash
+        env:
+          CERTIFICATE_P12_BASE64: ${{ secrets.HERDME_MACOS_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.HERDME_MACOS_CERTIFICATE_PASSWORD }}
+          DEVELOPER_ID_APPLICATION: ${{ secrets.HERDME_DEVELOPER_ID_APPLICATION }}
+          APPLE_ID: ${{ secrets.HERDME_APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.HERDME_APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.HERDME_APPLE_APP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for value in CERTIFICATE_P12_BASE64 CERTIFICATE_PASSWORD DEVELOPER_ID_APPLICATION \
+            APPLE_ID APPLE_TEAM_ID APPLE_APP_PASSWORD; do
+            [[ -n "${!value}" ]] || { echo "$value is not configured." >&2; exit 1; }
+          done
+          certificate_path="$RUNNER_TEMP/developer-id.p12"
+          keychain_path="$RUNNER_TEMP/herdme-release.keychain-db"
+          keychain_password=$(openssl rand -hex 32)
+          printf '%s' "$CERTIFICATE_P12_BASE64" | base64 -D > "$certificate_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" -k "$keychain_path" \
+            -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "$keychain_password" "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          security default-keychain -d user -s "$keychain_path"
+          security find-identity -v -p codesigning "$keychain_path" | grep -F "$DEVELOPER_ID_APPLICATION"
+          profile="herdme-ci-$GITHUB_RUN_ID"
+          xcrun notarytool store-credentials "$profile" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD"
+          printf 'HERDME_DEVELOPER_ID_APPLICATION=%s\n' "$DEVELOPER_ID_APPLICATION" >> "$GITHUB_ENV"
+          printf 'HERDME_NOTARY_PROFILE=%s\n' "$profile" >> "$GITHUB_ENV"
+
+      - name: Run macOS tests
+        shell: bash
+        run: |
+          xcodegen generate
+          xcodebuild \
+            -project HerdMe.xcodeproj \
+            -scheme HerdMe \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/release-tests \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: Build public macOS packages
+        shell: bash
+        env:
+          HERDME_RELEASE_MODE: public
+        run: ./scripts/package-macos.sh Release
+
+      - name: Generate and validate macOS SBOM
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(tr -d '[:space:]' < VERSION)
+          sbom_drop="$RUNNER_TEMP/herdme-macos-sbom"
+          sbom_path="dist/HerdMe-$version-macOS.spdx.json"
+          mkdir -p "$sbom_drop"
+          ditto dist/HerdMe.app "$sbom_drop/HerdMe.app"
+          cp \
+            "dist/HerdMe-$version-macOS.zip" \
+            "dist/HerdMe-$version-macOS.dmg" \
+            "dist/HerdMe-$version-macOS.sha256" \
+            "$sbom_drop/"
+          dotnet tool install --global Microsoft.Sbom.DotNetTool --version 4.1.5
+          sbom-tool generate \
+            -b "$sbom_drop" \
+            -bc "$GITHUB_WORKSPACE" \
+            -pn HerdMe-macOS \
+            -pv "$version" \
+            -ps "Organization: HerdMe" \
+            -nsb "https://github.com/$GITHUB_REPOSITORY"
+          sbom-tool validate \
+            -b "$sbom_drop" \
+            -o "$RUNNER_TEMP/macos-sbom-validation.json" \
+            -mi SPDX:2.2
+          cp "$sbom_drop/_manifest/spdx_2.2/manifest.spdx.json" "$sbom_path"
+          (
+            cd dist
+            shasum -a 256 "HerdMe-$version-macOS.spdx.json" \
+              > "HerdMe-$version-macOS.spdx.json.sha256"
+          )
+          test -s "$sbom_path"
+
+      - name: Upload macOS release artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: public-macos
+          path: |
+            dist/HerdMe-*-macOS.zip
+            dist/HerdMe-*-macOS.dmg
+            dist/HerdMe-*-macOS.sha256
+            dist/HerdMe-*-macOS.spdx.json
+            dist/HerdMe-*-macOS.spdx.json.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  windows:
+    name: Sign, test, and package Windows x64
+    needs: sign-feed
+    runs-on: windows-2022
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Install .NET 8
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --version=6.7.1 --no-progress --yes
+
+      - name: Import Windows release certificate
+        shell: pwsh
+        env:
+          CERTIFICATE_PFX_BASE64: ${{ secrets.HERDME_WINDOWS_CERTIFICATE_PFX_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.HERDME_WINDOWS_CERTIFICATE_PASSWORD }}
+          TIMESTAMP_URL: ${{ secrets.HERDME_WINDOWS_TIMESTAMP_URL }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_PFX_BASE64)) {
+              throw "HERDME_WINDOWS_CERTIFICATE_PFX_BASE64 is not configured."
+          }
+          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_PASSWORD)) {
+              throw "HERDME_WINDOWS_CERTIFICATE_PASSWORD is not configured."
+          }
+          if ([string]::IsNullOrWhiteSpace($env:TIMESTAMP_URL)) {
+              throw "HERDME_WINDOWS_TIMESTAMP_URL is not configured."
+          }
+          $certificatePath = Join-Path $env:RUNNER_TEMP "herdme-release.pfx"
+          [IO.File]::WriteAllBytes(
+              $certificatePath,
+              [Convert]::FromBase64String($env:CERTIFICATE_PFX_BASE64)
+          )
+          $password = ConvertTo-SecureString $env:CERTIFICATE_PASSWORD -AsPlainText -Force
+          $certificate = Import-PfxCertificate `
+              -FilePath $certificatePath `
+              -CertStoreLocation Cert:\CurrentUser\My `
+              -Password $password
+          if ($null -eq $certificate -or [string]::IsNullOrWhiteSpace($certificate.Thumbprint)) {
+              throw "The Windows release certificate could not be imported."
+          }
+          "HERDME_WINDOWS_SIGNING_THUMBPRINT=$($certificate.Thumbprint)" | Out-File `
+              -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "HERDME_WINDOWS_TIMESTAMP_URL=$env:TIMESTAMP_URL" | Out-File `
+              -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build and test signed Windows x64 artifacts
+        shell: pwsh
+        env:
+          HERDME_RELEASE_MODE: public
+        run: |
+          $ErrorActionPreference = "Stop"
+          try {
+              & ./Windows/acceptance.ps1 -Configuration Release -SkipLiveReleaseChecks
+          }
+          catch {
+              $message = $_.Exception.Message
+              $escaped = $message.Replace("%", "%25").Replace("`r", "%0D").Replace("`n", "%0A")
+              Write-Host "::error title=Signed Windows x64 acceptance failed::$escaped"
+              throw
+          }
+
+      - name: Generate and validate Windows SBOM
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = (Get-Content VERSION -Raw).Trim()
+          $sbomDrop = Join-Path $env:RUNNER_TEMP "herdme-windows-sbom"
+          $sbomPath = Join-Path "dist" "HerdMe-$version-win-x64.spdx.json"
+          New-Item -ItemType Directory -Path $sbomDrop -Force | Out-Null
+          Copy-Item "dist/HerdMe-$version-win-x64-portable.zip" $sbomDrop
+          Copy-Item "dist/HerdMe-$version-win-x64-portable.zip.sha256" $sbomDrop
+          Copy-Item "dist/HerdMe-$version-win-x64-setup.exe" $sbomDrop
+          Copy-Item "dist/HerdMe-$version-win-x64-setup.exe.sha256" $sbomDrop
+          dotnet tool install --global Microsoft.Sbom.DotNetTool --version 4.1.5
+          sbom-tool generate `
+            -b $sbomDrop `
+            -bc $env:GITHUB_WORKSPACE `
+            -pn HerdMe-Windows-x64 `
+            -pv $version `
+            -ps "Organization: HerdMe" `
+            -nsb "https://github.com/$env:GITHUB_REPOSITORY"
+          sbom-tool validate `
+            -b $sbomDrop `
+            -o (Join-Path $env:RUNNER_TEMP "windows-sbom-validation.json") `
+            -mi SPDX:2.2
+          Copy-Item `
+            (Join-Path $sbomDrop "_manifest/spdx_2.2/manifest.spdx.json") `
+            $sbomPath
+          $hash = (Get-FileHash -Algorithm SHA256 $sbomPath).Hash.ToLowerInvariant()
+          $sbomName = Split-Path -Leaf $sbomPath
+          "$hash  $sbomName" | Set-Content -Path "$sbomPath.sha256" -Encoding ascii
+          if ((Get-Item $sbomPath).Length -eq 0) {
+              throw "The generated Windows SBOM is empty."
+          }
+
+      - name: Upload Windows release artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: public-windows-x64
+          path: |
+            dist/HerdMe-*-win-x64-portable.zip
+            dist/HerdMe-*-win-x64-portable.zip.sha256
+            dist/HerdMe-*-win-x64-setup.exe
+            dist/HerdMe-*-win-x64-setup.exe.sha256
+            dist/HerdMe-*-win-x64.spdx.json
+            dist/HerdMe-*-win-x64.spdx.json.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Verify and publish GitHub Release
+    needs: [sign-feed, macos, windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: "public-*"
+          path: release-assets
+          merge-multiple: true
+
+      - name: Download signed update feed
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: signed-update-feed
+          path: release-assets
+
+      - name: Verify final release set
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(tr -d '[:space:]' < VERSION)
+          expected=(
+            "HerdMe-$version-macOS.zip"
+            "HerdMe-$version-macOS.dmg"
+            "HerdMe-$version-macOS.sha256"
+            "HerdMe-$version-macOS.spdx.json"
+            "HerdMe-$version-macOS.spdx.json.sha256"
+            "HerdMe-$version-win-x64-portable.zip"
+            "HerdMe-$version-win-x64-portable.zip.sha256"
+            "HerdMe-$version-win-x64-setup.exe"
+            "HerdMe-$version-win-x64-setup.exe.sha256"
+            "HerdMe-$version-win-x64.spdx.json"
+            "HerdMe-$version-win-x64.spdx.json.sha256"
+            "release-manifest.signed.json"
+          )
+          for artifact in "${expected[@]}"; do
+            [[ -f "release-assets/$artifact" ]] || {
+              echo "Missing release artifact: $artifact" >&2
+              exit 1
+            }
+          done
+          (
+            cd release-assets
+            sha256sum -c "HerdMe-$version-macOS.sha256"
+            sha256sum -c "HerdMe-$version-macOS.spdx.json.sha256"
+            sha256sum -c "HerdMe-$version-win-x64-portable.zip.sha256"
+            sha256sum -c "HerdMe-$version-win-x64-setup.exe.sha256"
+            sha256sum -c "HerdMe-$version-win-x64.spdx.json.sha256"
+          )
+          for sbom in \
+            "release-assets/HerdMe-$version-macOS.spdx.json" \
+            "release-assets/HerdMe-$version-win-x64.spdx.json"; do
+            jq -e '
+              .spdxVersion == "SPDX-2.2"
+              and ((.packages | type) == "array" and (.packages | length) > 0)
+              and ((.files | type) == "array" and (.files | length) > 0)
+            ' "$sbom" >/dev/null
+          done
+          ./scripts/verify-signed-update-manifest.sh \
+            release-assets/release-manifest.signed.json \
+            HerdMe/Resources/release-public-key.txt \
+            HerdMe/Resources/release-manifest.json
+
+      - name: Attest release build provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: release-assets/*
+
+      - name: Create immutable GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && {
+            echo "Release $GITHUB_REF_NAME already exists; refusing to overwrite it." >&2
+            exit 1
+          }
+          gh release create "$GITHUB_REF_NAME" \
+            release-assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --generate-notes \
+            --title "HerdMe $GITHUB_REF_NAME"

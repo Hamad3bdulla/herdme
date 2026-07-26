@@ -41,18 +41,39 @@ struct SitesView: View {
             Image(systemName: "sidebar.left")
                 .foregroundStyle(.secondary)
             Text(model.selectedSite?.domain(tld: model.configuration.tld) ?? "Sites")
-                .font(.system(size: 18, weight: .medium))
-            if model.environmentStatus == .running {
-                HStack(spacing: 5) {
-                    Circle().fill(.green).frame(width: 7, height: 7)
-                    Text("Running").font(.caption).foregroundStyle(.secondary)
-                    if model.certificateTrustState == .trusted {
-                        Image(systemName: "lock.fill")
+                .font(.headline)
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(model.environmentStatus.color)
+                    .frame(width: 7, height: 7)
+                Text(model.environmentStatus.rawValue)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if model.isHTTPSActive {
+                    Image(systemName: "lock.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .help("HTTPS active")
+                } else if model.environmentStatus == .running {
+                    Button {
+                        model.selectedPage = .general
+                    } label: {
+                        Image(systemName: "lock.open.fill")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.orange)
                     }
+                    .buttonStyle(.plain)
+                    .help("HTTP only. Open General to enable HTTPS.")
+                    .accessibilityLabel("HTTP only. Enable HTTPS")
                 }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Sites environment")
+            .accessibilityValue(
+                model.environmentStatus == .running
+                    ? model.isHTTPSActive ? "Running, HTTPS active" : "Running, HTTP only"
+                    : model.environmentStatus.rawValue
+            )
             Button {
                 model.toggleEnvironment()
             } label: {
@@ -65,6 +86,7 @@ struct SitesView: View {
                     || model.environmentStatus == .stopping
             )
             .help(model.environmentStatus == .running ? "Stop all sites" : "Start all sites")
+            .accessibilityLabel(model.environmentStatus == .running ? "Stop all sites" : "Start all sites")
             Spacer()
             Button {
                 model.refresh()
@@ -73,6 +95,7 @@ struct SitesView: View {
             }
             .buttonStyle(.borderless)
             .help("Refresh sites")
+            .accessibilityLabel("Refresh sites")
             Button {
                 showPreview.toggle()
                 model.configuration.sitePreviews = showPreview
@@ -82,6 +105,7 @@ struct SitesView: View {
             }
             .buttonStyle(.borderless)
             .help("Toggle site previews")
+            .accessibilityLabel(showPreview ? "Hide site previews" : "Show site previews")
             TextField("Search", text: $search)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 230)
@@ -109,11 +133,31 @@ struct SitesView: View {
                             Button {
                                 model.selectedSiteID = site.id
                             } label: {
-                                Text(site.domain(tld: model.configuration.tld))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .contentShape(Rectangle())
+                                HStack(spacing: 8) {
+                                    Image(systemName: frameworkSymbol(for: site.framework))
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 16)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(site.domain(tld: model.configuration.tld))
+                                            .lineLimit(1)
+                                        Text("PHP \(site.phpVersion ?? model.configuration.selectedPHP)")
+                                            .font(.caption2.monospacedDigit())
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer(minLength: 4)
+                                    Circle()
+                                        .fill(siteStatusColor(for: site))
+                                        .frame(width: 7, height: 7)
+                                        .help(siteStatusTitle(for: site))
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(site.domain(tld: model.configuration.tld))
+                            .accessibilityValue(
+                                "PHP \(site.phpVersion ?? model.configuration.selectedPHP), \(siteStatusTitle(for: site))"
+                            )
                             .listRowBackground(
                                 model.selectedSiteID == site.id
                                     ? Color.accentColor.opacity(0.18)
@@ -138,6 +182,39 @@ struct SitesView: View {
         }
         .frame(width: 270)
         .background(Color(nsColor: .textBackgroundColor))
+    }
+
+    private func frameworkSymbol(for framework: String) -> String {
+        switch framework {
+        case "Laravel": "shippingbox.fill"
+        case "WordPress": "w.circle.fill"
+        case "Node.js": "hexagon.fill"
+        case "PHP": "chevron.left.forwardslash.chevron.right"
+        default: "globe"
+        }
+    }
+
+    private func siteStatusColor(for site: SiteProject) -> Color {
+        if model.environmentStatus == .running, model.siteRuntimePorts[site.id] != nil {
+            return .green
+        }
+        if model.environmentStatus == .conflict { return .orange }
+        if model.environmentStatus == .starting || model.environmentStatus == .stopping {
+            return .yellow
+        }
+        return .secondary
+    }
+
+    private func siteStatusTitle(for site: SiteProject) -> String {
+        if model.environmentStatus == .running, model.siteRuntimePorts[site.id] != nil {
+            return "Running"
+        }
+        switch model.environmentStatus {
+        case .conflict: return "Port conflict"
+        case .starting: return "Starting"
+        case .stopping: return "Stopping"
+        case .running, .stopped: return "Stopped"
+        }
     }
 
     @ViewBuilder
@@ -209,7 +286,7 @@ struct SitesView: View {
                                 Divider()
                                 Button("Tinker") { model.openTinker(for: site) }
                                     .disabled(site.framework != "Laravel")
-                                Button("Logs") { model.selectedPage = .logs }
+                                Button("Logs") { model.showLogs(for: site) }
                                 Button("Debugger") { model.selectedPage = .debugger }
                                 if site.isLinked {
                                     Divider()
@@ -343,6 +420,20 @@ private final class DesktopPreviewScrollView: NSScrollView {
         )
         super.init(frame: .zero)
 
+        configurePreview()
+    }
+
+    required init?(coder: NSCoder) {
+        webView = WKWebView(
+            frame: NSRect(origin: .zero, size: Self.desktopViewport),
+            configuration: WKWebViewConfiguration()
+        )
+        super.init(coder: coder)
+
+        configurePreview()
+    }
+
+    private func configurePreview() {
         borderType = .noBorder
         drawsBackground = false
         contentView.drawsBackground = false
@@ -354,11 +445,6 @@ private final class DesktopPreviewScrollView: NSScrollView {
 
         webView.setValue(false, forKey: "drawsBackground")
         documentView = webView
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
     }
 
     override func layout() {

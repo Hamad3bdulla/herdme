@@ -12,40 +12,77 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly object sync = new();
+    private readonly SemaphoreSlim lifecycle = new(1, 1);
     private readonly Dictionary<Guid, ActiveService> active = [];
     private readonly ServicePackageInstaller installer;
+    private readonly WindowsServiceCredentialStore credentialStore;
 
-    public WindowsServiceManager(string? supportRoot = null)
+    public WindowsServiceManager(
+        string? supportRoot = null,
+        WindowsServiceCredentialStore? credentialStore = null
+    )
     {
         SupportRoot = supportRoot ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "HerdMe"
         );
         installer = new ServicePackageInstaller(SupportRoot);
+        this.credentialStore = credentialStore ?? new WindowsServiceCredentialStore();
     }
 
     public string SupportRoot { get; }
 
     public string ConfigurationPath => Path.Combine(SupportRoot, "Config", "services.json");
 
+    public string? LastLoadWarning { get; private set; }
+
+    public string? LastBackupPath { get; private set; }
+
     public IReadOnlyList<ManagedServiceInstance> LoadInstances()
     {
+        if (!File.Exists(ConfigurationPath)) return [];
+        LastLoadWarning = null;
+        LastBackupPath = null;
         try
         {
-            var loaded = File.Exists(ConfigurationPath)
-                ? JsonSerializer.Deserialize<List<ManagedServiceInstance>>(File.ReadAllText(ConfigurationPath)) ?? []
-                : [];
+            var loaded = JsonSerializer.Deserialize<List<ManagedServiceInstance>>(
+                File.ReadAllText(ConfigurationPath)
+            ) ?? throw new JsonException("The service settings document is empty.");
             return Normalize(loaded);
         }
-        catch (Exception error) when (error is IOException or JsonException)
+        catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException)
         {
+            PreserveUnreadableConfiguration();
             return [];
         }
+    }
+
+    private void PreserveUnreadableConfiguration()
+    {
+        var backupPath = Path.Combine(
+            Path.GetDirectoryName(ConfigurationPath)!,
+            $"services.corrupt-{Guid.NewGuid():N}.json"
+        );
+        try
+        {
+            File.Move(ConfigurationPath, backupPath);
+            LastBackupPath = backupPath;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            backupPath = ConfigurationPath;
+        }
+        LastLoadWarning =
+            $"HerdMe could not read its service settings. The original file was preserved at {backupPath}. No replacement settings were saved.";
     }
 
     public void SaveInstances(IEnumerable<ManagedServiceInstance> instances)
     {
         var normalized = Normalize(instances).ToList();
+        if (OperatingSystem.IsWindows())
+        {
+            foreach (var instance in normalized) _ = credentialStore.GetOrCreate(instance.Id);
+        }
         var directory = Path.GetDirectoryName(ConfigurationPath)!;
         Directory.CreateDirectory(directory);
         var temporary = ConfigurationPath + ".tmp";
@@ -102,6 +139,19 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     public async Task StartAsync(Guid id, CancellationToken cancellationToken = default)
     {
+        await lifecycle.WaitAsync(cancellationToken);
+        try
+        {
+            await StartCoreAsync(id, cancellationToken);
+        }
+        finally
+        {
+            lifecycle.Release();
+        }
+    }
+
+    private async Task StartCoreAsync(Guid id, CancellationToken cancellationToken)
+    {
         if (!OperatingSystem.IsWindows())
         {
             throw new PlatformNotSupportedException("Managed service processes require Windows.");
@@ -119,6 +169,9 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         var logDirectory = Path.Combine(SupportRoot, "Log", "services");
         Directory.CreateDirectory(dataDirectory);
         Directory.CreateDirectory(logDirectory);
+        var credentials = RequiresCredentials(instance.DefinitionId)
+            ? credentialStore.GetOrCreate(instance.Id)
+            : null;
         if (instance.DefinitionId == "mariadb")
         {
             await InitializeMariaDbAsync(dataDirectory, cancellationToken);
@@ -129,12 +182,19 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         }
         else if (instance.DefinitionId == "postgresql")
         {
-            await InitializePostgreSqlAsync(dataDirectory, cancellationToken);
+            await InitializePostgreSqlAsync(dataDirectory, credentials!, cancellationToken);
         }
 
         var consolePort = instance.DefinitionId is "minio" or "rustfs" ? FindAvailablePort() : 0;
-        var spec = BuildLaunchSpec(instance, installer.ExecutablePath(instance.DefinitionId), dataDirectory, consolePort);
+        var spec = BuildLaunchSpec(
+            instance,
+            installer.ExecutablePath(instance.DefinitionId),
+            dataDirectory,
+            consolePort,
+            credentials
+        );
         var logPath = Path.Combine(logDirectory, instance.Id.ToString("D") + ".log");
+        BoundedLog.RotateIfNeeded(logPath);
         var startInfo = new ProcessStartInfo
         {
             FileName = spec.Executable,
@@ -161,6 +221,17 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             await WaitUntilReadyAsync(process, instance.Port, cancellationToken);
+            if (credentials is not null
+                && DatabaseServiceAuthenticator.ProtectedDefinitions.Contains(instance.DefinitionId))
+            {
+                await DatabaseServiceAuthenticator.SecureAsync(
+                    instance,
+                    spec.Executable,
+                    dataDirectory,
+                    credentials,
+                    cancellationToken
+                );
+            }
             lock (sync)
             {
                 active[instance.Id] = new ActiveService(
@@ -180,6 +251,19 @@ public sealed class WindowsServiceManager : IAsyncDisposable
     }
 
     public async Task StopAsync(Guid id)
+    {
+        await lifecycle.WaitAsync();
+        try
+        {
+            await StopCoreAsync(id);
+        }
+        finally
+        {
+            lifecycle.Release();
+        }
+    }
+
+    private async Task StopCoreAsync(Guid id)
     {
         ActiveService? service;
         lock (sync)
@@ -230,12 +314,21 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     public async Task RemoveAsync(Guid id, bool deleteData)
     {
-        await StopAsync(id);
-        SaveInstances(LoadInstances().Where(instance => instance.Id != id));
-        if (deleteData)
+        await lifecycle.WaitAsync();
+        try
         {
-            var instanceRoot = Path.Combine(SupportRoot, "Services", id.ToString("D"));
-            if (Directory.Exists(instanceRoot)) Directory.Delete(instanceRoot, true);
+            await StopCoreAsync(id);
+            SaveInstances(LoadInstances().Where(instance => instance.Id != id));
+            credentialStore.Delete(id);
+            if (deleteData)
+            {
+                var instanceRoot = Path.Combine(SupportRoot, "Services", id.ToString("D"));
+                if (Directory.Exists(instanceRoot)) Directory.Delete(instanceRoot, true);
+            }
+        }
+        finally
+        {
+            lifecycle.Release();
         }
     }
 
@@ -243,9 +336,17 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         ManagedServiceInstance instance,
         string executable,
         string dataDirectory,
-        int minioConsolePort = 0
+        int minioConsolePort = 0,
+        ServiceCredentials? credentials = null
     )
     {
+        if (RequiresLaunchCredentials(instance.DefinitionId) && credentials is null)
+        {
+            throw new ArgumentNullException(
+                nameof(credentials),
+                $"{instance.Name} requires managed service credentials."
+            );
+        }
         var runtimeDirectory = instance.DefinitionId is "mariadb" or "mysql" or "postgresql" or "mongodb"
             ? Directory.GetParent(Path.GetDirectoryName(executable)!)!.FullName
             : Path.GetDirectoryName(executable)!;
@@ -255,6 +356,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                 executable,
                 runtimeDirectory,
                 [
+                    "--no-defaults",
                     "--console",
                     $"--basedir={runtimeDirectory}",
                     $"--datadir={dataDirectory}",
@@ -269,6 +371,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                 executable,
                 runtimeDirectory,
                 [
+                    "--no-defaults",
                     "--console",
                     $"--basedir={runtimeDirectory}",
                     $"--datadir={dataDirectory}",
@@ -334,8 +437,8 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                 ],
                 new Dictionary<string, string>
                 {
-                    ["MINIO_ROOT_USER"] = "herdme",
-                    ["MINIO_ROOT_PASSWORD"] = "herdme-local-service"
+                    ["MINIO_ROOT_USER"] = credentials!.Username,
+                    ["MINIO_ROOT_PASSWORD"] = credentials.Secret
                 }
             ),
             "minio" => throw new ArgumentOutOfRangeException(
@@ -349,7 +452,11 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                     "--address", $"127.0.0.1:{instance.Port}",
                     "--console-address", $"127.0.0.1:{minioConsolePort}"
                 ],
-                new Dictionary<string, string>()
+                new Dictionary<string, string>
+                {
+                    ["RUSTFS_ACCESS_KEY"] = credentials!.Username,
+                    ["RUSTFS_SECRET_KEY"] = credentials.Secret
+                }
             ),
             "rustfs" => throw new ArgumentOutOfRangeException(
                 nameof(minioConsolePort), "RustFS requires an available console port."
@@ -360,9 +467,41 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         };
     }
 
+    public ServiceEnvironmentUpdate AddToEnvironment(
+        string projectPath,
+        ManagedServiceInstance instance
+    )
+    {
+        var credentials = credentialStore.GetOrCreate(instance.Id);
+        return ServiceEnvironmentFile.Update(projectPath, instance, credentials);
+    }
+
+    public void OpenInTablePlus(ManagedServiceInstance instance)
+    {
+        TablePlusConnection.Open(ConnectionUri(instance));
+    }
+
+    public Uri ConnectionUri(ManagedServiceInstance instance)
+    {
+        var credentials = DatabaseServiceAuthenticator.ProtectedDefinitions.Contains(instance.DefinitionId)
+            ? credentialStore.GetOrCreate(instance.Id)
+            : null;
+        return TablePlusConnection.UriFor(instance, credentials)
+            ?? throw new NotSupportedException(
+                $"Connection URLs are not available for {instance.Name}."
+            );
+    }
+
+    private static bool RequiresCredentials(string definitionId) => definitionId is
+        "mysql" or "mariadb" or "postgresql" or "typesense" or "minio" or "rustfs";
+
+    private static bool RequiresLaunchCredentials(string definitionId) => definitionId is
+        "typesense" or "minio" or "rustfs";
+
     public async ValueTask DisposeAsync()
     {
         await StopAllAsync();
+        lifecycle.Dispose();
         GC.SuppressFinalize(this);
     }
 
@@ -388,6 +527,8 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+        startInfo.ArgumentList.Add("--no-defaults");
+        startInfo.ArgumentList.Add("--auth-root-authentication-method=normal");
         startInfo.ArgumentList.Add($"--basedir={runtimeDirectory}");
         startInfo.ArgumentList.Add($"--datadir={dataDirectory}");
         using var process = Process.Start(startInfo)
@@ -419,6 +560,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+        startInfo.ArgumentList.Add("--no-defaults");
         startInfo.ArgumentList.Add("--initialize-insecure");
         startInfo.ArgumentList.Add($"--basedir={runtimeDirectory}");
         startInfo.ArgumentList.Add($"--datadir={dataDirectory}");
@@ -436,6 +578,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     private async Task InitializePostgreSqlAsync(
         string dataDirectory,
+        ServiceCredentials credentials,
         CancellationToken cancellationToken
     )
     {
@@ -458,19 +601,37 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         };
         startInfo.ArgumentList.Add("-D");
         startInfo.ArgumentList.Add(dataDirectory);
-        startInfo.ArgumentList.Add("--username=postgres");
-        startInfo.ArgumentList.Add("--encoding=UTF8");
-        startInfo.ArgumentList.Add("--auth-local=trust");
-        startInfo.ArgumentList.Add("--auth-host=trust");
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("PostgreSQL's data directory could not be initialized.");
-        var standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var standardError = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        var output = (await standardOutput) + Environment.NewLine + (await standardError);
-        if (process.ExitCode != 0)
+        var passwordPath = Path.Combine(
+            Directory.GetParent(dataDirectory)!.FullName,
+            $".herdme-initdb-{Guid.NewGuid():N}.password"
+        );
+        try
         {
-            throw new InvalidOperationException("PostgreSQL initialization failed: " + output.Trim());
+            await File.WriteAllTextAsync(
+                passwordPath,
+                credentials.Secret + Environment.NewLine,
+                new System.Text.UTF8Encoding(false),
+                cancellationToken
+            );
+            startInfo.ArgumentList.Add($"--username={credentials.Username}");
+            startInfo.ArgumentList.Add($"--pwfile={passwordPath}");
+            startInfo.ArgumentList.Add("--encoding=UTF8");
+            startInfo.ArgumentList.Add("--auth-local=scram-sha-256");
+            startInfo.ArgumentList.Add("--auth-host=scram-sha-256");
+            using var process = Process.Start(startInfo)
+                ?? throw new InvalidOperationException("PostgreSQL's data directory could not be initialized.");
+            var standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var standardError = process.StandardError.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+            var output = (await standardOutput) + Environment.NewLine + (await standardError);
+            if (process.ExitCode != 0)
+            {
+                throw new InvalidOperationException("PostgreSQL initialization failed: " + output.Trim());
+            }
+        }
+        finally
+        {
+            if (File.Exists(passwordPath)) File.Delete(passwordPath);
         }
     }
 
@@ -502,16 +663,60 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         return result;
     }
 
+    public static bool IsPortAvailable(int port)
+    {
+        if (port is <= 0 or > 65_535) return false;
+        TcpListener? listener = null;
+        try
+        {
+            listener = new TcpListener(IPAddress.Loopback, port);
+            listener.Start();
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
+        finally
+        {
+            listener?.Stop();
+        }
+    }
+
+    public static int? AvailablePort(
+        int startingAt,
+        IEnumerable<int>? reservedPorts = null
+    )
+    {
+        return AvailablePort(
+            startingAt,
+            reservedPorts is null ? [] : new HashSet<int>(reservedPorts),
+            IsPortAvailable
+        );
+    }
+
+    internal static int? AvailablePort(
+        int startingAt,
+        IReadOnlySet<int> reservedPorts,
+        Func<int, bool> canBind
+    )
+    {
+        if (startingAt is <= 0 or > 65_535) return null;
+        for (var port = startingAt; port <= 65_535; port++)
+        {
+            if (!reservedPorts.Contains(port) && canBind(port)) return port;
+        }
+        for (var port = 1_024; port < startingAt; port++)
+        {
+            if (!reservedPorts.Contains(port) && canBind(port)) return port;
+        }
+        return null;
+    }
+
     private static void EnsurePortAvailable(int port)
     {
         if (port is <= 0 or > 65_535) throw new ArgumentOutOfRangeException(nameof(port));
-        try
-        {
-            var listener = new TcpListener(IPAddress.Loopback, port);
-            listener.Start();
-            listener.Stop();
-        }
-        catch (SocketException)
+        if (!IsPortAvailable(port))
         {
             throw new InvalidOperationException($"Port {port} is already in use.");
         }
@@ -564,8 +769,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         if (string.IsNullOrWhiteSpace(line)) return;
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.AppendAllText(path, $"[{DateTimeOffset.Now:O}] {line}{Environment.NewLine}");
+            BoundedLog.AppendLine(path, $"[{DateTimeOffset.Now:O}] {line}");
         }
         catch (IOException)
         {

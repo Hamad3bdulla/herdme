@@ -2,6 +2,8 @@ namespace HerdMe.Windows.Models;
 
 public sealed class WindowsSiteSettings
 {
+    public int SchemaVersion { get; set; }
+
     public List<string> Roots { get; set; } = [];
 
     public List<string> LinkedSites { get; set; } = [];

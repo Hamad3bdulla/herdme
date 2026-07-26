@@ -90,6 +90,8 @@ public sealed class ManagedServiceRow
 
     public int? ConsolePort { get; init; }
 
+    public string? ConnectionDisplay { get; init; }
+
     public string Status => State switch
     {
         ManagedServiceState.NotInstalled => "Not installed",
@@ -110,6 +112,12 @@ public sealed class ManagedServiceRow
     public bool CanOpenConsole => State == ManagedServiceState.Running
         && (DefinitionId is "minio" or "rustfs")
         && ConsolePort is > 0;
+
+    public bool CanOpenInTablePlus => State == ManagedServiceState.Running
+        && DefinitionId is
+            "mysql" or "mariadb" or "postgresql" or "mongodb" or "redis" or "valkey";
+
+    public string Subtitle => ConnectionDisplay ?? DefinitionId;
 }
 
 public enum ServicePackageChecksumAlgorithm

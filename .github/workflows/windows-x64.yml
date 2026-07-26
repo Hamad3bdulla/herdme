@@ -20,10 +20,10 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Install .NET 8
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: 8.0.x
 
@@ -33,16 +33,70 @@ jobs:
           dotnet --info
           cmake --version
 
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --version=6.7.1 --no-progress --yes
+
       - name: Run automated Windows x64 acceptance
         shell: pwsh
-        run: ./Windows/acceptance.ps1 -Configuration Release
+        run: |
+          $ErrorActionPreference = "Stop"
+          $transcript = Join-Path $env:GITHUB_WORKSPACE "build\windows-acceptance.log"
+          New-Item -ItemType Directory -Force -Path (Split-Path -Parent $transcript) | Out-Null
+          Start-Transcript -Path $transcript -Force -UseMinimalHeader | Out-Null
+          try {
+              & ./Windows/acceptance.ps1 -Configuration Release -SkipLiveReleaseChecks
+          }
+          catch {
+              $message = $_.Exception.Message
+              $escaped = $message.Replace("%", "%25").Replace("`r", "%0D").Replace("`n", "%0A")
+              Write-Host "::error title=Windows x64 acceptance failed::$escaped"
+              throw
+          }
+          finally {
+              Stop-Transcript | Out-Null
+          }
 
-      - name: Upload portable Windows artifact
-        uses: actions/upload-artifact@v4
+      - name: Collect Windows failure diagnostics
+        if: failure()
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:LOCALAPPDATA "HerdMe\Log"
+          $destination = Join-Path $env:GITHUB_WORKSPACE "build\windows-diagnostics"
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          if (Test-Path -LiteralPath $source -PathType Container) {
+              foreach ($name in @(
+                  "startup.log",
+                  "environment.log",
+                  "unhandled.log",
+                  "diagnostics.jsonl"
+              )) {
+                  $candidate = Join-Path $source $name
+                  if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                      Copy-Item -LiteralPath $candidate -Destination $destination -Force
+                  }
+              }
+          }
+
+      - name: Upload Windows failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: HerdMe-${{ github.run_number }}-win-x64-portable
+          name: HerdMe-${{ github.run_number }}-win-x64-failure-diagnostics
+          path: |
+            build/windows-acceptance.log
+            build/windows-diagnostics
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: HerdMe-${{ github.run_number }}-win-x64
           path: |
             dist/HerdMe-*-win-x64-portable.zip
             dist/HerdMe-*-win-x64-portable.zip.sha256
+            dist/HerdMe-*-win-x64-setup.exe
+            dist/HerdMe-*-win-x64-setup.exe.sha256
           if-no-files-found: error
           retention-days: 14

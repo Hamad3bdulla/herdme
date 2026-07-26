@@ -1,4 +1,3 @@
-using System.IO.Compression;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -8,7 +7,7 @@ namespace HerdMe.Windows.Services;
 
 public sealed class NodeRuntimeInstaller
 {
-    private static readonly HttpClient HttpClient = new();
+    private static readonly HttpClient HttpClient = ManagedDownloadClient.Create();
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public NodeRuntimeInstaller(string? supportRoot = null)
@@ -188,7 +187,7 @@ public sealed class NodeRuntimeInstaller
         try
         {
             await DownloadAndVerifyAsync(release, archive, cancellationToken);
-            ZipFile.ExtractToDirectory(archive, staging);
+            await SafeZipExtractor.ExtractAsync(archive, staging, cancellationToken);
             var extracted = Directory.EnumerateDirectories(staging).SingleOrDefault()
                 ?? throw new InvalidDataException("The Node.js archive layout was invalid.");
             if (!File.Exists(Path.Combine(extracted, "node.exe")))

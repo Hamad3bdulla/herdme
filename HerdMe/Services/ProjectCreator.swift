@@ -147,6 +147,7 @@ enum ProjectCreationError: LocalizedError {
     case externalApplicationPath
     case incompleteProject([String])
     case commandFailed(String)
+    case cancelled
 
     var errorDescription: String? {
         switch self {
@@ -160,6 +161,7 @@ enum ProjectCreationError: LocalizedError {
             "Laravel Installer finished without creating a complete Laravel project. Missing: \(missingFiles.joined(separator: ", "))."
         case let .commandFailed(output):
             ErrorPresentation(output, fallback: "Laravel Installer could not finish creating the site.").message
+        case .cancelled: "Site creation was cancelled. The incomplete project was removed."
         }
     }
 
@@ -214,9 +216,21 @@ actor ProjectCreator {
         progress: @escaping @MainActor @Sendable (ProjectCreationStage) -> Void = { _ in }
     ) async throws -> URL {
         try Self.validate(request)
+        try Task.checkCancellation()
 
         let trimmedName = request.name.trimmingCharacters(in: .whitespacesAndNewlines)
         let destination = request.parentDirectory.appendingPathComponent(trimmedName, isDirectory: true)
+        let stagingRoot = request.parentDirectory.appendingPathComponent(
+            ".herdme-create-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let stagedDestination = stagingRoot.appendingPathComponent(trimmedName, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: stagingRoot,
+            withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700]
+        )
+        defer { try? FileManager.default.removeItem(at: stagingRoot) }
 
         let php = rootURL.appendingPathComponent("bin/php")
         let laravel = rootURL.appendingPathComponent("Composer/vendor/bin/laravel")
@@ -227,52 +241,71 @@ actor ProjectCreator {
 
         let arguments = [laravel.path] + Self.laravelArguments(for: request)
 
-        await progress(.creatingLaravelProject)
-        let creation = try ProcessRunner.run(
-            php,
-            arguments: arguments,
-            currentDirectory: request.parentDirectory,
-            environment: managedEnvironment
-        )
-        guard creation.status == 0 else {
-            throw ProjectCreationError.commandFailed(creation.output)
-        }
-
-        if request.installBoost {
-            await progress(.installingLaravelBoost)
-            try installBoost(at: destination)
-        }
-        if request.starterKit.requiresFrontendAssets {
-            await progress(.preparingNodeRuntime)
-            let npm = try await ensureManagedNPM()
-            try validateFrontendBuild(at: destination)
-
-            await progress(.installingFrontendDependencies)
-            try runManagedCommand(
-                npm,
-                arguments: ["install", "--no-audit", "--no-fund", "--no-progress"],
-                at: destination,
-                fallbackError: "Frontend package installation failed."
+        do {
+            await progress(.creatingLaravelProject)
+            let creation = try ProcessRunner.run(
+                php,
+                arguments: arguments,
+                currentDirectory: stagingRoot,
+                environment: managedEnvironment,
+                cancellationRequested: Self.cancellationRequested
             )
+            guard creation.status == 0 else {
+                throw ProjectCreationError.commandFailed(creation.output)
+            }
 
-            await progress(.buildingFrontendAssets)
-            try runManagedCommand(
-                npm,
-                arguments: ["run", "build"],
-                at: destination,
-                fallbackError: "Frontend asset build failed."
+            if request.installBoost {
+                try Task.checkCancellation()
+                await progress(.installingLaravelBoost)
+                try installBoost(at: stagedDestination)
+            }
+            if request.starterKit.requiresFrontendAssets {
+                try Task.checkCancellation()
+                await progress(.preparingNodeRuntime)
+                let npm = try await ensureManagedNPM()
+                try Task.checkCancellation()
+                try validateFrontendBuild(at: stagedDestination)
+
+                await progress(.installingFrontendDependencies)
+                try runManagedCommand(
+                    npm,
+                    arguments: ["install", "--no-audit", "--no-fund", "--no-progress"],
+                    at: stagedDestination,
+                    fallbackError: "Frontend package installation failed."
+                )
+
+                try Task.checkCancellation()
+                await progress(.buildingFrontendAssets)
+                try runManagedCommand(
+                    npm,
+                    arguments: ["run", "build"],
+                    at: stagedDestination,
+                    fallbackError: "Frontend asset build failed."
+                )
+            }
+            if request.initializeGit {
+                try Task.checkCancellation()
+                await progress(.initializingGitRepository)
+                try initializeGit(at: stagedDestination)
+            }
+            try Task.checkCancellation()
+            await progress(.verifyingProject)
+            try verifyLaravelProject(
+                at: stagedDestination,
+                requiresFrontendAssets: request.starterKit.requiresFrontendAssets
             )
+            try Task.checkCancellation()
+            guard !FileManager.default.fileExists(atPath: destination.path) else {
+                throw ProjectCreationError.destinationExists
+            }
+            try FileManager.default.moveItem(at: stagedDestination, to: destination)
+            return destination
+        } catch is CancellationError {
+            throw ProjectCreationError.cancelled
+        } catch let error as ProcessRunnerError {
+            guard case .cancelled = error else { throw error }
+            throw ProjectCreationError.cancelled
         }
-        if request.initializeGit {
-            await progress(.initializingGitRepository)
-            try initializeGit(at: destination)
-        }
-        await progress(.verifyingProject)
-        try verifyLaravelProject(
-            at: destination,
-            requiresFrontendAssets: request.starterKit.requiresFrontendAssets
-        )
-        return destination
     }
 
     nonisolated static func laravelArguments(for request: NewProjectRequest) -> [String] {
@@ -343,7 +376,8 @@ actor ProjectCreator {
             executable,
             arguments: arguments,
             currentDirectory: directory,
-            environment: managedEnvironment
+            environment: managedEnvironment,
+            cancellationRequested: Self.cancellationRequested
         )
         guard result.status == 0 else {
             throw ProjectCreationError.commandFailed(result.output.isEmpty ? fallbackError : result.output)
@@ -364,7 +398,8 @@ actor ProjectCreator {
                 "require", "laravel/boost", "--dev", "--no-interaction", "--no-progress", "--no-ansi"
             ],
             currentDirectory: destination,
-            environment: managedEnvironment
+            environment: managedEnvironment,
+            cancellationRequested: Self.cancellationRequested
         )
         guard result.status == 0 else {
             throw ProjectCreationError.commandFailed(
@@ -384,7 +419,8 @@ actor ProjectCreator {
             arguments: ["init"],
             currentDirectory: destination,
             environment: managedEnvironment,
-            timeout: 30
+            timeout: 30,
+            cancellationRequested: Self.cancellationRequested
         )
         guard result.status == 0 else {
             throw ProjectCreationError.commandFailed(
@@ -407,5 +443,9 @@ actor ProjectCreator {
             "/usr/bin", "/bin", "/usr/sbin", "/sbin"
         ].joined(separator: ":")
         return environment
+    }
+
+    private nonisolated static var cancellationRequested: @Sendable () -> Bool {
+        { Task<Never, Never>.isCancelled }
     }
 }

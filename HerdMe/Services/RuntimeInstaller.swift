@@ -41,6 +41,14 @@ private struct HomebrewFormulaVersions: Decodable {
     let stable: String
 }
 
+enum PHPRuntimeSupport {
+    static let installableCycles = ["8.5", "8.4", "8.3", "8.2", "8.1", "8.0"]
+
+    static func isInstallable(_ cycle: String) -> Bool {
+        installableCycles.contains(cycle)
+    }
+}
+
 enum CommandFailureReporter {
     private static let lock = NSLock()
 
@@ -65,6 +73,7 @@ enum CommandFailureReporter {
         let logDirectory = rootURL.appendingPathComponent("Log", isDirectory: true)
         let logURL = logDirectory.appendingPathComponent("homebrew.log")
         try? FileManager.default.createDirectory(at: logDirectory, withIntermediateDirectories: true)
+        try? LogRotation.rotateIfNeeded(logURL)
         if !FileManager.default.fileExists(atPath: logURL.path) {
             FileManager.default.createFile(atPath: logURL.path, contents: nil)
         }
@@ -95,6 +104,7 @@ enum HomebrewFormulaTrust {
 
 enum RuntimeInstallationError: LocalizedError {
     case unsupportedArchitecture
+    case unsupportedPHPCycle(String)
     case releaseNotFound(String)
     case invalidResponse
     case archiveFailed(String)
@@ -107,6 +117,8 @@ enum RuntimeInstallationError: LocalizedError {
         switch self {
         case .unsupportedArchitecture:
             "This Mac architecture is not supported by the selected runtime."
+        case let .unsupportedPHPCycle(cycle):
+            "PHP \(cycle) is not available for new HerdMe installations. Install PHP 8.0 through 8.5 instead."
         case let .releaseNotFound(cycle):
             "No compatible Node.js " + cycle + " release was found."
         case .invalidResponse:
@@ -136,7 +148,7 @@ actor RuntimeInstaller {
     func installNode(cycle: String) async throws -> String {
         let archiveKey = try nodeArchiveKey()
         let indexURL = URL(string: "https://nodejs.org/dist/index.json")!
-        let (indexData, response) = try await URLSession.shared.data(from: indexURL)
+        let (indexData, response) = try await ManagedDownloadClient.data(from: indexURL)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             throw RuntimeInstallationError.invalidResponse
         }
@@ -158,8 +170,8 @@ actor RuntimeInstaller {
             let archiveName = "node-\(release.version)-\(platform).tar.gz"
             let downloadURL = URL(string: "https://nodejs.org/dist/\(release.version)/\(archiveName)")!
             let checksumsURL = URL(string: "https://nodejs.org/dist/\(release.version)/SHASUMS256.txt")!
-            async let archiveRequest = URLSession.shared.download(from: downloadURL)
-            async let checksumsRequest = URLSession.shared.data(from: checksumsURL)
+            async let archiveRequest = ManagedDownloadClient.download(from: downloadURL)
+            async let checksumsRequest = ManagedDownloadClient.data(from: checksumsURL)
             let ((temporaryArchive, downloadResponse), (checksumsData, checksumsResponse)) = try await (
                 archiveRequest,
                 checksumsRequest
@@ -187,7 +199,7 @@ actor RuntimeInstaller {
     func latestNodeVersions(cycles: [String]) async throws -> [String: String] {
         let archiveKey = try nodeArchiveKey()
         let indexURL = URL(string: "https://nodejs.org/dist/index.json")!
-        let (indexData, response) = try await URLSession.shared.data(from: indexURL)
+        let (indexData, response) = try await ManagedDownloadClient.data(from: indexURL)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             throw RuntimeInstallationError.invalidResponse
         }
@@ -203,6 +215,9 @@ actor RuntimeInstaller {
     func latestPHPVersions(cycles: [String]) throws -> [String: String] {
         let requestedCycles = Set(cycles)
         guard !requestedCycles.isEmpty else { return [:] }
+        if let unsupportedCycle = requestedCycles.first(where: { !PHPRuntimeSupport.isInstallable($0) }) {
+            throw RuntimeInstallationError.unsupportedPHPCycle(unsupportedCycle)
+        }
         guard let brew = brewURL() else { throw RuntimeInstallationError.packageManagerMissing }
         let formulae = requestedCycles.sorted().map { "php@\($0)" }
         let result = try run(
@@ -231,6 +246,9 @@ actor RuntimeInstaller {
     }
 
     func installPHP(cycle: String) throws -> String {
+        guard PHPRuntimeSupport.isInstallable(cycle) else {
+            throw RuntimeInstallationError.unsupportedPHPCycle(cycle)
+        }
         guard let brew = brewURL() else { throw RuntimeInstallationError.packageManagerMissing }
         let formula = "php@\(cycle)"
         let managedExecutable = rootURL.appendingPathComponent("Runtimes/php/\(cycle)/bin/php")
@@ -307,7 +325,7 @@ actor RuntimeInstaller {
     }
 
     nonisolated static func phpFormulaTrustTarget(from output: String, cycle: String) -> String? {
-        guard cycle.range(of: #"^[0-9]+\.[0-9]+$"#, options: .regularExpression) != nil else {
+        guard PHPRuntimeSupport.isInstallable(cycle) else {
             return nil
         }
         let expectedFormula = "shivammathur/php/php@\(cycle)"
@@ -336,6 +354,7 @@ actor RuntimeInstaller {
             }
             try fileManager.createSymbolicLink(at: link, withDestinationURL: candidate)
         }
+        try repairManagedToolLaunchers()
     }
 
     func laravelInstallerVersion(cycle: String) -> String? {
@@ -363,11 +382,12 @@ actor RuntimeInstaller {
 
     func composerVersion(cycle: String) -> String? {
         let php = rootURL.appendingPathComponent("Runtimes/php/\(cycle)/bin/php")
+        try? repairManagedToolLaunchers()
         guard fileManager.isExecutableFile(atPath: php.path),
-              fileManager.isReadableFile(atPath: composerURL.path),
+              fileManager.isReadableFile(atPath: composerPHARURL.path),
               let result = try? run(
                   php,
-                  arguments: [composerURL.path, "--version", "--no-ansi"],
+                  arguments: [composerPHARURL.path, "--version", "--no-ansi"],
                   environment: composerEnvironment
               ),
               result.status == 0 else {
@@ -391,7 +411,7 @@ actor RuntimeInstaller {
             throw RuntimeInstallationError.invalidResponse
         }
         let indexURL = URL(string: "https://getcomposer.org/versions")!
-        let (data, response) = try await URLSession.shared.data(from: indexURL)
+        let (data, response) = try await ManagedDownloadClient.data(from: indexURL)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             throw RuntimeInstallationError.invalidResponse
         }
@@ -422,6 +442,7 @@ actor RuntimeInstaller {
                 "Composer could not be updated. Full output is available in Logs/homebrew.log."
             )
         }
+        try repairManagedToolLaunchers()
         guard let version = composerVersion(cycle: cycle) else {
             throw RuntimeInstallationError.commandFailed(
                 "Composer was updated, but HerdMe could not read its version."
@@ -432,7 +453,7 @@ actor RuntimeInstaller {
 
     func latestLaravelInstallerVersion() async throws -> String {
         let indexURL = URL(string: "https://repo.packagist.org/p2/laravel/installer.json")!
-        let (data, response) = try await URLSession.shared.data(from: indexURL)
+        let (data, response) = try await ManagedDownloadClient.data(from: indexURL)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             throw RuntimeInstallationError.invalidResponse
         }
@@ -457,9 +478,12 @@ actor RuntimeInstaller {
 
     func isLaravelInstallerReadyForProjectCreation() -> Bool {
         let activePHP = rootURL.appendingPathComponent("bin/php")
+        try? repairManagedToolLaunchers()
         return fileManager.isExecutableFile(atPath: activePHP.path)
-            && fileManager.isReadableFile(atPath: composerURL.path)
+            && fileManager.isReadableFile(atPath: composerPHARURL.path)
+            && fileManager.isExecutableFile(atPath: composerLauncherURL.path)
             && fileManager.isReadableFile(atPath: laravelInstallerURL.path)
+            && fileManager.isExecutableFile(atPath: laravelLauncherURL.path)
     }
 
     func updateLaravelInstaller(cycle: String) async throws -> String {
@@ -484,6 +508,7 @@ actor RuntimeInstaller {
                 rootURL: rootURL
             ))
         }
+        try repairManagedToolLaunchers()
         guard let version = laravelInstallerVersion(cycle: cycle) else {
             throw RuntimeInstallationError.commandFailed("Laravel Installer was not available after Composer completed.")
         }
@@ -561,7 +586,7 @@ actor RuntimeInstaller {
     }
 
     nonisolated static func isNewerVersion(_ candidate: String, than current: String) -> Bool {
-        normalizedVersion(candidate).compare(normalizedVersion(current), options: .numeric) == .orderedDescending
+        VersionComparison.isNewer(candidate, than: current)
     }
 
     nonisolated static func normalizedVersion(_ version: String) -> String {
@@ -618,16 +643,29 @@ actor RuntimeInstaller {
         }
     }
 
-    private var composerURL: URL {
+    private var composerLauncherURL: URL {
         rootURL.appendingPathComponent("bin/composer")
+    }
+
+    private var composerPHARURL: URL {
+        rootURL.appendingPathComponent("Composer/composer.phar")
     }
 
     private var laravelInstallerURL: URL {
         rootURL.appendingPathComponent("Composer/vendor/bin/laravel")
     }
 
+    private var laravelLauncherURL: URL {
+        rootURL.appendingPathComponent("bin/laravel")
+    }
+
     private var composerEnvironment: [String: String] {
         var environment = ProcessInfo.processInfo.environment
+        for key in environment.keys.filter({ $0.hasPrefix("HERD_") }) {
+            environment.removeValue(forKey: key)
+        }
+        environment.removeValue(forKey: "PHPRC")
+        environment.removeValue(forKey: "PHP_INI_SCAN_DIR")
         let temporaryDirectory = rootURL.appendingPathComponent("Cache/tmp", isDirectory: true)
         try? fileManager.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
         environment["COMPOSER_HOME"] = rootURL.appendingPathComponent("Composer", isDirectory: true).path
@@ -643,20 +681,21 @@ actor RuntimeInstaller {
     }
 
     private func ensureComposer(php: URL) async throws -> URL {
-        if fileManager.isReadableFile(atPath: composerURL.path),
+        try repairManagedToolLaunchers()
+        if fileManager.isReadableFile(atPath: composerPHARURL.path),
            let result = try? run(
                php,
-               arguments: [composerURL.path, "--version", "--no-ansi"],
+               arguments: [composerPHARURL.path, "--version", "--no-ansi"],
                environment: composerEnvironment
            ),
            result.status == 0 {
-            return composerURL
+            return composerPHARURL
         }
 
         let installerURL = URL(string: "https://getcomposer.org/installer")!
         let signatureURL = URL(string: "https://composer.github.io/installer.sig")!
-        async let installerRequest = URLSession.shared.data(from: installerURL)
-        async let signatureRequest = URLSession.shared.data(from: signatureURL)
+        async let installerRequest = ManagedDownloadClient.data(from: installerURL)
+        async let signatureRequest = ManagedDownloadClient.data(from: signatureURL)
         let ((installerData, installerResponse), (signatureData, signatureResponse)) = try await (
             installerRequest,
             signatureRequest
@@ -675,39 +714,118 @@ actor RuntimeInstaller {
             throw RuntimeInstallationError.integrityCheckFailed(component: "Composer installer")
         }
 
-        let managedBin = rootURL.appendingPathComponent("bin", isDirectory: true)
-        try fileManager.createDirectory(at: managedBin, withIntermediateDirectories: true)
-        try fileManager.createDirectory(
-            at: rootURL.appendingPathComponent("Composer", isDirectory: true),
-            withIntermediateDirectories: true
-        )
+        let composerDirectory = rootURL.appendingPathComponent("Composer", isDirectory: true)
+        try fileManager.createDirectory(at: composerDirectory, withIntermediateDirectories: true)
         try fileManager.createDirectory(
             at: rootURL.appendingPathComponent("Cache/composer", isDirectory: true),
             withIntermediateDirectories: true
         )
         let staging = rootURL.appendingPathComponent("Cache/composer-installer-\(UUID().uuidString).php")
+        let installationDirectory = rootURL.appendingPathComponent(
+            "Cache/composer-install-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try fileManager.createDirectory(at: installationDirectory, withIntermediateDirectories: true)
         try installerData.write(to: staging, options: .atomic)
-        defer { try? fileManager.removeItem(at: staging) }
+        defer {
+            try? fileManager.removeItem(at: staging)
+            try? fileManager.removeItem(at: installationDirectory)
+        }
 
         let install = try run(
             php,
             arguments: [
                 staging.path,
-                "--install-dir=\(managedBin.path)",
-                "--filename=composer",
+                "--install-dir=\(installationDirectory.path)",
+                "--filename=composer.phar",
                 "--quiet"
             ],
             environment: composerEnvironment
         )
-        guard install.status == 0, fileManager.isReadableFile(atPath: composerURL.path) else {
+        let installedPHAR = installationDirectory.appendingPathComponent("composer.phar")
+        guard install.status == 0, fileManager.isReadableFile(atPath: installedPHAR.path) else {
             throw RuntimeInstallationError.commandFailed(CommandFailureReporter.recordAndSummarize(
                 install.output,
                 operation: "install Composer",
                 rootURL: rootURL
             ))
         }
-        try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: composerURL.path)
-        return composerURL
+        let verification = try run(
+            php,
+            arguments: [installedPHAR.path, "--version", "--no-ansi"],
+            environment: composerEnvironment
+        )
+        guard verification.status == 0, Self.composerVersion(from: verification.output) != nil else {
+            throw RuntimeInstallationError.commandFailed(
+                "Composer was downloaded, but the managed PHP runtime could not execute it."
+            )
+        }
+        if fileManager.fileExists(atPath: composerPHARURL.path) {
+            _ = try fileManager.replaceItemAt(composerPHARURL, withItemAt: installedPHAR)
+        } else {
+            try fileManager.moveItem(at: installedPHAR, to: composerPHARURL)
+        }
+        try fileManager.setAttributes([.posixPermissions: 0o644], ofItemAtPath: composerPHARURL.path)
+        try repairManagedToolLaunchers()
+        return composerPHARURL
+    }
+
+    func repairManagedToolLaunchers() throws {
+        let managedBin = rootURL.appendingPathComponent("bin", isDirectory: true)
+        let composerDirectory = rootURL.appendingPathComponent("Composer", isDirectory: true)
+        try fileManager.createDirectory(at: managedBin, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: composerDirectory, withIntermediateDirectories: true)
+        try migrateLegacyComposerPHARIfNeeded()
+
+        if fileManager.isReadableFile(atPath: composerPHARURL.path) {
+            try writeManagedLauncher(
+                Self.managedToolLauncher(target: "Composer/composer.phar"),
+                to: composerLauncherURL
+            )
+        }
+        if fileManager.isReadableFile(atPath: laravelInstallerURL.path) {
+            try writeManagedLauncher(
+                Self.managedToolLauncher(target: "Composer/vendor/bin/laravel"),
+                to: laravelLauncherURL
+            )
+        }
+    }
+
+    nonisolated static func managedToolLauncher(target: String) -> String {
+        """
+        #!/bin/sh
+        set -eu
+
+        HERDME_BIN=$(CDPATH= cd "$(dirname "$0")" && pwd -P)
+        HERDME_ROOT=$(CDPATH= cd "$HERDME_BIN/.." && pwd -P)
+        export COMPOSER_HOME="$HERDME_ROOT/Composer"
+        export COMPOSER_CACHE_DIR="$HERDME_ROOT/Cache/composer"
+        export PATH="$HERDME_BIN:${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}"
+        unset PHPRC PHP_INI_SCAN_DIR
+        exec "$HERDME_BIN/php" "$HERDME_ROOT/\(target)" "$@"
+
+        """
+    }
+
+    private func migrateLegacyComposerPHARIfNeeded() throws {
+        guard !fileManager.fileExists(atPath: composerPHARURL.path),
+              fileManager.isReadableFile(atPath: composerLauncherURL.path),
+              let handle = try? FileHandle(forReadingFrom: composerLauncherURL) else { return }
+        defer { try? handle.close() }
+        let prefix = try handle.read(upToCount: 64) ?? Data()
+        guard Self.isComposerPHARPrefix(prefix) else { return }
+        try fileManager.moveItem(at: composerLauncherURL, to: composerPHARURL)
+        try fileManager.setAttributes([.posixPermissions: 0o644], ofItemAtPath: composerPHARURL.path)
+    }
+
+    nonisolated static func isComposerPHARPrefix(_ data: Data) -> Bool {
+        guard let prefix = String(data: data, encoding: .utf8) else { return false }
+        return prefix.hasPrefix("#!/usr/bin/env php\n<?php") || prefix.hasPrefix("<?php")
+    }
+
+    private func writeManagedLauncher(_ contents: String, to url: URL) throws {
+        try Data(contents.utf8).write(to: url, options: .atomic)
+        try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
     }
 
     private func nodeArchiveKey() throws -> String {
@@ -756,19 +874,42 @@ actor RuntimeInstaller {
         let result = try ProcessRunner.run(
             executable,
             arguments: arguments,
-            environment: environment
+            environment: environment,
+            cancellationRequested: { Task<Never, Never>.isCancelled }
         )
         return (result.status, result.output)
     }
 
     private func unpack(archive: URL, into destination: URL) throws {
+        let tar = URL(fileURLWithPath: "/usr/bin/tar")
+        let names = try ProcessRunner.run(
+            tar,
+            arguments: ["-tzf", archive.path],
+            timeout: 2 * 60,
+            cancellationRequested: { Task<Never, Never>.isCancelled }
+        )
+        guard names.status == 0 else { throw RuntimeInstallationError.archiveFailed(names.output) }
+        let details = try ProcessRunner.run(
+            tar,
+            arguments: ["-tvzf", archive.path],
+            timeout: 2 * 60,
+            cancellationRequested: { Task<Never, Never>.isCancelled }
+        )
+        guard details.status == 0 else { throw RuntimeInstallationError.archiveFailed(details.output) }
+        try TarArchivePolicy.validate(nameListing: names.output, verboseListing: details.output)
+
         let result = try ProcessRunner.run(
-            URL(fileURLWithPath: "/usr/bin/tar"),
-            arguments: ["-xzf", archive.path, "-C", destination.path, "--strip-components", "1"],
-            timeout: 2 * 60
+            tar,
+            arguments: [
+                "-xzf", archive.path, "-C", destination.path, "--strip-components", "1",
+                "--no-same-owner", "--no-same-permissions"
+            ],
+            timeout: 2 * 60,
+            cancellationRequested: { Task<Never, Never>.isCancelled }
         )
         guard result.status == 0 else {
             throw RuntimeInstallationError.archiveFailed(result.output)
         }
+        try TarArchivePolicy.validateExtractedTree(at: destination)
     }
 }

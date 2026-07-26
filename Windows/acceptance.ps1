@@ -1,7 +1,8 @@
 param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release",
-    [switch]$LeaveRunning
+    [switch]$LeaveRunning,
+    [switch]$SkipLiveReleaseChecks
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,29 +16,49 @@ if (-not [Environment]::Is64BitOperatingSystem -or -not [Environment]::Is64BitPr
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$releaseMode = if ([string]::IsNullOrWhiteSpace($env:HERDME_RELEASE_MODE)) {
+    "local"
+} else {
+    $env:HERDME_RELEASE_MODE.ToLowerInvariant()
+}
+if ($releaseMode -notin @("local", "public")) {
+    throw "HERDME_RELEASE_MODE must be local or public."
+}
 $publishDirectory = Join-Path $repoRoot "build\windows-portable-win-x64"
 $executable = Join-Path $publishDirectory "HerdMe.Windows.exe"
 $project = Join-Path $PSScriptRoot "HerdMe.Windows\HerdMe.Windows.csproj"
 $contractProject = Join-Path $PSScriptRoot "HerdMe.Windows.ContractTests\HerdMe.Windows.ContractTests.csproj"
-[xml]$projectXml = Get-Content -Raw $project
-$version = ($projectXml.Project.PropertyGroup.Version | Select-Object -First 1)
+$version = (Get-Content -LiteralPath (Join-Path $repoRoot "VERSION") -Raw).Trim()
 $archive = Join-Path $repoRoot "dist\HerdMe-$version-win-x64-portable.zip"
 $checksumFile = "$archive.sha256"
+$installer = Join-Path $repoRoot "dist\HerdMe-$version-win-x64-setup.exe"
+$installerChecksumFile = "$installer.sha256"
+$installerTestDirectory = Join-Path $repoRoot "build\windows-installer-acceptance"
+if ($releaseMode -eq "public") {
+    . (Join-Path $PSScriptRoot "sign-windows-artifact.ps1")
+}
 
 & (Join-Path $PSScriptRoot "package-portable.ps1") `
     -Architecture x64 `
     -Configuration $Configuration
 if ($LASTEXITCODE -ne 0) { throw "The Windows package gate failed." }
+& (Join-Path $PSScriptRoot "package-installer.ps1") `
+    -Architecture x64 `
+    -Configuration $Configuration `
+    -SkipPortableBuild
+if ($LASTEXITCODE -ne 0) { throw "The Windows installer gate failed." }
 
-dotnet run `
-    --project $contractProject `
-    --configuration $Configuration `
-    --no-build `
-    --no-restore `
-    -- `
-    --live-service-releases `
-    --live-runtime-releases
-if ($LASTEXITCODE -ne 0) { throw "A managed service or runtime release source is unavailable or invalid." }
+if (-not $SkipLiveReleaseChecks) {
+    dotnet run `
+        --project $contractProject `
+        --configuration $Configuration `
+        --no-build `
+        --no-restore `
+        -- `
+        --live-service-releases `
+        --live-runtime-releases
+    if ($LASTEXITCODE -ne 0) { throw "A managed service or runtime release source is unavailable or invalid." }
+}
 
 if (-not (Test-Path $executable -PathType Leaf)) {
     throw "The packaged HerdMe executable was not found."
@@ -52,6 +73,79 @@ if ($checksumParts.Count -lt 2 -or $checksumParts[1] -ne (Split-Path -Leaf $arch
 $actualHash = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
 if ($checksumParts[0].ToLowerInvariant() -ne $actualHash) {
     throw "The Windows portable ZIP does not match its SHA-256 sidecar."
+}
+if (
+    -not (Test-Path -LiteralPath $installer -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $installerChecksumFile -PathType Leaf)
+) {
+    throw "The Windows installer or SHA-256 sidecar was not produced."
+}
+$installerChecksumParts = @((Get-Content -Raw $installerChecksumFile).Trim() -split "\s+")
+if (
+    $installerChecksumParts.Count -lt 2 -or
+    $installerChecksumParts[1] -ne (Split-Path -Leaf $installer)
+) {
+    throw "The Windows installer checksum sidecar has an invalid filename."
+}
+$actualInstallerHash = (Get-FileHash -Algorithm SHA256 $installer).Hash.ToLowerInvariant()
+if ($installerChecksumParts[0].ToLowerInvariant() -ne $actualInstallerHash) {
+    throw "The Windows installer does not match its SHA-256 sidecar."
+}
+
+if (Test-Path -LiteralPath $installerTestDirectory) {
+    Remove-Item -LiteralPath $installerTestDirectory -Recurse -Force
+}
+$installProcess = Start-Process `
+    -FilePath $installer `
+    -ArgumentList @(
+        "/VERYSILENT",
+        "/SUPPRESSMSGBOXES",
+        "/NORESTART",
+        "/DIR=`"$installerTestDirectory`""
+    ) `
+    -Wait `
+    -PassThru
+if ($installProcess.ExitCode -ne 0) {
+    throw "The Windows installer acceptance run failed with exit code $($installProcess.ExitCode)."
+}
+$installedExecutable = Join-Path $installerTestDirectory "HerdMe.Windows.exe"
+$installedCore = Join-Path $installerTestDirectory "Runtime\herdme-core.exe"
+foreach ($installedFile in @($installedExecutable, $installedCore)) {
+    if (-not (Test-Path -LiteralPath $installedFile -PathType Leaf)) {
+        throw "The Windows installer did not install $installedFile."
+    }
+}
+if ($releaseMode -eq "public") {
+    $expectedThumbprint = Get-HerdMeSigningThumbprint
+    Assert-HerdMeAuthenticodeSignature `
+        -Path $installer `
+        -ExpectedThumbprint $expectedThumbprint
+    Assert-HerdMeAuthenticodeSignature `
+        -Path $installedExecutable `
+        -ExpectedThumbprint $expectedThumbprint
+    Assert-HerdMeAuthenticodeSignature `
+        -Path $installedCore `
+        -ExpectedThumbprint $expectedThumbprint
+}
+& $installedCore doctor
+if ($LASTEXITCODE -ne 0) { throw "The installed portable core health check failed." }
+$uninstallers = @(Get-ChildItem -LiteralPath $installerTestDirectory -Filter "unins*.exe" -File)
+if ($uninstallers.Count -ne 1) {
+    throw "The Windows installer did not create exactly one uninstaller."
+}
+$uninstallProcess = Start-Process `
+    -FilePath $uninstallers[0].FullName `
+    -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART") `
+    -Wait `
+    -PassThru
+if ($uninstallProcess.ExitCode -ne 0) {
+    throw "The Windows uninstaller acceptance run failed with exit code $($uninstallProcess.ExitCode)."
+}
+if (Test-Path -LiteralPath $installedExecutable -PathType Leaf) {
+    throw "The Windows uninstaller left the application executable installed."
+}
+if (Test-Path -LiteralPath $installerTestDirectory) {
+    Remove-Item -LiteralPath $installerTestDirectory -Recurse -Force
 }
 
 function Get-HerdMeProcesses {

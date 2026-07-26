@@ -3,6 +3,7 @@ import SwiftUI
 struct ServicesView: View {
     @EnvironmentObject private var model: AppModel
     @State private var showingAddService = false
+    @State private var environmentService: ServiceInstance?
 
     var body: some View {
         PageContainer("Services") {
@@ -37,7 +38,18 @@ struct ServicesView: View {
                                 let definition = ServiceCatalog.all.first(where: { $0.id == instance.definitionID })
                                 let state = model.serviceState(for: instance)
                                 let isOperating = model.serviceOperation == instance.id
-                                Label(instance.name, systemImage: definition?.symbol ?? "externaldrive")
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Label(instance.name, systemImage: definition?.symbol ?? "externaldrive")
+                                    Text(
+                                        state.isRunning
+                                            ? TablePlusConnection.displayAddress(for: instance)
+                                                ?? instance.definitionID
+                                            : instance.definitionID
+                                    )
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                }
                                 Spacer()
                                 Text(PortPresentation.number(instance.port)).frame(width: 80)
                                 Group {
@@ -71,14 +83,22 @@ struct ServicesView: View {
                                     case .running:
                                         Button("Stop") { model.stopService(instance) }
                                         if model.canOpenServiceInTablePlus(instance) {
-                                            Button("Open in TablePlus") {
+                                            Button {
+                                                model.copyServiceConnectionURL(instance)
+                                            } label: {
+                                                Label("Copy Connection URL", systemImage: "doc.on.doc")
+                                            }
+                                            Button {
                                                 model.openServiceInTablePlus(instance)
+                                            } label: {
+                                                Label("Open in TablePlus", systemImage: "arrow.up.forward.app")
                                             }
                                         }
                                         if model.canOpenServiceConsole(instance) {
                                             Button("Open Console") { model.openServiceConsole(instance) }
                                         }
                                     }
+                                    Button("Add to .env…") { environmentService = instance }
                                     Button("Open Data Directory") { model.openServiceDataDirectory(instance) }
                                     Divider()
                                     Button("Delete", role: .destructive) { model.removeService(instance) }
@@ -88,7 +108,7 @@ struct ServicesView: View {
                                 .frame(width: 58)
                                 .disabled(isOperating)
                             }
-                            .frame(height: 44)
+                            .frame(height: 52)
                         }
                     }
                 }
@@ -106,9 +126,94 @@ struct ServicesView: View {
             AddServiceSheet(isPresented: $showingAddService)
                 .environmentObject(model)
         }
+        .sheet(item: $environmentService) { instance in
+            ServiceEnvironmentSheet(instance: instance)
+                .environmentObject(model)
+        }
         .onAppear {
             model.refreshServiceStates()
             model.refreshServiceUpdates()
+        }
+    }
+}
+
+private struct ServiceEnvironmentSheet: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    let instance: ServiceInstance
+    @State private var selectedSiteID = ""
+    @State private var update: ServiceEnvironmentUpdate?
+    @State private var errorMessage: String?
+
+    private var selectedSite: SiteProject? {
+        model.sites.first(where: { $0.id == selectedSiteID })
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Add \(instance.name) to .env")
+                .font(.title2.weight(.semibold))
+
+            if model.sites.isEmpty {
+                EmptyStateView(
+                    symbol: "folder.badge.questionmark",
+                    title: "No Sites Available",
+                    message: "Add or link a site before updating a .env file."
+                )
+            } else {
+                Picker("Site", selection: $selectedSiteID) {
+                    ForEach(model.sites) { site in
+                        Text(site.name).tag(site.id)
+                    }
+                }
+
+                if let selectedSite {
+                    Text(selectedSite.path.appendingPathComponent(".env").path)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .textSelection(.enabled)
+                }
+
+                if let update {
+                    Label(
+                        "Added \(update.addedKeys) and updated \(update.updatedKeys) variables.",
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .foregroundStyle(.green)
+                } else if let errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                }
+            }
+
+            HStack {
+                Spacer()
+                Button(update == nil ? "Cancel" : "Done") { dismiss() }
+                if !model.sites.isEmpty, update == nil {
+                    Button("Add to .env") { writeEnvironment() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(selectedSite == nil)
+                }
+            }
+        }
+        .padding(24)
+        .frame(width: 480)
+        .frame(minHeight: 230)
+        .onAppear {
+            if selectedSiteID.isEmpty {
+                selectedSiteID = model.selectedSite?.id ?? model.sites.first?.id ?? ""
+            }
+        }
+    }
+
+    private func writeEnvironment() {
+        guard let selectedSite else { return }
+        do {
+            update = try model.addServiceEnvironment(instance, to: selectedSite)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }
@@ -130,7 +235,8 @@ private struct AddServiceSheet: View {
             }
             .onChange(of: selected) { value in
                 name = value.name
-                port = value.defaultPort
+                port = model.suggestedServicePort(startingAt: value.defaultPort)
+                    ?? value.defaultPort
             }
             TextField("Service Name", text: $name)
             TextField("Port", value: $port, format: .number.grouping(.never))
@@ -138,8 +244,13 @@ private struct AddServiceSheet: View {
                 Spacer()
                 Button("Cancel") { isPresented = false }
                 Button("Add") {
-                    model.addService(definition: selected, name: name, port: port)
-                    isPresented = false
+                    if model.addService(definition: selected, name: name, port: port) {
+                        isPresented = false
+                    } else if let suggestion = model.suggestedServicePort(
+                        startingAt: port == 65_535 ? 1_024 : port + 1
+                    ) {
+                        port = suggestion
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || port <= 0)
@@ -147,5 +258,9 @@ private struct AddServiceSheet: View {
         }
         .padding(24)
         .frame(width: 420)
+        .onAppear {
+            port = model.suggestedServicePort(startingAt: selected.defaultPort)
+                ?? selected.defaultPort
+        }
     }
 }

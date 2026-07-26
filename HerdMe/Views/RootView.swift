@@ -20,14 +20,18 @@ struct RootView: View {
         }
         .herdTheme(model.configuration.theme)
         .background(WindowSizeController(page: model.selectedPage))
-        .alert("HerdMe", isPresented: Binding(
-            get: { model.lastError != nil },
-            set: { if !$0 { model.lastError = nil } }
-        )) {
-            Button("OK", role: .cancel) { model.lastError = nil }
-        } message: {
-            Text(ErrorPresentation(model.lastError ?? "Unknown error").message)
+        .overlay(alignment: .top) {
+            if let error = model.lastError {
+                ErrorBanner(presentation: ErrorPresentation(error)) {
+                    model.lastError = nil
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(10)
+            }
         }
+        .animation(.easeOut(duration: 0.18), value: model.lastError != nil)
         .alert(item: $model.updateNotice) { notice in
             if let downloadURL = notice.downloadURL {
                 return Alert(
@@ -61,6 +65,87 @@ struct RootView: View {
         case .logs: LogsView()
         case .about: AboutView()
         }
+    }
+}
+
+private struct ErrorBanner: View {
+    let presentation: ErrorPresentation
+    let dismiss: () -> Void
+    @State private var isShowingDetails = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+                .accessibilityHidden(true)
+            Text(presentation.message)
+                .font(.callout)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+            if presentation.technicalDetails != nil {
+                Button {
+                    isShowingDetails = true
+                } label: {
+                    Image(systemName: "info.circle")
+                }
+                .buttonStyle(.borderless)
+                .help("Show technical details")
+                .accessibilityLabel("Show technical details")
+            }
+            Button(action: dismiss) {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.borderless)
+            .help("Dismiss error")
+            .accessibilityLabel("Dismiss error")
+            .keyboardShortcut(.cancelAction)
+        }
+        .padding(12)
+        .frame(maxWidth: 620)
+        .background(.regularMaterial)
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.red.opacity(0.45), lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
+        .accessibilityElement(children: .contain)
+        .sheet(isPresented: $isShowingDetails) {
+            ErrorDetailsView(details: presentation.technicalDetails ?? "")
+        }
+    }
+}
+
+private struct ErrorDetailsView: View {
+    let details: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Technical Details")
+                .font(.headline)
+            ScrollView {
+                Text(details)
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            }
+            Divider()
+            HStack {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(details, forType: .string)
+                } label: {
+                    Label("Copy Details", systemImage: "doc.on.doc")
+                }
+                Spacer()
+                Button("Done") { dismiss() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 560, height: 360)
     }
 }
 

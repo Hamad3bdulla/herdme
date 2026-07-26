@@ -5,9 +5,11 @@ and Laravel projects. It provides site discovery, runtime management, local
 domains, HTTPS, services, mail inspection, dump inspection, logs, and debugger
 controls without subscriptions, activation, license keys, or paid gates.
 
-The shared runtime and CLI are portable C++20 so the same backend can power
-the native macOS and Windows applications. Platform-specific UI remains native:
-SwiftUI on macOS and WinUI on Windows.
+The portable C++20 core currently provides the JSON contract CLI consumed by
+the Windows application. The macOS application uses native Swift domain
+implementations, with shared behavioral fixtures covering contracts that exist
+in both layers. Platform-specific UI remains native: SwiftUI on macOS and WinUI
+on Windows.
 
 ## Independence
 
@@ -34,8 +36,15 @@ changing package-manager configuration; memory, upload, and post limits are
 also applied to the active FPM pool. Its service catalog includes MariaDB,
 MySQL, PostgreSQL, MongoDB, Redis, Valkey, Meilisearch, Typesense, MinIO, and
 RustFS on Apple Silicon.
-Running MySQL, MariaDB, PostgreSQL, MongoDB, Redis, and Valkey instances can be
-opened directly in TablePlus with their managed loopback connection settings.
+On both platforms, every managed service exposes an action that writes its
+connection settings into a selected project's `.env` file without duplicating
+keys. Running MySQL, MariaDB, PostgreSQL, MongoDB, Redis, and Valkey instances
+can also be opened directly in TablePlus with their managed loopback connection
+settings. MySQL, MariaDB, and PostgreSQL use a unique protected credential per
+service instance; new PostgreSQL clusters use SCRAM, and existing passwordless
+clusters are migrated without deleting their data. When a default service port is already assigned or owned by another
+application, HerdMe keeps the owner running and selects the next free loopback
+port instead.
 On a new installation, a native first-launch wizard prepares local domains,
 trusts HerdMe's HTTPS certificate, installs PHP 8.4, verifies Laravel's required
 extensions, and installs Composer, Laravel Installer, and Node.js 22. Every
@@ -55,8 +64,10 @@ applications reject a second process before it can start duplicate listeners.
 The Windows app uses the same first-launch stages in native WinUI and delays
 background listeners until setup succeeds. Its local-domain stage uses the
 normal Windows UAC prompt without opening a console.
-Stable and beta update checks are implemented on both platforms, with a local
-feed for development and an overridable HTTPS feed for releases. Both
+Stable and beta update checks are implemented on both platforms. Remote feeds
+must use HTTPS and a valid ECDSA P-256 signature; Release builds use a bundled
+feed URL and public key, while environment overrides are limited to Debug
+builds. See `docs/RELEASING.md` for the signing and publishing procedure. Both
 applications also expose the MIT license and third-party acknowledgements
 in-app. Windows packaging and full runtime verification on Windows hardware
 remain in progress.
@@ -66,9 +77,13 @@ remain in progress.
 HerdMe uses FastCGI for dynamic requests; it does not use FrankenPHP. macOS
 uses PHP-FPM, while Windows uses the official `php-cgi.exe -b` runtime because
 PHP-FPM is not available in official Windows PHP builds. Static files are
-served directly and Laravel routes fall back to
+streamed in bounded chunks on both platforms, including single HTTP byte-range
+requests for large assets, and Laravel routes fall back to
 `public/index.php`. HTTPS requests are forwarded with trusted proxy metadata so
 Laravel receives `HTTPS=on`.
+Dynamic FastCGI stdout is also streamed progressively on both platforms: HerdMe
+buffers only the bounded CGI header, strips hop-by-hop headers, and forwards
+body records as PHP produces them.
 
 New projects run directly through the managed Laravel Installer that is already
 installed by HerdMe. Project creation performs no version probe or package-manager
@@ -81,20 +96,24 @@ deployment requirements requested by this project: `ctype`, `curl`, `dom`,
 `tokenizer`, and `xml`. Startup stops with the exact missing-extension list if
 the selected runtime is incomplete.
 
-On macOS the debugger workflow installs and validates a stable PECL Xdebug
-build inside `~/Library/Application Support/HerdMe/Extensions`, applies the
-selected debug mode, trigger, port, and IDE key to PHP-FPM, and opens triggered
-site sessions without modifying Homebrew PHP files.
+On macOS the debugger workflow installs and validates a stable Xdebug build
+inside `~/Library/Application Support/HerdMe/Extensions`. The source archive
+must match the SHA-256 published on the official Xdebug download page before it
+is unpacked. HerdMe applies the selected debug mode, trigger, port, and IDE key
+to PHP-FPM without modifying Homebrew PHP files.
 
-Certificate trust and resolver setup use native macOS Authorization Services
-without opening Terminal or requesting Apple Events permission.
-The installed HerdMe network helper binds only loopback DNS, HTTP, and HTTPS,
-then drops administrator privileges to the current user. It forwards the
-standard ports to the app's managed listeners so browser URLs do not expose
+Certificate trust uses Security.framework in the user's Keychain, while local
+DNS and standard ports use an embedded `SMAppService` launch daemon. Neither
+path opens Terminal, requests Apple Events permission, or exposes a generic
+privileged command channel. The HerdMe network helper binds only loopback DNS,
+HTTP, and HTTPS, then moves network handling to the current user. It forwards
+the standard ports to the app's managed listeners so browser URLs do not expose
 internal ports such as `8080` or `8443`. Its launch service is associated with
-the `app.herdme.desktop` application identity. HerdMe detects an outdated helper,
-offers an explicit update action, and waits for the replacement service to be
-running before reporting setup as complete.
+the `app.herdme.desktop` application identity. Migration keeps the legacy
+service recoverable until the modern unprivileged worker owns every required
+port, restores it on failure, and prevents a failed migration from looping.
+HerdMe waits for the replacement service to be running before reporting setup
+as complete.
 Local WebKit previews use the loopback site runtime directly and render a
 desktop-width page inside the thumbnail, including when another application
 manages the selected local-domain resolver. Windows WebView2 previews apply
@@ -102,12 +121,16 @@ the same desktop viewport and fit it to the available preview frame.
 
 The tracked parity target and Windows architecture are in
 [`docs/PARITY.md`](docs/PARITY.md).
+Release history is maintained in [`CHANGELOG.md`](CHANGELOG.md), while `VERSION`
+and `BUILD_NUMBER` are the authoritative release identifiers for both platforms.
 
 ## Validation
 
-The current macOS suite executes 86 tests: 85 pass and the optional live
-Laravel-project test is skipped unless a project path or temporary-creation flag
-is supplied. A live run created Laravel 13.22.0 with the React starter kit
+The current macOS suite executes 151 tests: 149 pass, while the optional live
+Laravel-project and database-authentication tests are skipped unless their
+integration flags are supplied. Both optional gates were also run explicitly on
+July 26, 2026 and passed against an existing Laravel application and a temporary
+authenticated instance of the installed MySQL runtime. A live run created Laravel 13.22.0 with the React starter kit
 through HerdMe's managed installer, installed its npm packages, built and
 verified its Vite manifest, then served its dynamic page, a static asset, and
 HTTPS through the managed PHP-FPM environment.
@@ -118,7 +141,8 @@ keep the creation result visible and report each completed, active, or failed st
 The portable C++20 tests, expanded Windows C# cross-platform contracts, and all
 13 WinUI XAML XML checks pass on macOS. The Windows contract gate compiles every
 non-UI model and service, exercises static HTTP routing and traversal rejection,
-and cross-publishes as a self-contained PE32+ x86-64 executable. Debug builds
+proves progressive FastCGI output before `END_REQUEST`, and cross-publishes as a
+self-contained PE32+ x86-64 executable. Debug builds
 pass for both Apple Silicon and
 Intel. Native visual checks cover site start/stop, a real local HTTP preview,
 Logs, About and application icons, Mail/Dumps listeners, and single-instance
@@ -130,10 +154,61 @@ locale thousands separators, and live SMTP HTML plus VarDumper captures have
 been visually verified. A Windows machine is still required for the
 complete WinUI build and runtime acceptance checklist.
 
+Swift, portable C++, and both Windows C# projects treat compiler warnings as
+errors. The local Release gate builds a universal `arm64`/`x86_64` macOS app,
+verifies its signature, ZIP, DMG, and SHA-256 sidecar, installs that exact app,
+and confirms the local Laravel site returns `200` over HTTP. A prior explicit
+certificate-authorization gate also passed trusted HTTPS; the current freshly
+installed build correctly keeps HTTP available while macOS waits for the user
+to approve the saved HTTPS identity in Keychain.
+
+Managed services on both platforms include an `Add to .env` action. It lets the
+user select a discovered site, creates `.env` from `.env.example` when necessary,
+and safely adds or updates that service's Laravel connection variables without
+discarding unrelated settings or comments.
+
+The macOS mail inbox persists a bounded metadata index and loads full message
+bodies only when selected, so startup memory and disk reads do not scale with
+the combined raw size of the retained inbox.
+PHP-FPM worker capacity scales with the Mac's logical processor count and stays
+inside a bounded 4-to-32 child range.
+
+Managed databases, MinIO, RustFS, and Typesense no longer use shared or empty credentials. HerdMe
+generates a unique 256-bit secret per service instance, keeps it in macOS Keychain
+or Windows Credential Manager, and uses that same secret for database access,
+TablePlus, process launch where applicable, and Laravel `.env` export. A live
+macOS gate starts the installed MySQL and MariaDB runtimes and verifies that
+authenticated access succeeds while passwordless access fails.
+
+Local HTTPS secrets are protected the same way. macOS prefers Data Protection
+Keychain for the CA private key and random PKCS#12 password. Ad-hoc local builds
+fall back to the login Keychain only when the required entitlement is missing;
+a later properly signed build migrates those secrets before removing the legacy
+copies. Automatic startup attempts HTTPS only for a trusted CA and never permits
+a Keychain prompt during that background attempt. If protected credentials are
+available without UI, this also repairs profiles whose older approval marker is
+missing. If legacy credentials still require interaction, sites remain over
+HTTP and the General page offers Enable; stable signed builds can then start
+HTTPS automatically after that explicit approval. Plaintext keys are removed
+only after verified Keychain storage.
+Credential-protected services created by an older build likewise wait for one
+explicit Start before automatic startup reads their saved Keychain entry.
+Windows keeps random PFX passwords in Credential Manager, binds each credential
+to the PFX content digest, removes verified legacy `.password` files, and loads
+private keys with ephemeral key storage.
+
+The Logs page on both platforms can switch between HerdMe's own diagnostics and
+each discovered Laravel project's `storage/logs` directory. Opening Logs from a
+site selects that project immediately, while Follow mode refreshes only when the
+selected file changes.
+
 Live Windows release probes resolve all installable managed services plus PHP 8.0-8.5,
 Node.js 20/22/24/26, Composer, Laravel Installer, and Xdebug. The Xdebug probe
 downloads every supported NTS x64 archive, verifies its official GitHub
 SHA-256 digest, and extracts only its expected DLL.
+New PHP installations on both platforms use the same 8.0-8.5 allowlist. An
+older managed cycle remains visible and selectable only when its executables
+already exist, and HerdMe does not offer installation or update actions for it.
 
 HerdMe removes legacy references to another application's default project or
 private data folders from its own configuration. New park paths, project links,
@@ -173,12 +248,27 @@ xcodebuild -project HerdMe.xcodeproj -scheme HerdMe \
   test
 ```
 
-Create local ZIP and DMG artifacts for testing. These artifacts are ad-hoc
-signed; public releases still need a Developer ID signature and notarization.
+Create local ZIP and DMG artifacts for testing. Local artifacts are ad-hoc
+signed with hardened runtime enabled. Public mode requires a Developer ID
+Application identity and a notarytool keychain profile, then signs, notarizes,
+staples, assesses, and checksums the artifacts as documented in
+`docs/RELEASING.md`.
 
 ```sh
 ./scripts/package-macos.sh Release
 ```
+
+For repeated local installs, use a stable Apple Development identity so macOS
+Keychain continues to recognize the application between builds:
+
+```sh
+HERDME_LOCAL_CODESIGN_IDENTITY="Apple Development: Developer Name (TEAMID)" \
+./scripts/package-macos.sh Release
+```
+
+Ad-hoc signing remains the fallback for contributors without an Apple
+Development identity. Because its code identity changes on every build, it is
+not suitable for repeatedly installing the app against the same Keychain data.
 
 Build and inspect the shared core without any package manager dependencies:
 
@@ -209,10 +299,20 @@ Create a self-contained, unpackaged Windows portable ZIP with:
 .\Windows\package-portable.ps1 -Architecture x64 -Configuration Release
 ```
 
+Create the per-user Windows installer (it also builds the portable payload)
+with Inno Setup 6 installed:
+
+```powershell
+.\Windows\package-installer.ps1 -Architecture x64 -Configuration Release
+```
+
 The `Windows x64` GitHub Actions workflow runs the same build, contract, XAML,
-portable-package, PE-architecture, checksum, single-instance, listener, SMTP,
-and VarDumper gates on `windows-2022`, then uploads the ZIP plus its `.sha256`
-file.
+portable-package, installer install/uninstall, PE-architecture, checksum,
+single-instance, listener, SMTP, and VarDumper gates on `windows-2022`, then
+uploads the ZIP and Setup executable plus both `.sha256` files.
+Live upstream runtime/service metadata and checksum probes run in the separate
+scheduled `Upstream release sources` workflow so external outages do not make
+pull-request builds flaky.
 
 See [`Windows/README.md`](Windows/README.md) for the Windows prerequisites and
 current milestone.

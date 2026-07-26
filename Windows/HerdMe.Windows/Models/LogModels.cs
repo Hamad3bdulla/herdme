@@ -1,5 +1,18 @@
 namespace HerdMe.Windows.Models;
 
+public sealed class LogSourceRecord
+{
+    public required string Id { get; init; }
+
+    public required string Name { get; init; }
+
+    public required string RootPath { get; init; }
+
+    public required string FallbackPath { get; init; }
+
+    public bool IsApplication { get; init; }
+}
+
 public sealed class LogFileRecord
 {
     public required string Name { get; init; }

@@ -12,6 +12,8 @@ public sealed class MailCaptureService : IAsyncDisposable
     private readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
     private readonly ConcurrentDictionary<int, Task> sessions = new();
     private readonly string supportRoot;
+    private readonly int retentionLimit;
+    private readonly TimeSpan retentionAge;
     private CancellationTokenSource? cancellation;
     private TcpListener? listener;
     private Task? acceptTask;
@@ -19,12 +21,18 @@ public sealed class MailCaptureService : IAsyncDisposable
 
     public event EventHandler<CapturedMail>? MessageCaptured;
 
-    public MailCaptureService(string? supportRoot = null)
+    public MailCaptureService(
+        string? supportRoot = null,
+        int retentionLimit = CaptureRetention.DefaultItemLimit,
+        TimeSpan? retentionAge = null
+    )
     {
         this.supportRoot = supportRoot ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "HerdMe"
         );
+        this.retentionLimit = Math.Max(1, retentionLimit);
+        this.retentionAge = retentionAge ?? CaptureRetention.DefaultMaximumAge;
     }
 
     public bool IsRunning => listener is not null;
@@ -49,6 +57,7 @@ public sealed class MailCaptureService : IAsyncDisposable
     public IReadOnlyList<CapturedMail> Load()
     {
         Directory.CreateDirectory(DirectoryPath);
+        CaptureRetention.Prune(DirectoryPath, retentionLimit, retentionAge);
         return Directory.EnumerateFiles(DirectoryPath, "*.json")
             .Select(path =>
             {
@@ -217,6 +226,7 @@ public sealed class MailCaptureService : IAsyncDisposable
         var temporary = path + ".tmp";
         File.WriteAllText(temporary, JsonSerializer.Serialize(message, jsonOptions));
         File.Move(temporary, path, true);
+        CaptureRetention.Prune(DirectoryPath, retentionLimit, retentionAge);
     }
 
     private static string Address(string command)

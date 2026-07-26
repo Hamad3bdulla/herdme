@@ -5,6 +5,8 @@ namespace HerdMe.Windows.Services;
 
 public sealed class SiteConfigurationStore
 {
+    public const int CurrentSchemaVersion = 1;
+
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public SiteConfigurationStore(string? supportRoot = null)
@@ -19,39 +21,104 @@ public sealed class SiteConfigurationStore
 
     public string SettingsPath => Path.Combine(SupportRoot, "Config", "sites.json");
 
+    public string? LastLoadWarning { get; private set; }
+
+    public string? LastBackupPath { get; private set; }
+
     public WindowsSiteSettings Load()
     {
+        if (!File.Exists(SettingsPath)) return DefaultSettings();
+        LastLoadWarning = null;
+        LastBackupPath = null;
         try
         {
-            if (File.Exists(SettingsPath))
+            var json = File.ReadAllText(SettingsPath);
+            using var document = JsonDocument.Parse(json);
+            var sourceSchemaVersion = 0;
+            if (document.RootElement.TryGetProperty(
+                nameof(WindowsSiteSettings.SchemaVersion),
+                out var schemaElement
+            ))
             {
-                var json = File.ReadAllText(SettingsPath);
-                var settings = JsonSerializer.Deserialize<WindowsSiteSettings>(
-                    json
-                );
-                if (settings is not null)
+                if (schemaElement.ValueKind != JsonValueKind.Number
+                    || !schemaElement.TryGetInt32(out sourceSchemaVersion)
+                    || sourceSchemaVersion < 0)
                 {
-                    using var document = JsonDocument.Parse(json);
-                    if (!document.RootElement.TryGetProperty(
-                        nameof(WindowsSiteSettings.OnboardingCompleted),
-                        out _
-                    ))
-                    {
-                        // Settings written before the wizard belong to an existing installation.
-                        settings.OnboardingCompleted = true;
-                    }
-                    return Normalize(settings);
+                    throw new JsonException("The site settings schema version is invalid.");
                 }
             }
+            if (sourceSchemaVersion > CurrentSchemaVersion)
+            {
+                PreserveUnsupportedSettings(sourceSchemaVersion);
+                return DefaultSettings();
+            }
+            var settings = JsonSerializer.Deserialize<WindowsSiteSettings>(json)
+                ?? throw new JsonException("The site settings document is empty.");
+            if (!document.RootElement.TryGetProperty(
+                nameof(WindowsSiteSettings.OnboardingCompleted),
+                out _
+            ))
+            {
+                // Settings written before the wizard belong to an existing installation.
+                settings.OnboardingCompleted = true;
+            }
+            var normalized = Normalize(settings);
+            if (sourceSchemaVersion < CurrentSchemaVersion) Save(normalized);
+            return normalized;
         }
-        catch (Exception error) when (error is IOException or JsonException)
+        catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException)
         {
+            PreserveUnreadableSettings();
         }
         return DefaultSettings();
     }
 
+    private void PreserveUnreadableSettings()
+    {
+        var backupPath = Path.Combine(
+            Path.GetDirectoryName(SettingsPath)!,
+            $"sites.corrupt-{Guid.NewGuid():N}.json"
+        );
+        try
+        {
+            File.Move(SettingsPath, backupPath);
+            LastBackupPath = backupPath;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            backupPath = SettingsPath;
+        }
+        LastLoadWarning =
+            $"HerdMe could not read its site settings. The original file was preserved at {backupPath}. No replacement settings were saved.";
+    }
+
+    private void PreserveUnsupportedSettings(int schemaVersion)
+    {
+        var backupPath = Path.Combine(
+            Path.GetDirectoryName(SettingsPath)!,
+            $"sites.unsupported-v{schemaVersion}-{Guid.NewGuid():N}.json"
+        );
+        try
+        {
+            File.Move(SettingsPath, backupPath);
+            LastBackupPath = backupPath;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            backupPath = SettingsPath;
+        }
+        LastLoadWarning =
+            $"HerdMe did not replace site settings created by a newer release (schema {schemaVersion}). The original file was preserved at {backupPath}. Update HerdMe before restoring it.";
+    }
+
     public void Save(WindowsSiteSettings settings)
     {
+        if (settings.SchemaVersion is < 0 or > CurrentSchemaVersion)
+        {
+            throw new InvalidOperationException(
+                $"Unsupported site settings schema {settings.SchemaVersion}; this release supports up to {CurrentSchemaVersion}."
+            );
+        }
         var normalized = Normalize(settings);
         Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
         var temporary = SettingsPath + ".tmp";
@@ -129,6 +196,7 @@ public sealed class SiteConfigurationStore
         }
         return new WindowsSiteSettings
         {
+            SchemaVersion = CurrentSchemaVersion,
             Roots = roots,
             LinkedSites = linkedSites,
             Tld = tld,
@@ -190,7 +258,11 @@ public sealed class SiteConfigurationStore
 
     private static WindowsSiteSettings DefaultSettings()
     {
-        return new WindowsSiteSettings { Roots = [DefaultRoot()] };
+        return new WindowsSiteSettings
+        {
+            SchemaVersion = CurrentSchemaVersion,
+            Roots = [DefaultRoot()]
+        };
     }
 
     private static string DefaultRoot()

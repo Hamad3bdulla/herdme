@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 struct DebuggerSettings: Equatable, Sendable {
@@ -93,8 +94,16 @@ struct XdebugInstallation: Equatable, Sendable {
     let extensionURL: URL
 }
 
+struct XdebugSourceRelease: Equatable, Sendable {
+    let version: String
+    let archiveURL: URL
+    let sha256: String
+}
+
 enum XdebugInstallationError: LocalizedError {
     case invalidRelease
+    case checksumMismatch
+    case unsafeArchive
     case runtimeMissing(String)
     case buildToolMissing(String)
     case commandFailed(String)
@@ -104,6 +113,10 @@ enum XdebugInstallationError: LocalizedError {
         switch self {
         case .invalidRelease:
             "The Xdebug release service returned an invalid version."
+        case .checksumMismatch:
+            "The downloaded Xdebug archive did not match its official SHA-256 checksum."
+        case .unsafeArchive:
+            "The Xdebug archive contains an unsafe path and was rejected."
         case let .runtimeMissing(cycle):
             "Install HerdMe PHP \(cycle) before installing Xdebug."
         case let .buildToolMissing(tool):
@@ -187,19 +200,22 @@ actor XdebugManager {
             throw XdebugInstallationError.buildToolMissing("make")
         }
 
-        let latestURL = URL(string: "https://pecl.php.net/rest/r/xdebug/stable.txt")!
-        let (versionData, versionResponse) = try await URLSession.shared.data(from: latestURL)
-        guard (versionResponse as? HTTPURLResponse)?.statusCode == 200,
-              let version = String(data: versionData, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines),
-              Self.isValid(version: version) else {
+        let releasesURL = URL(string: "https://xdebug.org/download")!
+        let (releaseData, releaseResponse) = try await ManagedDownloadClient.data(from: releasesURL)
+        guard (releaseResponse as? HTTPURLResponse)?.statusCode == 200,
+              let releaseHTML = String(data: releaseData, encoding: .utf8),
+              let release = Self.sourceRelease(from: releaseHTML) else {
             throw XdebugInstallationError.invalidRelease
         }
 
-        let archiveURL = URL(string: "https://pecl.php.net/get/xdebug-\(version).tgz")!
-        let (downloadedArchive, archiveResponse) = try await URLSession.shared.download(from: archiveURL)
+        let (downloadedArchive, archiveResponse) = try await ManagedDownloadClient.download(
+            from: release.archiveURL
+        )
         guard (archiveResponse as? HTTPURLResponse)?.statusCode == 200 else {
             throw XdebugInstallationError.invalidRelease
+        }
+        guard try Self.sha256(of: downloadedArchive) == release.sha256 else {
+            throw XdebugInstallationError.checksumMismatch
         }
 
         let stagingRoot = fileManager.temporaryDirectory.appendingPathComponent(
@@ -212,10 +228,42 @@ actor XdebugManager {
         try fileManager.createSymbolicLink(at: buildRuntimeURL, withDestinationURL: runtimeURL)
         defer { try? fileManager.removeItem(at: stagingRoot) }
 
+        let archiveListing = try run(
+            URL(fileURLWithPath: "/usr/bin/tar"),
+            arguments: ["-tzf", downloadedArchive.path]
+        )
+        try requireSuccess(archiveListing)
+        guard Self.archiveEntriesAreSafe(archiveListing.output) else {
+            throw XdebugInstallationError.unsafeArchive
+        }
+        let verboseArchiveListing = try run(
+            URL(fileURLWithPath: "/usr/bin/tar"),
+            arguments: ["-tvzf", downloadedArchive.path]
+        )
+        try requireSuccess(verboseArchiveListing)
+        do {
+            try TarArchivePolicy.validate(
+                nameListing: archiveListing.output,
+                verboseListing: verboseArchiveListing.output
+            )
+        } catch {
+            throw XdebugInstallationError.unsafeArchive
+        }
+
         try requireSuccess(run(
             URL(fileURLWithPath: "/usr/bin/tar"),
-            arguments: ["-xzf", downloadedArchive.path, "-C", sourceURL.path, "--strip-components", "1"]
+            arguments: [
+                "-xzf", downloadedArchive.path,
+                "-C", sourceURL.path,
+                "--strip-components", "1",
+                "--no-same-owner", "--no-same-permissions"
+            ]
         ))
+        do {
+            try TarArchivePolicy.validateExtractedTree(at: sourceURL)
+        } catch {
+            throw XdebugInstallationError.unsafeArchive
+        }
 
         let environment = buildEnvironment(runtimeURL: buildRuntimeURL)
         try requireSuccess(run(
@@ -254,10 +302,10 @@ actor XdebugManager {
         try fileManager.moveItem(at: candidate, to: destination)
 
         guard let installation = installed(cycle: cycle, php: php),
-              installation.version == version else {
+              installation.version == release.version else {
             throw XdebugInstallationError.extensionInvalid
         }
-        try Data((version + "\n").utf8).write(
+        try Data((release.version + "\n").utf8).write(
             to: destination.deletingLastPathComponent().appendingPathComponent("VERSION"),
             options: .atomic
         )
@@ -266,6 +314,87 @@ actor XdebugManager {
 
     nonisolated static func isValid(version: String) -> Bool {
         version.range(of: "^[0-9]+\\.[0-9]+\\.[0-9]+$", options: .regularExpression) != nil
+    }
+
+    nonisolated static func sourceRelease(from html: String) -> XdebugSourceRelease? {
+        guard let anchorPattern = try? NSRegularExpression(
+            pattern: #"<a\b[^>]*>"#,
+            options: [.caseInsensitive]
+        ) else { return nil }
+        let fullRange = NSRange(html.startIndex..<html.endIndex, in: html)
+        for match in anchorPattern.matches(in: html, range: fullRange) {
+            guard let range = Range(match.range, in: html) else { continue }
+            let anchor = String(html[range])
+            guard let href = attribute("href", in: anchor),
+                  let title = attribute("title", in: anchor),
+                  let version = capture(
+                      pattern: #"^/files/xdebug-([0-9]+\.[0-9]+\.[0-9]+)\.tgz$"#,
+                      in: href
+                  ),
+                  isValid(version: version),
+                  let checksum = capture(
+                      pattern: #"^SHA256:\s*([0-9a-fA-F]{64})$"#,
+                      in: title
+                        .replacingOccurrences(of: "&nbsp;", with: " ")
+                        .replacingOccurrences(of: "\u{00A0}", with: " ")
+                  )?.lowercased(),
+                  let archiveURL = URL(string: href, relativeTo: URL(string: "https://xdebug.org"))?
+                    .absoluteURL,
+                  archiveURL.scheme == "https",
+                  archiveURL.host == "xdebug.org" else {
+                continue
+            }
+            return XdebugSourceRelease(
+                version: version,
+                archiveURL: archiveURL,
+                sha256: checksum
+            )
+        }
+        return nil
+    }
+
+    nonisolated static func sha256(of data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    nonisolated static func archiveEntriesAreSafe(_ listing: String) -> Bool {
+        let entries = listing.split(whereSeparator: \.isNewline)
+        guard !entries.isEmpty, entries.count <= 20_000 else { return false }
+        return entries.allSatisfy { entry in
+            let path = String(entry)
+            guard !path.isEmpty, !path.hasPrefix("/"), !path.contains("\\") else {
+                return false
+            }
+            return !path.split(separator: "/", omittingEmptySubsequences: false).contains("..")
+        }
+    }
+
+    private nonisolated static func attribute(_ name: String, in anchor: String) -> String? {
+        capture(pattern: #"\b"# + NSRegularExpression.escapedPattern(for: name)
+            + #"\s*=\s*[\"']([^\"']+)[\"']"#, in: anchor)
+    }
+
+    private nonisolated static func capture(pattern: String, in value: String) -> String? {
+        guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+              let match = expression.firstMatch(
+                in: value,
+                range: NSRange(value.startIndex..<value.endIndex, in: value)
+              ),
+              match.numberOfRanges > 1,
+              let range = Range(match.range(at: 1), in: value) else {
+            return nil
+        }
+        return String(value[range])
+    }
+
+    private nonisolated static func sha256(of fileURL: URL) throws -> String {
+        let handle = try FileHandle(forReadingFrom: fileURL)
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while let data = try handle.read(upToCount: 1_048_576), !data.isEmpty {
+            hasher.update(data: data)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     private func buildEnvironment(runtimeURL: URL) -> [String: String] {

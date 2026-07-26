@@ -1,0 +1,15 @@
+[PHP Modules]
+ctype
+dom
+fileinfo
+filter
+hash
+mbstring
+openssl
+pcre
+pdo
+session
+tokenizer
+[Zend Modules]
+curl
+xml

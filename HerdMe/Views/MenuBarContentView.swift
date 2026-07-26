@@ -41,13 +41,16 @@ struct MenuBarContentView: View {
             .disabled(model.isCheckingForUpdates)
         Divider()
         Button("Quit HerdMe") {
-            model.shutdown()
             NSApplication.shared.terminate(nil)
         }
     }
 
     private func show(_ page: SidebarPage) {
-        model.selectedPage = page
+        if page == .logs {
+            model.showApplicationLogs()
+        } else {
+            model.selectedPage = page
+        }
         openWindow(id: "main")
         NSApplication.shared.activate(ignoringOtherApps: true)
     }

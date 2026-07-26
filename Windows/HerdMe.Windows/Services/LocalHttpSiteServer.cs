@@ -5,7 +5,9 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
+using System.Runtime.InteropServices;
 using System.Text;
+using Microsoft.Win32.SafeHandles;
 
 namespace HerdMe.Windows.Services;
 
@@ -27,7 +29,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
 
     public int? Port { get; private set; }
 
-    public bool IsRunning => listener is not null;
+    public bool IsRunning => listener is not null && acceptTask is { IsCompleted: false };
 
     public Task<int> StartAsync(
         IEnumerable<LocalSiteDefinition> sites,
@@ -142,14 +144,16 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                     await WriteErrorAsync(stream, "404 Not Found", cancellationToken);
                     return;
                 }
-                var response = await ResponseAsync(request, route, cancellationToken);
-                await stream.WriteAsync(response, cancellationToken);
+                await WriteResponseAsync(stream, request, route, cancellationToken);
             }
             catch (HttpRequestException error)
             {
                 await WriteErrorAsync(stream, error.Status, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (HttpResponseStartedException)
             {
             }
             catch (Exception error) when (error is IOException or SocketException or InvalidDataException)
@@ -166,7 +170,8 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         }
     }
 
-    private async Task<byte[]> ResponseAsync(
+    private async Task WriteResponseAsync(
+        Stream destination,
         HttpRequestData request,
         SiteRoute route,
         CancellationToken cancellationToken
@@ -178,19 +183,17 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         {
             if (request.Method is not ("GET" or "HEAD"))
             {
-                return ErrorResponse("405 Method Not Allowed");
+                await destination.WriteAsync(ErrorResponse("405 Method Not Allowed"), cancellationToken);
+                return;
             }
-            var file = await File.ReadAllBytesAsync(resource.StaticFile, cancellationToken);
-            return MakeResponse(
-                "200 OK",
-                [
-                    ("Content-Type", MimeType(Path.GetExtension(resource.StaticFile))),
-                    ("Content-Length", file.Length.ToString()),
-                    ("Cache-Control", "no-cache"),
-                    ("Connection", "close")
-                ],
-                request.Method == "HEAD" ? [] : file
+            await WriteStaticFileAsync(
+                destination,
+                route.DocumentRoot,
+                resource.StaticFile,
+                request,
+                cancellationToken
             );
+            return;
         }
 
         var parameters = FastCgiParameters(
@@ -200,14 +203,143 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             resource,
             certificate is not null
         );
-        var result = await fastCgiClient.PerformAsync(
-            route.PhpFastCgiPort,
-            parameters,
-            request.Body,
+        var writer = new FastCgiHttpResponseWriter(destination, request.Method == "HEAD");
+        try
+        {
+            var result = await fastCgiClient.PerformStreamingAsync(
+                route.PhpFastCgiPort,
+                parameters,
+                request.Body,
+                writer.WriteAsync,
+                cancellationToken
+            );
+            await writer.CompleteAsync();
+            if (result.StandardError.Length > 0) WritePhpLog(result.StandardError);
+        }
+        catch (Exception error) when (writer.HasStarted && error is not OperationCanceledException)
+        {
+            throw new HttpResponseStartedException(error);
+        }
+    }
+
+    private static async Task WriteStaticFileAsync(
+        Stream destination,
+        string documentRoot,
+        string path,
+        HttpRequestData request,
+        CancellationToken cancellationToken
+    )
+    {
+        await using var file = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete,
+            64 * 1_024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan
+        );
+        if (!IsInside(FinalPath(file.SafeFileHandle, file.Name), documentRoot))
+        {
+            throw new HttpRequestException("403 Forbidden");
+        }
+        var fileSize = file.Length;
+        if (!TrySelectByteRange(request.Header("Range"), fileSize, out var selectedRange))
+        {
+            await destination.WriteAsync(
+                MakeResponseHead(
+                    "416 Range Not Satisfiable",
+                    [
+                        ("Content-Range", $"bytes */{fileSize}"),
+                        ("Accept-Ranges", "bytes"),
+                        ("Content-Length", "0"),
+                        ("Cache-Control", "no-cache"),
+                        ("Connection", "close")
+                    ]
+                ),
+                cancellationToken
+            );
+            return;
+        }
+
+        var headers = new List<(string, string)>
+        {
+            ("Content-Type", MimeType(Path.GetExtension(path))),
+            ("Content-Length", selectedRange.Length.ToString()),
+            ("Accept-Ranges", "bytes"),
+            ("Cache-Control", "no-cache"),
+            ("Connection", "close")
+        };
+        if (selectedRange.IsPartial)
+        {
+            headers.Insert(
+                2,
+                (
+                    "Content-Range",
+                    $"bytes {selectedRange.Offset}-{selectedRange.Offset + selectedRange.Length - 1}/{fileSize}"
+                )
+            );
+        }
+        await destination.WriteAsync(
+            MakeResponseHead(selectedRange.IsPartial ? "206 Partial Content" : "200 OK", headers),
             cancellationToken
         );
-        if (result.StandardError.Length > 0) WritePhpLog(result.StandardError);
-        return ParseFastCgiResponse(result.StandardOutput);
+        if (request.Method == "HEAD" || selectedRange.Length == 0) return;
+
+        file.Seek(selectedRange.Offset, SeekOrigin.Begin);
+        var buffer = new byte[64 * 1_024];
+        var remaining = selectedRange.Length;
+        while (remaining > 0)
+        {
+            var count = await file.ReadAsync(
+                buffer.AsMemory(0, (int)Math.Min(buffer.Length, remaining)),
+                cancellationToken
+            );
+            if (count == 0) throw new IOException("The static file changed while it was being served.");
+            await destination.WriteAsync(buffer.AsMemory(0, count), cancellationToken);
+            remaining -= count;
+        }
+    }
+
+    private static bool TrySelectByteRange(string? value, long fileSize, out ByteRange selectedRange)
+    {
+        selectedRange = new ByteRange(0, fileSize, false);
+        if (value is null) return true;
+        if (fileSize <= 0) return false;
+
+        var components = value.Split('=', 2, StringSplitOptions.None);
+        if (components.Length != 2
+            || !components[0].Trim().Equals("bytes", StringComparison.OrdinalIgnoreCase)
+            || components[1].Contains(','))
+        {
+            return false;
+        }
+        var bounds = components[1].Split('-', 2, StringSplitOptions.None);
+        if (bounds.Length != 2) return false;
+        var startText = bounds[0].Trim();
+        var endText = bounds[1].Trim();
+        if (startText.Length == 0)
+        {
+            if (!long.TryParse(endText, out var suffixLength) || suffixLength <= 0) return false;
+            var length = Math.Min(suffixLength, fileSize);
+            selectedRange = new ByteRange(fileSize - length, length, true);
+            return true;
+        }
+        if (!long.TryParse(startText, out var start) || start < 0 || start >= fileSize) return false;
+        long end;
+        if (endText.Length == 0)
+        {
+            end = fileSize - 1;
+        }
+        else if (!long.TryParse(endText, out var requestedEnd) || requestedEnd < start)
+        {
+            return false;
+        }
+        else
+        {
+            end = Math.Min(requestedEnd, fileSize - 1);
+        }
+        selectedRange = new ByteRange(start, end - start + 1, true);
+        return true;
     }
 
     private static Dictionary<string, string> FastCgiParameters(
@@ -263,44 +395,120 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
 
     private static ResolvedResource Resolve(string documentRoot, string requestPath)
     {
-        var root = Path.GetFullPath(documentRoot).TrimEnd(Path.DirectorySeparatorChar);
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(documentRoot));
         var relative = requestPath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
         var candidate = Path.GetFullPath(Path.Combine(root, relative));
-        if (!candidate.Equals(root, StringComparison.OrdinalIgnoreCase)
-            && !candidate.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new HttpRequestException("403 Forbidden");
-        }
+        if (!IsInside(candidate, root)) throw new HttpRequestException("403 Forbidden");
 
         if (Directory.Exists(candidate))
         {
+            var resolvedDirectory = ResolveInside(candidate, root);
             foreach (var index in new[] { "index.html", "index.htm" })
             {
-                var file = Path.Combine(candidate, index);
-                if (File.Exists(file)) return new ResolvedResource(file, null, null, null);
+                var file = Path.Combine(resolvedDirectory, index);
+                if (File.Exists(file))
+                {
+                    return new ResolvedResource(ResolveInside(file, root), null, null, null);
+                }
             }
-            var phpIndex = Path.Combine(candidate, "index.php");
+            var phpIndex = Path.Combine(resolvedDirectory, "index.php");
             if (File.Exists(phpIndex))
             {
                 var name = requestPath.EndsWith('/') ? requestPath + "index.php" : requestPath + "/index.php";
-                return new ResolvedResource(null, phpIndex, name, null);
+                return new ResolvedResource(null, ResolveInside(phpIndex, root), name, null);
             }
         }
         else if (File.Exists(candidate))
         {
-            return Path.GetExtension(candidate).Equals(".php", StringComparison.OrdinalIgnoreCase)
-                ? new ResolvedResource(null, candidate, requestPath, null)
-                : new ResolvedResource(candidate, null, null, null);
+            var resolvedFile = ResolveInside(candidate, root);
+            return Path.GetExtension(resolvedFile).Equals(".php", StringComparison.OrdinalIgnoreCase)
+                ? new ResolvedResource(null, resolvedFile, requestPath, null)
+                : new ResolvedResource(resolvedFile, null, null, null);
         }
 
         var frontController = Path.Combine(root, "index.php");
         if (!File.Exists(frontController)) throw new HttpRequestException("404 Not Found");
         return new ResolvedResource(
             null,
-            frontController,
+            ResolveInside(frontController, root),
             "/index.php",
             requestPath == "/" ? null : requestPath
         );
+    }
+
+    private static string ResolveInside(string path, string root)
+    {
+        try
+        {
+            var resolved = CanonicalExistingPath(path);
+            if (IsInside(resolved, root)) return resolved;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+        }
+        throw new HttpRequestException("403 Forbidden");
+    }
+
+    private static string CanonicalExistingPath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var pathRoot = Path.GetPathRoot(fullPath)
+            ?? throw new IOException("The local site path has no filesystem root.");
+        var current = pathRoot;
+        var relative = Path.GetRelativePath(pathRoot, fullPath);
+        foreach (var component in relative.Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+            StringSplitOptions.RemoveEmptyEntries
+        ))
+        {
+            var next = Path.Combine(current, component);
+            FileSystemInfo entry = Directory.Exists(next)
+                ? new DirectoryInfo(next)
+                : new FileInfo(next);
+            var target = entry.ResolveLinkTarget(returnFinalTarget: true);
+            current = target is null ? next : Path.GetFullPath(target.FullName);
+        }
+        return Path.GetFullPath(current);
+    }
+
+    private static bool IsInside(string candidate, string root)
+    {
+        var normalizedRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+        var normalizedCandidate = Path.GetFullPath(candidate);
+        return normalizedCandidate.Equals(normalizedRoot, StringComparison.OrdinalIgnoreCase)
+            || normalizedCandidate.StartsWith(
+                normalizedRoot + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase
+            );
+    }
+
+    private static string FinalPath(SafeFileHandle handle, string fallbackPath)
+    {
+        if (!OperatingSystem.IsWindows()) return CanonicalExistingPath(fallbackPath);
+        var capacity = 512;
+        while (true)
+        {
+            var buffer = new StringBuilder(capacity);
+            var length = GetFinalPathNameByHandle(handle, buffer, (uint)capacity, 0);
+            if (length == 0)
+            {
+                throw new IOException(
+                    $"Windows could not resolve the opened static file (error {Marshal.GetLastWin32Error()})."
+                );
+            }
+            if (length < capacity)
+            {
+                var value = buffer.ToString();
+                if (value.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase))
+                {
+                    return @"\\" + value[8..];
+                }
+                return value.StartsWith(@"\\?\", StringComparison.OrdinalIgnoreCase)
+                    ? value[4..]
+                    : value;
+            }
+            capacity = checked((int)length + 1);
+        }
     }
 
     private static async Task<HttpRequestData> ReadRequestAsync(
@@ -441,49 +649,109 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         }
     }
 
-    private static byte[] ParseFastCgiResponse(byte[] response)
+    private static ParsedFastCgiHead ParseFastCgiResponseHead(ReadOnlySpan<byte> response)
     {
-        var delimiter = IndexOf(response, "\r\n\r\n"u8);
-        var delimiterLength = 4;
-        if (delimiter < 0)
+        string headerText;
+        try
         {
-            delimiter = IndexOf(response, "\n\n"u8);
-            delimiterLength = 2;
+            headerText = new UTF8Encoding(false, true).GetString(response).Replace("\r\n", "\n");
         }
-        if (delimiter < 0) throw new InvalidDataException("PHP returned invalid CGI headers.");
-
-        var headerText = Encoding.UTF8.GetString(response, 0, delimiter).Replace("\r\n", "\n");
-        var body = response[(delimiter + delimiterLength)..];
+        catch (DecoderFallbackException error)
+        {
+            throw new InvalidDataException("PHP returned non-UTF-8 CGI headers.", error);
+        }
         var status = "200 OK";
         var headers = new List<(string, string)>();
-        foreach (var line in headerText.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        long? contentLength = null;
+        var hopByHopHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
+            "Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization",
+            "TE", "Trailer", "Transfer-Encoding", "Upgrade"
+        };
+        foreach (var line in headerText.Split('\n', StringSplitOptions.None))
+        {
+            if (line.Length == 0) continue;
             var separator = line.IndexOf(':');
-            if (separator <= 0) continue;
+            if (separator <= 0) throw new InvalidDataException("PHP returned malformed CGI headers.");
             var name = line[..separator].Trim();
             var value = line[(separator + 1)..].Trim();
-            if (name.Equals("Status", StringComparison.OrdinalIgnoreCase)) status = value;
-            else if (!name.Equals("Connection", StringComparison.OrdinalIgnoreCase)) headers.Add((name, value));
+            if (!IsValidHeaderName(name) || !IsValidHeaderValue(value))
+            {
+                throw new InvalidDataException("PHP returned unsafe CGI headers.");
+            }
+            if (name.Equals("Status", StringComparison.OrdinalIgnoreCase))
+            {
+                status = value;
+            }
+            else if (name.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
+            {
+                if (contentLength is not null
+                    || !long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed)
+                    || parsed < 0)
+                {
+                    throw new InvalidDataException("PHP returned an invalid Content-Length header.");
+                }
+                contentLength = parsed;
+                headers.Add((name, value));
+            }
+            else if (!hopByHopHeaders.Contains(name))
+            {
+                headers.Add((name, value));
+            }
         }
+        if (!IsValidStatus(status)) throw new InvalidDataException("PHP returned an invalid CGI status.");
         if (status == "200 OK" && headers.Any(header =>
             header.Item1.Equals("Location", StringComparison.OrdinalIgnoreCase))) status = "302 Found";
-        if (!headers.Any(header => header.Item1.Equals("Content-Length", StringComparison.OrdinalIgnoreCase)))
-            headers.Add(("Content-Length", body.Length.ToString()));
         if (!headers.Any(header => header.Item1.Equals("Content-Type", StringComparison.OrdinalIgnoreCase)))
             headers.Add(("Content-Type", "text/html; charset=utf-8"));
         headers.Add(("Connection", "close"));
-        return MakeResponse(status, headers, body);
+        var statusCode = int.Parse(status.AsSpan(0, 3), CultureInfo.InvariantCulture);
+        return new ParsedFastCgiHead(
+            MakeResponseHead(status, headers),
+            contentLength,
+            statusCode is >= 100 and < 200 or 204 or 304
+        );
+    }
+
+    private static bool IsValidStatus(string status)
+    {
+        if (status.Length < 3
+            || !status.AsSpan(0, 3).ToString().All(char.IsAsciiDigit)
+            || !int.TryParse(status.AsSpan(0, 3), NumberStyles.None, CultureInfo.InvariantCulture, out var code)
+            || code is < 100 or > 599)
+        {
+            return false;
+        }
+        return status.Length == 3
+            || char.IsWhiteSpace(status[3]) && IsValidHeaderValue(status);
+    }
+
+    private static bool IsValidHeaderName(string name)
+    {
+        return name.Length > 0 && name.All(character =>
+            char.IsAsciiLetterOrDigit(character) || character == '-'
+        );
+    }
+
+    private static bool IsValidHeaderValue(string value)
+    {
+        return value.All(character => character == '\t' || character is >= ' ' and <= '~');
     }
 
     private static byte[] MakeResponse(string status, IEnumerable<(string, string)> headers, byte[] body)
     {
         using var output = new MemoryStream();
+        output.Write(MakeResponseHead(status, headers));
+        output.Write(body);
+        return output.ToArray();
+    }
+
+    private static byte[] MakeResponseHead(string status, IEnumerable<(string, string)> headers)
+    {
         var head = new StringBuilder($"HTTP/1.1 {status}\r\n");
         foreach (var header in headers) head.Append(header.Item1).Append(": ").Append(header.Item2).Append("\r\n");
         head.Append("\r\n");
-        output.Write(Encoding.UTF8.GetBytes(head.ToString()));
-        output.Write(body);
-        return output.ToArray();
+        return Encoding.UTF8.GetBytes(head.ToString());
     }
 
     private static Task WriteErrorAsync(Stream stream, string status, CancellationToken cancellationToken)
@@ -508,7 +776,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     private static string DocumentRoot(string sitePath)
     {
         var publicPath = Path.Combine(sitePath, "public");
-        return Directory.Exists(publicPath) ? Path.GetFullPath(publicPath) : Path.GetFullPath(sitePath);
+        return CanonicalExistingPath(Directory.Exists(publicPath) ? publicPath : sitePath);
     }
 
     private static string NormalizeHost(string host)
@@ -560,13 +828,131 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 "Log",
                 "sites"
             );
-            Directory.CreateDirectory(directory);
-            File.AppendAllText(
+            BoundedLog.AppendText(
                 Path.Combine(directory, "php-errors.log"),
                 Encoding.UTF8.GetString(errors)
             );
         }
         catch (IOException)
+        {
+        }
+    }
+
+    private sealed class FastCgiHttpResponseWriter
+    {
+        private static readonly byte[] HeaderDelimiter = "\r\n\r\n"u8.ToArray();
+        private static readonly byte[] AlternateHeaderDelimiter = "\n\n"u8.ToArray();
+        private readonly Stream destination;
+        private readonly bool headOnly;
+        private readonly MemoryStream headerBuffer = new();
+        private long? declaredContentLength;
+        private long bodyBytes;
+        private bool bodyForbidden;
+
+        public FastCgiHttpResponseWriter(Stream destination, bool headOnly)
+        {
+            this.destination = destination;
+            this.headOnly = headOnly;
+        }
+
+        public bool HasStarted { get; private set; }
+
+        public async ValueTask WriteAsync(
+            ReadOnlyMemory<byte> content,
+            CancellationToken cancellationToken
+        )
+        {
+            if (content.IsEmpty) return;
+            if (HasStarted)
+            {
+                await WriteBodyAsync(content, cancellationToken);
+                return;
+            }
+
+            await headerBuffer.WriteAsync(content, cancellationToken);
+            var buffered = headerBuffer.ToArray();
+            var delimiter = FindHeaderDelimiter(buffered);
+            if (delimiter.Index < 0)
+            {
+                if (headerBuffer.Length > MaximumHeaderSize)
+                {
+                    throw new InvalidDataException("PHP returned CGI headers larger than 1MB.");
+                }
+                return;
+            }
+            if (delimiter.Index > MaximumHeaderSize)
+            {
+                throw new InvalidDataException("PHP returned CGI headers larger than 1MB.");
+            }
+
+            var parsed = ParseFastCgiResponseHead(buffered.AsSpan(0, delimiter.Index));
+            declaredContentLength = parsed.ContentLength;
+            bodyForbidden = parsed.BodyForbidden;
+            var bodyOffset = delimiter.Index + delimiter.Length;
+            var bufferedBody = buffered.AsSpan(bodyOffset).ToArray();
+            headerBuffer.SetLength(0);
+            HasStarted = true;
+            await destination.WriteAsync(parsed.ResponseHead, cancellationToken);
+            await WriteBodyAsync(bufferedBody, cancellationToken);
+        }
+
+        public Task CompleteAsync()
+        {
+            if (!HasStarted)
+            {
+                throw new InvalidDataException("PHP returned a FastCGI response without CGI headers.");
+            }
+            if (!headOnly
+                && !bodyForbidden
+                && declaredContentLength is { } expected
+                && bodyBytes != expected)
+            {
+                throw new InvalidDataException("PHP returned a body that did not match Content-Length.");
+            }
+            return Task.CompletedTask;
+        }
+
+        private async ValueTask WriteBodyAsync(
+            ReadOnlyMemory<byte> content,
+            CancellationToken cancellationToken
+        )
+        {
+            if (content.IsEmpty) return;
+            if (content.Length > long.MaxValue - bodyBytes)
+            {
+                throw new InvalidDataException("PHP returned an oversized response body.");
+            }
+            bodyBytes += content.Length;
+            if (declaredContentLength is { } expected && bodyBytes > expected)
+            {
+                throw new InvalidDataException("PHP returned a body larger than Content-Length.");
+            }
+            if (!headOnly && !bodyForbidden)
+            {
+                await destination.WriteAsync(content, cancellationToken);
+            }
+        }
+
+        private static (int Index, int Length) FindHeaderDelimiter(ReadOnlySpan<byte> content)
+        {
+            var standard = content.IndexOf(HeaderDelimiter);
+            var alternate = content.IndexOf(AlternateHeaderDelimiter);
+            if (standard < 0) return (alternate, alternate < 0 ? 0 : AlternateHeaderDelimiter.Length);
+            if (alternate < 0 || standard <= alternate) return (standard, HeaderDelimiter.Length);
+            return (alternate, AlternateHeaderDelimiter.Length);
+        }
+    }
+
+    private sealed record ParsedFastCgiHead(
+        byte[] ResponseHead,
+        long? ContentLength,
+        bool BodyForbidden
+    );
+
+    private sealed class HttpResponseStartedException : Exception
+    {
+        public HttpResponseStartedException(Exception innerException)
+            : base("The HTTP response had already started.", innerException)
         {
         }
     }
@@ -694,6 +1080,16 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     );
 
     private sealed record SiteRoute(string DocumentRoot, int PhpFastCgiPort);
+
+    private readonly record struct ByteRange(long Offset, long Length, bool IsPartial);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern uint GetFinalPathNameByHandle(
+        SafeFileHandle file,
+        StringBuilder path,
+        uint pathLength,
+        uint flags
+    );
 
     private sealed class HttpRequestException : Exception
     {

@@ -2,6 +2,11 @@ namespace HerdMe.Windows.Services;
 
 public static class LogPresentation
 {
+    public static string SiteLogRoot(string sitePath)
+    {
+        return Path.Combine(Path.GetFullPath(sitePath), "storage", "logs");
+    }
+
     public static string FilterLines(string content, string? query)
     {
         var value = query?.Trim() ?? string.Empty;

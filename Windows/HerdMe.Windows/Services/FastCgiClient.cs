@@ -6,6 +6,7 @@ using System.Text;
 namespace HerdMe.Windows.Services;
 
 public sealed record FastCgiResult(byte[] StandardOutput, byte[] StandardError);
+public sealed record FastCgiStreamingResult(byte[] StandardError);
 
 public sealed class FastCgiClient
 {
@@ -18,6 +19,8 @@ public sealed class FastCgiClient
     private const byte StandardError = 7;
     private const ushort RequestIdentifier = 1;
     private const int MaximumContentLength = 65_535;
+    private const int MaximumBufferedOutputLength = 64 * 1_024 * 1_024;
+    private const int MaximumStandardErrorLength = 1 * 1_024 * 1_024;
 
     public async Task<FastCgiResult> PerformAsync(
         int port,
@@ -26,6 +29,34 @@ public sealed class FastCgiClient
         CancellationToken cancellationToken = default
     )
     {
+        using var output = new MemoryStream();
+        async ValueTask CollectOutputAsync(ReadOnlyMemory<byte> content, CancellationToken token)
+        {
+            if (output.Length + content.Length > MaximumBufferedOutputLength)
+            {
+                throw new InvalidDataException("FastCGI response exceeded the buffered-client limit.");
+            }
+            await output.WriteAsync(content, token);
+        }
+        var result = await PerformStreamingAsync(
+            port,
+            parameters,
+            body,
+            CollectOutputAsync,
+            cancellationToken
+        );
+        return new FastCgiResult(output.ToArray(), result.StandardError);
+    }
+
+    public async Task<FastCgiStreamingResult> PerformStreamingAsync(
+        int port,
+        IReadOnlyDictionary<string, string> parameters,
+        ReadOnlyMemory<byte> body,
+        Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> onStandardOutput,
+        CancellationToken cancellationToken = default
+    )
+    {
+        ArgumentNullException.ThrowIfNull(onStandardOutput);
         using var client = new TcpClient();
         await client.ConnectAsync(IPAddress.Loopback, port, cancellationToken);
         await using var stream = client.GetStream();
@@ -40,8 +71,8 @@ public sealed class FastCgiClient
         await WriteRecordsAsync(stream, StandardInput, body, cancellationToken);
         await WriteRecordAsync(stream, StandardInput, ReadOnlyMemory<byte>.Empty, cancellationToken);
 
-        using var output = new MemoryStream();
         using var errors = new MemoryStream();
+        var errorsWereTruncated = false;
         var header = new byte[8];
         while (true)
         {
@@ -57,17 +88,32 @@ public sealed class FastCgiClient
             switch (header[1])
             {
                 case StandardOutput:
-                    await output.WriteAsync(content, cancellationToken);
+                    if (content.Length > 0)
+                    {
+                        await onStandardOutput(content, cancellationToken);
+                    }
                     break;
                 case StandardError:
-                    await errors.WriteAsync(content, cancellationToken);
+                    var available = Math.Max(0, MaximumStandardErrorLength - checked((int)errors.Length));
+                    if (available > 0)
+                    {
+                        await errors.WriteAsync(content.AsMemory(0, Math.Min(available, content.Length)), cancellationToken);
+                    }
+                    if (content.Length > available) errorsWereTruncated = true;
                     break;
                 case EndRequest:
-                    return new FastCgiResult(output.ToArray(), errors.ToArray());
-            }
-            if (output.Length + errors.Length > 64 * 1_024 * 1_024)
-            {
-                throw new InvalidDataException("FastCGI response exceeded the HerdMe limit.");
+                    if (content.Length < 8 || content[4] != 0)
+                    {
+                        throw new InvalidDataException("FastCGI returned an invalid end-request record.");
+                    }
+                    if (errorsWereTruncated)
+                    {
+                        await errors.WriteAsync(
+                            Encoding.UTF8.GetBytes("\n[HerdMe truncated PHP-FPM stderr at 1MB]\n"),
+                            cancellationToken
+                        );
+                    }
+                    return new FastCgiStreamingResult(errors.ToArray());
             }
         }
     }

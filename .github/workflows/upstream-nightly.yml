@@ -1,0 +1,39 @@
+name: Upstream release sources
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-release-sources
+  cancel-in-progress: true
+
+jobs:
+  live-contracts:
+    name: Verify runtime and service releases
+    runs-on: windows-2022
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Install .NET 8
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Verify live release metadata, checksums, and downloads
+        shell: pwsh
+        run: |
+          dotnet run `
+            --project Windows/HerdMe.Windows.ContractTests/HerdMe.Windows.ContractTests.csproj `
+            --configuration Release `
+            -p:TreatWarningsAsErrors=true `
+            -- `
+            --live-service-releases `
+            --live-runtime-releases

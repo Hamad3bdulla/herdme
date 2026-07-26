@@ -21,6 +21,10 @@ cmake -S (Join-Path $repoRoot "Core") -B $coreBuild -A $Architecture -DBUILD_TES
 if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed." }
 cmake --build $coreBuild --config $Configuration
 if ($LASTEXITCODE -ne 0) { throw "The portable core build failed." }
+$coreExecutable = Join-Path $coreBuild "$Configuration\herdme-core.exe"
+if (-not (Test-Path $coreExecutable -PathType Leaf)) {
+    throw "The portable core executable was not produced at $coreExecutable."
+}
 
 if (-not $SkipTests) {
     $scriptFiles = @(Get-ChildItem $PSScriptRoot -Recurse -Filter "*.ps1" -File)
@@ -47,12 +51,19 @@ if (-not $SkipTests) {
         --configuration $Configuration `
         -p:TreatWarningsAsErrors=true
     if ($LASTEXITCODE -ne 0) { throw "The Windows contract build failed." }
-    dotnet run `
-        --project $contractProject `
-        --configuration $Configuration `
-        --no-build `
-        --no-restore
-    if ($LASTEXITCODE -ne 0) { throw "The Windows contract tests failed." }
+    $previousCoreTestExecutable = $env:HERDME_CORE_TEST_EXECUTABLE
+    try {
+        $env:HERDME_CORE_TEST_EXECUTABLE = $coreExecutable
+        dotnet run `
+            --project $contractProject `
+            --configuration $Configuration `
+            --no-build `
+            --no-restore
+        if ($LASTEXITCODE -ne 0) { throw "The Windows contract tests failed." }
+    }
+    finally {
+        $env:HERDME_CORE_TEST_EXECUTABLE = $previousCoreTestExecutable
+    }
 
     $xamlFiles = @(Get-ChildItem (Join-Path $PSScriptRoot "HerdMe.Windows") -Recurse -Filter "*.xaml")
     if ($xamlFiles.Count -lt 13) {
@@ -72,10 +83,6 @@ if (-not $SkipTests) {
 }
 
 New-Item -ItemType Directory -Force -Path $runtimeDirectory | Out-Null
-$coreExecutable = Join-Path $coreBuild "$Configuration\herdme-core.exe"
-if (-not (Test-Path $coreExecutable -PathType Leaf)) {
-    throw "The portable core executable was not produced at $coreExecutable."
-}
 Copy-Item $coreExecutable (Join-Path $runtimeDirectory "herdme-core.exe") -Force
 
 dotnet build $project `

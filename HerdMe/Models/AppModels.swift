@@ -56,7 +56,7 @@ enum SidebarPage: String, CaseIterable, Identifiable {
     }
 }
 
-struct SiteProject: Identifiable, Hashable {
+struct SiteProject: Identifiable, Hashable, Sendable {
     let path: URL
     let name: String
     let framework: String
@@ -102,7 +102,7 @@ struct SiteProject: Identifiable, Hashable {
     }
 }
 
-struct RuntimeVersion: Identifiable, Hashable {
+struct RuntimeVersion: Identifiable, Hashable, Sendable {
     let cycle: String
     var installedVersion: String?
     var isActive: Bool
@@ -185,6 +185,7 @@ struct ServiceInstance: Identifiable, Hashable, Codable, Sendable {
 }
 
 struct AppConfiguration: Codable {
+    var configSchemaVersion: Int
     var parkPaths: [String]
     var tld: String
     var selectedPHP: String
@@ -202,6 +203,7 @@ struct AppConfiguration: Codable {
     var onboardingCompleted: Bool
 
     init(
+        configSchemaVersion: Int,
         parkPaths: [String],
         tld: String,
         selectedPHP: String,
@@ -218,6 +220,7 @@ struct AppConfiguration: Codable {
         independenceMigrationVersion: Int,
         onboardingCompleted: Bool = true
     ) {
+        self.configSchemaVersion = configSchemaVersion
         self.parkPaths = parkPaths
         self.tld = tld
         self.selectedPHP = selectedPHP
@@ -238,6 +241,10 @@ struct AppConfiguration: Codable {
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         let defaults = Self.default
+        configSchemaVersion = try values.decodeIfPresent(
+            Int.self,
+            forKey: .configSchemaVersion
+        ) ?? 0
         parkPaths = try values.decodeIfPresent([String].self, forKey: .parkPaths) ?? defaults.parkPaths
         tld = try values.decodeIfPresent(String.self, forKey: .tld) ?? defaults.tld
         selectedPHP = try values.decodeIfPresent(String.self, forKey: .selectedPHP) ?? defaults.selectedPHP
@@ -265,6 +272,7 @@ struct AppConfiguration: Codable {
     static var `default`: AppConfiguration {
         let home = FileManager.default.homeDirectoryForCurrentUser
         return AppConfiguration(
+            configSchemaVersion: ConfigurationStore.currentConfigSchemaVersion,
             parkPaths: [home.appendingPathComponent("HerdMe").path],
             tld: "test",
             selectedPHP: "8.4",
@@ -365,6 +373,20 @@ struct CapturedMail: Identifiable, Hashable, Codable, Sendable {
     let raw: String
     let htmlBody: String?
 
+    var summary: CapturedMailSummary {
+        CapturedMailSummary(
+            id: id,
+            sender: sender,
+            recipients: recipients,
+            subject: subject,
+            receivedAt: receivedAt
+        )
+    }
+
+    func matchesSearch(_ query: String) -> Bool {
+        summary.matchesSearch(query)
+    }
+
     static func parse(sender: String, recipients: [String], raw: String) -> CapturedMail {
         let normalized = raw.replacingOccurrences(of: "\r\n", with: "\n")
         let sections = normalized.components(separatedBy: "\n\n")
@@ -399,6 +421,28 @@ struct CapturedMail: Identifiable, Hashable, Codable, Sendable {
             raw: raw,
             htmlBody: content.html
         )
+    }
+}
+
+struct CapturedMailSummary: Identifiable, Hashable, Codable, Sendable {
+    let id: UUID
+    let sender: String
+    let recipients: [String]
+    let subject: String
+    let receivedAt: Date
+
+    func matchesSearch(_ query: String) -> Bool {
+        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return true }
+        let searchableValues = [
+            sender,
+            recipients.joined(separator: " "),
+            subject,
+            receivedAt.formatted(date: .numeric, time: .shortened)
+        ]
+        return searchableValues.contains {
+            $0.localizedCaseInsensitiveContains(normalized)
+        }
     }
 }
 

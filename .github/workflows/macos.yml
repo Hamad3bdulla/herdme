@@ -20,15 +20,18 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Select the latest stable Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
         with:
           xcode-version: latest-stable
 
       - name: Install XcodeGen
         run: brew install xcodegen
+
+      - name: Verify release version metadata
+        run: ./scripts/check-version.sh
 
       - name: Generate the Xcode project
         run: xcodegen generate
@@ -53,11 +56,98 @@ jobs:
         run: ./scripts/package-macos.sh Release
 
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: HerdMe-${{ github.run_number }}-macOS
           path: |
             dist/HerdMe-*-macOS.zip
             dist/HerdMe-*-macOS.dmg
+            dist/HerdMe-*-macOS.sha256
           if-no-files-found: error
           retention-days: 14
+
+  deep-diagnostics:
+    name: Static analysis and sanitizers
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Select the latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+
+      - name: Analyze the macOS application
+        run: |
+          xcodebuild \
+            -project HerdMe.xcodeproj \
+            -scheme HerdMe \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/macos-analyze \
+            CODE_SIGNING_ALLOWED=NO \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            analyze
+
+      - name: Analyze the network helper
+        run: |
+          xcrun clang --analyze \
+            -std=c17 \
+            -Wall -Wextra -Werror \
+            -mmacosx-version-min=13.0 \
+            Tools/NetworkHelper/main.c \
+            -o build/network-helper-analysis.plist
+
+      - name: Test dynamic network helper listeners
+        run: zsh Tools/NetworkHelper/test-network-helper.sh
+
+      - name: Run macOS tests with Address and Undefined Behavior Sanitizers
+        run: |
+          xcodebuild \
+            -project HerdMe.xcodeproj \
+            -scheme HerdMe \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/macos-asan-ubsan \
+            CODE_SIGNING_ALLOWED=NO \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            -enableAddressSanitizer YES \
+            -enableUndefinedBehaviorSanitizer YES \
+            test
+
+      - name: Run macOS tests with Thread Sanitizer
+        run: |
+          xcodebuild \
+            -project HerdMe.xcodeproj \
+            -scheme HerdMe \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/macos-tsan \
+            CODE_SIGNING_ALLOWED=NO \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            -enableThreadSanitizer YES \
+            test
+
+      - name: Run portable core with Address and Undefined Behavior Sanitizers
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+          UBSAN_OPTIONS: print_stacktrace=1
+        run: |
+          cmake \
+            -S Core \
+            -B build/core-sanitizers \
+            -DBUILD_TESTING=ON \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' \
+            -DCMAKE_EXE_LINKER_FLAGS='-fsanitize=address,undefined'
+          cmake --build build/core-sanitizers --parallel
+          ctest --test-dir build/core-sanitizers --output-on-failure

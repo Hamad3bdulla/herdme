@@ -19,15 +19,7 @@
                         <ComboBox
                             x:Name="PhpCycleBox"
                             Width="120"
-                            SelectedIndex="1"
-                            SelectionChanged="PhpCycle_SelectionChanged">
-                            <x:String>8.5</x:String>
-                            <x:String>8.4</x:String>
-                            <x:String>8.3</x:String>
-                            <x:String>8.2</x:String>
-                            <x:String>8.1</x:String>
-                            <x:String>8.0</x:String>
-                        </ComboBox>
+                            SelectionChanged="PhpCycle_SelectionChanged" />
                         <Button x:Name="InstallPhpButton" Click="InstallPhp_Click">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <SymbolIcon Symbol="Download" />

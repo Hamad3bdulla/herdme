@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 final class HerdMeApplicationDelegate: NSObject, NSApplicationDelegate {
     weak var model: AppModel?
+    private var isFinishingTermination = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
@@ -12,8 +13,15 @@ final class HerdMeApplicationDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.applicationIconImage = icon
     }
 
-    func applicationWillTerminate(_ notification: Notification) {
-        model?.shutdown()
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let model else { return .terminateNow }
+        guard !isFinishingTermination else { return .terminateLater }
+        isFinishingTermination = true
+        Task {
+            await model.shutdown()
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 }
 

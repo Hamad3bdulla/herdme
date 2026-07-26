@@ -10,26 +10,38 @@ public static class RuntimeVersionComparison
 {
     public static bool IsNewer(string candidate, string current)
     {
-        var normalizedCandidate = Normalize(candidate);
-        var normalizedCurrent = Normalize(current);
-        if (normalizedCandidate.Equals(normalizedCurrent, StringComparison.OrdinalIgnoreCase)) return false;
-
-        if (Version.TryParse(normalizedCandidate, out var candidateVersion)
-            && Version.TryParse(normalizedCurrent, out var currentVersion))
-        {
-            return candidateVersion > currentVersion;
-        }
-
-        if (TryParseSemanticVersion(normalizedCandidate, out var candidateSemantic)
-            && TryParseSemanticVersion(normalizedCurrent, out var currentSemantic))
-        {
-            return CompareSemanticVersions(candidateSemantic, currentSemantic) > 0;
-        }
-
-        return CompareNatural(normalizedCandidate, normalizedCurrent) > 0;
+        return Compare(candidate, current) > 0;
     }
 
-    public static string Normalize(string version) => version.Trim().TrimStart('v');
+    public static int Compare(string left, string right)
+    {
+        var normalizedLeft = Normalize(left);
+        var normalizedRight = Normalize(right);
+        if (normalizedLeft.Equals(normalizedRight, StringComparison.Ordinal)) return 0;
+
+        if (TryParseSemanticVersion(normalizedLeft, out var leftSemantic)
+            && TryParseSemanticVersion(normalizedRight, out var rightSemantic))
+        {
+            return CompareSemanticVersions(leftSemantic, rightSemantic);
+        }
+
+        if (Version.TryParse(normalizedLeft, out var leftVersion)
+            && Version.TryParse(normalizedRight, out var rightVersion))
+        {
+            return leftVersion.CompareTo(rightVersion);
+        }
+
+        return CompareNatural(normalizedLeft, normalizedRight);
+    }
+
+    public static bool IsSemanticVersion(string value) =>
+        TryParseSemanticVersion(Normalize(value), out _);
+
+    public static string Normalize(string version)
+    {
+        var trimmed = version.Trim();
+        return trimmed.Length > 0 && trimmed[0] is 'v' or 'V' ? trimmed[1..] : trimmed;
+    }
 
     public static RuntimeInstallAction InstallAction(
         bool isInstalled,
@@ -46,22 +58,27 @@ public static class RuntimeVersionComparison
 
     private static bool TryParseSemanticVersion(string value, out SemanticVersion version)
     {
-        var withoutBuild = value.Split('+', 2)[0];
+        var buildParts = value.Split('+');
+        if (buildParts.Length > 2
+            || buildParts.Length == 2 && !ValidIdentifiers(buildParts[1], true))
+        {
+            version = default;
+            return false;
+        }
+        var withoutBuild = buildParts[0];
         var separator = withoutBuild.IndexOf('-');
         var core = separator < 0 ? withoutBuild : withoutBuild[..separator];
         var prerelease = separator < 0 ? null : withoutBuild[(separator + 1)..];
         var coreParts = core.Split('.');
-        var numbers = new int[coreParts.Length];
-        for (var index = 0; index < coreParts.Length; index++)
+        if (coreParts.Length == 0
+            || coreParts.Any(part => !ValidNumericIdentifier(part, false))
+            || prerelease is not null && !ValidIdentifiers(prerelease, false))
         {
-            if (!int.TryParse(coreParts[index], out numbers[index]))
-            {
-                version = default;
-                return false;
-            }
+            version = default;
+            return false;
         }
-        version = new SemanticVersion(numbers, prerelease);
-        return numbers.Length > 0;
+        version = new SemanticVersion(coreParts, prerelease?.Split('.'));
+        return true;
     }
 
     private static int CompareSemanticVersions(SemanticVersion left, SemanticVersion right)
@@ -69,29 +86,62 @@ public static class RuntimeVersionComparison
         var coreLength = Math.Max(left.Core.Length, right.Core.Length);
         for (var index = 0; index < coreLength; index++)
         {
-            var leftPart = index < left.Core.Length ? left.Core[index] : 0;
-            var rightPart = index < right.Core.Length ? right.Core[index] : 0;
-            if (leftPart != rightPart) return leftPart.CompareTo(rightPart);
+            var leftPart = index < left.Core.Length ? left.Core[index] : "0";
+            var rightPart = index < right.Core.Length ? right.Core[index] : "0";
+            var coreOrder = CompareNumeric(leftPart, rightPart);
+            if (coreOrder != 0) return coreOrder;
         }
 
         if (left.Prerelease is null) return right.Prerelease is null ? 0 : 1;
         if (right.Prerelease is null) return -1;
-        var leftParts = left.Prerelease.Split(['.', '-'], StringSplitOptions.RemoveEmptyEntries);
-        var rightParts = right.Prerelease.Split(['.', '-'], StringSplitOptions.RemoveEmptyEntries);
-        var count = Math.Min(leftParts.Length, rightParts.Length);
+        var count = Math.Min(left.Prerelease.Length, right.Prerelease.Length);
         for (var index = 0; index < count; index++)
         {
-            var leftIsNumber = int.TryParse(leftParts[index], out var leftNumber);
-            var rightIsNumber = int.TryParse(rightParts[index], out var rightNumber);
-            if (leftIsNumber && rightIsNumber && leftNumber != rightNumber)
+            var leftPart = left.Prerelease[index];
+            var rightPart = right.Prerelease[index];
+            if (leftPart == rightPart) continue;
+            var leftIsNumber = leftPart.All(char.IsAsciiDigit);
+            var rightIsNumber = rightPart.All(char.IsAsciiDigit);
+            if (leftIsNumber && rightIsNumber)
             {
-                return leftNumber.CompareTo(rightNumber);
+                return CompareNumeric(leftPart, rightPart);
             }
             if (leftIsNumber != rightIsNumber) return leftIsNumber ? -1 : 1;
-            var comparison = StringComparer.OrdinalIgnoreCase.Compare(leftParts[index], rightParts[index]);
+            var comparison = StringComparer.Ordinal.Compare(leftPart, rightPart);
             if (comparison != 0) return comparison;
         }
-        return leftParts.Length.CompareTo(rightParts.Length);
+        return left.Prerelease.Length.CompareTo(right.Prerelease.Length);
+    }
+
+    private static bool ValidIdentifiers(string value, bool numericLeadingZeros)
+    {
+        var identifiers = value.Split('.');
+        return identifiers.Length > 0 && identifiers.All(identifier =>
+            identifier.Length > 0
+            && identifier.All(character => char.IsAsciiLetterOrDigit(character) || character == '-')
+            && (!identifier.All(char.IsAsciiDigit)
+                || ValidNumericIdentifier(identifier, numericLeadingZeros))
+        );
+    }
+
+    private static bool ValidNumericIdentifier(string value, bool allowLeadingZeros)
+    {
+        return value.Length > 0
+            && value.All(char.IsAsciiDigit)
+            && (allowLeadingZeros || value.Length == 1 || value[0] != '0');
+    }
+
+    private static int CompareNumeric(string left, string right)
+    {
+        var normalizedLeft = left.TrimStart('0');
+        var normalizedRight = right.TrimStart('0');
+        if (normalizedLeft.Length == 0) normalizedLeft = "0";
+        if (normalizedRight.Length == 0) normalizedRight = "0";
+        if (normalizedLeft.Length != normalizedRight.Length)
+        {
+            return normalizedLeft.Length.CompareTo(normalizedRight.Length);
+        }
+        return string.CompareOrdinal(normalizedLeft, normalizedRight);
     }
 
     private static int CompareNatural(string left, string right)
@@ -141,5 +191,5 @@ public static class RuntimeVersionComparison
         return parts;
     }
 
-    private readonly record struct SemanticVersion(int[] Core, string? Prerelease);
+    private readonly record struct SemanticVersion(string[] Core, string[]? Prerelease);
 }

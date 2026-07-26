@@ -9,12 +9,20 @@ struct LocalLogFile: Identifiable, Hashable, Sendable {
     var id: String { url.path }
 }
 
-struct LogStore {
+struct LogStore: Sendable {
     private static let appendLock = NSLock()
     let rootURL: URL
+    let maximumLogBytes: UInt64
+    let retainedLogFiles: Int
 
-    init(rootURL: URL) {
+    init(
+        rootURL: URL,
+        maximumLogBytes: UInt64 = LogRotation.defaultMaximumBytes,
+        retainedLogFiles: Int = LogRotation.defaultArchiveCount
+    ) {
         self.rootURL = rootURL.standardizedFileURL.resolvingSymlinksInPath()
+        self.maximumLogBytes = max(1, maximumLogBytes)
+        self.retainedLogFiles = max(0, retainedLogFiles)
     }
 
     func files() -> [LocalLogFile] {
@@ -65,6 +73,11 @@ struct LogStore {
 
         try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         let logURL = rootURL.appendingPathComponent("app.log")
+        try LogRotation.rotateIfNeeded(
+            logURL,
+            maximumBytes: maximumLogBytes,
+            archiveCount: retainedLogFiles
+        )
         if !FileManager.default.fileExists(atPath: logURL.path) {
             try Data().write(to: logURL, options: .atomic)
         }

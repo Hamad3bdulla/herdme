@@ -8,7 +8,7 @@ namespace HerdMe.Windows.Services;
 
 public sealed partial class ComposerToolManager
 {
-    private static readonly HttpClient HttpClient = new();
+    private static readonly HttpClient HttpClient = ManagedDownloadClient.Create();
     private readonly CoreClient coreClient;
     private readonly PhpRuntimeInstaller phpInstaller;
     private readonly PhpRuntimePolicy phpPolicy;
@@ -256,9 +256,26 @@ public sealed partial class ComposerToolManager
         foreach (var variable in environment) startInfo.Environment[variable.Key] = variable.Value;
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException($"{Path.GetFileName(executable)} could not be started.");
-        var standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var standardError = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
+        var standardOutput = process.StandardOutput.ReadToEndAsync();
+        var standardError = process.StandardError.ReadToEndAsync();
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+                // The command exited between the cancellation check and tree termination.
+            }
+            await process.WaitForExitAsync(CancellationToken.None);
+            await Task.WhenAll(standardOutput, standardError);
+            throw;
+        }
         var output = (await standardOutput) + Environment.NewLine + (await standardError);
         if (process.ExitCode != 0)
         {

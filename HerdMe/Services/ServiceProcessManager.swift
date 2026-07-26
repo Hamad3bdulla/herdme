@@ -24,6 +24,7 @@ enum ServiceRuntimeError: LocalizedError {
     case portUnavailable(Int)
     case commandFailed(String)
     case processFailed(String)
+    case readinessTimedOut(String, Int)
 
     var errorDescription: String? {
         switch self {
@@ -39,6 +40,8 @@ enum ServiceRuntimeError: LocalizedError {
             output.isEmpty ? "The service package command failed." : output
         case let .processFailed(name):
             "The \(name) service exited before it became ready. Check its log for details."
+        case let .readinessTimedOut(name, port):
+            "The \(name) service did not become ready on port \(port). Check its log for details."
         }
     }
 }
@@ -47,6 +50,12 @@ final class ServiceProcessManager: @unchecked Sendable {
     private struct Descriptor {
         let formula: String?
         let executable: String
+    }
+
+    private struct ManagedProcessHandles {
+        let process: Process?
+        let adoptedPID: pid_t?
+        let outputHandle: FileHandle?
     }
 
     struct DatabaseConflictRecoveryPlan: Equatable {
@@ -74,6 +83,11 @@ final class ServiceProcessManager: @unchecked Sendable {
     let rootURL: URL
     private let fileManager: FileManager
     private let executableOverrides: [String: URL]
+    private let credentialStore: ServiceCredentialStore
+    private let readinessProbe: @Sendable (Int) -> Bool
+    private let readinessTimeout: TimeInterval
+    private let operationGate = AsyncOperationGate()
+    private let lifecycleLock = NSRecursiveLock()
     private let lock = NSLock()
     private var processes: [UUID: Process] = [:]
     private var adoptedProcessIDs: [UUID: pid_t] = [:]
@@ -83,14 +97,24 @@ final class ServiceProcessManager: @unchecked Sendable {
     init(
         rootURL: URL,
         fileManager: FileManager = .default,
-        executableOverrides: [String: URL] = [:]
+        executableOverrides: [String: URL] = [:],
+        credentialStore: ServiceCredentialStore = ServiceCredentialStore(),
+        readinessProbe: @escaping @Sendable (Int) -> Bool = {
+            LocalEnvironmentEngine.canConnect(port: $0)
+        },
+        readinessTimeout: TimeInterval = 30
     ) {
         self.rootURL = rootURL
         self.fileManager = fileManager
         self.executableOverrides = executableOverrides
+        self.credentialStore = credentialStore
+        self.readinessProbe = readinessProbe
+        self.readinessTimeout = max(0.05, readinessTimeout)
     }
 
     func state(for instance: ServiceInstance) -> ServiceRuntimeState {
+        lifecycleLock.lock()
+        defer { lifecycleLock.unlock() }
         lock.lock()
         let running = processes[instance.id]?.isRunning == true
         let adoptedPID = adoptedProcessIDs[instance.id]
@@ -129,26 +153,60 @@ final class ServiceProcessManager: @unchecked Sendable {
         }.value
     }
 
-    func start(_ instance: ServiceInstance) async throws {
+    func start(
+        _ instance: ServiceInstance,
+        allowCredentialInteraction: Bool = true
+    ) async throws {
+        await operationGate.acquire()
         do {
-            try await Task.detached(priority: .userInitiated) { [self] in
-                try startSynchronously(instance)
-            }.value
+            try Task.checkCancellation()
+            try await startManaged(
+                instance,
+                allowCredentialInteraction: allowCredentialInteraction
+            )
+            await operationGate.release()
         } catch {
+            await operationGate.release()
             recordStartFailure(instance: instance, error: error)
             throw error
         }
     }
 
-    func stop(_ instance: ServiceInstance) {
-        stop(id: instance.id)
+    func stop(_ instance: ServiceInstance) async {
+        await operationGate.acquire()
+        await stop(id: instance.id)
+        await operationGate.release()
     }
 
-    func stopAll() {
+    func stopAll() async {
+        await operationGate.acquire()
+        let identifiers = activeIdentifiers()
+        for identifier in identifiers {
+            await stop(id: identifier)
+        }
+        await operationGate.release()
+    }
+
+    func stopAllImmediately() {
         lock.lock()
-        let identifiers = Array(Set(processes.keys).union(adoptedProcessIDs.keys))
+        let activeProcesses = processes
+        let adopted = adoptedProcessIDs
+        let handles = outputHandles
+        processes.removeAll()
+        adoptedProcessIDs.removeAll()
+        outputHandles.removeAll()
+        consolePorts.removeAll()
         lock.unlock()
-        identifiers.forEach(stop(id:))
+
+        activeProcesses.forEach { identifier, process in
+            AsyncProcessLifecycle.terminateImmediately(process)
+            removeRuntimeArtifacts(id: identifier)
+        }
+        adopted.forEach { identifier, pid in
+            AsyncProcessLifecycle.terminateImmediately(pid: pid)
+            removeRuntimeArtifacts(id: identifier)
+        }
+        handles.values.forEach { try? $0.close() }
     }
 
     func dataDirectory(for instance: ServiceInstance) -> URL {
@@ -156,6 +214,8 @@ final class ServiceProcessManager: @unchecked Sendable {
     }
 
     func consoleURL(for instance: ServiceInstance) -> URL? {
+        lifecycleLock.lock()
+        defer { lifecycleLock.unlock() }
         guard instance.definitionID == "minio" || instance.definitionID == "rustfs" else {
             return nil
         }
@@ -364,7 +424,10 @@ final class ServiceProcessManager: @unchecked Sendable {
         return .commandFailed(message + " Full output is available in Logs/homebrew.log.")
     }
 
-    private func startSynchronously(_ instance: ServiceInstance) throws {
+    private func startManaged(
+        _ instance: ServiceInstance,
+        allowCredentialInteraction: Bool
+    ) async throws {
         if state(for: instance) == .running { return }
         guard instance.port > 0, instance.port <= 65_535,
               LocalEnvironmentEngine.canBind(port: instance.port) else {
@@ -378,12 +441,22 @@ final class ServiceProcessManager: @unchecked Sendable {
         let logsURL = rootURL.appendingPathComponent("Log/services", isDirectory: true)
         try fileManager.createDirectory(at: dataURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: logsURL, withIntermediateDirectories: true)
-        try prepareDataIfNeeded(instance: instance, executable: executable, dataURL: dataURL)
+        let credentials = try credentialsIfRequired(
+            for: instance,
+            allowInteraction: allowCredentialInteraction
+        )
+        try prepareDataIfNeeded(
+            instance: instance,
+            executable: executable,
+            dataURL: dataURL,
+            credentials: credentials
+        )
         if instance.definitionID == "mysql" || instance.definitionID == "mariadb" {
             try? fileManager.removeItem(atPath: Self.databaseSocketPath(for: instance.id))
         }
 
         let logURL = logsURL.appendingPathComponent(instance.id.uuidString + ".log")
+        try LogRotation.rotateIfNeeded(logURL)
         if !fileManager.fileExists(atPath: logURL.path) {
             fileManager.createFile(atPath: logURL.path, contents: nil)
         }
@@ -422,24 +495,55 @@ final class ServiceProcessManager: @unchecked Sendable {
             for: instance,
             dataURL: dataURL,
             consolePort: consolePort,
-            peeringPort: peeringPort
+            peeringPort: peeringPort,
+            credentials: credentials
         )
         var environment = ProcessInfo.processInfo.environment
         let runtimeBin = executable.deletingLastPathComponent().path
         environment["PATH"] = runtimeBin + ":" + rootURL.appendingPathComponent("bin").path
             + ":" + (environment["PATH"] ?? "")
         if instance.definitionID == "minio" {
-            environment["MINIO_ROOT_USER"] = "herdme"
-            environment["MINIO_ROOT_PASSWORD"] = "herdme-local-service"
+            environment["MINIO_ROOT_USER"] = credentials?.username
+            environment["MINIO_ROOT_PASSWORD"] = credentials?.secret
+        } else if instance.definitionID == "rustfs" {
+            environment["RUSTFS_ACCESS_KEY"] = credentials?.username
+            environment["RUSTFS_SECRET_KEY"] = credentials?.secret
         }
         process.environment = environment
         process.standardOutput = outputHandle
         process.standardError = outputHandle
         try process.run()
-        usleep(120_000)
-        guard process.isRunning else {
+        let becameReady: Bool
+        do {
+            becameReady = try await waitUntilReady(process: process, port: instance.port)
+        } catch {
+            await AsyncProcessLifecycle.terminate(process)
             try? outputHandle.close()
-            throw ServiceRuntimeError.processFailed(instance.name)
+            throw error
+        }
+        guard becameReady else {
+            let exitedEarly = !process.isRunning
+            await AsyncProcessLifecycle.terminate(process)
+            try? outputHandle.close()
+            throw exitedEarly
+                ? ServiceRuntimeError.processFailed(instance.name)
+                : ServiceRuntimeError.readinessTimedOut(instance.name, instance.port)
+        }
+
+        if let credentials, DatabaseServiceAuthenticator.protectedDefinitions.contains(instance.definitionID) {
+            do {
+                try await DatabaseServiceAuthenticator.secure(
+                    instance: instance,
+                    executable: executable,
+                    dataURL: dataURL,
+                    credentials: credentials,
+                    fileManager: fileManager
+                )
+            } catch {
+                await AsyncProcessLifecycle.terminate(process)
+                try? outputHandle.close()
+                throw error
+            }
         }
 
         do {
@@ -448,17 +552,28 @@ final class ServiceProcessManager: @unchecked Sendable {
                 options: .atomic
             )
         } catch {
-            process.terminate()
+            await AsyncProcessLifecycle.terminate(process)
             try? outputHandle.close()
             throw error
         }
 
-        lock.lock()
-        processes[instance.id] = process
-        adoptedProcessIDs[instance.id] = nil
-        outputHandles[instance.id] = outputHandle
-        consolePorts[instance.id] = consolePort
-        lock.unlock()
+        register(
+            process: process,
+            outputHandle: outputHandle,
+            consolePort: consolePort,
+            for: instance.id
+        )
+    }
+
+    private func waitUntilReady(process: Process, port: Int) async throws -> Bool {
+        let deadline = ProcessInfo.processInfo.systemUptime + readinessTimeout
+        while process.isRunning {
+            try Task.checkCancellation()
+            if readinessProbe(port) { return true }
+            if ProcessInfo.processInfo.systemUptime >= deadline { return false }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        return false
     }
 
     private func recordStartFailure(instance: ServiceInstance, error: Error) {
@@ -467,6 +582,7 @@ final class ServiceProcessManager: @unchecked Sendable {
         let message = "[HerdMe] Failed to start \(instance.name): \(error.localizedDescription)\n"
         do {
             try fileManager.createDirectory(at: logsURL, withIntermediateDirectories: true)
+            try LogRotation.rotateIfNeeded(logURL)
             if !fileManager.fileExists(atPath: logURL.path) {
                 try Data(message.utf8).write(to: logURL, options: .atomic)
                 return
@@ -483,23 +599,39 @@ final class ServiceProcessManager: @unchecked Sendable {
     private func prepareDataIfNeeded(
         instance: ServiceInstance,
         executable: URL,
-        dataURL: URL
+        dataURL: URL,
+        credentials: ServiceCredentials?
     ) throws {
-        let contents = (try? fileManager.contentsOfDirectory(atPath: dataURL.path)) ?? []
-        guard contents.isEmpty else { return }
-
         let command: (URL, [String])?
         switch instance.definitionID {
         case "mysql":
-            command = (executable, ["--initialize-insecure", "--datadir=\(dataURL.path)"])
+            guard !fileManager.fileExists(atPath: dataURL.appendingPathComponent("mysql").path) else { return }
+            command = (executable, ["--no-defaults", "--initialize-insecure", "--datadir=\(dataURL.path)"])
         case "mariadb":
+            guard !fileManager.fileExists(atPath: dataURL.appendingPathComponent("mysql").path) else { return }
             let installer = executable.deletingLastPathComponent().appendingPathComponent("mariadb-install-db")
             command = fileManager.isExecutableFile(atPath: installer.path)
-                ? (installer, ["--auth-root-authentication-method=normal", "--datadir=\(dataURL.path)"])
+                ? (installer, ["--no-defaults", "--auth-root-authentication-method=normal", "--datadir=\(dataURL.path)"])
                 : nil
         case "postgresql":
+            guard !fileManager.fileExists(atPath: dataURL.appendingPathComponent("PG_VERSION").path),
+                  let credentials else { return }
             let initdb = executable.deletingLastPathComponent().appendingPathComponent("initdb")
-            command = (initdb, ["-D", dataURL.path, "--auth=trust", "--encoding=UTF8"])
+            let passwordURL = dataURL.deletingLastPathComponent()
+                .appendingPathComponent(".herdme-initdb-\(UUID().uuidString).password")
+            try Data((credentials.secret + "\n").utf8).write(to: passwordURL, options: [.atomic])
+            try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: passwordURL.path)
+            defer { try? fileManager.removeItem(at: passwordURL) }
+            let result = try Self.run(initdb, arguments: [
+                "-D", dataURL.path,
+                "--username=\(credentials.username)",
+                "--pwfile=\(passwordURL.path)",
+                "--auth-local=scram-sha-256",
+                "--auth-host=scram-sha-256",
+                "--encoding=UTF8"
+            ])
+            guard result.status == 0 else { throw ServiceRuntimeError.commandFailed(result.output) }
+            return
         default:
             command = nil
         }
@@ -512,7 +644,8 @@ final class ServiceProcessManager: @unchecked Sendable {
         for instance: ServiceInstance,
         dataURL: URL,
         consolePort: Int?,
-        peeringPort: Int?
+        peeringPort: Int?,
+        credentials: ServiceCredentials? = nil
     ) -> [String] {
         switch instance.definitionID {
         case "redis", "valkey":
@@ -522,14 +655,16 @@ final class ServiceProcessManager: @unchecked Sendable {
             ]
         case "mysql":
             return [
-                "--datadir=\(dataURL.path)", "--port=\(instance.port)", "--bind-address=127.0.0.1",
+                "--no-defaults", "--datadir=\(dataURL.path)", "--port=\(instance.port)",
+                "--bind-address=127.0.0.1",
                 "--mysqlx=0",
                 "--socket=\(Self.databaseSocketPath(for: instance.id))",
                 "--pid-file=\(dataURL.appendingPathComponent("mysql.pid").path)"
             ]
         case "mariadb":
             return [
-                "--datadir=\(dataURL.path)", "--port=\(instance.port)", "--bind-address=127.0.0.1",
+                "--no-defaults", "--datadir=\(dataURL.path)", "--port=\(instance.port)",
+                "--bind-address=127.0.0.1",
                 "--socket=\(Self.databaseSocketPath(for: instance.id))",
                 "--pid-file=\(dataURL.appendingPathComponent("mysql.pid").path)"
             ]
@@ -543,9 +678,9 @@ final class ServiceProcessManager: @unchecked Sendable {
                 "--no-analytics", "true"
             ]
         case "typesense":
-            guard let peeringPort else { return [] }
+            guard let peeringPort, let credentials else { return [] }
             return [
-                "--data-dir", dataURL.path, "--api-key", "herdme-local-service",
+                "--data-dir", dataURL.path, "--api-key", credentials.secret,
                 "--api-address", "127.0.0.1", "--api-port", String(instance.port),
                 "--peering-address", "127.0.0.1", "--peering-port", String(peeringPort),
                 "--enable-cors"
@@ -567,6 +702,22 @@ final class ServiceProcessManager: @unchecked Sendable {
         }
     }
 
+    private func credentialsIfRequired(
+        for instance: ServiceInstance,
+        allowInteraction: Bool
+    ) throws -> ServiceCredentials? {
+        guard Self.requiresCredentials(definitionID: instance.definitionID) else { return nil }
+        return try credentialStore.credentials(
+            for: instance.id,
+            allowInteraction: allowInteraction
+        )
+    }
+
+    static func requiresCredentials(definitionID: String) -> Bool {
+        ["mysql", "mariadb", "postgresql", "typesense", "minio", "rustfs"]
+            .contains(definitionID)
+    }
+
     private func executableURL(for definitionID: String) -> URL? {
         if let override = executableOverrides[definitionID], fileManager.isExecutableFile(atPath: override.path) {
             return override
@@ -576,26 +727,49 @@ final class ServiceProcessManager: @unchecked Sendable {
         return fileManager.isExecutableFile(atPath: candidate.path) ? candidate.resolvingSymlinksInPath() : nil
     }
 
-    private func stop(id: UUID) {
-        lock.lock()
-        let process = processes.removeValue(forKey: id)
-        let adoptedPID = adoptedProcessIDs.removeValue(forKey: id)
-        let handle = outputHandles.removeValue(forKey: id)
-        consolePorts[id] = nil
-        lock.unlock()
+    private func stop(id: UUID) async {
+        let handles = takeProcessHandles(id: id)
         defer { try? fileManager.removeItem(atPath: Self.databaseSocketPath(for: id)) }
 
-        if let process {
-            if process.isRunning {
-                process.terminate()
-                for _ in 0..<40 where process.isRunning { usleep(25_000) }
-                if process.isRunning { Darwin.kill(process.processIdentifier, SIGKILL) }
-            }
-        } else if let adoptedPID {
-            terminate(pid: adoptedPID)
+        if let process = handles.process {
+            await AsyncProcessLifecycle.terminate(process)
+        } else if let adoptedPID = handles.adoptedPID {
+            await AsyncProcessLifecycle.terminate(pid: adoptedPID)
         }
-        try? handle?.close()
+        try? handles.outputHandle?.close()
         removePIDFile(id: id)
+    }
+
+    private func activeIdentifiers() -> [UUID] {
+        lock.lock()
+        defer { lock.unlock() }
+        return Array(Set(processes.keys).union(adoptedProcessIDs.keys))
+    }
+
+    private func register(
+        process: Process,
+        outputHandle: FileHandle,
+        consolePort: Int?,
+        for id: UUID
+    ) {
+        lock.lock()
+        processes[id] = process
+        adoptedProcessIDs[id] = nil
+        outputHandles[id] = outputHandle
+        consolePorts[id] = consolePort
+        lock.unlock()
+    }
+
+    private func takeProcessHandles(id: UUID) -> ManagedProcessHandles {
+        lock.lock()
+        defer { lock.unlock() }
+        let handles = ManagedProcessHandles(
+            process: processes.removeValue(forKey: id),
+            adoptedPID: adoptedProcessIDs.removeValue(forKey: id),
+            outputHandle: outputHandles.removeValue(forKey: id)
+        )
+        consolePorts[id] = nil
+        return handles
     }
 
     private func pidFileURL(for instance: ServiceInstance) -> URL {
@@ -642,14 +816,9 @@ final class ServiceProcessManager: @unchecked Sendable {
         return executableMatches && actualDataPath == expectedDataPath
     }
 
-    private func terminate(pid: pid_t) {
-        guard Darwin.kill(pid, 0) == 0 else { return }
-        Darwin.kill(pid, SIGTERM)
-        for _ in 0..<40 {
-            if Darwin.kill(pid, 0) != 0 { return }
-            usleep(25_000)
-        }
-        if Darwin.kill(pid, 0) == 0 { Darwin.kill(pid, SIGKILL) }
+    private func removeRuntimeArtifacts(id: UUID) {
+        try? fileManager.removeItem(atPath: Self.databaseSocketPath(for: id))
+        removePIDFile(id: id)
     }
 
     private static func processArguments(pid: pid_t) -> [String]? {

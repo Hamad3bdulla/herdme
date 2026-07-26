@@ -11,3 +11,4 @@ Windows/HerdMe.Windows/obj/
 Windows/HerdMe.Windows.ContractTests/bin/
 Windows/HerdMe.Windows.ContractTests/obj/
 Windows/HerdMe.Windows/Runtime/
+release-private-key*.pem

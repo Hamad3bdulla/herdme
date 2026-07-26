@@ -96,7 +96,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
                                     <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" />
-                                    <TextBlock Text="{x:Bind DefinitionId}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="{x:Bind Subtitle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>
                                 <TextBlock Grid.Column="1" Text="{x:Bind Port}" VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="2" Text="{x:Bind Version}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
@@ -126,10 +126,30 @@
                                     </Button>
                                     <Button
                                         Tag="{x:Bind Id}"
+                                        Click="AddToEnvironment_Click"
+                                        ToolTipService.ToolTip="Add service connection to a site .env">
+                                        <TextBlock Text=".env" />
+                                    </Button>
+                                    <Button
+                                        Tag="{x:Bind Id}"
                                         Click="OpenConsole_Click"
                                         Visibility="{x:Bind CanOpenConsole}"
                                         ToolTipService.ToolTip="Open service console">
                                         <TextBlock Text="Console" />
+                                    </Button>
+                                    <Button
+                                        Tag="{x:Bind Id}"
+                                        Click="CopyConnection_Click"
+                                        Visibility="{x:Bind CanOpenInTablePlus}"
+                                        ToolTipService.ToolTip="Copy database connection URL">
+                                        <SymbolIcon Symbol="Copy" />
+                                    </Button>
+                                    <Button
+                                        Tag="{x:Bind Id}"
+                                        Click="OpenTablePlus_Click"
+                                        Visibility="{x:Bind CanOpenInTablePlus}"
+                                        ToolTipService.ToolTip="Open database in TablePlus">
+                                        <TextBlock Text="TablePlus" />
                                     </Button>
                                     <Button Tag="{x:Bind Id}" Click="Delete_Click" ToolTipService.ToolTip="Delete service instance">
                                         <SymbolIcon Symbol="Delete" />

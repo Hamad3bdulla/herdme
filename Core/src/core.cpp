@@ -1,7 +1,6 @@
 #include "herdme/core.hpp"
 
 #include <algorithm>
-#include <cctype>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
@@ -18,6 +17,29 @@
 
 namespace herdme {
 namespace {
+
+std::optional<std::string> environment_value(const char* name) {
+#ifdef _WIN32
+    char* value = nullptr;
+    std::size_t length = 0;
+    if (_dupenv_s(&value, &length, name) != 0 || value == nullptr) {
+        std::free(value);
+        return std::nullopt;
+    }
+    std::string result(value);
+    std::free(value);
+    return result;
+#else
+    if (const char* value = std::getenv(name)) return std::string(value);
+    return std::nullopt;
+#endif
+}
+
+char ascii_lower(const unsigned char value) {
+    return value >= 'A' && value <= 'Z'
+        ? static_cast<char>(value + ('a' - 'A'))
+        : static_cast<char>(value);
+}
 
 std::string json_escape(const std::string& value) {
     std::ostringstream output;
@@ -68,15 +90,15 @@ std::string framework_at(const std::filesystem::path& root) {
 }
 
 std::vector<std::filesystem::path> split_path() {
-    const char* raw_path = std::getenv("PATH");
-    if (raw_path == nullptr) return {};
+    const auto raw_path = environment_value("PATH");
+    if (!raw_path) return {};
 #ifdef _WIN32
     constexpr char separator = ';';
 #else
     constexpr char separator = ':';
 #endif
     std::vector<std::filesystem::path> values;
-    std::stringstream stream(raw_path);
+    std::stringstream stream(*raw_path);
     std::string value;
     while (std::getline(stream, value, separator)) {
         if (!value.empty()) values.emplace_back(value);
@@ -122,8 +144,8 @@ bool is_same_or_child_path(
     auto candidate_text = path_string(resolved_candidate);
     auto root_text = path_string(resolved_root);
 #ifdef _WIN32
-    std::transform(candidate_text.begin(), candidate_text.end(), candidate_text.begin(), ::tolower);
-    std::transform(root_text.begin(), root_text.end(), root_text.begin(), ::tolower);
+    std::transform(candidate_text.begin(), candidate_text.end(), candidate_text.begin(), ascii_lower);
+    std::transform(root_text.begin(), root_text.end(), root_text.begin(), ascii_lower);
 #endif
     if (candidate_text == root_text) return true;
     if (root_text.empty() || root_text.back() != '/') root_text += '/';
@@ -133,18 +155,18 @@ bool is_same_or_child_path(
 bool belongs_to_other_herd(const std::filesystem::path& path) {
     std::vector<std::filesystem::path> roots;
 #ifdef _WIN32
-    if (const char* user_profile = std::getenv("USERPROFILE")) {
-        roots.emplace_back(std::filesystem::path(user_profile) / "Herd");
+    if (const auto user_profile = environment_value("USERPROFILE")) {
+        roots.emplace_back(std::filesystem::path(*user_profile) / "Herd");
     }
-    if (const char* local_app_data = std::getenv("LOCALAPPDATA")) {
-        roots.emplace_back(std::filesystem::path(local_app_data) / "Herd");
+    if (const auto local_app_data = environment_value("LOCALAPPDATA")) {
+        roots.emplace_back(std::filesystem::path(*local_app_data) / "Herd");
     }
-    if (const char* app_data = std::getenv("APPDATA")) {
-        roots.emplace_back(std::filesystem::path(app_data) / "Herd");
+    if (const auto app_data = environment_value("APPDATA")) {
+        roots.emplace_back(std::filesystem::path(*app_data) / "Herd");
     }
 #else
-    if (const char* home = std::getenv("HOME")) {
-        const auto home_path = std::filesystem::path(home);
+    if (const auto home = environment_value("HOME")) {
+        const auto home_path = std::filesystem::path(*home);
         roots.emplace_back(home_path / "Herd");
         roots.emplace_back(home_path / "Library" / "Application Support" / "Herd");
     }
@@ -159,9 +181,7 @@ std::string lowercase_trimmed(std::string value) {
     if (first == std::string::npos) return {};
     const auto last = value.find_last_not_of(" \t\r\n");
     value = value.substr(first, last - first + 1);
-    std::transform(value.begin(), value.end(), value.begin(), [](const unsigned char character) {
-        return static_cast<char>(std::tolower(character));
-    });
+    std::transform(value.begin(), value.end(), value.begin(), ascii_lower);
     return value;
 }
 
@@ -179,9 +199,9 @@ RuntimeCheck inspect_runtime(const std::string& name) {
     if (!executable) return {name, std::nullopt, "missing", false};
 
     std::string normalized = path_string(*executable);
-    std::transform(normalized.begin(), normalized.end(), normalized.begin(), ::tolower);
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(), ascii_lower);
     std::string managed_root = path_string(support_directory());
-    std::transform(managed_root.begin(), managed_root.end(), managed_root.begin(), ::tolower);
+    std::transform(managed_root.begin(), managed_root.end(), managed_root.begin(), ascii_lower);
 
     if (normalized.rfind(managed_root + "/", 0) == 0) {
         return {name, executable, "managed", true};
@@ -201,7 +221,7 @@ std::string dns_label(const std::string& name) {
     std::string original;
     original.reserve(name.size());
     for (const unsigned char value : name) {
-        original.push_back(value >= 'A' && value <= 'Z' ? static_cast<char>(value + ('a' - 'A')) : value);
+        original.push_back(ascii_lower(value));
     }
 
     const auto is_alphanumeric = [](const unsigned char value) {
@@ -236,16 +256,16 @@ std::string dns_label(const std::string& name) {
 
 std::filesystem::path support_directory() {
 #ifdef _WIN32
-    if (const char* app_data = std::getenv("LOCALAPPDATA")) {
-        return std::filesystem::path(app_data) / "HerdMe";
+    if (const auto app_data = environment_value("LOCALAPPDATA")) {
+        return std::filesystem::path(*app_data) / "HerdMe";
     }
-    if (const char* app_data = std::getenv("APPDATA")) {
-        return std::filesystem::path(app_data) / "HerdMe";
+    if (const auto app_data = environment_value("APPDATA")) {
+        return std::filesystem::path(*app_data) / "HerdMe";
     }
     return std::filesystem::temp_directory_path() / "HerdMe";
 #else
-    if (const char* user_home = std::getenv("HOME")) {
-        return std::filesystem::path(user_home) / "Library" / "Application Support" / "HerdMe";
+    if (const auto user_home = environment_value("HOME")) {
+        return std::filesystem::path(*user_home) / "Library" / "Application Support" / "HerdMe";
     }
     return std::filesystem::temp_directory_path() / "HerdMe";
 #endif
@@ -297,8 +317,8 @@ std::vector<Site> scan_sites(
     std::sort(sites.begin(), sites.end(), [](const Site& left, const Site& right) {
         std::string left_name = left.name;
         std::string right_name = right.name;
-        std::transform(left_name.begin(), left_name.end(), left_name.begin(), ::tolower);
-        std::transform(right_name.begin(), right_name.end(), right_name.begin(), ::tolower);
+        std::transform(left_name.begin(), left_name.end(), left_name.begin(), ascii_lower);
+        std::transform(right_name.begin(), right_name.end(), right_name.begin(), ascii_lower);
         return left_name < right_name;
     });
     return sites;

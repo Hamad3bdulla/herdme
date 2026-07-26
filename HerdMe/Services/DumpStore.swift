@@ -3,13 +3,23 @@ import Foundation
 actor DumpStore {
     let directoryURL: URL
     private let fileManager = FileManager.default
+    private let retentionPolicy: CaptureRetentionPolicy
 
-    init(rootURL: URL) {
+    init(
+        rootURL: URL,
+        retentionLimit: Int = CaptureRetentionPolicy.defaultItemLimit,
+        retentionAge: TimeInterval = CaptureRetentionPolicy.defaultMaximumAge
+    ) {
         directoryURL = rootURL.appendingPathComponent("Dumps", isDirectory: true)
+        retentionPolicy = CaptureRetentionPolicy(
+            itemLimit: retentionLimit,
+            maximumAge: retentionAge
+        )
         try? fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
     }
 
     func load() -> [CapturedDump] {
+        try? retentionPolicy.prune(directoryURL: directoryURL, fileManager: fileManager)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return ((try? fileManager.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil)) ?? [])
@@ -29,6 +39,7 @@ actor DumpStore {
             to: directoryURL.appendingPathComponent(dump.id.uuidString + ".json"),
             options: .atomic
         )
+        try retentionPolicy.prune(directoryURL: directoryURL, fileManager: fileManager)
     }
 
     func clear() throws {

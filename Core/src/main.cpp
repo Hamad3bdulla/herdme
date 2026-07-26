@@ -5,10 +5,14 @@
 #include <string>
 #include <vector>
 
+#ifndef HERDME_VERSION
+#define HERDME_VERSION "development"
+#endif
+
 namespace {
 
 void print_usage() {
-    std::cout << "HerdMe Core 0.1.0\n"
+    std::cout << "HerdMe Core " HERDME_VERSION "\n"
               << "Usage:\n"
               << "  herdme-core doctor\n"
               << "  php -m | herdme-core php-extensions\n"
@@ -66,7 +70,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     if (command == "--version" || command == "version") {
-        std::cout << "0.1.0\n";
+        std::cout << HERDME_VERSION "\n";
         return 0;
     }
 

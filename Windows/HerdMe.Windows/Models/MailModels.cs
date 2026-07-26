@@ -27,6 +27,16 @@ public sealed class CapturedMail
     [JsonIgnore]
     public string ReceivedText => ReceivedAt.LocalDateTime.ToString("g");
 
+    public bool MatchesSearch(string? query)
+    {
+        var normalized = query?.Trim();
+        if (string.IsNullOrEmpty(normalized)) return true;
+        return Sender.Contains(normalized, StringComparison.CurrentCultureIgnoreCase)
+            || Subject.Contains(normalized, StringComparison.CurrentCultureIgnoreCase)
+            || Recipients.Any(value => value.Contains(normalized, StringComparison.CurrentCultureIgnoreCase))
+            || ReceivedText.Contains(normalized, StringComparison.CurrentCultureIgnoreCase);
+    }
+
     public static CapturedMail Parse(string sender, IEnumerable<string> recipients, string raw)
     {
         var normalized = raw.Replace("\r\n", "\n");

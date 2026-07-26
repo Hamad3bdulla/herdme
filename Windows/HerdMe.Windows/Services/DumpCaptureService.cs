@@ -12,6 +12,8 @@ public sealed class DumpCaptureService : IAsyncDisposable
     private readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
     private readonly ConcurrentDictionary<int, Task> sessions = new();
     private readonly string supportRoot;
+    private readonly int retentionLimit;
+    private readonly TimeSpan retentionAge;
     private CancellationTokenSource? cancellation;
     private TcpListener? listener;
     private Task? acceptTask;
@@ -19,12 +21,18 @@ public sealed class DumpCaptureService : IAsyncDisposable
 
     public event EventHandler<CapturedDump>? DumpCaptured;
 
-    public DumpCaptureService(string? supportRoot = null)
+    public DumpCaptureService(
+        string? supportRoot = null,
+        int retentionLimit = CaptureRetention.DefaultItemLimit,
+        TimeSpan? retentionAge = null
+    )
     {
         this.supportRoot = supportRoot ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "HerdMe"
         );
+        this.retentionLimit = Math.Max(1, retentionLimit);
+        this.retentionAge = retentionAge ?? CaptureRetention.DefaultMaximumAge;
     }
 
     public bool IsRunning => listener is not null;
@@ -49,6 +57,7 @@ public sealed class DumpCaptureService : IAsyncDisposable
     public IReadOnlyList<CapturedDump> Load()
     {
         Directory.CreateDirectory(DirectoryPath);
+        CaptureRetention.Prune(DirectoryPath, retentionLimit, retentionAge);
         return Directory.EnumerateFiles(DirectoryPath, "*.json")
             .Select(path =>
             {
@@ -143,5 +152,6 @@ public sealed class DumpCaptureService : IAsyncDisposable
         var temporary = path + ".tmp";
         File.WriteAllText(temporary, JsonSerializer.Serialize(dump, jsonOptions));
         File.Move(temporary, path, true);
+        CaptureRetention.Prune(DirectoryPath, retentionLimit, retentionAge);
     }
 }

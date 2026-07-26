@@ -1,0 +1,17 @@
+PHP 8.4 startup notice that must not be treated as an extension
+[PHP Modules]
+ctype
+curl
+dom
+fileinfo
+filter
+hash
+mbstring
+openssl
+pcre
+pdo
+session
+tokenizer
+xml
+[Zend Modules]
+Xdebug

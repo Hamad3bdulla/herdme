@@ -12,6 +12,7 @@ public partial class App : Application
     private TaskbarIcon? trayIcon;
     private volatile bool exitRequested;
     private int backgroundServicesStarted;
+    private int reportingUnhandledError;
 
     public App()
     {
@@ -31,6 +32,7 @@ public partial class App : Application
             return;
         }
         InitializeComponent();
+        UnhandledException += App_UnhandledException;
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -145,10 +147,9 @@ public partial class App : Application
                     "HerdMe",
                     "Log"
                 );
-                Directory.CreateDirectory(logDirectory);
-                await File.AppendAllTextAsync(
+                await BoundedLog.AppendLineAsync(
                     Path.Combine(logDirectory, "environment.log"),
-                    $"[{DateTimeOffset.Now:O}] Automatic start failed: {error.Message}{Environment.NewLine}"
+                    $"[{DateTimeOffset.Now:O}] Automatic start failed: {error.Message}"
                 );
             }
             catch (IOException)
@@ -193,14 +194,65 @@ public partial class App : Application
                 "HerdMe",
                 "Log"
             );
-            Directory.CreateDirectory(logDirectory);
-            await File.AppendAllTextAsync(
+            await BoundedLog.AppendLineAsync(
                 Path.Combine(logDirectory, "startup.log"),
-                $"[{DateTimeOffset.Now:O}] {component} failed: {error.Message}{Environment.NewLine}"
+                $"[{DateTimeOffset.Now:O}] {component} failed: {error.Message}"
             );
         }
         catch (IOException)
         {
+        }
+    }
+
+    private void App_UnhandledException(
+        object sender,
+        Microsoft.UI.Xaml.UnhandledExceptionEventArgs args
+    )
+    {
+        if (!UnhandledExceptionPolicy.CanRecover(args.Exception)) return;
+        args.Handled = true;
+        _ = ReportUnhandledExceptionAsync(args.Exception);
+    }
+
+    private async Task ReportUnhandledExceptionAsync(Exception error)
+    {
+        try
+        {
+            var logDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "HerdMe",
+                "Log"
+            );
+            await BoundedLog.AppendLineAsync(
+                Path.Combine(logDirectory, "unhandled.log"),
+                $"[{DateTimeOffset.Now:O}] {error}"
+            );
+        }
+        catch (Exception logError) when (logError is IOException or UnauthorizedAccessException)
+        {
+        }
+
+        if (Interlocked.Exchange(ref reportingUnhandledError, 1) != 0) return;
+        try
+        {
+            if (MainWindow?.Content is not FrameworkElement root || root.XamlRoot is null) return;
+            var dialog = new Microsoft.UI.Xaml.Controls.ContentDialog
+            {
+                XamlRoot = root.XamlRoot,
+                Title = "HerdMe could not complete the operation",
+                Content = UnhandledExceptionPolicy.UserMessage(error),
+                CloseButtonText = "OK"
+            };
+            await dialog.ShowAsync();
+        }
+        catch (Exception dialogError) when (
+            dialogError is InvalidOperationException or System.Runtime.InteropServices.COMException
+        )
+        {
+        }
+        finally
+        {
+            Interlocked.Exchange(ref reportingUnhandledError, 0);
         }
     }
 }

@@ -1,0 +1,1 @@
+https://github.com/Hamad3bdulla/herdme/releases/latest/download/release-manifest.signed.json

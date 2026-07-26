@@ -1,4 +1,3 @@
-using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
 
@@ -14,9 +13,13 @@ public sealed record PhpWindowsRelease(
 
 public sealed class PhpRuntimeInstaller
 {
-    private static readonly HttpClient HttpClient = new();
+    private static readonly HttpClient HttpClient = ManagedDownloadClient.Create();
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly CoreClient coreClient;
+
+    public static IReadOnlyList<string> SupportedCycles { get; } = Array.AsReadOnly(
+        new[] { "8.5", "8.4", "8.3", "8.2", "8.1", "8.0" }
+    );
 
     public PhpRuntimeInstaller(CoreClient? coreClient = null, string? supportRoot = null)
     {
@@ -32,6 +35,11 @@ public sealed class PhpRuntimeInstaller
     }
 
     public string RuntimeRoot { get; }
+
+    public static bool IsSupportedCycle(string cycle)
+    {
+        return SupportedCycles.Contains(cycle, StringComparer.Ordinal);
+    }
 
     public string PhpExecutable(string cycle) => Path.Combine(RuntimeRoot, cycle, "php.exe");
 
@@ -76,6 +84,7 @@ public sealed class PhpRuntimeInstaller
         CancellationToken cancellationToken = default
     )
     {
+        EnsureSupportedCycle(cycle);
         using var stream = await HttpClient.GetStreamAsync(
             "https://windows.php.net/downloads/releases/releases.json",
             cancellationToken
@@ -124,6 +133,7 @@ public sealed class PhpRuntimeInstaller
         CancellationToken cancellationToken = default
     )
     {
+        EnsureSupportedCycle(cycle);
         if (!OperatingSystem.IsWindows())
         {
             throw new PlatformNotSupportedException("Windows PHP packages can only be installed on Windows.");
@@ -144,7 +154,11 @@ public sealed class PhpRuntimeInstaller
         try
         {
             await DownloadAndVerifyAsync(release, archivePath, cancellationToken);
-            ZipFile.ExtractToDirectory(archivePath, stagingPath);
+            await SafeZipExtractor.ExtractAsync(
+                archivePath,
+                stagingPath,
+                cancellationToken
+            );
             await File.WriteAllTextAsync(
                 Path.Combine(stagingPath, "php.ini"),
                 PhpIni,
@@ -200,6 +214,18 @@ public sealed class PhpRuntimeInstaller
             if (Directory.Exists(backupPath)) Directory.Delete(backupPath, true);
         }
         return release;
+    }
+
+    private static void EnsureSupportedCycle(string cycle)
+    {
+        if (!IsSupportedCycle(cycle))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(cycle),
+                cycle,
+                "HerdMe supports new PHP installations from 8.0 through 8.5."
+            );
+        }
     }
 
     private static async Task DownloadAndVerifyAsync(

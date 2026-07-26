@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct GeneralView: View {
@@ -18,22 +19,32 @@ struct GeneralView: View {
 
                     List(selection: $selectedPath) {
                         ForEach(model.configuration.parkPaths, id: \.self) { path in
-                            Text(path)
-                                .font(.system(size: 13))
+                            HStack {
+                                Text(path)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                Spacer(minLength: 8)
+                                Text("\(siteCount(in: path))")
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
                                 .tag(path)
+                                .accessibilityLabel(path)
+                                .accessibilityValue("\(siteCount(in: path)) sites")
                         }
                     }
                     .listStyle(.bordered(alternatesRowBackgrounds: true))
-                    .frame(height: 78)
+                    .frame(minHeight: 150, idealHeight: 150, maxHeight: 220)
 
                     HStack(spacing: 0) {
                         Button {
-                            model.addParkPath()
+                            chooseParkPath()
                         } label: {
                             Image(systemName: "plus")
                         }
                         .buttonStyle(.borderless)
                         .help("Add a sites folder")
+                        .accessibilityLabel("Add a sites folder")
                         .frame(width: 30)
 
                         Divider().frame(height: 20)
@@ -49,6 +60,7 @@ struct GeneralView: View {
                         .buttonStyle(.borderless)
                         .disabled(selectedPath == nil)
                         .help("Remove the selected folder")
+                        .accessibilityLabel("Remove the selected folder")
                         .frame(width: 30)
                     }
                 }
@@ -90,13 +102,15 @@ struct GeneralView: View {
                             Circle()
                                 .fill(certificateColor)
                                 .frame(width: 7, height: 7)
-                            Text(model.certificateTrustState.title)
+                            Text(model.httpsStatusTitle)
                                 .foregroundStyle(.secondary)
-                            if model.certificateTrustState != .trusted {
+                            if model.shouldOfferHTTPSAction {
                                 if model.privilegedOperation == "certificate" {
                                     ProgressView().controlSize(.small)
                                 } else {
-                                    Button("Trust") { model.installCertificateAuthority() }
+                                    Button(model.httpsActionTitle) {
+                                        model.installCertificateAuthority()
+                                    }
                                         .buttonStyle(.bordered)
                                 }
                             }
@@ -179,6 +193,33 @@ struct GeneralView: View {
             model.refreshCertificateTrust()
             model.refreshLaunchAtLogin()
         }
+        .onDisappear {
+            if tld.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                != model.configuration.tld {
+                model.updateTLD(tld)
+            }
+        }
+    }
+
+    private func chooseParkPath() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Add"
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            model.addParkPath(url)
+        }
+    }
+
+    private func siteCount(in path: String) -> Int {
+        let root = URL(fileURLWithPath: path).standardizedFileURL.path
+        let prefix = root.hasSuffix("/") ? root : root + "/"
+        return model.sites.filter {
+            let sitePath = $0.path.standardizedFileURL.path
+            return sitePath == root || sitePath.hasPrefix(prefix)
+        }.count
     }
 
     private var resolverTitle: String {

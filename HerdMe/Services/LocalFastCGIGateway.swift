@@ -32,6 +32,7 @@ final class LocalFastCGIGateway: @unchecked Sendable {
     private let documentRoot: URL
     private let fpmPort: Int
     private let queue = DispatchQueue(label: "app.herdme.fastcgi-gateway", qos: .userInitiated)
+    private let sessionsLock = NSLock()
     private var listener: NWListener?
     private var sessions: [UUID: FastCGIHTTPSession] = [:]
     private(set) var port: Int?
@@ -42,6 +43,11 @@ final class LocalFastCGIGateway: @unchecked Sendable {
     }
 
     var isRunning: Bool { listener != nil }
+
+    var isHealthy: Bool {
+        guard listener != nil, let port else { return false }
+        return LocalEnvironmentEngine.canConnect(port: port)
+    }
 
     func start(preferredPort: Int) throws -> Int {
         if let port, listener != nil { return port }
@@ -66,7 +72,9 @@ final class LocalFastCGIGateway: @unchecked Sendable {
                 handler: FastCGIHTTPHandler(documentRoot: self.documentRoot, fpmPort: self.fpmPort),
                 onStop: { [weak self] in self?.removeSession(identifier) }
             )
+            self.sessionsLock.lock()
             self.sessions[identifier] = session
+            self.sessionsLock.unlock()
             session.start()
         }
         listener.stateUpdateHandler = { state in
@@ -83,23 +91,35 @@ final class LocalFastCGIGateway: @unchecked Sendable {
     func stop() {
         listener?.cancel()
         listener = nil
-        sessions.values.forEach { $0.stop() }
+        sessionsLock.lock()
+        let activeSessions = Array(sessions.values)
         sessions.removeAll()
+        sessionsLock.unlock()
+        activeSessions.forEach { $0.stop() }
         port = nil
     }
 
     private func removeSession(_ identifier: UUID) {
-        queue.async { [weak self] in self?.sessions[identifier] = nil }
+        sessionsLock.lock()
+        sessions.removeValue(forKey: identifier)
+        sessionsLock.unlock()
     }
 }
 
 private final class FastCGIHTTPSession: @unchecked Sendable {
+    private static let fileChunkSize = 64 * 1_024
+    private static let processingQueue = DispatchQueue(
+        label: "app.herdme.fastcgi-gateway.processing",
+        qos: .userInitiated,
+        attributes: .concurrent
+    )
     private let incoming: NWConnection
     private let handler: FastCGIHTTPHandler
     private let onStop: @Sendable () -> Void
     private let queue = DispatchQueue(label: "app.herdme.fastcgi-gateway.session", qos: .userInitiated)
     private var buffer = Data()
     private var stopped = false
+    private var responseFileDescriptor: Int32?
 
     init(
         incoming: NWConnection,
@@ -126,8 +146,16 @@ private final class FastCGIHTTPSession: @unchecked Sendable {
     }
 
     func stop() {
+        queue.async { [weak self] in self?.stopOnQueue() }
+    }
+
+    private func stopOnQueue() {
         guard !stopped else { return }
         stopped = true
+        if let responseFileDescriptor {
+            Darwin.close(responseFileDescriptor)
+            self.responseFileDescriptor = nil
+        }
         incoming.cancel()
         onStop()
     }
@@ -144,7 +172,7 @@ private final class FastCGIHTTPSession: @unchecked Sendable {
                self.buffer.count >= length {
                 do {
                     let request = try HTTPWireRequest(data: self.buffer.prefix(length))
-                    self.send(try self.handler.response(to: request))
+                    self.process(request)
                 } catch {
                     NSLog("HerdMe FastCGI request failed: %@", error.localizedDescription)
                     self.send(HTTPWireResponse.error(status: Self.status(for: error)))
@@ -157,10 +185,148 @@ private final class FastCGIHTTPSession: @unchecked Sendable {
         }
     }
 
-    private func send(_ response: Data) {
-        incoming.send(content: response, isComplete: true, completion: .contentProcessed { [weak self] _ in
-            self?.stop()
-        })
+    private func process(_ request: HTTPWireRequest) {
+        Self.processingQueue.async { [weak self] in
+            guard let self else { return }
+            do {
+                switch try self.handler.responsePlan(to: request) {
+                case let .complete(response):
+                    self.queue.async { [weak self] in
+                        guard let self, !self.stopped else { return }
+                        self.send(response)
+                    }
+                case let .fastCGI(fastCGIRequest):
+                    try self.streamFastCGI(fastCGIRequest, headOnly: request.method == "HEAD")
+                }
+            } catch {
+                NSLog("HerdMe FastCGI request failed: %@", error.localizedDescription)
+                self.queue.async { [weak self] in
+                    guard let self, !self.stopped else { return }
+                    self.send(HTTPWireResponse.error(status: Self.status(for: error)))
+                }
+            }
+        }
+    }
+
+    private func streamFastCGI(_ request: FastCGIRequest, headOnly: Bool) throws {
+        var parser = FastCGIHTTPStreamParser(headOnly: headOnly)
+        do {
+            let errors = try FastCGIClient(port: handler.fpmPort).performStreaming(
+                parameters: request.parameters,
+                body: request.body
+            ) { chunk in
+                try parser.consume(chunk) { [weak self] content in
+                    guard let self else {
+                        throw LocalFastCGIError.connectionFailed("The HTTP session ended.")
+                    }
+                    try self.sendStreamingChunk(content)
+                }
+            }
+            try parser.finish()
+            if !errors.isEmpty {
+                NSLog("HerdMe PHP-FPM: %@", String(decoding: errors, as: UTF8.self))
+            }
+            incoming.send(
+                content: nil,
+                isComplete: true,
+                completion: .contentProcessed { [weak self] _ in self?.stopOnQueue() }
+            )
+        } catch {
+            guard parser.didStartResponse else { throw error }
+            queue.async { [weak self] in self?.stopOnQueue() }
+        }
+    }
+
+    private func sendStreamingChunk(_ content: Data) throws {
+        guard !content.isEmpty else { return }
+        let completion = NetworkSendCompletion()
+        incoming.send(
+            content: content,
+            isComplete: false,
+            completion: .contentProcessed { error in completion.resolve(error) }
+        )
+        try completion.wait()
+    }
+
+    private func send(_ response: HTTPWireResponse) {
+        switch response.body {
+        case let .data(body):
+            var content = response.header
+            content.append(body)
+            incoming.send(content: content, isComplete: true, completion: .contentProcessed { [weak self] _ in
+                self?.stopOnQueue()
+            })
+        case let .file(url, offset, length):
+            guard length > 0 else {
+                incoming.send(
+                    content: response.header,
+                    isComplete: true,
+                    completion: .contentProcessed { [weak self] _ in self?.stopOnQueue() }
+                )
+                return
+            }
+            let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC)
+            var metadata = stat()
+            guard descriptor >= 0,
+                  fstat(descriptor, &metadata) == 0,
+                  metadata.st_mode & S_IFMT == S_IFREG,
+                  metadata.st_size >= off_t(offset) + off_t(length) else {
+                if descriptor >= 0 { Darwin.close(descriptor) }
+                send(HTTPWireResponse.error(status: "404 Not Found"))
+                return
+            }
+            responseFileDescriptor = descriptor
+            incoming.send(
+                content: response.header,
+                isComplete: false,
+                completion: .contentProcessed { [weak self] error in
+                    guard let self else { return }
+                    guard error == nil else {
+                        self.stopOnQueue()
+                        return
+                    }
+                    self.sendFileChunk(descriptor: descriptor, offset: offset, remaining: length)
+                }
+            )
+        }
+    }
+
+    private func sendFileChunk(descriptor: Int32, offset: Int64, remaining: Int) {
+        guard !stopped, responseFileDescriptor == descriptor, remaining > 0 else {
+            stopOnQueue()
+            return
+        }
+        let requested = min(Self.fileChunkSize, remaining)
+        var chunk = Data(count: requested)
+        let count = chunk.withUnsafeMutableBytes { bytes in
+            pread(descriptor, bytes.baseAddress, bytes.count, off_t(offset))
+        }
+        guard count > 0 else {
+            stopOnQueue()
+            return
+        }
+        if count < chunk.count { chunk.removeSubrange(count..<chunk.count) }
+        let nextRemaining = remaining - count
+        incoming.send(
+            content: chunk,
+            isComplete: nextRemaining == 0,
+            completion: .contentProcessed { [weak self] error in
+                guard let self else { return }
+                guard error == nil else {
+                    self.stopOnQueue()
+                    return
+                }
+                if nextRemaining == 0 {
+                    self.stopOnQueue()
+                } else {
+                    self.sendFileChunk(
+                        descriptor: descriptor,
+                        offset: offset + Int64(count),
+                        remaining: nextRemaining
+                    )
+                }
+            }
+        )
     }
 
     private static func status(for error: Error) -> String {
@@ -170,6 +336,31 @@ private final class FastCGIHTTPSession: @unchecked Sendable {
         case LocalFastCGIError.scriptMissing: "404 Not Found"
         case LocalFastCGIError.malformedRequest: "400 Bad Request"
         default: "502 Bad Gateway"
+        }
+    }
+}
+
+private final class NetworkSendCompletion: @unchecked Sendable {
+    private let lock = NSLock()
+    private let semaphore = DispatchSemaphore(value: 0)
+    private var error: NWError?
+
+    func resolve(_ error: NWError?) {
+        lock.lock()
+        self.error = error
+        lock.unlock()
+        semaphore.signal()
+    }
+
+    func wait() throws {
+        guard semaphore.wait(timeout: .now() + .seconds(60)) == .success else {
+            throw LocalFastCGIError.connectionFailed("The HTTP client stopped accepting response data.")
+        }
+        lock.lock()
+        let resolvedError = error
+        lock.unlock()
+        if let resolvedError {
+            throw LocalFastCGIError.connectionFailed(resolvedError.localizedDescription)
         }
     }
 }
@@ -284,21 +475,35 @@ private struct HTTPWireRequest: Sendable {
     }
 }
 
+private struct FastCGIRequest: Sendable {
+    let parameters: [String: String]
+    let body: Data
+}
+
 private struct FastCGIHTTPHandler: Sendable {
     let documentRoot: URL
     let fpmPort: Int
 
-    func response(to request: HTTPWireRequest) throws -> Data {
+    enum ResponsePlan: Sendable {
+        case complete(HTTPWireResponse)
+        case fastCGI(FastCGIRequest)
+    }
+
+    func responsePlan(to request: HTTPWireRequest) throws -> ResponsePlan {
         let target = try RequestTarget(request.target)
         let resource = try resolve(path: target.path)
         switch resource {
         case let .staticFile(url):
             guard request.method == "GET" || request.method == "HEAD" else {
-                return HTTPWireResponse.error(status: "405 Method Not Allowed")
+                return .complete(HTTPWireResponse.error(status: "405 Method Not Allowed"))
             }
-            return try HTTPWireResponse.staticFile(url, headOnly: request.method == "HEAD")
+            return .complete(try HTTPWireResponse.staticFile(
+                url,
+                headOnly: request.method == "HEAD",
+                rangeHeader: request.header(named: "Range")
+            ))
         case let .script(scriptURL, scriptName, pathInfo):
-            let result = try FastCGIClient(port: fpmPort).perform(
+            return .fastCGI(FastCGIRequest(
                 parameters: parameters(
                     for: request,
                     target: target,
@@ -307,11 +512,7 @@ private struct FastCGIHTTPHandler: Sendable {
                     pathInfo: pathInfo
                 ),
                 body: request.body
-            )
-            if !result.standardError.isEmpty {
-                NSLog("HerdMe PHP-FPM: %@", String(decoding: result.standardError, as: UTF8.self))
-            }
-            return try HTTPWireResponse.fastCGI(result.standardOutput)
+            ))
         }
     }
 
@@ -433,56 +634,112 @@ private struct RequestTarget: Sendable {
     }
 }
 
-private enum HTTPWireResponse {
-    static func fastCGI(_ response: Data) throws -> Data {
-        let delimiter = Data("\r\n\r\n".utf8)
-        let alternateDelimiter = Data("\n\n".utf8)
-        let range = response.range(of: delimiter) ?? response.range(of: alternateDelimiter)
-        guard let range,
-              let headerText = String(data: response[..<range.lowerBound], encoding: .utf8) else {
+private struct HTTPWireResponse: Sendable {
+    enum Body: Sendable {
+        case data(Data)
+        case file(URL, offset: Int64, length: Int)
+    }
+
+    let header: Data
+    let body: Body
+
+    static func fastCGIHeader(_ data: Data) throws -> FastCGIHTTPHeader {
+        guard let headerText = String(data: data, encoding: .utf8) else {
             throw LocalFastCGIError.invalidResponse
         }
-        let body = Data(response[range.upperBound...])
         var status = "200 OK"
         var headers: [(String, String)] = []
+        var contentLength: Int?
+        let hopByHopHeaders: Set<String> = [
+            "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
+            "te", "trailer", "transfer-encoding", "upgrade"
+        ]
         for line in headerText.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n") {
-            guard let separator = line.firstIndex(of: ":") else { continue }
+            guard !line.isEmpty else { continue }
+            guard let separator = line.firstIndex(of: ":") else {
+                throw LocalFastCGIError.invalidResponse
+            }
             let name = String(line[..<separator]).trimmingCharacters(in: .whitespaces)
             let value = String(line[line.index(after: separator)...]).trimmingCharacters(in: .whitespaces)
+            guard isValidHeaderName(name), isValidHeaderValue(value) else {
+                throw LocalFastCGIError.invalidResponse
+            }
             if name.caseInsensitiveCompare("Status") == .orderedSame {
                 status = value
-            } else if name.caseInsensitiveCompare("Connection") != .orderedSame {
+            } else if name.caseInsensitiveCompare("Content-Length") == .orderedSame {
+                guard contentLength == nil, let parsed = Int(value), parsed >= 0 else {
+                    throw LocalFastCGIError.invalidResponse
+                }
+                contentLength = parsed
+                headers.append((name, value))
+            } else if !hopByHopHeaders.contains(name.lowercased()) {
                 headers.append((name, value))
             }
         }
+        guard isValidStatus(status) else { throw LocalFastCGIError.invalidResponse }
         if status == "200 OK", headers.contains(where: { $0.0.caseInsensitiveCompare("Location") == .orderedSame }) {
             status = "302 Found"
-        }
-        if !headers.contains(where: { $0.0.caseInsensitiveCompare("Content-Length") == .orderedSame }) {
-            headers.append(("Content-Length", String(body.count)))
         }
         if !headers.contains(where: { $0.0.caseInsensitiveCompare("Content-Type") == .orderedSame }) {
             headers.append(("Content-Type", "text/html; charset=utf-8"))
         }
         headers.append(("Connection", "close"))
-        return make(status: status, headers: headers, body: body)
-    }
-
-    static func staticFile(_ url: URL, headOnly: Bool) throws -> Data {
-        let data = try Data(contentsOf: url, options: .mappedIfSafe)
-        return make(
-            status: "200 OK",
-            headers: [
-                ("Content-Type", mimeType(for: url.pathExtension)),
-                ("Content-Length", String(data.count)),
-                ("Cache-Control", "no-cache"),
-                ("Connection", "close")
-            ],
-            body: headOnly ? Data() : data
+        let statusCode = Int(status.prefix(3)) ?? 0
+        return FastCGIHTTPHeader(
+            data: makeHeader(status: status, headers: headers),
+            contentLength: contentLength,
+            bodyForbidden: (100..<200).contains(statusCode) || statusCode == 204 || statusCode == 304
         )
     }
 
-    static func error(status: String) -> Data {
+    static func staticFile(_ url: URL, headOnly: Bool, rangeHeader: String?) throws -> HTTPWireResponse {
+        let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+        guard values.isRegularFile == true, let fileSize = values.fileSize, fileSize >= 0 else {
+            throw LocalFastCGIError.invalidPath
+        }
+        guard let selectedRange = HTTPByteRange.select(rangeHeader, fileSize: fileSize) else {
+            return make(
+                status: "416 Range Not Satisfiable",
+                headers: [
+                    ("Content-Range", "bytes */\(fileSize)"),
+                    ("Accept-Ranges", "bytes"),
+                    ("Content-Length", "0"),
+                    ("Cache-Control", "no-cache"),
+                    ("Connection", "close")
+                ],
+                body: Data()
+            )
+        }
+        var headers = [
+            ("Content-Type", mimeType(for: url.pathExtension)),
+            ("Content-Length", String(selectedRange.length)),
+            ("Accept-Ranges", "bytes"),
+            ("Cache-Control", "no-cache"),
+            ("Connection", "close")
+        ]
+        if selectedRange.isPartial {
+            headers.insert(
+                (
+                    "Content-Range",
+                    "bytes \(selectedRange.offset)-\(selectedRange.offset + Int64(selectedRange.length) - 1)/\(fileSize)"
+                ),
+                at: 2
+            )
+        }
+        let responseHeader = makeHeader(
+            status: selectedRange.isPartial ? "206 Partial Content" : "200 OK",
+            headers: headers
+        )
+        if headOnly || selectedRange.length == 0 {
+            return HTTPWireResponse(header: responseHeader, body: .data(Data()))
+        }
+        return make(
+            header: responseHeader,
+            body: .file(url, offset: selectedRange.offset, length: selectedRange.length)
+        )
+    }
+
+    static func error(status: String) -> HTTPWireResponse {
         let body = Data("HerdMe could not serve this local site.\n".utf8)
         return make(
             status: status,
@@ -495,13 +752,24 @@ private enum HTTPWireResponse {
         )
     }
 
-    private static func make(status: String, headers: [(String, String)], body: Data) -> Data {
+    private static func make(
+        status: String,
+        headers: [(String, String)],
+        body: Data
+    ) -> HTTPWireResponse {
+        HTTPWireResponse(header: makeHeader(status: status, headers: headers), body: .data(body))
+    }
+
+    private static func make(header: Data, body: Body) -> HTTPWireResponse {
+        HTTPWireResponse(header: header, body: body)
+    }
+
+    fileprivate static func makeHeader(status: String, headers: [(String, String)]) -> Data {
         var response = Data("HTTP/1.1 \(status)\r\n".utf8)
         for header in headers {
             response.append(Data("\(header.0): \(header.1)\r\n".utf8))
         }
         response.append(Data("\r\n".utf8))
-        response.append(body)
         return response
     }
 
@@ -527,11 +795,153 @@ private enum HTTPWireResponse {
         default: "application/octet-stream"
         }
     }
+
+    private static func isValidStatus(_ status: String) -> Bool {
+        guard status.count >= 3,
+              status.prefix(3).allSatisfy(\.isNumber),
+              let code = Int(status.prefix(3)),
+              (100...599).contains(code) else {
+            return false
+        }
+        if status.count == 3 { return true }
+        return status[status.index(status.startIndex, offsetBy: 3)].isWhitespace
+            && isValidHeaderValue(status)
+    }
+
+    private static func isValidHeaderName(_ name: String) -> Bool {
+        !name.isEmpty && name.utf8.allSatisfy { byte in
+            (48...57).contains(byte)
+                || (65...90).contains(byte)
+                || (97...122).contains(byte)
+                || byte == 45
+        }
+    }
+
+    private static func isValidHeaderValue(_ value: String) -> Bool {
+        value.utf8.allSatisfy { byte in byte == 9 || (32...126).contains(byte) }
+    }
 }
 
-private struct FastCGIResult: Sendable {
-    let standardOutput: Data
-    let standardError: Data
+private struct FastCGIHTTPHeader: Sendable {
+    let data: Data
+    let contentLength: Int?
+    let bodyForbidden: Bool
+}
+
+private struct FastCGIHTTPStreamParser {
+    private static let maximumHeaderSize = 1 * 1_024 * 1_024
+    private static let delimiter = Data("\r\n\r\n".utf8)
+    private static let alternateDelimiter = Data("\n\n".utf8)
+
+    let headOnly: Bool
+    private(set) var didStartResponse = false
+    private var headerBuffer = Data()
+    private var declaredContentLength: Int?
+    private var bodyBytes = 0
+    private var bodyForbidden = false
+
+    init(headOnly: Bool) {
+        self.headOnly = headOnly
+    }
+
+    mutating func consume(_ chunk: Data, send: (Data) throws -> Void) throws {
+        guard !chunk.isEmpty else { return }
+        if didStartResponse {
+            try consumeBody(chunk, send: send)
+            return
+        }
+
+        headerBuffer.append(chunk)
+        guard headerBuffer.count <= Self.maximumHeaderSize else {
+            throw LocalFastCGIError.invalidResponse
+        }
+        guard let range = Self.headerRange(in: headerBuffer) else { return }
+        let parsed = try HTTPWireResponse.fastCGIHeader(Data(headerBuffer[..<range.lowerBound]))
+        declaredContentLength = parsed.contentLength
+        bodyForbidden = parsed.bodyForbidden
+        try send(parsed.data)
+        didStartResponse = true
+        let body = Data(headerBuffer[range.upperBound...])
+        headerBuffer.removeAll(keepingCapacity: false)
+        try consumeBody(body, send: send)
+    }
+
+    mutating func finish() throws {
+        guard didStartResponse else { throw LocalFastCGIError.invalidResponse }
+        if !headOnly, !bodyForbidden, let declaredContentLength,
+           bodyBytes != declaredContentLength {
+            throw LocalFastCGIError.invalidResponse
+        }
+    }
+
+    private mutating func consumeBody(_ body: Data, send: (Data) throws -> Void) throws {
+        guard !body.isEmpty else { return }
+        let (updatedBodyBytes, overflow) = bodyBytes.addingReportingOverflow(body.count)
+        guard !overflow else { throw LocalFastCGIError.invalidResponse }
+        bodyBytes = updatedBodyBytes
+        if let declaredContentLength, bodyBytes > declaredContentLength {
+            throw LocalFastCGIError.invalidResponse
+        }
+        if !headOnly, !bodyForbidden { try send(body) }
+    }
+
+    private static func headerRange(in data: Data) -> Range<Data.Index>? {
+        let standard = data.range(of: delimiter)
+        let alternate = data.range(of: alternateDelimiter)
+        return switch (standard, alternate) {
+        case let (left?, right?): left.lowerBound <= right.lowerBound ? left : right
+        case let (left?, nil): left
+        case let (nil, right?): right
+        case (nil, nil): nil
+        }
+    }
+}
+
+private struct HTTPByteRange: Sendable {
+    let offset: Int64
+    let length: Int
+    let isPartial: Bool
+
+    static func select(_ value: String?, fileSize: Int) -> HTTPByteRange? {
+        guard let value else {
+            return HTTPByteRange(offset: 0, length: fileSize, isPartial: false)
+        }
+        guard fileSize > 0 else { return nil }
+        let components = value.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+        guard components.count == 2,
+              components[0].trimmingCharacters(in: .whitespaces).lowercased() == "bytes",
+              !components[1].contains(",") else {
+            return nil
+        }
+        let bounds = components[1].split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
+        guard bounds.count == 2 else { return nil }
+        let startText = bounds[0].trimmingCharacters(in: .whitespaces)
+        let endText = bounds[1].trimmingCharacters(in: .whitespaces)
+
+        if startText.isEmpty {
+            guard let suffixLength = Int(endText), suffixLength > 0 else { return nil }
+            let length = min(suffixLength, fileSize)
+            return HTTPByteRange(
+                offset: Int64(fileSize - length),
+                length: length,
+                isPartial: true
+            )
+        }
+
+        guard let start = Int(startText), start >= 0, start < fileSize else { return nil }
+        let end: Int
+        if endText.isEmpty {
+            end = fileSize - 1
+        } else {
+            guard let requestedEnd = Int(endText), requestedEnd >= start else { return nil }
+            end = min(requestedEnd, fileSize - 1)
+        }
+        return HTTPByteRange(
+            offset: Int64(start),
+            length: end - start + 1,
+            isPartial: true
+        )
+    }
 }
 
 private struct FastCGIClient: Sendable {
@@ -544,10 +954,15 @@ private struct FastCGIClient: Sendable {
     private static let standardError: UInt8 = 7
     private static let requestIdentifier: UInt16 = 1
     private static let maximumContentLength = 65_535
+    private static let maximumStandardErrorSize = 1 * 1_024 * 1_024
 
     let port: Int
 
-    func perform(parameters: [String: String], body: Data) throws -> FastCGIResult {
+    func performStreaming(
+        parameters: [String: String],
+        body: Data,
+        onStandardOutput: (Data) throws -> Void
+    ) throws -> Data {
         let descriptor = socket(AF_INET, SOCK_STREAM, 0)
         guard descriptor >= 0 else { throw LocalFastCGIError.connectionFailed(Self.systemError()) }
         defer { Darwin.close(descriptor) }
@@ -574,8 +989,8 @@ private struct FastCGIClient: Sendable {
         try Self.writeRecords(type: Self.standardInput, content: body, to: descriptor)
         try Self.write(Self.record(type: Self.standardInput, content: Data()), to: descriptor)
 
-        var output = Data()
         var errors = Data()
+        var errorsWereTruncated = false
         while true {
             let header = try Self.readExactly(8, from: descriptor)
             let bytes = [UInt8](header)
@@ -588,16 +1003,21 @@ private struct FastCGIClient: Sendable {
             guard requestID == Self.requestIdentifier else { continue }
             switch bytes[1] {
             case Self.standardOutput:
-                output.append(content)
+                if !content.isEmpty { try onStandardOutput(content) }
             case Self.standardError:
-                errors.append(content)
+                let available = max(0, Self.maximumStandardErrorSize - errors.count)
+                if available > 0 { errors.append(content.prefix(available)) }
+                if content.count > available { errorsWereTruncated = true }
             case Self.endRequest:
-                return FastCGIResult(standardOutput: output, standardError: errors)
+                guard content.count >= 8, content[4] == 0 else {
+                    throw LocalFastCGIError.invalidResponse
+                }
+                if errorsWereTruncated {
+                    errors.append(Data("\n[HerdMe truncated PHP-FPM stderr at 1MB]\n".utf8))
+                }
+                return errors
             default:
                 break
-            }
-            guard output.count + errors.count <= 64 * 1_024 * 1_024 else {
-                throw LocalFastCGIError.invalidResponse
             }
         }
     }

@@ -58,11 +58,20 @@ struct PHPRuntimeValidator: Sendable {
     }
 
     nonisolated static func report(moduleOutput: String) -> PHPExtensionReport {
-        let loaded = Set(
-            moduleOutput.components(separatedBy: .newlines)
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-                .filter { !$0.isEmpty && !$0.hasPrefix("[") }
-        )
+        var readingPHPModules = false
+        var loaded = Set<String>()
+        for line in moduleOutput.components(separatedBy: .newlines) {
+            let normalized = line.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if normalized == "[php modules]" {
+                readingPHPModules = true
+                continue
+            }
+            if normalized.hasPrefix("["), normalized.hasSuffix("]") {
+                readingPHPModules = false
+                continue
+            }
+            if readingPHPModules, !normalized.isEmpty { loaded.insert(normalized) }
+        }
         let missing = laravelRequiredExtensions.filter { !loaded.contains($0) }
         return PHPExtensionReport(loaded: loaded, missing: missing)
     }

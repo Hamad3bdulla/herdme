@@ -4,6 +4,11 @@ namespace HerdMe.Windows.Services;
 
 public sealed class WindowsLocalEnvironment : IAsyncDisposable
 {
+    private sealed record PreparedPhpLaunch(
+        string PhpCgiExecutable,
+        PhpRuntimeLaunchContract Contract
+    );
+
     private readonly CoreClient coreClient = new();
     private readonly PhpRuntimeInstaller runtimeInstaller;
     private readonly PhpRuntimePolicy runtimePolicy;
@@ -13,6 +18,13 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
     private readonly WindowsCertificateManager certificateManager = new();
     private readonly WindowsHostsManager hostsManager = new();
     private readonly SemaphoreSlim operationLock = new(1, 1);
+    private readonly object healthMonitorLock = new();
+    private volatile IReadOnlyList<PhpFastCgiProcess> phpProcessSnapshot = [];
+    private volatile IReadOnlyList<SiteRecord> configuredSites = [];
+    private string? activeConfigurationKey;
+    private CancellationTokenSource? healthMonitorCancellation;
+    private Task? healthMonitorTask;
+    private int recoveryEnabled;
 
     public WindowsLocalEnvironment()
     {
@@ -20,10 +32,14 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         runtimePolicy = new PhpRuntimePolicy(coreClient);
     }
 
-    public bool IsRunning => phpProcesses.Count > 0
-        && phpProcesses.Values.All(process => process.IsRunning)
+    public bool IsRunning => phpProcessSnapshot.Count > 0
+        && phpProcessSnapshot.All(process => process.IsRunning)
         && httpServer.IsRunning
         && httpsServer.IsRunning;
+
+    public bool IsDegraded => Volatile.Read(ref recoveryEnabled) == 1
+        && configuredSites.Count > 0
+        && !IsRunning;
 
     public int? HttpPort => httpServer.Port;
 
@@ -51,71 +67,69 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
+        var siteList = sites.ToArray();
+        if (siteList.Length == 0)
+        {
+            throw new InvalidOperationException("Scan at least one site before starting.");
+        }
         await operationLock.WaitAsync(cancellationToken);
         try
         {
-            if (IsRunning && HttpPort is not null) return HttpPort.Value;
-            var siteList = sites.ToList();
-            if (siteList.Count == 0) throw new InvalidOperationException("Scan at least one site before starting.");
-
             var settings = runtimePolicy.Load();
-            var cycles = siteList.Select(site => site.PhpVersion ?? settings.PhpCycle)
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-            var missingCycles = cycles.Where(cycle => !runtimeInstaller.IsInstalled(cycle)).ToList();
-            if (missingCycles.Count > 0)
+            var configurationKey = ConfigurationKey(siteList, settings.PhpCycle);
+            if (IsRunning
+                && HttpPort is not null
+                && activeConfigurationKey == configurationKey)
             {
-                throw new InvalidOperationException(
-                    "Install these HerdMe PHP runtimes before starting sites: "
-                    + string.Join(", ", missingCycles)
-                );
+                return HttpPort.Value;
             }
-            try
+            var launches = await PreparePhpLaunchesAsync(siteList, settings, cancellationToken);
+            configuredSites = siteList;
+            await StopCoreAsync();
+            var httpPort = await StartCoreAsync(
+                siteList,
+                settings,
+                launches,
+                cancellationToken
+            );
+            Volatile.Write(ref recoveryEnabled, 1);
+            EnsureHealthMonitorStarted();
+            return httpPort;
+        }
+        finally
+        {
+            operationLock.Release();
+        }
+    }
+
+    public async Task SynchronizeSitesAsync(
+        IEnumerable<SiteRecord> sites,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (Volatile.Read(ref recoveryEnabled) == 0) return;
+        var siteList = sites.ToArray();
+        await operationLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (Volatile.Read(ref recoveryEnabled) == 0) return;
+            if (siteList.Length == 0)
             {
-                var ports = new Dictionary<string, int>(StringComparer.Ordinal);
-                foreach (var cycle in cycles)
-                {
-                    var php = runtimeInstaller.PhpExecutable(cycle);
-                    var phpCgi = runtimeInstaller.PhpCgiExecutable(cycle);
-                    var contract = await runtimePolicy.PrepareLaunchAsync(php, cycle, cancellationToken);
-                    var process = new PhpFastCgiProcess();
-                    ports[cycle] = await process.StartAsync(phpCgi, contract, cancellationToken);
-                    phpProcesses[cycle] = process;
-                }
-                await hostsManager.EnsureMappingsAsync(
-                    siteList.Select(site => site.Domain),
-                    cancellationToken
-                );
-                var definitions = siteList
-                    .Select(site => new LocalSiteDefinition(
-                        site.Domain,
-                        site.Path,
-                        ports[site.PhpVersion ?? settings.PhpCycle]
-                    ))
-                    .ToList();
-                var httpPort = await httpServer.StartAsync(
-                    definitions,
-                    phpFastCgiPort: ports.Values.First(),
-                    cancellationToken: cancellationToken
-                );
-                var certificate = certificateManager.PrepareServerCertificate(
-                    siteList.Select(site => site.Domain)
-                );
-                await httpsServer.StartAsync(
-                    definitions,
-                    phpFastCgiPort: ports.Values.First(),
-                    preferredPort: 443,
-                    fallbackPort: 8_443,
-                    serverCertificate: certificate,
-                    cancellationToken: cancellationToken
-                );
-                return httpPort;
-            }
-            catch
-            {
+                configuredSites = [];
                 await StopCoreAsync();
-                throw;
+                return;
             }
+            var settings = runtimePolicy.Load();
+            var configurationKey = ConfigurationKey(siteList, settings.PhpCycle);
+            if (IsRunning && activeConfigurationKey == configurationKey)
+            {
+                configuredSites = siteList;
+                return;
+            }
+            var launches = await PreparePhpLaunchesAsync(siteList, settings, cancellationToken);
+            configuredSites = siteList;
+            await StopCoreAsync();
+            await StartCoreAsync(siteList, settings, launches, cancellationToken);
         }
         finally
         {
@@ -125,6 +139,9 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
 
     public async Task StopAsync()
     {
+        Volatile.Write(ref recoveryEnabled, 0);
+        configuredSites = [];
+        await CancelHealthMonitorAsync();
         await operationLock.WaitAsync();
         try
         {
@@ -145,9 +162,220 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
 
     private async Task StopCoreAsync()
     {
+        phpProcessSnapshot = [];
+        activeConfigurationKey = null;
         await httpsServer.StopAsync();
         await httpServer.StopAsync();
         foreach (var process in phpProcesses.Values) await process.StopAsync();
         phpProcesses.Clear();
+    }
+
+    private async Task<int> StartCoreAsync(
+        IReadOnlyList<SiteRecord> siteList,
+        PhpRuntimeSettings settings,
+        IReadOnlyDictionary<string, PreparedPhpLaunch> launches,
+        CancellationToken cancellationToken
+    )
+    {
+        try
+        {
+            var ports = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var (cycle, launch) in launches.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+            {
+                var process = new PhpFastCgiProcess();
+                ports[cycle] = await process.StartAsync(
+                    launch.PhpCgiExecutable,
+                    launch.Contract,
+                    cancellationToken
+                );
+                phpProcesses[cycle] = process;
+            }
+            phpProcessSnapshot = phpProcesses.Values.ToArray();
+            await hostsManager.EnsureMappingsAsync(
+                siteList.Select(site => site.Domain),
+                cancellationToken
+            );
+            var definitions = siteList
+                .Select(site => new LocalSiteDefinition(
+                    site.Domain,
+                    site.Path,
+                    ports[site.PhpVersion ?? settings.PhpCycle]
+                ))
+                .ToList();
+            var httpPort = await httpServer.StartAsync(
+                definitions,
+                phpFastCgiPort: ports.Values.First(),
+                cancellationToken: cancellationToken
+            );
+            var certificate = certificateManager.PrepareServerCertificate(
+                siteList.Select(site => site.Domain)
+            );
+            await httpsServer.StartAsync(
+                definitions,
+                phpFastCgiPort: ports.Values.First(),
+                preferredPort: 443,
+                fallbackPort: 8_443,
+                serverCertificate: certificate,
+                cancellationToken: cancellationToken
+            );
+            activeConfigurationKey = ConfigurationKey(siteList, settings.PhpCycle);
+            return httpPort;
+        }
+        catch
+        {
+            await StopCoreAsync();
+            throw;
+        }
+    }
+
+    private async Task<IReadOnlyDictionary<string, PreparedPhpLaunch>> PreparePhpLaunchesAsync(
+        IReadOnlyList<SiteRecord> siteList,
+        PhpRuntimeSettings settings,
+        CancellationToken cancellationToken
+    )
+    {
+        var cycles = siteList.Select(site => site.PhpVersion ?? settings.PhpCycle)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var missingCycles = cycles.Where(cycle => !runtimeInstaller.IsInstalled(cycle)).ToArray();
+        if (missingCycles.Length > 0)
+        {
+            throw new InvalidOperationException(
+                "Install these HerdMe PHP runtimes before starting sites: "
+                + string.Join(", ", missingCycles)
+            );
+        }
+        var launches = new Dictionary<string, PreparedPhpLaunch>(StringComparer.Ordinal);
+        foreach (var cycle in cycles)
+        {
+            var php = runtimeInstaller.PhpExecutable(cycle);
+            var contract = await runtimePolicy.PrepareLaunchAsync(php, cycle, cancellationToken);
+            launches[cycle] = new PreparedPhpLaunch(
+                runtimeInstaller.PhpCgiExecutable(cycle),
+                contract
+            );
+        }
+        return launches;
+    }
+
+    private void EnsureHealthMonitorStarted()
+    {
+        lock (healthMonitorLock)
+        {
+            if (healthMonitorTask is { IsCompleted: false }) return;
+            healthMonitorCancellation?.Dispose();
+            healthMonitorCancellation = new CancellationTokenSource();
+            healthMonitorTask = MonitorHealthAsync(healthMonitorCancellation.Token);
+        }
+    }
+
+    private async Task CancelHealthMonitorAsync()
+    {
+        CancellationTokenSource? source;
+        Task? task;
+        lock (healthMonitorLock)
+        {
+            source = healthMonitorCancellation;
+            task = healthMonitorTask;
+            healthMonitorCancellation = null;
+            healthMonitorTask = null;
+        }
+        source?.Cancel();
+        if (task is not null)
+        {
+            try
+            {
+                await task;
+            }
+            catch (OperationCanceledException) when (source?.IsCancellationRequested == true)
+            {
+            }
+        }
+        source?.Dispose();
+    }
+
+    private async Task MonitorHealthAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (Volatile.Read(ref recoveryEnabled) == 0
+                    || configuredSites.Count == 0
+                    || IsRunning)
+                {
+                    continue;
+                }
+                Exception? recoveryError = null;
+                await operationLock.WaitAsync(cancellationToken);
+                try
+                {
+                    if (Volatile.Read(ref recoveryEnabled) == 0
+                        || configuredSites.Count == 0
+                        || IsRunning)
+                    {
+                        continue;
+                    }
+                    var sites = configuredSites;
+                    var settings = runtimePolicy.Load();
+                    var launches = await PreparePhpLaunchesAsync(sites, settings, cancellationToken);
+                    await StopCoreAsync();
+                    await StartCoreAsync(sites, settings, launches, cancellationToken);
+                }
+                catch (Exception error) when (error is not OperationCanceledException)
+                {
+                    recoveryError = error;
+                }
+                finally
+                {
+                    operationLock.Release();
+                }
+                if (recoveryError is not null)
+                {
+                    await LogRecoveryFailureAsync(recoveryError);
+                    await Task.Delay(TimeSpan.FromSeconds(8), cancellationToken);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private static async Task LogRecoveryFailureAsync(Exception error)
+    {
+        try
+        {
+            var directory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "HerdMe",
+                "Log"
+            );
+            await BoundedLog.AppendLineAsync(
+                Path.Combine(directory, "environment.log"),
+                $"[{DateTimeOffset.Now:O}] Automatic recovery failed: {error.Message}"
+            );
+        }
+        catch (IOException)
+        {
+        }
+    }
+
+    internal static string ConfigurationKey(
+        IEnumerable<SiteRecord> sites,
+        string defaultPhpCycle
+    )
+    {
+        var entries = sites.Select(site => string.Join('\0',
+            site.Domain.Trim().TrimEnd('.').ToLowerInvariant(),
+            Path.GetFullPath(site.Path).TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar
+            ).ToUpperInvariant(),
+            site.PhpVersion ?? defaultPhpCycle
+        )).Order(StringComparer.Ordinal);
+        return defaultPhpCycle + "\n" + string.Join("\n", entries);
     }
 }

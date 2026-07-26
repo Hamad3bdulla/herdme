@@ -11,16 +11,22 @@
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <PublishTrimmed>false</PublishTrimmed>
-    <Version>0.1.0</Version>
-    <AssemblyVersion>0.1.0.1</AssemblyVersion>
-    <FileVersion>0.1.0.1</FileVersion>
+    <HerdMeVersionFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../VERSION'))</HerdMeVersionFile>
+    <HerdMeBuildNumberFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../BUILD_NUMBER'))</HerdMeBuildNumberFile>
+    <HerdMeVersion>$([System.IO.File]::ReadAllText('$(HerdMeVersionFile)').Trim())</HerdMeVersion>
+    <HerdMeBuildNumber>$([System.IO.File]::ReadAllText('$(HerdMeBuildNumberFile)').Trim())</HerdMeBuildNumber>
+    <Version>$(HerdMeVersion)</Version>
+    <AssemblyVersion>$(HerdMeVersion).$(HerdMeBuildNumber)</AssemblyVersion>
+    <FileVersion>$(HerdMeVersion).$(HerdMeBuildNumber)</FileVersion>
     <ApplicationIcon>Assets\HerdMe.ico</ApplicationIcon>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="H.NotifyIcon.WinUI" Version="2.3.2" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.250401001" />
   </ItemGroup>
 
@@ -40,6 +46,14 @@
     <Content Include="..\..\HerdMe\Resources\release-manifest.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>release-manifest.json</TargetPath>
+    </Content>
+    <Content Include="..\..\HerdMe\Resources\release-public-key.txt" Condition="Exists('..\..\HerdMe\Resources\release-public-key.txt')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>release-public-key.txt</TargetPath>
+    </Content>
+    <Content Include="..\..\HerdMe\Resources\release-feed-url.txt" Condition="Exists('..\..\HerdMe\Resources\release-feed-url.txt')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>release-feed-url.txt</TargetPath>
     </Content>
   </ItemGroup>
 </Project>

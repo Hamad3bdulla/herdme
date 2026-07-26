@@ -5,7 +5,10 @@
       "build": 1,
       "channel": "stable",
       "notes": "Initial open-source development release.",
-      "downloadURL": null
+      "downloadURLs": {
+        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.0/HerdMe-0.1.0-macOS.zip",
+        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.0/HerdMe-0.1.0-win-x64-setup.exe"
+      }
     }
   ]
 }

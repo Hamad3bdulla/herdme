@@ -1,4 +1,3 @@
-using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -8,7 +7,7 @@ namespace HerdMe.Windows.Services;
 
 public sealed class ServicePackageInstaller
 {
-    private static readonly HttpClient HttpClient = CreateHttpClient();
+    private static readonly HttpClient HttpClient = ManagedDownloadClient.Create();
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public ServicePackageInstaller(string? supportRoot = null)
@@ -95,7 +94,11 @@ public sealed class ServicePackageInstaller
             Directory.CreateDirectory(stagingContainer);
             if (release.IsZipArchive)
             {
-                ZipFile.ExtractToDirectory(download, stagingContainer);
+                await SafeZipExtractor.ExtractAsync(
+                    download,
+                    stagingContainer,
+                    cancellationToken
+                );
                 NormalizeExtractedRuntime(stagingContainer, definitionId);
             }
             else
@@ -643,10 +646,4 @@ public sealed class ServicePackageInstaller
         return value is { Length: 32 } && value.All(Uri.IsHexDigit);
     }
 
-    private static HttpClient CreateHttpClient()
-    {
-        var client = new HttpClient();
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("HerdMe/1.0 (+https://github.com/herdme)");
-        return client;
-    }
 }

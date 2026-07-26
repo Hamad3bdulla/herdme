@@ -11,12 +11,27 @@ namespace HerdMe.Windows;
 
 public sealed partial class MainWindow : Window
 {
+    private string? pendingLogSitePath;
+    private string? configurationLoadWarning;
+
     public MainWindow(bool skipOnboarding = false)
     {
         InitializeComponent();
         ResizeWindow();
+        var siteSettings = AppServices.SiteSettings.Load();
+        _ = AppServices.Services.LoadInstances();
+        configurationLoadWarning = string.Join(
+            Environment.NewLine + Environment.NewLine,
+            new[]
+            {
+                AppServices.SiteSettings.LastLoadWarning,
+                AppServices.Services.LastLoadWarning
+            }.Where(message => !string.IsNullOrWhiteSpace(message))
+        );
+        if (string.IsNullOrWhiteSpace(configurationLoadWarning)) configurationLoadWarning = null;
+        if (configurationLoadWarning is not null) Activated += ShowConfigurationLoadWarning;
         RequiresOnboarding = !skipOnboarding
-            && !AppServices.SiteSettings.Load().OnboardingCompleted;
+            && !siteSettings.OnboardingCompleted;
         Navigation.Visibility = RequiresOnboarding ? Visibility.Collapsed : Visibility.Visible;
         Onboarding.Visibility = RequiresOnboarding ? Visibility.Visible : Visibility.Collapsed;
         Navigation.SelectedItem = Navigation.MenuItems[0];
@@ -25,6 +40,26 @@ public sealed partial class MainWindow : Window
     public bool RequiresOnboarding { get; private set; }
 
     public event EventHandler? InitialSetupCompleted;
+
+    private async void ShowConfigurationLoadWarning(object sender, WindowActivatedEventArgs args)
+    {
+        if (
+            configurationLoadWarning is null
+            || Content is not FrameworkElement root
+            || root.XamlRoot is not { } xamlRoot
+        ) return;
+        Activated -= ShowConfigurationLoadWarning;
+        var warning = configurationLoadWarning;
+        configurationLoadWarning = null;
+        var dialog = new ContentDialog
+        {
+            Title = "HerdMe settings could not be loaded",
+            Content = warning,
+            CloseButtonText = "OK",
+            XamlRoot = xamlRoot
+        };
+        await dialog.ShowAsync();
+    }
 
     private void ResizeWindow()
     {
@@ -67,7 +102,8 @@ public sealed partial class MainWindow : Window
                 ContentFrame.Navigate(typeof(DumpsPage));
                 break;
             case "logs":
-                ContentFrame.Navigate(typeof(LogsPage));
+                ContentFrame.Navigate(typeof(LogsPage), pendingLogSitePath);
+                pendingLogSitePath = null;
                 break;
             case "debugger":
                 ContentFrame.Navigate(typeof(DebuggerPage));
@@ -78,6 +114,23 @@ public sealed partial class MainWindow : Window
             default:
                 ContentFrame.Navigate(typeof(GeneralPage));
                 break;
+        }
+    }
+
+    public void NavigateToLogs(string sitePath)
+    {
+        pendingLogSitePath = sitePath;
+        var logsItem = Navigation.MenuItems
+            .OfType<NavigationViewItem>()
+            .First(item => string.Equals(item.Tag?.ToString(), "logs", StringComparison.Ordinal));
+        if (ReferenceEquals(Navigation.SelectedItem, logsItem))
+        {
+            ContentFrame.Navigate(typeof(LogsPage), pendingLogSitePath);
+            pendingLogSitePath = null;
+        }
+        else
+        {
+            Navigation.SelectedItem = logsItem;
         }
     }
 

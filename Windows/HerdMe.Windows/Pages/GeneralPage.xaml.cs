@@ -327,7 +327,7 @@ public sealed partial class GeneralPage : Page
     private async Task ShowUpdateAsync(AppUpdateRelease release)
     {
         var downloadAvailable = Uri.TryCreate(
-            release.DownloadUrl,
+            release.PlatformDownloadUrl,
             UriKind.Absolute,
             out var downloadUri
         );

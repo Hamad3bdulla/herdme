@@ -19,7 +19,7 @@ struct NodeView: View {
                     }
                     .padding(.horizontal, 8)
 
-                    ForEach(model.nodeVersions) { runtime in
+                    ForEach(Array(model.nodeVersions.enumerated()), id: \.element.id) { index, runtime in
                         HStack {
                             Text(runtime.cycle).frame(width: 150, alignment: .leading)
                             Text(runtime.installedVersion ?? "Not installed")
@@ -31,9 +31,10 @@ struct NodeView: View {
                                 Text("Working...")
                                     .foregroundStyle(.secondary)
                             } else if runtime.isInstalled {
-                                Label("Active", systemImage: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                    .opacity(runtime.isActive ? 1 : 0)
+                                if runtime.isActive {
+                                    Label("Active", systemImage: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                }
                                 Menu {
                                     Button("Use") { model.activateNode(runtime.cycle) }
                                         .disabled(runtime.isActive)
@@ -51,7 +52,7 @@ struct NodeView: View {
                         }
                         .padding(.horizontal, 8)
                         .frame(height: 38)
-                        .background(runtime.cycle.hashValue.isMultiple(of: 2) ? Color.primary.opacity(0.04) : Color.clear)
+                        .background(index.isMultiple(of: 2) ? Color.primary.opacity(0.04) : Color.clear)
                     }
                 }
             }

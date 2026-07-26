@@ -4,7 +4,10 @@ import SwiftUI
 struct MailView: View {
     @EnvironmentObject private var model: AppModel
     @State private var selectedMessageID: CapturedMail.ID?
+    @State private var selectedMessage: CapturedMail?
+    @State private var isLoadingMessage = false
     @State private var detailTab: DetailTab = .preview
+    @State private var search = ""
 
     private enum DetailTab: String, CaseIterable, Identifiable {
         case preview = "Preview"
@@ -14,8 +17,8 @@ struct MailView: View {
         var id: String { rawValue }
     }
 
-    private var selectedMessage: CapturedMail? {
-        model.mailMessages.first { $0.id == selectedMessageID }
+    private var filteredMessages: [CapturedMailSummary] {
+        model.mailMessages.filter { $0.matchesSearch(search) }
     }
 
     var body: some View {
@@ -26,11 +29,16 @@ struct MailView: View {
                         Label("Mail Server", systemImage: "envelope")
                             .font(.headline)
                         Spacer()
-                        Circle()
-                            .fill(model.isMailServerRunning ? .green : .secondary)
-                            .frame(width: 8, height: 8)
-                        Text(model.isMailServerRunning ? "Running" : "Stopped")
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(model.isMailServerRunning ? .green : .secondary)
+                                .frame(width: 8, height: 8)
+                            Text(model.isMailServerRunning ? "Running" : "Stopped")
+                                .foregroundStyle(.secondary)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Mail server")
+                        .accessibilityValue(model.isMailServerRunning ? "Running" : "Stopped")
                         Button {
                             model.isMailServerRunning ? model.stopMailServer() : model.startMailServer()
                         } label: {
@@ -38,6 +46,7 @@ struct MailView: View {
                         }
                         .buttonStyle(.borderless)
                         .help(model.isMailServerRunning ? "Stop mail server" : "Start mail server")
+                        .accessibilityLabel(model.isMailServerRunning ? "Stop mail server" : "Start mail server")
                     }
                     PanelDivider()
                     SettingRow("SMTP Port") {
@@ -76,22 +85,29 @@ struct MailView: View {
                             .buttonStyle(.borderless)
                             .disabled(model.mailMessages.isEmpty)
                             .help("Delete all messages")
+                            .accessibilityLabel("Delete all messages")
                         }
                         .padding(.bottom, 8)
 
+                        TextField("Search messages", text: $search)
+                            .textFieldStyle(.roundedBorder)
+                            .padding(.bottom, 8)
+
                         if model.mailMessages.isEmpty {
                             EmptyStateView(symbol: "tray", title: "Inbox is empty", message: "")
+                        } else if filteredMessages.isEmpty {
+                            EmptyStateView(symbol: "magnifyingglass", title: "No matching messages", message: "")
                         } else {
                             ScrollView {
                                 LazyVStack(spacing: 2) {
-                                    ForEach(model.mailMessages) { message in
+                                    ForEach(filteredMessages) { message in
                                         Button {
                                             selectedMessageID = message.id
                                         } label: {
                                             VStack(alignment: .leading, spacing: 3) {
                                                 Text(message.sender).font(.callout.weight(.medium)).lineLimit(1)
                                                 Text(message.subject).font(.caption).lineLimit(1)
-                                                Text(message.receivedAt, style: .time)
+                                                Text(message.receivedAt, format: .dateTime.month().day().hour().minute())
                                                     .font(.caption2)
                                                     .foregroundStyle(.secondary)
                                             }
@@ -108,7 +124,7 @@ struct MailView: View {
                     }
                     .frame(width: 245)
                     Divider().padding(.horizontal, 14)
-                    if let message = selectedMessage {
+                    if let message = selectedMessage, message.id == selectedMessageID {
                         VStack(alignment: .leading, spacing: 9) {
                             HStack {
                                 Text(message.subject).font(.title3.weight(.semibold)).lineLimit(2)
@@ -121,6 +137,7 @@ struct MailView: View {
                                 }
                                 .buttonStyle(.borderless)
                                 .help("Delete message")
+                                .accessibilityLabel("Delete message")
                             }
                             Text("From: " + message.sender).font(.caption).foregroundStyle(.secondary)
                             Text("To: " + message.recipients.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
@@ -135,7 +152,7 @@ struct MailView: View {
                                 case .preview:
                                     MailHTMLPreview(
                                         html: message.htmlBody
-                                            ?? "<pre style=\"white-space:pre-wrap\">\(MailMIMEParser.escapedHTML(message.body))</pre>"
+                                            ?? "<pre>\(MailMIMEParser.escapedHTML(message.body))</pre>"
                                     )
                                 case .text:
                                     ScrollView {
@@ -154,6 +171,9 @@ struct MailView: View {
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
+                    } else if isLoadingMessage, selectedMessageID != nil {
+                        ProgressView("Loading message")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         EmptyStateView(symbol: "envelope.open", title: "Select a message", message: "")
                     }
@@ -165,8 +185,46 @@ struct MailView: View {
             selectedMessageID = selectedMessageID ?? model.mailMessages.first?.id
         }
         .onChange(of: model.mailMessages.first?.id) { newestMessageID in
-            selectedMessageID = newestMessageID
+            if let newestMessageID,
+               filteredMessages.contains(where: { $0.id == newestMessageID }) {
+                selectedMessageID = newestMessageID
+            } else if !filteredMessages.contains(where: { $0.id == selectedMessageID }) {
+                selectedMessageID = filteredMessages.first?.id
+            }
         }
         .onChange(of: selectedMessageID) { _ in detailTab = .preview }
+        .onChange(of: search) { _ in
+            if !filteredMessages.contains(where: { $0.id == selectedMessageID }) {
+                selectedMessageID = filteredMessages.first?.id
+            }
+        }
+        .task(id: selectedMessageID) {
+            await loadSelectedMessage()
+        }
+    }
+
+    @MainActor
+    private func loadSelectedMessage() async {
+        guard let selectedMessageID else {
+            selectedMessage = nil
+            isLoadingMessage = false
+            return
+        }
+        if selectedMessage?.id == selectedMessageID { return }
+        selectedMessage = nil
+        isLoadingMessage = true
+        do {
+            let message = try await model.mailMessage(id: selectedMessageID)
+            guard !Task.isCancelled, self.selectedMessageID == selectedMessageID else { return }
+            selectedMessage = message
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled, self.selectedMessageID == selectedMessageID else { return }
+            model.lastError = error.localizedDescription
+        }
+        if self.selectedMessageID == selectedMessageID {
+            isLoadingMessage = false
+        }
     }
 }

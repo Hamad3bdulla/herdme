@@ -47,13 +47,38 @@ enum IndependentPathError: LocalizedError {
     }
 }
 
+enum ConfigurationStoreError: LocalizedError, Equatable {
+    case invalidSchemaVersion(Int)
+    case unsupportedSchemaVersion(found: Int, supported: Int)
+
+    var errorDescription: String? {
+        switch self {
+        case let .invalidSchemaVersion(version):
+            "The settings schema version \(version) is invalid."
+        case let .unsupportedSchemaVersion(found, supported):
+            "The settings were created by a newer HerdMe release (schema \(found)); this release supports up to schema \(supported)."
+        }
+    }
+}
+
 final class ConfigurationStore {
+    struct LoadIssue: Equatable {
+        let message: String
+        let backupURL: URL?
+    }
+
+    static let currentConfigSchemaVersion = 1
     static let currentIndependenceMigrationVersion = 1
+
+    private struct SchemaHeader: Decodable {
+        let configSchemaVersion: Int?
+    }
 
     let rootURL: URL
     let configURL: URL
     let projectsURL: URL
     private let fileManager: FileManager
+    private(set) var loadIssue: LoadIssue?
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
@@ -69,9 +94,56 @@ final class ConfigurationStore {
         try? fileManager.createDirectory(at: projectsURL, withIntermediateDirectories: true)
     }
 
+    init(rootURL: URL, projectsURL: URL, fileManager: FileManager = .default) {
+        self.fileManager = fileManager
+        self.rootURL = rootURL
+        configURL = rootURL.appendingPathComponent("config.json")
+        self.projectsURL = projectsURL
+        try? fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        try? fileManager.createDirectory(
+            at: rootURL.appendingPathComponent("Sites"),
+            withIntermediateDirectories: true
+        )
+        try? fileManager.createDirectory(at: projectsURL, withIntermediateDirectories: true)
+    }
+
     func load() -> AppConfiguration {
-        guard let data = try? Data(contentsOf: configURL),
-              var value = try? JSONDecoder().decode(AppConfiguration.self, from: data) else {
+        guard fileManager.fileExists(atPath: configURL.path) else {
+            return .default
+        }
+        loadIssue = nil
+        let data: Data
+        let sourceSchemaVersion: Int
+        var value: AppConfiguration
+        do {
+            data = try Data(contentsOf: configURL)
+            sourceSchemaVersion = try JSONDecoder().decode(
+                SchemaHeader.self,
+                from: data
+            ).configSchemaVersion ?? 0
+            guard sourceSchemaVersion >= 0 else {
+                throw ConfigurationStoreError.invalidSchemaVersion(sourceSchemaVersion)
+            }
+            if sourceSchemaVersion > Self.currentConfigSchemaVersion {
+                let backupURL = preserveConfiguration(
+                    prefix: "config.unsupported-v\(sourceSchemaVersion)"
+                )
+                let location = backupURL?.path ?? configURL.path
+                loadIssue = LoadIssue(
+                    message: "HerdMe did not replace settings created by a newer release (schema \(sourceSchemaVersion)). The original file was preserved at \(location). Update HerdMe before restoring it.",
+                    backupURL: backupURL
+                )
+                return .default
+            }
+            value = try JSONDecoder().decode(AppConfiguration.self, from: data)
+            value = try Self.migratingSchema(in: value)
+        } catch {
+            let backupURL = preserveConfiguration(prefix: "config.corrupt")
+            let location = backupURL?.path ?? configURL.path
+            loadIssue = LoadIssue(
+                message: "HerdMe could not read its settings. The original file was preserved at \(location). No replacement settings were saved.",
+                backupURL: backupURL
+            )
             return .default
         }
         let migrated = Self.migratingIndependentPaths(
@@ -79,11 +151,49 @@ final class ConfigurationStore {
             homeDirectory: fileManager.homeDirectoryForCurrentUser
         )
         if migrated.parkPaths != value.parkPaths
-            || migrated.independenceMigrationVersion != value.independenceMigrationVersion {
+            || migrated.independenceMigrationVersion != value.independenceMigrationVersion
+            || migrated.configSchemaVersion != sourceSchemaVersion {
             value = migrated
             try? save(migrated)
         }
         return value
+    }
+
+    private func preserveConfiguration(prefix: String) -> URL? {
+        let backupURL = rootURL.appendingPathComponent(
+            "\(prefix)-\(UUID().uuidString.lowercased()).json"
+        )
+        do {
+            try fileManager.moveItem(at: configURL, to: backupURL)
+            return backupURL
+        } catch {
+            return nil
+        }
+    }
+
+    static func migratingSchema(in configuration: AppConfiguration) throws -> AppConfiguration {
+        guard configuration.configSchemaVersion >= 0 else {
+            throw ConfigurationStoreError.invalidSchemaVersion(configuration.configSchemaVersion)
+        }
+        guard configuration.configSchemaVersion <= currentConfigSchemaVersion else {
+            throw ConfigurationStoreError.unsupportedSchemaVersion(
+                found: configuration.configSchemaVersion,
+                supported: currentConfigSchemaVersion
+            )
+        }
+
+        var migrated = configuration
+        while migrated.configSchemaVersion < currentConfigSchemaVersion {
+            switch migrated.configSchemaVersion {
+            case 0:
+                migrated.configSchemaVersion = 1
+            default:
+                throw ConfigurationStoreError.invalidSchemaVersion(
+                    migrated.configSchemaVersion
+                )
+            }
+        }
+        return migrated
     }
 
     static func migratingIndependentPaths(
@@ -111,6 +221,7 @@ final class ConfigurationStore {
     }
 
     func save(_ configuration: AppConfiguration) throws {
+        let configuration = try Self.migratingSchema(in: configuration)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         let data = try encoder.encode(configuration)

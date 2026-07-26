@@ -4,12 +4,19 @@ import Security
 
 final class LocalHTTPProxy: @unchecked Sendable {
     private let queue = DispatchQueue(label: "app.herdme.http-proxy", qos: .userInitiated)
+    private let sessionsLock = NSLock()
+    private let routesLock = NSLock()
     private var listener: NWListener?
     private var sessions: [UUID: HTTPProxySession] = [:]
     private var routes: [String: Int] = [:]
     private(set) var port: Int?
 
     var isRunning: Bool { listener != nil }
+
+    var isHealthy: Bool {
+        guard listener != nil, let port else { return false }
+        return LocalEnvironmentEngine.canConnect(port: port)
+    }
 
     func start(
         routes: [String: Int],
@@ -18,7 +25,7 @@ final class LocalHTTPProxy: @unchecked Sendable {
         fallbackPort: Int = 8_080
     ) throws -> Int {
         if let port, listener != nil {
-            self.routes = Self.normalized(routes)
+            replaceRoutes(with: routes)
             return port
         }
 
@@ -34,7 +41,7 @@ final class LocalHTTPProxy: @unchecked Sendable {
             throw LocalEnvironmentError.noAvailablePort
         }
 
-        self.routes = Self.normalized(routes)
+        replaceRoutes(with: routes)
         let isSecure = identity != nil
         let parameters: NWParameters
         if let identity {
@@ -60,10 +67,12 @@ final class LocalHTTPProxy: @unchecked Sendable {
             let session = HTTPProxySession(
                 incoming: connection,
                 secure: isSecure,
-                route: { [weak self] host in self?.routes[host] },
+                route: { [weak self] host in self?.route(for: host) },
                 onStop: { [weak self] in self?.removeSession(id) }
             )
+            self.sessionsLock.lock()
             self.sessions[id] = session
+            self.sessionsLock.unlock()
             session.start()
         }
         listener.stateUpdateHandler = { state in
@@ -78,20 +87,40 @@ final class LocalHTTPProxy: @unchecked Sendable {
     }
 
     func update(routes: [String: Int]) {
-        queue.async { [weak self] in self?.routes = Self.normalized(routes) }
+        queue.async { [weak self] in self?.replaceRoutes(with: routes) }
     }
 
     func stop() {
         listener?.cancel()
         listener = nil
-        sessions.values.forEach { $0.stop() }
+        sessionsLock.lock()
+        let activeSessions = Array(sessions.values)
         sessions.removeAll()
+        sessionsLock.unlock()
+        activeSessions.forEach { $0.stop() }
+        routesLock.lock()
         routes.removeAll()
+        routesLock.unlock()
         port = nil
     }
 
     private func removeSession(_ id: UUID) {
-        queue.async { [weak self] in self?.sessions[id] = nil }
+        sessionsLock.lock()
+        sessions.removeValue(forKey: id)
+        sessionsLock.unlock()
+    }
+
+    private func route(for host: String) -> Int? {
+        routesLock.lock()
+        defer { routesLock.unlock() }
+        return routes[host]
+    }
+
+    private func replaceRoutes(with routes: [String: Int]) {
+        let normalized = Self.normalized(routes)
+        routesLock.lock()
+        self.routes = normalized
+        routesLock.unlock()
     }
 
     nonisolated static func host(in request: Data) -> String? {

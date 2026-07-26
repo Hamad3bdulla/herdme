@@ -53,6 +53,7 @@ struct DumpsView: View {
                             .buttonStyle(.borderless)
                             .disabled(model.dumps.isEmpty)
                             .help("Delete all dumps")
+                            .accessibilityLabel("Delete all dumps")
                         }
                         .padding(.bottom, 8)
 

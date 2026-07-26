@@ -36,6 +36,7 @@ public sealed class PhpFastCgiProcess : IAsyncDisposable
         var logDirectory = Path.Combine(supportPath, "Log", "fastcgi");
         Directory.CreateDirectory(logDirectory);
         logPath = Path.Combine(logDirectory, $"php-{contract.Settings.PhpCycle}.log");
+        BoundedLog.RotateIfNeeded(logPath);
 
         var startInfo = new ProcessStartInfo
         {
@@ -113,7 +114,7 @@ public sealed class PhpFastCgiProcess : IAsyncDisposable
         if (eventArgs.Data is null || logPath is null) return;
         try
         {
-            File.AppendAllText(logPath, $"[{DateTimeOffset.Now:O}] {eventArgs.Data}{Environment.NewLine}");
+            BoundedLog.AppendLine(logPath, $"[{DateTimeOffset.Now:O}] {eventArgs.Data}");
         }
         catch (IOException)
         {

@@ -61,75 +61,148 @@ public sealed partial class LaravelProjectCreator
         await tools.EnsureLaravelInstallerAsync(settings.PhpCycle, cancellationToken);
         var php = phpInstaller.PhpExecutable(settings.PhpCycle);
         var arguments = BuildLaravelArguments(request with { Name = name });
-        progress?.Report(LaravelProjectCreationStage.CreatingLaravelProject);
-        await ComposerToolManager.RunAsync(
-            php,
-            [tools.LaravelExecutable, .. arguments],
-            parent,
-            tools.ManagedEnvironment(settings.PhpCycle),
-            cancellationToken
-        );
-
-        if (request.InstallBoost)
+        var stagingRoot = Path.Combine(parent, $".herdme-create-{Guid.NewGuid():N}");
+        var stagedDestination = Path.Combine(stagingRoot, name);
+        Directory.CreateDirectory(stagingRoot);
+        File.SetAttributes(stagingRoot, File.GetAttributes(stagingRoot) | FileAttributes.Hidden);
+        try
         {
-            progress?.Report(LaravelProjectCreationStage.InstallingLaravelBoost);
+            progress?.Report(LaravelProjectCreationStage.CreatingLaravelProject);
             await ComposerToolManager.RunAsync(
                 php,
-                [
-                    tools.ComposerPath,
-                    "require", "laravel/boost", "--dev",
-                    "--no-interaction", "--no-progress", "--no-ansi"
-                ],
-                destination,
-                tools.ManagedEnvironment(settings.PhpCycle),
-                cancellationToken
-            );
-        }
-        if (LaravelProjectCreationStages.RequiresFrontendAssets(request))
-        {
-            progress?.Report(LaravelProjectCreationStage.PreparingNodeRuntime);
-            var nodeDirectory = await nodeInstaller.EnsureActiveRuntimeAsync("22", cancellationToken);
-            var npm = Path.Combine(nodeDirectory, "npm.cmd");
-            ValidateFrontendBuild(destination);
-
-            progress?.Report(LaravelProjectCreationStage.InstallingFrontendDependencies);
-            await ComposerToolManager.RunAsync(
-                npm,
-                ["install", "--no-audit", "--no-fund", "--no-progress"],
-                destination,
+                [tools.LaravelExecutable, .. arguments],
+                stagingRoot,
                 tools.ManagedEnvironment(settings.PhpCycle),
                 cancellationToken
             );
 
-            progress?.Report(LaravelProjectCreationStage.BuildingFrontendAssets);
-            await ComposerToolManager.RunAsync(
-                npm,
-                ["run", "build"],
-                destination,
-                tools.ManagedEnvironment(settings.PhpCycle),
-                cancellationToken
-            );
+            if (request.InstallBoost)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(LaravelProjectCreationStage.InstallingLaravelBoost);
+                await ComposerToolManager.RunAsync(
+                    php,
+                    [
+                        tools.ComposerPath,
+                        "require", "laravel/boost", "--dev",
+                        "--no-interaction", "--no-progress", "--no-ansi"
+                    ],
+                    stagedDestination,
+                    tools.ManagedEnvironment(settings.PhpCycle),
+                    cancellationToken
+                );
+            }
+            if (LaravelProjectCreationStages.RequiresFrontendAssets(request))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(LaravelProjectCreationStage.PreparingNodeRuntime);
+                var nodeDirectory = await nodeInstaller.EnsureActiveRuntimeAsync("22", cancellationToken);
+                var npm = Path.Combine(nodeDirectory, "npm.cmd");
+                ValidateFrontendBuild(stagedDestination);
+
+                progress?.Report(LaravelProjectCreationStage.InstallingFrontendDependencies);
+                await ComposerToolManager.RunAsync(
+                    npm,
+                    ["install", "--no-audit", "--no-fund", "--no-progress"],
+                    stagedDestination,
+                    tools.ManagedEnvironment(settings.PhpCycle),
+                    cancellationToken
+                );
+
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(LaravelProjectCreationStage.BuildingFrontendAssets);
+                await ComposerToolManager.RunAsync(
+                    npm,
+                    ["run", "build"],
+                    stagedDestination,
+                    tools.ManagedEnvironment(settings.PhpCycle),
+                    cancellationToken
+                );
+            }
+            if (request.InitializeGit)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(LaravelProjectCreationStage.InitializingGitRepository);
+                await ComposerToolManager.RunAsync(
+                    "git.exe",
+                    ["init"],
+                    stagedDestination,
+                    tools.ManagedEnvironment(settings.PhpCycle),
+                    cancellationToken
+                );
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(LaravelProjectCreationStage.VerifyingProject);
+            if (!File.Exists(Path.Combine(stagedDestination, "artisan"))
+                || !File.Exists(Path.Combine(stagedDestination, "vendor", "autoload.php"))
+                || LaravelProjectCreationStages.RequiresFrontendAssets(request)
+                    && !File.Exists(Path.Combine(stagedDestination, "public", "build", "manifest.json")))
+            {
+                throw new InvalidDataException("Laravel Installer finished without creating a complete Laravel project.");
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Directory.Exists(destination) || File.Exists(destination))
+            {
+                throw new IOException("A file or folder with this project name already exists.");
+            }
+            Directory.Move(stagedDestination, destination);
+            return destination;
         }
-        if (request.InitializeGit)
+        finally
         {
-            progress?.Report(LaravelProjectCreationStage.InitializingGitRepository);
-            await ComposerToolManager.RunAsync(
-                "git.exe",
-                ["init"],
-                destination,
-                tools.ManagedEnvironment(settings.PhpCycle),
-                cancellationToken
-            );
+            DeleteStagingDirectory(stagingRoot);
         }
-        progress?.Report(LaravelProjectCreationStage.VerifyingProject);
-        if (!File.Exists(Path.Combine(destination, "artisan"))
-            || !File.Exists(Path.Combine(destination, "vendor", "autoload.php"))
-            || LaravelProjectCreationStages.RequiresFrontendAssets(request)
-                && !File.Exists(Path.Combine(destination, "public", "build", "manifest.json")))
+    }
+
+    internal static void DeleteStagingDirectory(string stagingRoot)
+    {
+        if (!Directory.Exists(stagingRoot)) return;
+        for (var attempt = 1; attempt <= 3; attempt++)
         {
-            throw new InvalidDataException("Laravel Installer finished without creating a complete Laravel project.");
+            try
+            {
+                ClearReadOnlyAttributes(stagingRoot);
+                Directory.Delete(stagingRoot, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < 3)
+            {
+                Thread.Sleep(100 * attempt);
+            }
+            catch (UnauthorizedAccessException) when (attempt < 3)
+            {
+                Thread.Sleep(100 * attempt);
+            }
         }
-        return destination;
+        Directory.Delete(stagingRoot, recursive: true);
+    }
+
+    private static void ClearReadOnlyAttributes(string root)
+    {
+        var pending = new Stack<string>();
+        pending.Push(root);
+        while (pending.TryPop(out var directory))
+        {
+            foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
+            {
+                var attributes = File.GetAttributes(entry);
+                if ((attributes & FileAttributes.ReadOnly) != 0)
+                {
+                    File.SetAttributes(entry, attributes & ~FileAttributes.ReadOnly);
+                    attributes &= ~FileAttributes.ReadOnly;
+                }
+                if ((attributes & FileAttributes.Directory) != 0
+                    && (attributes & FileAttributes.ReparsePoint) == 0)
+                {
+                    pending.Push(entry);
+                }
+            }
+            var directoryAttributes = File.GetAttributes(directory);
+            if ((directoryAttributes & FileAttributes.ReadOnly) != 0)
+            {
+                File.SetAttributes(directory, directoryAttributes & ~FileAttributes.ReadOnly);
+            }
+        }
     }
 
     public static IReadOnlyList<string> BuildLaravelArguments(LaravelProjectRequest request)

@@ -8,11 +8,18 @@
     <Grid Padding="32" RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid>
             <TextBlock Text="Logs" Style="{StaticResource TitleTextBlockStyle}" />
             <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                <ComboBox
+                    x:Name="SourceBox"
+                    Width="190"
+                    ItemsSource="{x:Bind Sources}"
+                    DisplayMemberPath="Name"
+                    SelectionChanged="SourceBox_SelectionChanged" />
                 <ToggleSwitch
                     x:Name="LiveRefreshToggle"
                     IsOn="True"
@@ -31,7 +38,14 @@
                 </Button>
             </StackPanel>
         </Grid>
-        <Grid Grid.Row="1" ColumnSpacing="16">
+        <InfoBar
+            x:Name="SourceWarning"
+            Grid.Row="1"
+            IsOpen="False"
+            IsClosable="True"
+            Severity="Warning"
+            Message="Some log sources could not be loaded. HerdMe application logs remain available." />
+        <Grid Grid.Row="2" ColumnSpacing="16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="300" />
                 <ColumnDefinition Width="*" />

@@ -32,7 +32,7 @@ struct PageContainer<Content: View>: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text(title)
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.title.weight(.semibold))
                 content
             }
             .padding(.horizontal, 24)
@@ -59,10 +59,10 @@ struct SettingRow<Content: View>: View {
         HStack(alignment: detail == nil ? .center : .top, spacing: 16) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 14))
+                    .font(.body)
                 if let detail {
                     Text(detail)
-                        .font(.system(size: 12))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }

@@ -8,6 +8,10 @@ public sealed record MailMimeContent(string? PlainText = null, string? Html = nu
 
 public static partial class MailMimeParser
 {
+    private const int MaximumPreviewCharacters = 4 * 1_024 * 1_024;
+    private const string PreviewStyle = "body{font:14px system-ui;margin:18px;line-height:1.45;overflow-wrap:anywhere}img{max-width:100%;height:auto}pre{white-space:pre-wrap}";
+    private const string PreviewStyleHash = "48hOXKVM1rwpXip/9XRIr0XijcrNP/RHiD+a7aSGrzg=";
+
     public static MailMimeContent Parse(string raw) => ParsePart(raw.Replace("\r\n", "\n"));
 
     public static string DecodeHeader(string value)
@@ -32,12 +36,22 @@ public static partial class MailMimeParser
 
     public static string SafeHtmlDocument(string html)
     {
-        const string policy = "default-src 'none'; img-src data: cid:; style-src 'unsafe-inline'; font-src data:";
+        const string policy = "default-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; object-src 'none'; img-src data: cid:; font-src 'none'; style-src 'sha256-" + PreviewStyleHash + "'; sandbox";
+        var preview = html.Length <= MaximumPreviewCharacters
+            ? html
+            : html[..MaximumPreviewCharacters] + "<p>[Preview truncated]</p>";
         return "<!doctype html><html><head><meta charset=\"utf-8\">"
             + $"<meta http-equiv=\"Content-Security-Policy\" content=\"{policy}\">"
             + "<meta name=\"color-scheme\" content=\"light dark\">"
-            + "<style>body{font:14px Segoe UI;margin:18px;line-height:1.45;overflow-wrap:anywhere}img{max-width:100%;height:auto}</style>"
-            + "</head><body>" + html + "</body></html>";
+            + "<style>" + PreviewStyle + "</style>"
+            + "</head><body>" + preview + "</body></html>";
+    }
+
+    public static bool IsPreviewNavigationAllowed(string? uri)
+    {
+        return uri is not null
+            && (uri.Equals("about:blank", StringComparison.OrdinalIgnoreCase)
+                || uri.StartsWith("about:blank#", StringComparison.OrdinalIgnoreCase));
     }
 
     private static MailMimeContent ParsePart(string raw)

@@ -18,7 +18,7 @@ public sealed record XdebugWindowsRelease(
 
 public sealed class XdebugManager
 {
-    private static readonly HttpClient HttpClient = CreateHttpClient();
+    private static readonly HttpClient HttpClient = ManagedDownloadClient.Create();
 
     public string ExtensionPath(string phpCycle)
     {
@@ -255,13 +255,6 @@ public sealed class XdebugManager
         await using var input = entry.Open();
         await using var output = File.Create(destination);
         await input.CopyToAsync(output, cancellationToken);
-    }
-
-    private static HttpClient CreateHttpClient()
-    {
-        var client = new HttpClient();
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("HerdMe/1.0 (+https://github.com/herdme)");
-        return client;
     }
 
     private static bool IsVersion(string value)

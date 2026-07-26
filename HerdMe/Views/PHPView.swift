@@ -19,7 +19,7 @@ struct PHPView: View {
                     }
                     .padding(.horizontal, 8)
 
-                    ForEach(model.phpVersions) { runtime in
+                    ForEach(Array(model.phpVersions.enumerated()), id: \.element.id) { index, runtime in
                         HStack {
                             Text(runtime.installedVersion.map { "\(runtime.cycle) (\($0))" } ?? runtime.cycle)
                             Spacer()
@@ -48,7 +48,7 @@ struct PHPView: View {
                         }
                         .padding(.horizontal, 8)
                         .frame(height: 32)
-                        .background(runtime.cycle.hashValue.isMultiple(of: 2) ? Color.primary.opacity(0.04) : Color.clear)
+                        .background(index.isMultiple(of: 2) ? Color.primary.opacity(0.04) : Color.clear)
                     }
                 }
             }

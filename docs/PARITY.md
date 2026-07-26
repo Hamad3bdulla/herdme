@@ -11,19 +11,20 @@ will not be implemented.
 | Layer | macOS | Windows |
 | --- | --- | --- |
 | Native shell | SwiftUI | WinUI 3 |
-| Shared domain model | C++20 core and JSON contracts | Same C++20 core and JSON contracts |
+| Domain contracts | Native Swift implementations checked against shared behavioral fixtures | C++20 core JSON CLI plus native C# adapters |
 | Application data | `~/Library/Application Support/HerdMe` | `%LOCALAPPDATA%\HerdMe` |
 | Process control | Foundation `Process` adapter | Win32 process and Job Object adapter |
 | HTTP/HTTPS | Network.framework adapter | `TcpListener`, `SslStream`, and FastCGI adapters |
 | PHP request engine | PHP-FPM and FastCGI gateway | Official `php-cgi.exe -b` and native FastCGI gateway |
 | Local CA trust | Security.framework and Keychain | Windows Certificate Store |
 | Local domains | HerdMe-owned loopback DNS and standard-port helper | Windows DNS/hosts platform adapter |
-| Packaging | Local ZIP/DMG; signing and notarization planned | x64 portable ZIP; signing and installer planned |
+| Packaging | Local ZIP/DMG plus gated Developer ID/notarization mode | x64 portable ZIP and per-user Setup executable plus gated Authenticode mode |
 
-Platform UI and privileged operations stay native. Scanning, configuration
-contracts, domain normalization, runtime metadata, route tables, health checks,
-and service definitions move into the portable core so macOS and Windows expose
-the same behavior.
+Platform UI and privileged operations stay native. The portable core is the
+Windows contract backend today; macOS implements the same selected behavior in
+Swift. Shared fixtures are the compatibility gate for duplicated pure logic,
+starting with Laravel PHP-extension inspection. More logic may move into the
+core only behind a stable C ABI or versioned JSON contract.
 
 ## Parity matrix
 
@@ -39,17 +40,17 @@ the same behavior.
 | Laravel PHP extension validation | Implemented | Enforced by launch policy and PHP page | Verify against managed PHP on Windows |
 | Node runtime management | Functional | Official ZIP packages and checksum validation implemented | Verify installed binaries on Windows hardware |
 | Per-site PHP and Node selection | Implemented | Override files and per-PHP FastCGI routing implemented | Verify mixed-version sites on Windows hardware |
-| HTTP host routing | Implemented | GET, POST, static, front-controller, and chunked requests implemented | Browser test on Windows hardware |
-| PHP FastCGI serving | PHP-FPM, implemented and Laravel-tested | `php-cgi.exe -b`, implemented in isolation | Run Laravel 13 against official Windows PHP |
+| HTTP host routing | GET, POST, streamed static GET/HEAD with byte ranges, front-controller, chunked requests, and symlink containment implemented | Equivalent bounded static streaming, single-range responses, and symlink/junction containment with final-handle verification implemented | Browser and junction test on Windows hardware |
+| PHP FastCGI serving | PHP-FPM, progressively streamed and Laravel-tested | `php-cgi.exe -b`, progressively streamed and protocol-tested | Run Laravel 13 against official Windows PHP |
 | HTTPS and local CA | Implemented | `SslStream` and independent Windows certificate-store CA implemented | Verify trust prompts on Windows hardware |
 | Local DNS | Implemented | Isolated hosts block with backup and console-free self-elevating helper implemented | Verify elevation flow on Windows hardware |
 | SMTP capture and inbox | MIME text/HTML preview implemented and tested | MIME text/HTML preview implemented and protocol-tested | Visual verification on Windows hardware |
 | VarDumper capture | Implemented | Implemented and parser-tested | Visual verification on Windows hardware |
-| Managed service lifecycle | MariaDB, MySQL, PostgreSQL, MongoDB, Redis, Valkey, Meilisearch, Typesense, MinIO, plus RustFS on arm64; automatic installation, Homebrew-backed update detection, current-version update hiding, per-service automatic startup, live storage-console actions, verified process recovery after an interrupted app exit, and safe MySQL/MariaDB install or upgrade conflict recovery | MariaDB, MySQL, PostgreSQL, MongoDB, Redis, Meilisearch, MinIO, and RustFS implemented with published or release-pinned checksums, automatic installation, current-version update hiding, per-service automatic startup, and live storage-console actions. Valkey and Typesense are visible but disabled with an explicit reason because their official releases publish no native Windows assets. | Resolve vetted native Valkey/Typesense builds and run every service on Windows hardware |
-| Logs | Implemented | HerdMe-owned live log reader with search implemented | Visual verification on Windows hardware |
+| Managed service lifecycle | MariaDB, MySQL, PostgreSQL, MongoDB, Redis, Valkey, Meilisearch, Typesense, MinIO, plus RustFS on arm64; automatic installation, update detection, current-version update hiding, automatic startup, storage consoles, process recovery, MySQL/MariaDB package-conflict recovery, and verified per-instance database authentication | MariaDB, MySQL, PostgreSQL, MongoDB, Redis, Meilisearch, MinIO, and RustFS implemented with verified packages, automatic installation/update, automatic startup, storage consoles, and equivalent database authentication/migration contracts. Valkey and Typesense remain disabled because upstream publishes no native Windows assets. | Run authentication migration and every service on Windows hardware; resolve vetted Valkey/Typesense builds |
+| Logs | HerdMe and per-site Laravel logs with search and Follow mode implemented | Equivalent source picker, direct site navigation, search, and live refresh implemented | Visual verification on Windows hardware |
 | Xdebug | Installed, configured, and FPM-tested | Isolated installer, settings, site selection, and trigger URL implemented | Connect and test with `php-cgi.exe` on Windows |
 | Launch at login | Implemented | HKCU background startup and saved-site restore implemented | Verify sign-in behavior on Windows hardware |
-| Updates and packaging | Stable/beta checks plus local ZIP/DMG packaging implemented | Stable/beta checks, portable self-contained ZIP packaging, SHA-256 sidecar, and Windows x64 CI workflow implemented | Run CI, then add signed and notarized release pipelines |
+| Updates and packaging | Stable/beta checks, separate platform artifacts, local packaging, and a Developer ID/notarization gate implemented | Stable/beta checks, separate platform artifacts, portable self-contained ZIP, per-user installer with automated install/uninstall acceptance, Authenticode gate, SHA-256 sidecars, and Windows x64 CI workflow implemented | Supply release certificates and feed URLs, run both public pipelines, then complete native acceptance |
 
 ## Delivery order
 
@@ -59,8 +60,8 @@ the same behavior.
    Typesense without substituting an untrusted third-party binary.
 3. Run the cross-platform behavioral and visual parity checklist and close any
    differences within the selected 99% scope.
-4. Add signed and notarized macOS packaging plus signed Windows packaging after
-   the behavior target passes.
+4. Run the implemented Developer ID/notarization and Authenticode modes with
+   release credentials after the behavior target passes.
 
 ## 99% acceptance target
 
@@ -88,9 +89,12 @@ before the 99% acceptance target can be declared complete.
 
 ## Current validation snapshot
 
-On July 25, 2026, the macOS Swift 6 suite executed 78 tests: 77 passed with zero
-failures, and the optional live Laravel-project test was skipped in the default
-run. A separate live gate created Laravel 13.22.0 with the React starter kit
+On July 26, 2026, the macOS Swift 6 suite executed 151 tests: 149 passed with zero
+failures, and the optional live Laravel-project and database-authentication tests were skipped in the default
+run. Both optional tests were then enabled and passed: HerdMe copied and served
+an existing Laravel application through PHP-FPM and trusted HTTPS, and an
+isolated temporary instance of the installed MySQL runtime accepted the managed
+credential while rejecting passwordless access. A separate live gate created Laravel 13.22.0 with the React starter kit
 through HerdMe's managed installer, restored its npm dependencies, built and
 verified its production Vite manifest, and served dynamic HTTP, a static asset,
 and trusted-metadata HTTPS through PHP-FPM. The suite includes an installed PHP 8.4
@@ -100,6 +104,28 @@ PHP version detection, application and PHP update selection, Homebrew service
 update detection, service install/upgrade conflict recovery, service descriptors,
 persisted service-process recovery with stale-PID rejection, and the
 single-instance file lock.
+The same suite also passed under AddressSanitizer plus Undefined
+Behavior Sanitizer and, separately, under ThreadSanitizer. The portable Core
+tests passed under AddressSanitizer plus Undefined Behavior Sanitizer, while
+Xcode static analysis and Clang analysis of the network helper completed cleanly.
+These checks now run in the macOS `deep-diagnostics` CI job.
+Mail startup loads a bounded metadata index instead of decoding every stored
+body, HTML preview, and raw payload; the selected message is loaded on demand.
+Legacy captures rebuild the index automatically without changing message files.
+PHP-FPM capacity now scales from 4 to 32 children using the machine's logical
+processor count instead of applying the same fixed ceiling to every Mac.
+The Sites UI now reports HTTPS only when its listener is actually active; a
+trusted certificate without Keychain approval is shown as HTTP-only instead of
+displaying a misleading lock. Opening a stopped or newly discovered site starts
+or resynchronizes the local environment before launching the browser, and a
+failed transition recovers from `Starting` to an actionable stopped/conflict
+state instead of remaining stuck.
+Swift, portable C++, and both Windows C# projects now treat compiler warnings as
+errors. The final forced-crash decoder path in the macOS site preview was
+replaced with a real initializer. A universal local Release package passed
+signature, archive, disk-image, checksum, version, and architecture validation;
+the exact app installed under `/Applications` then returned `200` for
+`lllkkk.test` over HTTP and trusted HTTPS without an exposed port.
 Project creation has real process-backed fixtures that verify its visible
 Laravel, Boost, Node.js, npm, Vite, Git, and project-verification stages, the
 resulting Git repository, and the generated Vite manifest. Incomplete Laravel
@@ -108,6 +134,27 @@ macOS and Windows creation views now keep the complete stage list and failure
 detail visible until the user closes the result.
 Custom starter kits accept a validated `vendor/package` Composer identifier and
 use Laravel Installer's official `--using` option on both platforms.
+The Logs page on both platforms discovers every Laravel project's `storage/logs`
+directory, preserves direct navigation from the selected site, supports source
+switching and search, and follows files without creating or modifying project
+directories.
+Every managed service exposes an `Add to .env` action on macOS and Windows. The
+user selects a discovered site, and HerdMe creates `.env` from `.env.example`
+when needed or updates the matching connection variables in place while
+preserving comments and line endings. The contract suite verifies every catalog
+service has a mapping and that repeated updates do not append duplicate keys.
+Database, storage, and Typesense credentials are unique per service instance and
+persist in Keychain on macOS or Windows Credential Manager. MySQL, MariaDB, and
+PostgreSQL use that same credential in the engine, `.env`, and TablePlus.
+PostgreSQL starts with SCRAM; older trust/passwordless clusters migrate with an
+atomic marker and restore their access file if verification fails. A live macOS
+gate starts installed MySQL and MariaDB builds and proves that managed login
+succeeds and passwordless login fails.
+Certificate secrets follow the same platform boundary: macOS prefers Data
+Protection Keychain for its CA key and random identity password, falls back to
+the login Keychain for ad-hoc builds missing the entitlement, and migrates the
+fallback after a protected write succeeds. Windows migrates PFX passwords
+to Credential Manager and imports private keys with ephemeral key storage.
 The application also migrates legacy park-path references away from another
 application's project and private data folders, rejects new roots, links, or
 project creation under those paths, and ignores symbolic links that resolve
@@ -120,12 +167,15 @@ scannable.
 Apple Silicon tests and Intel builds pass. Native visual checks confirm real
 HTTP content in the site preview, start/stop, Logs, the Dock/About icon,
 Mail/Dumps listeners, and rejection of a forced second process. Certificate
-trust and resolver installation now use native Authorization Services without
-opening Terminal or requesting Apple Events permission; password-based
-completion remains a manual check. The local network helper carries a stable
-HerdMe identifier, associates its launch service with `app.herdme.desktop`,
-detects installed-helper updates, and waits for launchd readiness before the UI
-reports setup success. Automatic listener and site
+trust now uses Security.framework in the user trust domain, and the
+resolver/standard-port helper is registered through `SMAppService` without a
+Terminal, Apple Events, or a generic privileged command runner. The local
+network helper carries a stable HerdMe identifier, associates its launch service
+with `app.herdme.desktop`, rolls back to a preserved legacy service if migration
+cannot acquire every listener, detects installed-helper updates, and waits for
+the modern launchd job to be running before the UI reports setup success. Live
+acceptance still requires a notarized Developer ID build on a clean Mac.
+Automatic listener and site
 environment failures are written to `app.log`, while managed-service failures
 are written to the service log, without blocking the main window.
 
@@ -141,18 +191,20 @@ endpoint now use locale-independent, ungrouped digits such as `9003` instead of
 `9,003`.
 
 The portable C++20 tests, expanded Windows C# service-contract fixtures, and all
-13 WinUI XAML XML checks also pass on macOS. The contract project now compiles
+13 WinUI XAML XML checks also pass on macOS. The C# contracts were rerun with a
+locally isolated .NET 8.0.423 SDK and `TreatWarningsAsErrors`. The contract project now compiles
 every non-UI Windows model and service and runs the local HTTP server against
-static GET/HEAD, host isolation, method rejection, and encoded traversal in
+streamed 2MB static GET/HEAD, single byte ranges with `206/416`, host isolation,
+method rejection, and encoded traversal in
 origin-form and absolute-form targets. It also cross-publishes as a
 self-contained PE32+ x86-64 executable. Windows is explicitly x64-only, and its
 contracts cover the selected-site Debug Session URL. Local macOS ZIP/DMG and
-Windows portable ZIP scripts are present. A Windows x64 CI workflow runs the
-native package gate and uploads the ZIP plus SHA-256 sidecar after the repository
-is pushed. A complete WinUI build cannot be produced on macOS: the Windows App
+Windows portable ZIP and Setup scripts are present. A Windows x64 CI workflow
+runs the native package gate, validates installation/removal, and uploads both
+artifacts plus SHA-256 sidecars after the repository is pushed. A complete WinUI build cannot be produced on macOS: the Windows App
 SDK executable compiler cannot run there, while its managed compiler ultimately
 requires `kernel32.dll`. Final Windows execution, the first CI artifact, signing,
-and release packaging remain outstanding acceptance gates.
+and the first signed release remain outstanding acceptance gates.
 
 The optional live Windows release-source probe currently resolves and reaches
 MariaDB 11.8.8, MySQL 9.7.1, PostgreSQL 18.4, MongoDB 8.0.28, Redis 8.8.1,
@@ -169,7 +221,8 @@ only the expected DLL, and rejects archive traversal entries.
 The Windows service-contract fixtures use real loopback protocol sessions for
 SMTP, VarDumper, and FastCGI. They verify persisted mail and dumps, PHP
 serialization, FastCGI parameters and stdout/stderr, request-body chunking above
-65,535 bytes, isolated hosts-file rendering, per-site PHP/Node overrides, and
+65,535 bytes, progressive stdout delivery before `END_REQUEST`, hop-by-hop header
+removal, isolated hosts-file rendering, per-site PHP/Node overrides, and
 stable/beta update selection without writing to `%LOCALAPPDATA%`. Redis for
 Windows release selection, published SHA-256 validation, and its persistent
 loopback-only launch contract are covered as well. MySQL contracts cover its

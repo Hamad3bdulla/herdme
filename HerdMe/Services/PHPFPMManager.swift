@@ -24,13 +24,14 @@ final class PHPFPMManager: @unchecked Sendable {
 
     private let rootURL: URL
     private let fileManager: FileManager
+    private let operationGate = AsyncOperationGate()
     private let lock = NSLock()
     private var runtimes: [String: Runtime] = [:]
+    private var didCleanStaleProcesses = false
 
     init(rootURL: URL, fileManager: FileManager = .default) {
         self.rootURL = rootURL
         self.fileManager = fileManager
-        cleanupStaleProcesses()
     }
 
     var isRunning: Bool {
@@ -39,24 +40,53 @@ final class PHPFPMManager: @unchecked Sendable {
         return runtimes.values.contains(where: { $0.process.isRunning })
     }
 
+    var isHealthy: Bool {
+        lock.lock()
+        let active = Array(runtimes.values)
+        lock.unlock()
+        return !active.isEmpty && active.allSatisfy {
+            $0.process.isRunning && Self.canConnect(port: $0.port)
+        }
+    }
+
     func start(
         executable: URL,
         identifier: String,
         preferredPort: Int,
         phpOptions: [String: String] = [:]
-    ) throws -> Int {
+    ) async throws -> Int {
+        await operationGate.acquire()
+        do {
+            let port = try await startManaged(
+                executable: executable,
+                identifier: identifier,
+                preferredPort: preferredPort,
+                phpOptions: phpOptions
+            )
+            await operationGate.release()
+            return port
+        } catch {
+            await operationGate.release()
+            throw error
+        }
+    }
+
+    private func startManaged(
+        executable: URL,
+        identifier: String,
+        preferredPort: Int,
+        phpOptions: [String: String]
+    ) async throws -> Int {
+        try Task.checkCancellation()
+        await prepareForStart()
+
         guard fileManager.isExecutableFile(atPath: executable.path) else {
             throw PHPFPMError.executableMissing
         }
 
         let key = Self.safeName(identifier)
-        lock.lock()
-        if let runtime = runtimes[key], runtime.process.isRunning {
-            lock.unlock()
-            return runtime.port
-        }
-        let stale = runtimes.removeValue(forKey: key)
-        lock.unlock()
+        let (activePort, stale) = takeRuntimeForStart(key: key)
+        if let activePort { return activePort }
         try? stale?.outputHandle.close()
 
         guard let port = LocalEnvironmentEngine.availablePort(startingAt: preferredPort) else {
@@ -78,6 +108,11 @@ final class PHPFPMManager: @unchecked Sendable {
         let pidURL = configurationDirectory.appendingPathComponent("\(key).pid")
         let errorLogURL = logDirectory.appendingPathComponent("\(key).log")
         let outputLogURL = logDirectory.appendingPathComponent("\(key)-output.log")
+        try LogRotation.rotateIfNeeded(errorLogURL)
+        try LogRotation.rotateIfNeeded(outputLogURL)
+        if let xdebugLog = phpOptions["xdebug.log"] {
+            try LogRotation.rotateIfNeeded(URL(fileURLWithPath: xdebugLog))
+        }
         let configuration = Self.configuration(
             port: port,
             pidURL: pidURL,
@@ -109,47 +144,82 @@ final class PHPFPMManager: @unchecked Sendable {
 
         do {
             try process.run()
-            for _ in 0..<150 {
-                if Self.canConnect(port: port) { break }
-                if !process.isRunning { break }
-                usleep(20_000)
-            }
-            guard process.isRunning, Self.canConnect(port: port) else {
-                if process.isRunning { process.terminate() }
+            let ready = try await waitUntilReady(process: process, port: port)
+            guard ready else {
+                await AsyncProcessLifecycle.terminate(process)
                 try? outputHandle.close()
                 throw PHPFPMError.startupFailed(outputLogURL.path)
             }
         } catch {
-            if process.isRunning { process.terminate() }
+            await AsyncProcessLifecycle.terminate(process)
             try? outputHandle.close()
             throw error
         }
 
-        lock.lock()
-        runtimes[key] = Runtime(process: process, outputHandle: outputHandle, port: port)
-        lock.unlock()
+        store(Runtime(process: process, outputHandle: outputHandle, port: port), forKey: key)
         return port
     }
 
-    func stopAll() {
-        lock.lock()
-        let active = Array(runtimes.values)
-        runtimes.removeAll()
-        lock.unlock()
+    func stopAll() async {
+        await operationGate.acquire()
+        let active = takeAllRuntimes()
 
         for runtime in active {
-            if runtime.process.isRunning {
-                runtime.process.terminate()
-                for _ in 0..<80 where runtime.process.isRunning { usleep(25_000) }
-                if runtime.process.isRunning {
-                    Darwin.kill(runtime.process.processIdentifier, SIGKILL)
-                }
-            }
+            await AsyncProcessLifecycle.terminate(runtime.process, gracePeriod: 2)
+            try? runtime.outputHandle.close()
+        }
+        await operationGate.release()
+    }
+
+    func stopAllImmediately() {
+        let active = takeAllRuntimes()
+        for runtime in active {
+            AsyncProcessLifecycle.terminateImmediately(runtime.process)
             try? runtime.outputHandle.close()
         }
     }
 
-    private func cleanupStaleProcesses() {
+    private func waitUntilReady(process: Process, port: Int) async throws -> Bool {
+        let deadline = ProcessInfo.processInfo.systemUptime + 3
+        while process.isRunning {
+            try Task.checkCancellation()
+            if Self.canConnect(port: port) { return true }
+            if ProcessInfo.processInfo.systemUptime >= deadline { return false }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        return false
+    }
+
+    private func takeRuntimeForStart(key: String) -> (activePort: Int?, stale: Runtime?) {
+        lock.lock()
+        defer { lock.unlock() }
+        if let runtime = runtimes[key], runtime.process.isRunning {
+            return (runtime.port, nil)
+        }
+        return (nil, runtimes.removeValue(forKey: key))
+    }
+
+    private func store(_ runtime: Runtime, forKey key: String) {
+        lock.lock()
+        runtimes[key] = runtime
+        lock.unlock()
+    }
+
+    private func takeAllRuntimes() -> [Runtime] {
+        lock.lock()
+        defer { lock.unlock() }
+        let active = Array(runtimes.values)
+        runtimes.removeAll()
+        return active
+    }
+
+    private func prepareForStart() async {
+        guard !didCleanStaleProcesses else { return }
+        await cleanupStaleProcesses()
+        didCleanStaleProcesses = true
+    }
+
+    private func cleanupStaleProcesses() async {
         let configurationDirectory = rootURL.appendingPathComponent("Runtime/fpm", isDirectory: true)
         let pidFiles = ((try? fileManager.contentsOfDirectory(
             at: configurationDirectory,
@@ -167,9 +237,7 @@ final class PHPFPMManager: @unchecked Sendable {
             guard command.contains(configurationDirectory.path), command.contains("php-fpm") else {
                 continue
             }
-            Darwin.kill(pid, SIGTERM)
-            for _ in 0..<40 where Darwin.kill(pid, 0) == 0 { usleep(25_000) }
-            if Darwin.kill(pid, 0) == 0 { Darwin.kill(pid, SIGKILL) }
+            await AsyncProcessLifecycle.terminate(pid: pid)
         }
     }
 
@@ -186,9 +254,20 @@ final class PHPFPMManager: @unchecked Sendable {
         }
     }
 
-    private static func configuration(port: Int, pidURL: URL, errorLogURL: URL) -> String {
+    static func maximumChildren(logicalProcessorCount: Int) -> Int {
+        let boundedProcessorCount = min(max(logicalProcessorCount, 1), 16)
+        return max(4, boundedProcessorCount * 2)
+    }
+
+    static func configuration(
+        port: Int,
+        pidURL: URL,
+        errorLogURL: URL,
+        logicalProcessorCount: Int = ProcessInfo.processInfo.activeProcessorCount
+    ) -> String {
         let pid = quoted(pidURL.path)
         let errorLog = quoted(errorLogURL.path)
+        let maximumChildren = maximumChildren(logicalProcessorCount: logicalProcessorCount)
         return """
         [global]
         pid = \(pid)
@@ -200,7 +279,7 @@ final class PHPFPMManager: @unchecked Sendable {
         listen = 127.0.0.1:\(port)
         listen.allowed_clients = 127.0.0.1
         pm = dynamic
-        pm.max_children = 12
+        pm.max_children = \(maximumChildren)
         pm.start_servers = 2
         pm.min_spare_servers = 1
         pm.max_spare_servers = 4

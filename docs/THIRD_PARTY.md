@@ -35,6 +35,10 @@ downloaded from the official Node.js release directory and must match the exact
 filename and SHA-256 digest published in that release's `SHASUMS256.txt` before
 they are unpacked. The Composer installer must match Composer's separately
 published SHA-384 signature before it is executed.
+Xdebug source archives for macOS are downloaded from `xdebug.org` only after
+HerdMe extracts the exact release filename and SHA-256 digest published on the
+official download page. The archive digest and every archive path are checked
+before extraction and compilation.
 
 Windows service packages require their published SHA-256 digest when available.
 The MySQL Windows ZIP is the explicit exception: Oracle currently publishes MD5

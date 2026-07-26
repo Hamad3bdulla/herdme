@@ -9,7 +9,11 @@ struct SidebarView: View {
 
             ForEach(SidebarPage.visibleCases) { page in
                 Button {
-                    model.selectedPage = page
+                    if page == .logs {
+                        model.showApplicationLogs()
+                    } else {
+                        model.selectedPage = page
+                    }
                 } label: {
                     HStack(spacing: 9) {
                         ZStack {
@@ -34,6 +38,8 @@ struct SidebarView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(page.rawValue)
+                .accessibilityAddTraits(model.selectedPage == page ? .isSelected : [])
                 .padding(.horizontal, 10)
             }
 
@@ -43,4 +49,3 @@ struct SidebarView: View {
         .background(Color(nsColor: .windowBackgroundColor))
     }
 }
-

@@ -18,6 +18,7 @@ public sealed partial class SitesPage : Page
     private readonly WindowsLocalEnvironment environment = AppServices.Environment;
     private readonly SiteConfigurationStore settingsStore = AppServices.SiteSettings;
     private readonly LaravelProjectCreator projectCreator = new();
+    private CancellationTokenSource? projectCreationCancellation;
     private readonly SiteRuntimeStore siteRuntimeStore = new();
     private readonly PhpRuntimeInstaller phpInstaller = new();
     private readonly NodeRuntimeInstaller nodeInstaller = new();
@@ -48,6 +49,11 @@ public sealed partial class SitesPage : Page
         if (loaded) return;
         loaded = true;
         await ScanAsync();
+    }
+
+    private void Page_Unloaded(object sender, RoutedEventArgs e)
+    {
+        projectCreationCancellation?.Cancel();
     }
 
     private async void Environment_Click(object sender, RoutedEventArgs e)
@@ -91,7 +97,9 @@ public sealed partial class SitesPage : Page
     private void UpdateEnvironmentState()
     {
         var running = environment.IsRunning;
-        EnvironmentStatusText.Text = running ? "Running" : "Stopped";
+        EnvironmentStatusText.Text = running
+            ? "Running"
+            : environment.IsDegraded ? "Recovering" : "Stopped";
         EnvironmentButtonText.Text = running ? "Stop all" : "Start all";
         EnvironmentButtonIcon.Symbol = running ? Symbol.Stop : Symbol.Play;
         EnvironmentEndpointText.Text = running
@@ -242,6 +250,7 @@ public sealed partial class SitesPage : Page
         {
             XamlRoot = XamlRoot,
             Title = "Creating Laravel project",
+            CloseButtonText = "Cancel",
             Content = new ScrollViewer
             {
                 Content = progressContent,
@@ -257,6 +266,18 @@ public sealed partial class SitesPage : Page
             currentStage = stage;
             UpdateProjectCreationProgress(stages, stageRows, statusText, stage);
         });
+        using var cancellation = new CancellationTokenSource();
+        projectCreationCancellation = cancellation;
+        var creationFinished = false;
+        progressDialog.Closing += (_, args) =>
+        {
+            if (creationFinished) return;
+            args.Cancel = true;
+            if (cancellation.IsCancellationRequested) return;
+            cancellation.Cancel();
+            statusText.Text = "Cancelling and removing the incomplete project...";
+            progressDialog.CloseButtonText = string.Empty;
+        };
 
         CreateLaravelButton.IsEnabled = false;
         ScanProgress.IsActive = true;
@@ -264,7 +285,7 @@ public sealed partial class SitesPage : Page
         await Task.Yield();
         try
         {
-            await projectCreator.CreateAsync(request, creationProgress);
+            await projectCreator.CreateAsync(request, creationProgress, cancellation.Token);
             currentStage = LaravelProjectCreationStage.RegisteringSite;
             UpdateProjectCreationProgress(stages, stageRows, statusText, currentStage);
             await ScanAsync(throwOnError: true);
@@ -273,6 +294,14 @@ public sealed partial class SitesPage : Page
             progressRing.IsActive = false;
             progressDialog.Title = "Laravel project created";
             progressDialog.CloseButtonText = "Done";
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            UpdateProjectCreationFailure(stageRows, currentStage);
+            progressRing.IsActive = false;
+            progressDialog.Title = "Laravel project creation cancelled";
+            statusText.Text = "Creation was cancelled and the incomplete project was removed.";
+            progressDialog.CloseButtonText = "Close";
         }
         catch (Exception error)
         {
@@ -306,6 +335,11 @@ public sealed partial class SitesPage : Page
         }
         finally
         {
+            creationFinished = true;
+            if (ReferenceEquals(projectCreationCancellation, cancellation))
+            {
+                projectCreationCancellation = null;
+            }
             ScanProgress.IsActive = false;
             CreateLaravelButton.IsEnabled = true;
         }
@@ -486,6 +520,7 @@ public sealed partial class SitesPage : Page
             {
                 Sites.Add(site);
             }
+            await environment.SynchronizeSitesAsync(Sites);
             ApplyFilter(selectedPath);
         }
         catch (Exception error)
@@ -562,18 +597,24 @@ public sealed partial class SitesPage : Page
 
     private async Task RefreshPreviewAsync()
     {
-        PreviewBorder.Visibility = PreviewToggle.IsOn && selectedSite is not null
+        var site = selectedSite;
+        PreviewBorder.Visibility = PreviewToggle.IsOn && site is not null
             ? Visibility.Visible
             : Visibility.Collapsed;
-        if (!PreviewToggle.IsOn || selectedSite is null) return;
+        if (!PreviewToggle.IsOn || site is null) return;
+        PreviewFailureState.Visibility = Visibility.Collapsed;
+        SitePreview.Visibility = Visibility.Visible;
         try
         {
             await SitePreview.EnsureCoreWebView2Async();
             await ApplyDesktopPreviewMetricsAsync();
-            SitePreview.Source = SiteUri(selectedSite);
+            if (!IsSelected(site)) return;
+            SitePreview.Source = SiteUri(site);
         }
         catch (Exception error) when (error is InvalidOperationException or COMException)
         {
+            await ReportPreviewFailureAsync("initialization", site, error.ToString());
+            if (IsSelected(site)) ShowPreviewFailure();
         }
     }
 
@@ -589,6 +630,10 @@ public sealed partial class SitesPage : Page
         }
         catch (Exception error) when (error is InvalidOperationException or COMException)
         {
+            if (selectedSite is not null)
+            {
+                await ReportPreviewFailureAsync("desktop metrics", selectedSite, error.ToString());
+            }
         }
     }
 
@@ -597,6 +642,21 @@ public sealed partial class SitesPage : Page
         CoreWebView2NavigationCompletedEventArgs args
     )
     {
+        if (!args.IsSuccess)
+        {
+            if (selectedSite is not null)
+            {
+                await ReportPreviewFailureAsync(
+                    "navigation",
+                    selectedSite,
+                    $"WebView2 status: {args.WebErrorStatus}"
+                );
+                ShowPreviewFailure();
+            }
+            return;
+        }
+        PreviewFailureState.Visibility = Visibility.Collapsed;
+        SitePreview.Visibility = Visibility.Visible;
         await ApplyDesktopPreviewMetricsAsync();
     }
 
@@ -617,6 +677,32 @@ public sealed partial class SitesPage : Page
         _ = RefreshPreviewAsync();
     }
 
+    private void RetryPreview_Click(object sender, RoutedEventArgs e)
+    {
+        _ = RefreshPreviewAsync();
+    }
+
+    private bool IsSelected(SiteRecord site)
+    {
+        return selectedSite?.Path.Equals(site.Path, StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private void ShowPreviewFailure()
+    {
+        SitePreview.Visibility = Visibility.Collapsed;
+        PreviewFailureState.Visibility = Visibility.Visible;
+    }
+
+    private async Task ReportPreviewFailureAsync(string stage, SiteRecord site, string details)
+    {
+        await DiagnosticLog.WriteFailureAsync(
+            "site-preview",
+            stage,
+            $"The preview for {site.Name} at {site.Path} failed.",
+            details
+        );
+    }
+
     private async void OpenSite_Click(object sender, RoutedEventArgs e)
     {
         if (selectedSite is null) return;
@@ -635,15 +721,23 @@ public sealed partial class SitesPage : Page
         if (selectedSite is null) return;
         try
         {
-            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{selectedSite.Path}\"")
+            var explorer = new ProcessStartInfo("explorer.exe")
             {
                 UseShellExecute = true
-            });
+            };
+            explorer.ArgumentList.Add(selectedSite.Path);
+            Process.Start(explorer);
         }
         catch (Exception error) when (error is Win32Exception or InvalidOperationException)
         {
             await ShowErrorAsync(error.Message);
         }
+    }
+
+    private void OpenLogs_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is null) return;
+        App.MainWindow.NavigateToLogs(selectedSite.Path);
     }
 
     private async void OpenTerminal_Click(object sender, RoutedEventArgs e)
