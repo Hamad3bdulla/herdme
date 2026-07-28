@@ -1065,12 +1065,13 @@ internal static partial class ContractChecks
         var windowSource = File.ReadAllText(Path.Combine(projectRoot, "MainWindow.xaml.cs"));
         Check(
             localizationSource.Contains("Microsoft.Windows.ApplicationModel.Resources", StringComparison.Ordinal)
-                && localizationSource.Contains("new ResourceManager(", StringComparison.Ordinal)
+                && localizationSource.Contains("new ResourceLoader(", StringComparison.Ordinal)
                 && localizationSource.Contains("HerdMe.Windows.pri", StringComparison.Ordinal)
-                && localizationSource.Contains("MainResourceMap.GetValue", StringComparison.Ordinal)
+                && localizationSource.Contains("Loader.Value.GetString(key)", StringComparison.Ordinal)
                 && !localizationSource.Contains("new ResourceLoader()", StringComparison.Ordinal)
+                && !localizationSource.Contains("MainResourceMap.GetValue", StringComparison.Ordinal)
                 && localizationSource.Contains("ApplicationLanguages.Languages", StringComparison.Ordinal),
-            "Windows localization explicitly loads the unpackaged MRT Core resource index"
+            "Windows localization explicitly loads strings from the unpackaged MRT Core resource index"
         );
         Check(
             windowSource.Contains("RootLayout.Language = AppLocalization.LanguageTag", StringComparison.Ordinal)

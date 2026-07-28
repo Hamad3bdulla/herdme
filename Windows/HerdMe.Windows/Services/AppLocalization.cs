@@ -7,7 +7,7 @@ namespace HerdMe.Windows.Services;
 
 public static class AppLocalization
 {
-    private static readonly Lazy<ResourceManager> Manager = new(() => new ResourceManager(
+    private static readonly Lazy<ResourceLoader> Loader = new(() => new ResourceLoader(
         Path.Combine(AppContext.BaseDirectory, "HerdMe.Windows.pri")
     ));
 
@@ -21,7 +21,7 @@ public static class AppLocalization
     public static string Get(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        var value = Manager.Value.MainResourceMap.GetValue($"Resources/{key}").ValueAsString;
+        var value = Loader.Value.GetString(key);
         return string.IsNullOrWhiteSpace(value) ? key : value;
     }
 
