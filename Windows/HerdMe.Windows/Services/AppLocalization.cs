@@ -7,6 +7,7 @@ namespace HerdMe.Windows.Services;
 
 public static class AppLocalization
 {
+    private const string ResourceUriPrefix = "ms-resource://HerdMe.Windows/Resources/";
     private static readonly Lazy<ResourceLoader> Loader = new(() => new ResourceLoader(
         Path.Combine(AppContext.BaseDirectory, "HerdMe.Windows.pri")
     ));
@@ -21,7 +22,7 @@ public static class AppLocalization
     public static string Get(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        var value = Loader.Value.GetString(key);
+        var value = Loader.Value.GetStringForUri(new Uri($"{ResourceUriPrefix}{key}"));
         return string.IsNullOrWhiteSpace(value) ? key : value;
     }
 

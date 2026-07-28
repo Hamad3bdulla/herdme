@@ -610,6 +610,14 @@ internal static partial class ContractChecks
                 ),
             "the unpackaged Windows publish copies the generated project resource index"
         );
+        Check(
+            projectDocument.Descendants()
+                .Any(element =>
+                    element.Name.LocalName == "ProjectPriIndexName"
+                    && element.Value == "HerdMe.Windows"
+                ),
+            "the unpackaged Windows resource index has a stable application map name"
+        );
 
         var windowsDirectory = Path.Combine(repositoryRoot, "Windows");
         Check(
@@ -1067,7 +1075,8 @@ internal static partial class ContractChecks
             localizationSource.Contains("Microsoft.Windows.ApplicationModel.Resources", StringComparison.Ordinal)
                 && localizationSource.Contains("new ResourceLoader(", StringComparison.Ordinal)
                 && localizationSource.Contains("HerdMe.Windows.pri", StringComparison.Ordinal)
-                && localizationSource.Contains("Loader.Value.GetString(key)", StringComparison.Ordinal)
+                && localizationSource.Contains("ms-resource://HerdMe.Windows/Resources/", StringComparison.Ordinal)
+                && localizationSource.Contains("Loader.Value.GetStringForUri", StringComparison.Ordinal)
                 && !localizationSource.Contains("new ResourceLoader()", StringComparison.Ordinal)
                 && !localizationSource.Contains("MainResourceMap.GetValue", StringComparison.Ordinal)
                 && localizationSource.Contains("ApplicationLanguages.Languages", StringComparison.Ordinal),
