@@ -513,6 +513,21 @@ internal static partial class ContractChecks
             "the Windows tray icon uses the H.NotifyIcon generated icon source API"
         );
 
+        var projectDocument = XDocument.Load(Path.Combine(projectRoot, "HerdMe.Windows.csproj"));
+        Check(
+            projectDocument.Descendants()
+                .Any(element =>
+                    element.Name.LocalName == "UseXamlCompilerExecutable"
+                    && element.Value.Equals("false", StringComparison.OrdinalIgnoreCase)
+                ),
+            "the Windows project uses the managed XAML compiler for actionable diagnostics"
+        );
+        Check(
+            File.ReadAllText(Path.Combine(repositoryRoot, "Windows", "build.ps1"))
+                .Contains("-p:UseXamlCompilerExecutable=false", StringComparison.Ordinal),
+            "the native Windows build keeps the managed XAML compiler enabled"
+        );
+
         var navigationContract = new[]
         {
             (Tag: "dashboard", NavigationId: "NavDashboard", Page: "DashboardPage.xaml", PageId: "DashboardPageRoot"),
