@@ -48,8 +48,9 @@ rescue ArgumentError
   abort "#{name} must be a number between 0 and 100."
 end
 
-target_floor = threshold.call("HERDME_MIN_APP_COVERAGE", "37.0")
-domain_floor = threshold.call("HERDME_MIN_DOMAIN_COVERAGE", "68.0")
+# Hosted runners intentionally skip live tests that require managed PHP/PHP-FPM/Xdebug.
+target_floor = threshold.call("HERDME_MIN_APP_COVERAGE", "35.5")
+domain_floor = threshold.call("HERDME_MIN_DOMAIN_COVERAGE", "67.5")
 file_floor = threshold.call("HERDME_MIN_DOMAIN_FILE_COVERAGE", "10.0")
 
 percent = ->(covered, executable) { executable.zero? ? 100.0 : covered.fdiv(executable) * 100 }

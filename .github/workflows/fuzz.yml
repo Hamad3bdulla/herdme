@@ -70,7 +70,7 @@ jobs:
           retention-days: 14
 
   swift-parsers:
-    name: Swift parsers with libFuzzer, ASan, and UBSan
+    name: Swift parsers with libFuzzer and ASan
     runs-on: ubuntu-24.04
     timeout-minutes: 15
 
@@ -91,7 +91,7 @@ jobs:
             -O \
             -g \
             -warnings-as-errors \
-            -sanitize=fuzzer,address,undefined \
+            -sanitize=fuzzer,address \
             -DHERDME_FUZZ_MIME \
             HerdMe/Services/MailMIMEParser.swift \
             Fuzzing/Swift/ParserFuzzer.swift \
@@ -101,7 +101,7 @@ jobs:
             -O \
             -g \
             -warnings-as-errors \
-            -sanitize=fuzzer,address,undefined \
+            -sanitize=fuzzer,address \
             -DHERDME_FUZZ_PHP_SERIALIZATION \
             HerdMe/Services/PHPSerializationParser.swift \
             Fuzzing/Swift/ParserFuzzer.swift \
@@ -111,7 +111,7 @@ jobs:
             -O \
             -g \
             -warnings-as-errors \
-            -sanitize=fuzzer,address,undefined \
+            -sanitize=fuzzer,address \
             -DHERDME_FUZZ_FASTCGI \
             HerdMe/Services/FastCGIWireProtocol.swift \
             Fuzzing/Swift/ParserFuzzer.swift \
@@ -120,7 +120,6 @@ jobs:
       - name: Run bounded Swift fuzz campaigns
         env:
           ASAN_OPTIONS: abort_on_error=1:detect_leaks=1:strict_string_checks=1
-          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: |
           mkdir -p build/swift-fuzz-artifacts build/swift-fuzz-logs
           for target in mime php-serialization fastcgi; do

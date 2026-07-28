@@ -1,0 +1,10 @@
+* text=auto
+
+*.cs text eol=lf
+*.csproj text eol=lf
+*.xaml text eol=lf
+*.ps1 text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+*.resw text eol=lf
+
