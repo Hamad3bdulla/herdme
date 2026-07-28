@@ -1,7 +1,9 @@
 using H.NotifyIcon;
 using HerdMe.Windows.Services;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 
 namespace HerdMe.Windows;
 
@@ -91,7 +93,45 @@ public partial class App : Application
         startCommand.ExecuteRequested += StartCommand_ExecuteRequested;
         var stopCommand = (XamlUICommand)Resources["StopAllCommand"];
         stopCommand.ExecuteRequested += StopCommand_ExecuteRequested;
-        trayIcon = (TaskbarIcon)Resources["TrayIcon"];
+
+        var contextMenu = new MenuFlyout { AreOpenCloseAnimationsEnabled = false };
+        contextMenu.Items.Add(new MenuFlyoutItem
+        {
+            Command = openCommand,
+            Text = openCommand.Label
+        });
+        contextMenu.Items.Add(new MenuFlyoutSeparator());
+        contextMenu.Items.Add(new MenuFlyoutItem
+        {
+            Command = startCommand,
+            Text = startCommand.Label
+        });
+        contextMenu.Items.Add(new MenuFlyoutItem
+        {
+            Command = stopCommand,
+            Text = stopCommand.Label
+        });
+        contextMenu.Items.Add(new MenuFlyoutSeparator());
+        contextMenu.Items.Add(new MenuFlyoutItem
+        {
+            Command = quitCommand,
+            Text = quitCommand.Label
+        });
+
+        trayIcon = new TaskbarIcon
+        {
+            Visibility = Visibility.Visible,
+            ToolTipText = "HerdMe",
+            ContextMenuMode = ContextMenuMode.SecondWindow,
+            LeftClickCommand = openCommand,
+            NoLeftClickDelay = true,
+            IconSource = new GeneratedIconSource
+            {
+                Text = "H",
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 227, 27, 35))
+            },
+            ContextFlyout = contextMenu
+        };
         trayIcon.ForceCreate();
     }
 

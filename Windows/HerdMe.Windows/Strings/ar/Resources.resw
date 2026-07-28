@@ -8,11 +8,6 @@
   <data name="TrayQuitCommand.Label" xml:space="preserve"><value>إنهاء HerdMe</value></data>
   <data name="TrayStartAllCommand.Label" xml:space="preserve"><value>تشغيل الكل</value></data>
   <data name="TrayStopAllCommand.Label" xml:space="preserve"><value>إيقاف الكل</value></data>
-  <data name="TrayIcon.ToolTipText" xml:space="preserve"><value>HerdMe</value></data>
-  <data name="TrayOpenMenu.Text" xml:space="preserve"><value>فتح HerdMe</value></data>
-  <data name="TrayStartAllMenu.Text" xml:space="preserve"><value>تشغيل الكل</value></data>
-  <data name="TrayStopAllMenu.Text" xml:space="preserve"><value>إيقاف الكل</value></data>
-  <data name="TrayQuitMenu.Text" xml:space="preserve"><value>إنهاء HerdMe</value></data>
   <data name="NavGeneral.Content" xml:space="preserve"><value>عام</value></data>
   <data name="NavSites.Content" xml:space="preserve"><value>المواقع</value></data>
   <data name="NavPhp.Content" xml:space="preserve"><value>PHP</value></data>

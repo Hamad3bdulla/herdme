@@ -1,5 +1,5 @@
 param(
-    [string]$ProjectPath = (Join-Path $PSScriptRoot "HerdMe.Windows/HerdMe.Windows.csproj"),
+    [string]$ProjectPath = (Join-Path $PSScriptRoot "HerdMe.Windows.ContractTests/HerdMe.Windows.ContractTests.csproj"),
     [string]$DotNetPath = "dotnet",
     [ValidateSet("x64")]
     [string]$Architecture = "x64",

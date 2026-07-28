@@ -1,5 +1,0 @@
-<Project>
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'HerdMe.Windows'">
-    <UseXamlCompilerExecutable>false</UseXamlCompilerExecutable>
-  </PropertyGroup>
-</Project>

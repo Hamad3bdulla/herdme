@@ -502,32 +502,34 @@ internal static partial class ContractChecks
         }
 
         var appDocument = XDocument.Load(Path.Combine(projectRoot, "App.xaml"));
-        var taskbarIcon = appDocument.Descendants()
-            .Single(element => element.Name.LocalName == "TaskbarIcon");
-        var generatedIconSource = taskbarIcon.Elements()
-            .SingleOrDefault(element => element.Name.LocalName == "TaskbarIcon.IconSource")?
-            .Elements()
-            .SingleOrDefault();
         Check(
-            generatedIconSource?.Name.LocalName == "GeneratedIconSource",
-            "the Windows tray icon uses the H.NotifyIcon generated icon source API"
+            appDocument.Descendants().All(element => element.Name.LocalName != "TaskbarIcon"),
+            "the third-party tray icon is kept out of the compiled XAML surface"
+        );
+        var appCodeBehind = File.ReadAllText(Path.Combine(projectRoot, "App.xaml.cs"));
+        Check(
+            appCodeBehind.Contains("new TaskbarIcon", StringComparison.Ordinal)
+                && appCodeBehind.Contains("new GeneratedIconSource", StringComparison.Ordinal),
+            "the Windows tray icon is created with the H.NotifyIcon generated icon source API"
         );
 
-        var buildTargetsDocument = XDocument.Load(
-            Path.Combine(repositoryRoot, "Windows", "Directory.Build.targets")
+        var windowsDirectory = Path.Combine(repositoryRoot, "Windows");
+        Check(
+            !File.Exists(Path.Combine(windowsDirectory, "Directory.Build.targets")),
+            "the Windows build does not override the XAML compiler after SDK imports"
         );
         Check(
-            buildTargetsDocument.Descendants()
-                .Any(element =>
-                    element.Name.LocalName == "UseXamlCompilerExecutable"
-                    && element.Value.Equals("false", StringComparison.OrdinalIgnoreCase)
+            File.ReadAllText(Path.Combine(windowsDirectory, "build.ps1"))
+                .Contains("-p:UseXamlCompilerExecutable=true", StringComparison.Ordinal),
+            "the native Windows build uses the executable XAML compiler"
+        );
+        Check(
+            File.ReadAllText(Path.Combine(windowsDirectory, "check-format.ps1"))
+                .Contains(
+                    "HerdMe.Windows.ContractTests/HerdMe.Windows.ContractTests.csproj",
+                    StringComparison.Ordinal
                 ),
-            "the Windows build targets override the SDK with the managed XAML compiler"
-        );
-        Check(
-            File.ReadAllText(Path.Combine(repositoryRoot, "Windows", "build.ps1"))
-                .Contains("-p:UseXamlCompilerExecutable=false", StringComparison.Ordinal),
-            "the native Windows build keeps the managed XAML compiler enabled"
+            "C# formatting is checked through the cross-platform project without loading XAML"
         );
 
         var navigationContract = new[]
@@ -600,7 +602,6 @@ internal static partial class ContractChecks
         );
         var invariantTranslationKeys = new HashSet<string>(StringComparer.Ordinal)
         {
-            "TrayIcon.ToolTipText",
             "NavPhp.Content",
             "NavNode.Content",
             "OnboardingSetupSummary.Text",
