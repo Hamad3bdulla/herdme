@@ -513,6 +513,19 @@ internal static partial class ContractChecks
             "the Windows tray icon is created with the H.NotifyIcon generated icon source API"
         );
 
+        var projectDocument = XDocument.Load(
+            Path.Combine(projectRoot, "HerdMe.Windows.csproj")
+        );
+        Check(
+            projectDocument.Descendants()
+                .Any(element =>
+                    element.Name.LocalName == "PackageReference"
+                    && element.Attribute("Include")?.Value == "System.Formats.Nrbf"
+                    && element.Attribute("Version")?.Value == "9.0.1"
+                ),
+            "the Windows XAML compiler can resolve the H.NotifyIcon drawing dependency graph"
+        );
+
         var windowsDirectory = Path.Combine(repositoryRoot, "Windows");
         Check(
             !File.Exists(Path.Combine(windowsDirectory, "Directory.Build.targets")),
