@@ -101,7 +101,7 @@ dotnet build $project `
     --configuration $Configuration `
     --runtime $runtimeIdentifier `
     -p:Platform=$Architecture `
-    -p:UseXamlCompilerExecutable=false `
+    -p:UseXamlCompilerExecutable=true `
     -p:TreatWarningsAsErrors=true `
     "-bl:$nativeBuildBinaryLog" `
     "-flp:logfile=$nativeBuildLog;verbosity=diagnostic"
