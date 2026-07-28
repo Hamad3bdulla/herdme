@@ -174,9 +174,12 @@ if ($null -eq $builtExecutable) {
 $buildOutput = $builtExecutable.DirectoryName
 foreach ($relativePath in @(
     "HerdMe.Windows.exe",
+    "HerdMe.Windows.pri",
     "Runtime\herdme-core.exe",
+    "Microsoft.Windows.ApplicationModel.Resources.dll",
     "Microsoft.WindowsAppRuntime.dll",
     "Microsoft.ui.xaml.dll",
+    "MRM.dll",
     "LICENSE",
     "THIRD_PARTY.md",
     "release-manifest.json"

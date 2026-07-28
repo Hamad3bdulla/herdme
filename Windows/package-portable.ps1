@@ -62,9 +62,12 @@ if ($LASTEXITCODE -ne 0) { throw "The self-contained Windows publish failed." }
 
 $requiredFiles = @(
     "HerdMe.Windows.exe",
+    "HerdMe.Windows.pri",
     "Runtime\herdme-core.exe",
+    "Microsoft.Windows.ApplicationModel.Resources.dll",
     "Microsoft.WindowsAppRuntime.dll",
     "Microsoft.ui.xaml.dll",
+    "MRM.dll",
     "LICENSE",
     "THIRD_PARTY.md",
     "release-manifest.json"
