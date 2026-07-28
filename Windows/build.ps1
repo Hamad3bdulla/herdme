@@ -101,10 +101,22 @@ dotnet build $project `
     --configuration $Configuration `
     --runtime $runtimeIdentifier `
     -p:Platform=$Architecture `
+    -p:UseXamlCompilerExecutable=false `
     -p:TreatWarningsAsErrors=true `
     "-bl:$nativeBuildBinaryLog" `
     "-flp:logfile=$nativeBuildLog;verbosity=diagnostic"
 if ($LASTEXITCODE -ne 0) {
+    $xamlOutputFiles = @(
+        Get-ChildItem (Join-Path (Split-Path -Parent $project) "obj") `
+            -Recurse `
+            -Filter "output.json" `
+            -File `
+            -ErrorAction SilentlyContinue
+    )
+    foreach ($xamlOutput in $xamlOutputFiles) {
+        Write-Host "XAML compiler diagnostics from $($xamlOutput.FullName):"
+        Get-Content -LiteralPath $xamlOutput.FullName | Write-Host
+    }
     $diagnostics = @(
         if (Test-Path -LiteralPath $nativeBuildLog -PathType Leaf) {
             Select-String `
@@ -116,7 +128,9 @@ if ($LASTEXITCODE -ne 0) {
         }
     )
     $detail = if ($diagnostics.Count -eq 0) {
-        if (Test-Path -LiteralPath $nativeBuildBinaryLog -PathType Leaf) {
+        if ($xamlOutputFiles.Count -gt 0) {
+            "No structured compiler error was found; inspect the uploaded XAML output.json and native build logs."
+        } elseif (Test-Path -LiteralPath $nativeBuildBinaryLog -PathType Leaf) {
             "No structured compiler error was found; inspect build/windows-native-build.binlog."
         } elseif (Test-Path -LiteralPath $nativeBuildLog -PathType Leaf) {
             "MSBuild failed without a structured compiler error; inspect build/windows-native-build.log."

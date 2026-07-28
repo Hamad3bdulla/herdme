@@ -1,5 +1,13 @@
 import Foundation
 
+private func localizedPHPSerializationError(_ key: String) -> String {
+    #if canImport(Darwin)
+        return Bundle.main.localizedString(forKey: key, value: key, table: nil)
+    #else
+        return key
+    #endif
+}
+
 indirect enum PHPSerializedValue: Sendable {
     case null
     case bool(Bool)
@@ -72,11 +80,12 @@ enum PHPSerializationError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .malformed: String(localized: "Malformed PHP serialized value.")
-        case .resourceLimit: String(localized: "The PHP serialized value exceeds HerdMe's safety limits.")
+        case .malformed: localizedPHPSerializationError("Malformed PHP serialized value.")
+        case .resourceLimit:
+            localizedPHPSerializationError("The PHP serialized value exceeds HerdMe's safety limits.")
         case .unsupported(let type):
             String.localizedStringWithFormat(
-                String(localized: "Unsupported PHP serialized type: %@"),
+                localizedPHPSerializationError("Unsupported PHP serialized type: %@"),
                 String(type)
             )
         }

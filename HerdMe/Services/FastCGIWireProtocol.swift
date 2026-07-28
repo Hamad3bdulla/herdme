@@ -1,5 +1,13 @@
 import Foundation
 
+private func localizedFastCGIError(_ key: String) -> String {
+    #if canImport(Darwin)
+        return Bundle.main.localizedString(forKey: key, value: key, table: nil)
+    #else
+        return key
+    #endif
+}
+
 enum LocalFastCGIError: LocalizedError {
     case malformedRequest
     case headerTooLarge
@@ -14,26 +22,26 @@ enum LocalFastCGIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .malformedRequest:
-            String(localized: "The local HTTP request is malformed.")
+            localizedFastCGIError("The local HTTP request is malformed.")
         case .headerTooLarge:
-            String(localized: "The local HTTP request headers are too large.")
+            localizedFastCGIError("The local HTTP request headers are too large.")
         case .requestTooLarge:
-            String(localized: "The local HTTP request is too large.")
+            localizedFastCGIError("The local HTTP request is too large.")
         case .unsupportedHTTPVersion:
-            String(localized: "The local HTTP version is not supported.")
+            localizedFastCGIError("The local HTTP version is not supported.")
         case .unsupportedTransferCoding:
-            String(localized: "The local HTTP transfer coding is not supported.")
+            localizedFastCGIError("The local HTTP transfer coding is not supported.")
         case .invalidPath:
-            String(localized: "The requested local path is invalid.")
+            localizedFastCGIError("The requested local path is invalid.")
         case .scriptMissing:
-            String(localized: "The requested local site has no front controller.")
+            localizedFastCGIError("The requested local site has no front controller.")
         case .connectionFailed(let message):
             String.localizedStringWithFormat(
-                String(localized: "PHP-FPM connection failed: %@"),
+                localizedFastCGIError("PHP-FPM connection failed: %@"),
                 message
             )
         case .invalidResponse:
-            String(localized: "PHP-FPM returned an invalid response.")
+            localizedFastCGIError("PHP-FPM returned an invalid response.")
         }
     }
 }

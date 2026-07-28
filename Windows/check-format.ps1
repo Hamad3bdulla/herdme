@@ -1,6 +1,8 @@
 param(
     [string]$ProjectPath = (Join-Path $PSScriptRoot "HerdMe.Windows/HerdMe.Windows.csproj"),
     [string]$DotNetPath = "dotnet",
+    [ValidateSet("x64")]
+    [string]$Architecture = "x64",
     [switch]$NoRestore
 )
 
@@ -26,22 +28,35 @@ function Invoke-DotNetChecked {
 }
 
 $resolvedProject = (Resolve-Path -LiteralPath $ProjectPath).Path
-if (-not $NoRestore) {
-    Invoke-DotNetChecked `
-        -Arguments @("restore", $resolvedProject, "--verbosity", "minimal") `
-        -FailureMessage "Restoring the C# formatting workspace failed" | Out-Null
-}
+$previousPlatform = $env:Platform
+try {
+    $env:Platform = $Architecture
+    if (-not $NoRestore) {
+        Invoke-DotNetChecked `
+            -Arguments @(
+                "restore",
+                $resolvedProject,
+                "--verbosity",
+                "minimal",
+                "-p:Platform=$Architecture"
+            ) `
+            -FailureMessage "Restoring the C# formatting workspace failed" | Out-Null
+    }
 
-$formatOutput = Invoke-DotNetChecked `
-    -Arguments @(
-        "format",
-        $resolvedProject,
-        "--verify-no-changes",
-        "--no-restore",
-        "--verbosity",
-        "diagnostic"
-    ) `
-    -FailureMessage "C# formatting verification failed"
+    $formatOutput = Invoke-DotNetChecked `
+        -Arguments @(
+            "format",
+            $resolvedProject,
+            "--verify-no-changes",
+            "--no-restore",
+            "--verbosity",
+            "diagnostic"
+        ) `
+        -FailureMessage "C# formatting verification failed"
+}
+finally {
+    $env:Platform = $previousPlatform
+}
 
 $outputText = $formatOutput -join "`n"
 $loadFailurePatterns = @(

@@ -85,6 +85,8 @@ jobs:
           path: |
             build/windows-native-build.log
             build/windows-native-build.binlog
+            Windows/HerdMe.Windows/obj/**/input.json
+            Windows/HerdMe.Windows/obj/**/output.json
           if-no-files-found: warn
           retention-days: 14
 

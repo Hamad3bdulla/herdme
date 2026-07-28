@@ -44,6 +44,7 @@ struct OnboardingView: View {
             appIcon
             Text(securityCoordinator.onboardingStage.title)
                 .font(.system(size: 34, weight: .bold))
+                .accessibilityLabel(Text(verbatim: securityCoordinator.onboardingStage.title))
                 .accessibilityIdentifier("onboarding.welcome.title")
             Text(securityCoordinator.onboardingStage.detail)
                 .font(.system(size: 14))

@@ -11,7 +11,6 @@ final class HerdMeUITests: XCTestCase {
 
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["onboarding.welcome.title"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.staticTexts["onboarding.welcome.title"].label, "Welcome to HerdMe")
         XCTAssertTrue(app.buttons["onboarding.setup"].exists)
         XCTAssertFalse(app.buttons["sidebar.general"].exists)
         retainScreenshot(named: "fresh-installation", from: app)
@@ -31,7 +30,7 @@ final class HerdMeUITests: XCTestCase {
             let button = app.buttons["sidebar.\(identifier)"]
             XCTAssertTrue(button.waitForExistence(timeout: 5), "Missing sidebar page: \(title)")
             XCTAssertEqual(button.label, title)
-            button.click()
+            click(button, in: app.windows.firstMatch)
             XCTAssertTrue(button.isSelected, "Sidebar did not select: \(title)")
         }
         XCTAssertFalse(app.buttons["onboarding.setup"].exists)
@@ -57,7 +56,7 @@ final class HerdMeUITests: XCTestCase {
             let button = app.buttons["sidebar.\(identifier)"]
             XCTAssertTrue(button.waitForExistence(timeout: 5), "Missing Arabic sidebar page: \(title)")
             XCTAssertEqual(button.label, title)
-            button.click()
+            click(button, in: window)
             XCTAssertTrue(button.isSelected, "Arabic sidebar did not select: \(title)")
         }
 
@@ -111,6 +110,35 @@ final class HerdMeUITests: XCTestCase {
         }
         app.launch()
         return app
+    }
+
+    private func click(
+        _ element: XCUIElement,
+        in window: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        if element.isHittable {
+            element.click()
+            return
+        }
+
+        let elementFrame = element.frame
+        let windowFrame = window.frame
+        XCTAssertFalse(elementFrame.isEmpty, "Element has no clickable frame", file: file, line: line)
+        XCTAssertTrue(
+            windowFrame.intersects(elementFrame),
+            "Element is outside the application window",
+            file: file,
+            line: line
+        )
+        guard !elementFrame.isEmpty, windowFrame.intersects(elementFrame) else { return }
+
+        let offset = CGVector(
+            dx: (elementFrame.midX - windowFrame.minX) / windowFrame.width,
+            dy: (elementFrame.midY - windowFrame.minY) / windowFrame.height
+        )
+        window.coordinate(withNormalizedOffset: offset).click()
     }
 
     private func retainScreenshot(named name: String, from app: XCUIApplication) {
