@@ -569,10 +569,18 @@ internal static partial class ContractChecks
             !File.Exists(Path.Combine(windowsDirectory, "Directory.Build.targets")),
             "the Windows build does not override the XAML compiler after SDK imports"
         );
+        var buildScript = File.ReadAllText(Path.Combine(windowsDirectory, "build.ps1"));
         Check(
-            File.ReadAllText(Path.Combine(windowsDirectory, "build.ps1"))
-                .Contains("/p:UseXamlCompilerExecutable=false", StringComparison.Ordinal),
+            buildScript.Contains("/p:UseXamlCompilerExecutable=false", StringComparison.Ordinal),
             "the native Windows build uses the managed XAML compiler through Visual Studio MSBuild"
+        );
+        Check(
+            buildScript.Contains("-Filter \"*.xaml\" -File", StringComparison.Ordinal)
+                && buildScript.Contains(
+                    "$_ -in @(\"bin\", \"obj\")",
+                    StringComparison.Ordinal
+                ),
+            "the repeated Windows build validates only source XAML files"
         );
         var buildTools = File.ReadAllText(
             Path.Combine(windowsDirectory, "windows-build-tools.ps1")

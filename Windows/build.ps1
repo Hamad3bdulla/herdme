@@ -77,7 +77,13 @@ if (-not $SkipTests) {
         $env:HERDME_CORE_TEST_EXECUTABLE = $previousCoreTestExecutable
     }
 
-    $xamlFiles = @(Get-ChildItem (Join-Path $PSScriptRoot "HerdMe.Windows") -Recurse -Filter "*.xaml")
+    $xamlProjectRoot = Join-Path $PSScriptRoot "HerdMe.Windows"
+    $xamlFiles = @(Get-ChildItem $xamlProjectRoot -Recurse -Filter "*.xaml" -File |
+        Where-Object {
+            $relativePath = [IO.Path]::GetRelativePath($xamlProjectRoot, $_.FullName)
+            $pathSegments = @($relativePath -split "[\/\\]")
+            @($pathSegments | Where-Object { $_ -in @("bin", "obj") }).Count -eq 0
+        })
     if ($xamlFiles.Count -lt 13) {
         throw "The native Windows project is missing expected XAML files."
     }
