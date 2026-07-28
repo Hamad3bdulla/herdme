@@ -5,21 +5,21 @@ namespace HerdMe.Windows.Models;
 
 public sealed class CapturedMail
 {
-    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid Id { get; set; } = Guid.NewGuid();
 
-    public string Sender { get; init; } = "Unknown sender";
+    public string Sender { get; set; } = "Unknown sender";
 
-    public List<string> Recipients { get; init; } = [];
+    public List<string> Recipients { get; set; } = [];
 
-    public string Subject { get; init; } = "(No subject)";
+    public string Subject { get; set; } = "(No subject)";
 
-    public DateTimeOffset ReceivedAt { get; init; } = DateTimeOffset.Now;
+    public DateTimeOffset ReceivedAt { get; set; } = DateTimeOffset.Now;
 
-    public string Body { get; init; } = string.Empty;
+    public string Body { get; set; } = string.Empty;
 
-    public string Raw { get; init; } = string.Empty;
+    public string Raw { get; set; } = string.Empty;
 
-    public string? HtmlBody { get; init; }
+    public string? HtmlBody { get; set; }
 
     [JsonIgnore]
     public string RecipientsText => string.Join(", ", Recipients);

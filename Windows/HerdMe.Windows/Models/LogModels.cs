@@ -2,26 +2,26 @@ namespace HerdMe.Windows.Models;
 
 public sealed class LogSourceRecord
 {
-    public required string Id { get; init; }
+    public string Id { get; set; } = string.Empty;
 
-    public required string Name { get; init; }
+    public string Name { get; set; } = string.Empty;
 
-    public required string RootPath { get; init; }
+    public string RootPath { get; set; } = string.Empty;
 
-    public required string FallbackPath { get; init; }
+    public string FallbackPath { get; set; } = string.Empty;
 
-    public bool IsApplication { get; init; }
+    public bool IsApplication { get; set; }
 }
 
 public sealed class LogFileRecord
 {
-    public required string Name { get; init; }
+    public string Name { get; set; } = string.Empty;
 
-    public required string Path { get; init; }
+    public string Path { get; set; } = string.Empty;
 
-    public long Size { get; init; }
+    public long Size { get; set; }
 
-    public DateTimeOffset ModifiedAt { get; init; }
+    public DateTimeOffset ModifiedAt { get; set; }
 
     public string SizeText => Size < 1_024
         ? $"{Size} B"

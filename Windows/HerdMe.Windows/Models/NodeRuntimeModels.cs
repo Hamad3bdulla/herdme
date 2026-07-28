@@ -29,17 +29,17 @@ public sealed record NodeWindowsRelease(
 
 public sealed class NodeRuntimeRow
 {
-    public required string Major { get; init; }
+    public string Major { get; set; } = string.Empty;
 
-    public string? InstalledVersion { get; init; }
+    public string? InstalledVersion { get; set; }
 
     public bool IsInstalled => InstalledVersion is not null;
 
-    public bool IsActive { get; init; }
+    public bool IsActive { get; set; }
 
-    public bool IsUpdateAvailable { get; init; }
+    public bool IsUpdateAvailable { get; set; }
 
     public bool CanInstallOrUpdate => !IsInstalled || IsUpdateAvailable;
 
-    public string Status { get; init; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
 }

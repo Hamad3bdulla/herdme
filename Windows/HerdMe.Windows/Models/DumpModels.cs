@@ -5,15 +5,15 @@ namespace HerdMe.Windows.Models;
 
 public sealed class CapturedDump
 {
-    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid Id { get; set; } = Guid.NewGuid();
 
-    public DateTimeOffset ReceivedAt { get; init; } = DateTimeOffset.Now;
+    public DateTimeOffset ReceivedAt { get; set; } = DateTimeOffset.Now;
 
-    public string Source { get; init; } = "Unknown source";
+    public string Source { get; set; } = "Unknown source";
 
-    public string Summary { get; init; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
 
-    public string Payload { get; init; } = string.Empty;
+    public string Payload { get; set; } = string.Empty;
 
     [JsonIgnore]
     public string ReceivedText => ReceivedAt.LocalDateTime.ToString("g");

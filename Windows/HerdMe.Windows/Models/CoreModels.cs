@@ -17,19 +17,19 @@ public sealed class DoctorResponse
 public sealed class RuntimeCheck
 {
     [JsonPropertyName("name")]
-    public string Name { get; init; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
 
     [JsonPropertyName("available")]
-    public bool Available { get; init; }
+    public bool Available { get; set; }
 
     [JsonPropertyName("detected")]
-    public bool Detected { get; init; }
+    public bool Detected { get; set; }
 
     [JsonPropertyName("source")]
-    public string Source { get; init; } = string.Empty;
+    public string Source { get; set; } = string.Empty;
 
     [JsonPropertyName("path")]
-    public string? Path { get; init; }
+    public string? Path { get; set; }
 
     public string Status => Available ? "Available" : Detected ? "Unavailable" : "Missing";
 }
@@ -58,25 +58,25 @@ public sealed class SitesResponse
 public sealed class SiteRecord
 {
     [JsonPropertyName("name")]
-    public string Name { get; init; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
 
     [JsonPropertyName("path")]
-    public string Path { get; init; } = string.Empty;
+    public string Path { get; set; } = string.Empty;
 
     [JsonPropertyName("domain")]
-    public string Domain { get; init; } = string.Empty;
+    public string Domain { get; set; } = string.Empty;
 
     [JsonPropertyName("framework")]
-    public string Framework { get; init; } = string.Empty;
+    public string Framework { get; set; } = string.Empty;
 
     [JsonPropertyName("linked")]
-    public bool Linked { get; init; }
+    public bool Linked { get; set; }
 
     [JsonPropertyName("phpVersion")]
-    public string? PhpVersion { get; init; }
+    public string? PhpVersion { get; set; }
 
     [JsonPropertyName("nodeVersion")]
-    public string? NodeVersion { get; init; }
+    public string? NodeVersion { get; set; }
 
     [JsonIgnore]
     public string? GitSummary { get; set; }

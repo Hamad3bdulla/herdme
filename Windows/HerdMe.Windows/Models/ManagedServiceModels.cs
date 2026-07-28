@@ -63,34 +63,34 @@ public enum ManagedServiceState
 
 public sealed class ManagedServiceRow
 {
-    public required Guid Id { get; init; }
+    public Guid Id { get; set; }
 
-    public required string DefinitionId { get; init; }
+    public string DefinitionId { get; set; } = string.Empty;
 
-    public required string Name { get; init; }
+    public string Name { get; set; } = string.Empty;
 
-    public required int Port { get; init; }
+    public int Port { get; set; }
 
-    public required string Version { get; init; }
+    public string Version { get; set; } = string.Empty;
 
-    public required ManagedServiceState State { get; init; }
+    public ManagedServiceState State { get; set; }
 
-    public required bool StartAutomatically { get; init; }
+    public bool StartAutomatically { get; set; }
 
-    public required bool IsUpdateAvailable { get; init; }
+    public bool IsUpdateAvailable { get; set; }
 
-    public int? ConsolePort { get; init; }
+    public int? ConsolePort { get; set; }
 
-    public string? ConnectionDisplay { get; init; }
+    public string? ConnectionDisplay { get; set; }
 
-    public required string Status { get; init; }
+    public string Status { get; set; } = string.Empty;
 
-    public required string InstallLabel { get; init; }
+    public string InstallLabel { get; set; } = string.Empty;
 
     public bool CanInstallOrUpdate => State == ManagedServiceState.NotInstalled
         || State == ManagedServiceState.Stopped && IsUpdateAvailable;
 
-    public required string ToggleLabel { get; init; }
+    public string ToggleLabel { get; set; } = string.Empty;
 
     public bool CanToggle => State != ManagedServiceState.NotInstalled;
 

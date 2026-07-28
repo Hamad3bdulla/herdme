@@ -656,9 +656,43 @@ internal static partial class ContractChecks
                 && sitesPageCodeBehind.Contains(
                     "ScrollViewer.SetVerticalScrollBarVisibility(editor",
                     StringComparison.Ordinal
-                ),
+            ),
             "the environment editor configures TextBox scrollbars with WinUI attached properties"
         );
+
+        foreach (var modelType in new[]
+        {
+            typeof(SiteRecord),
+            typeof(CapturedDump),
+            typeof(RuntimeCheck),
+            typeof(LogSourceRecord),
+            typeof(LogFileRecord),
+            typeof(CapturedMail),
+            typeof(NodeRuntimeRow),
+            typeof(ManagedServiceRow)
+        })
+        {
+            Check(
+                modelType.GetConstructor(Type.EmptyTypes) is not null,
+                $"Windows XAML model {modelType.Name} has a public parameterless constructor"
+            );
+            var writableProperties = modelType.GetProperties()
+                .Where(property => property.SetMethod is not null)
+                .ToArray();
+            Check(
+                writableProperties.All(property =>
+                    property.SetMethod!.ReturnParameter.GetRequiredCustomModifiers()
+                        .All(modifier =>
+                            modifier.FullName != "System.Runtime.CompilerServices.IsExternalInit"
+                        )
+                        && property.CustomAttributes.All(attribute =>
+                            attribute.AttributeType.FullName
+                                != "System.Runtime.CompilerServices.RequiredMemberAttribute"
+                        )
+                ),
+                $"Windows XAML model {modelType.Name} exposes mutable, non-required properties to generated bindings"
+            );
+        }
     }
 
     internal static void VerifyLocalizationContracts(string repositoryRoot)
