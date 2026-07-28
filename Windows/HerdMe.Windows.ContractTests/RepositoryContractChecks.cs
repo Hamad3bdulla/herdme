@@ -413,6 +413,13 @@ internal static partial class ContractChecks
             projectRoot,
             "*.xaml",
             SearchOption.AllDirectories
+        ).Where(xamlPath =>
+            !Path.GetRelativePath(projectRoot, xamlPath)
+                .Split(
+                    [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                    StringSplitOptions.RemoveEmptyEntries
+                )
+                .Any(segment => segment is "bin" or "obj")
         ).Order(StringComparer.Ordinal).ToArray();
         Check(xamlFiles.Length >= 13, "the native Windows project includes every expected XAML surface");
 
