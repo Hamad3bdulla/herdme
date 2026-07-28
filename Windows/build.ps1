@@ -19,6 +19,7 @@ $runtimeIdentifier = "win-x64"
 $nativeBuildLog = Join-Path $repoRoot "build\windows-native-build.log"
 $nativeBuildBinaryLog = Join-Path $repoRoot "build\windows-native-build.binlog"
 $nativeBuildLogDirectory = Split-Path -Parent $nativeBuildLog
+. (Join-Path $PSScriptRoot "windows-build-tools.ps1")
 
 cmake -S (Join-Path $repoRoot "Core") -B $coreBuild -A $Architecture -DBUILD_TESTING=ON
 if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed." }
@@ -97,14 +98,22 @@ New-Item -ItemType Directory -Force -Path $runtimeDirectory | Out-Null
 New-Item -ItemType Directory -Force -Path $nativeBuildLogDirectory | Out-Null
 Copy-Item $coreExecutable (Join-Path $runtimeDirectory "herdme-core.exe") -Force
 
-dotnet build $project `
-    --configuration $Configuration `
+dotnet restore $project `
     --runtime $runtimeIdentifier `
-    -p:Platform=$Architecture `
-    -p:UseXamlCompilerExecutable=true `
-    -p:TreatWarningsAsErrors=true `
-    "-bl:$nativeBuildBinaryLog" `
-    "-flp:logfile=$nativeBuildLog;verbosity=diagnostic"
+    -p:Platform=$Architecture
+if ($LASTEXITCODE -ne 0) { throw "Restoring the native WinUI project failed." }
+Install-HerdMeXamlCompilerDependency
+$msbuild = Find-HerdMeMSBuild
+& $msbuild $project `
+    /t:Build `
+    "/p:Configuration=$Configuration" `
+    "/p:RuntimeIdentifier=$runtimeIdentifier" `
+    "/p:Platform=$Architecture" `
+    /p:UseXamlCompilerExecutable=false `
+    /p:TreatWarningsAsErrors=true `
+    "/bl:$nativeBuildBinaryLog" `
+    /fl `
+    "/flp:logfile=$nativeBuildLog;verbosity=diagnostic"
 if ($LASTEXITCODE -ne 0) {
     $xamlOutputFiles = @(
         Get-ChildItem (Join-Path (Split-Path -Parent $project) "obj") `

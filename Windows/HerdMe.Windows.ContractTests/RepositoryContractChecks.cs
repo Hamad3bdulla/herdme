@@ -525,6 +525,15 @@ internal static partial class ContractChecks
                 ),
             "the Windows XAML compiler can resolve the H.NotifyIcon drawing dependency graph"
         );
+        Check(
+            projectDocument.Descendants()
+                .Any(element =>
+                    element.Name.LocalName == "PackageDownload"
+                    && element.Attribute("Include")?.Value == "System.Security.Permissions"
+                    && element.Attribute("Version")?.Value == "[6.0.0]"
+                ),
+            "the managed XAML compiler compatibility dependency is restored"
+        );
 
         var windowsDirectory = Path.Combine(repositoryRoot, "Windows");
         Check(
@@ -533,8 +542,28 @@ internal static partial class ContractChecks
         );
         Check(
             File.ReadAllText(Path.Combine(windowsDirectory, "build.ps1"))
-                .Contains("-p:UseXamlCompilerExecutable=true", StringComparison.Ordinal),
-            "the native Windows build uses the executable XAML compiler"
+                .Contains("/p:UseXamlCompilerExecutable=false", StringComparison.Ordinal),
+            "the native Windows build uses the managed XAML compiler through Visual Studio MSBuild"
+        );
+        var buildTools = File.ReadAllText(
+            Path.Combine(windowsDirectory, "windows-build-tools.ps1")
+        );
+        Check(
+            buildTools.Contains("Find-HerdMeMSBuild", StringComparison.Ordinal)
+                && buildTools.Contains("System.Security.Permissions.dll", StringComparison.Ordinal),
+            "the Windows build locates Visual Studio MSBuild and patches its XAML task dependency"
+        );
+        var portablePackaging = File.ReadAllText(
+            Path.Combine(windowsDirectory, "package-portable.ps1")
+        );
+        Check(
+            portablePackaging.Contains("Find-HerdMeMSBuild", StringComparison.Ordinal)
+                && portablePackaging.Contains("/t:Publish", StringComparison.Ordinal)
+                && portablePackaging.Contains(
+                    "/p:UseXamlCompilerExecutable=false",
+                    StringComparison.Ordinal
+                ),
+            "the portable Windows publish uses the validated Visual Studio MSBuild path"
         );
         Check(
             File.ReadAllText(Path.Combine(windowsDirectory, "check-format.ps1"))

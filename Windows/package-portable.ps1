@@ -30,6 +30,7 @@ $version = (Get-Content -LiteralPath (Join-Path $repoRoot "VERSION") -Raw).Trim(
 $archive = Join-Path $outputDirectory "HerdMe-$version-$runtimeIdentifier-portable.zip"
 $checksumFile = "$archive.sha256"
 . (Join-Path $PSScriptRoot "sign-windows-artifact.ps1")
+. (Join-Path $PSScriptRoot "windows-build-tools.ps1")
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 foreach ($oldOutput in @($archive, $checksumFile)) {
     if (Test-Path -LiteralPath $oldOutput) {
@@ -46,14 +47,17 @@ if (Test-Path $publishDirectory) {
 }
 New-Item -ItemType Directory -Force -Path $publishDirectory | Out-Null
 
-dotnet publish $project `
-    --configuration $Configuration `
-    --runtime $runtimeIdentifier `
-    --self-contained true `
-    --output $publishDirectory `
-    -p:Platform=$Architecture `
-    -p:WindowsPackageType=None `
-    -p:TreatWarningsAsErrors=true
+$msbuild = Find-HerdMeMSBuild
+& $msbuild $project `
+    /t:Publish `
+    "/p:Configuration=$Configuration" `
+    "/p:RuntimeIdentifier=$runtimeIdentifier" `
+    "/p:Platform=$Architecture" `
+    /p:SelfContained=true `
+    "/p:PublishDir=$publishDirectory\" `
+    /p:WindowsPackageType=None `
+    /p:UseXamlCompilerExecutable=false `
+    /p:TreatWarningsAsErrors=true
 if ($LASTEXITCODE -ne 0) { throw "The self-contained Windows publish failed." }
 
 $requiredFiles = @(
