@@ -184,8 +184,9 @@ internal static partial class ContractChecks
         var mainWindowSource = File.ReadAllText(Path.Combine(windowsRoot, "MainWindow.xaml.cs"));
         Check(
             mainWindowSource.Contains("public MainWindow(AppServices services", StringComparison.Ordinal)
+                && mainWindowSource.Contains("if (ContentFrame.Content is null) ShowPage(\"dashboard\")", StringComparison.Ordinal)
                 && !mainWindowSource.Contains("ContentFrame.Navigate", StringComparison.Ordinal),
-            "the main window injects dependencies when it creates pages"
+            "the main window injects dependencies and always creates its initial dashboard"
         );
         var onboardingSource = File.ReadAllText(
             Path.Combine(windowsRoot, "Views", "OnboardingView.xaml.cs")

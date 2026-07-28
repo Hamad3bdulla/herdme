@@ -40,6 +40,7 @@ public sealed partial class MainWindow : Window
         Navigation.Visibility = RequiresOnboarding ? Visibility.Collapsed : Visibility.Visible;
         Onboarding.Visibility = RequiresOnboarding ? Visibility.Visible : Visibility.Collapsed;
         Navigation.SelectedItem = Navigation.MenuItems[0];
+        if (ContentFrame.Content is null) ShowPage("dashboard");
     }
 
     public bool RequiresOnboarding { get; private set; }
@@ -83,6 +84,11 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        ShowPage(tag);
+    }
+
+    private void ShowPage(string tag)
+    {
         switch (tag)
         {
             case "dashboard":
