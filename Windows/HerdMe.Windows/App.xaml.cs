@@ -128,7 +128,9 @@ public partial class App : Application
             IconSource = new GeneratedIconSource
             {
                 Text = "H",
-                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 227, 27, 35))
+                Foreground = new SolidColorBrush(
+                    global::Windows.UI.Color.FromArgb(255, 227, 27, 35)
+                )
             },
             ContextFlyout = contextMenu
         };

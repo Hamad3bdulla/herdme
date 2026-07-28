@@ -527,7 +527,11 @@ internal static partial class ContractChecks
         var appCodeBehind = File.ReadAllText(Path.Combine(projectRoot, "App.xaml.cs"));
         Check(
             appCodeBehind.Contains("new TaskbarIcon", StringComparison.Ordinal)
-                && appCodeBehind.Contains("new GeneratedIconSource", StringComparison.Ordinal),
+                && appCodeBehind.Contains("new GeneratedIconSource", StringComparison.Ordinal)
+                && appCodeBehind.Contains(
+                    "global::Windows.UI.Color.FromArgb",
+                    StringComparison.Ordinal
+                ),
             "the Windows tray icon is created with the H.NotifyIcon generated icon source API"
         );
 
@@ -640,6 +644,20 @@ internal static partial class ContractChecks
         Check(
             acceptanceSource.Contains("Assert-WinUiNavigation $primary", StringComparison.Ordinal),
             "native Windows acceptance executes the WinUI navigation smoke test"
+        );
+        var sitesPageCodeBehind = File.ReadAllText(
+            Path.Combine(projectRoot, "Pages", "SitesPage.xaml.cs")
+        );
+        Check(
+            sitesPageCodeBehind.Contains(
+                "ScrollViewer.SetHorizontalScrollBarVisibility(editor",
+                StringComparison.Ordinal
+            )
+                && sitesPageCodeBehind.Contains(
+                    "ScrollViewer.SetVerticalScrollBarVisibility(editor",
+                    StringComparison.Ordinal
+                ),
+            "the environment editor configures TextBox scrollbars with WinUI attached properties"
         );
     }
 

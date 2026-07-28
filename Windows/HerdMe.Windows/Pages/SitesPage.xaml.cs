@@ -1275,10 +1275,10 @@ public sealed partial class SitesPage : Page
             IsSpellCheckEnabled = false,
             FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"),
             MinWidth = 640,
-            Height = 420,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+            Height = 420
         };
+        ScrollViewer.SetHorizontalScrollBarVisibility(editor, ScrollBarVisibility.Auto);
+        ScrollViewer.SetVerticalScrollBarVisibility(editor, ScrollBarVisibility.Auto);
         var content = new StackPanel { Spacing = 10, MinWidth = 640 };
         content.Children.Add(pathText);
         content.Children.Add(statusText);
