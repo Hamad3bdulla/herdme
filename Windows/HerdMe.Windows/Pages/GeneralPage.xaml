@@ -8,7 +8,7 @@
     <ScrollViewer>
         <StackPanel Padding="32" Spacing="16">
             <Grid>
-                <TextBlock x:Uid="GeneralPageTitle" Text="General" Style="{StaticResource TitleTextBlockStyle}" />
+                <TextBlock x:Uid="GeneralPageTitle" AutomationProperties.AutomationId="GeneralPageRoot" Text="General" Style="{StaticResource TitleTextBlockStyle}" />
                 <Button HorizontalAlignment="Right" Click="Refresh_Click">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <SymbolIcon Symbol="Refresh" />

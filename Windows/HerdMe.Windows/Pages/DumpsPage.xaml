@@ -12,7 +12,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <TextBlock x:Uid="DumpsPageTitle" Text="Dumps" Style="{StaticResource TitleTextBlockStyle}" />
+        <TextBlock x:Uid="DumpsPageTitle" AutomationProperties.AutomationId="DumpsPageRoot" Text="Dumps" Style="{StaticResource TitleTextBlockStyle}" />
 
         <Border Grid.Row="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
             <Grid ColumnSpacing="16">

@@ -17,7 +17,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="4">
-                <TextBlock x:Uid="DashboardPageTitle" Text="Dashboard" Style="{StaticResource TitleTextBlockStyle}" />
+                <TextBlock x:Uid="DashboardPageTitle" AutomationProperties.AutomationId="DashboardPageRoot" Text="Dashboard" Style="{StaticResource TitleTextBlockStyle}" />
                 <TextBlock
                     x:Uid="DashboardPageSubtitle"
                     Text="Your local development environment at a glance."

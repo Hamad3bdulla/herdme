@@ -12,7 +12,7 @@
         </Grid.RowDefinitions>
         <Grid>
             <StackPanel>
-                <TextBlock x:Uid="NodePageTitle" Text="Node.js" Style="{StaticResource TitleTextBlockStyle}" />
+                <TextBlock x:Uid="NodePageTitle" AutomationProperties.AutomationId="NodePageRoot" Text="Node.js" Style="{StaticResource TitleTextBlockStyle}" />
                 <TextBlock x:Uid="NodePageDescription" Text="Official Windows runtimes managed by HerdMe" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
             <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">

@@ -14,7 +14,7 @@
 
         <Grid>
             <StackPanel>
-                <TextBlock x:Uid="ServicesPageTitle" Text="Services" Style="{StaticResource TitleTextBlockStyle}" />
+                <TextBlock x:Uid="ServicesPageTitle" AutomationProperties.AutomationId="ServicesPageRoot" Text="Services" Style="{StaticResource TitleTextBlockStyle}" />
                 <TextBlock x:Uid="ServicesPageDescription" Text="Checksum-verified open-source Windows service runtimes" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
             <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">

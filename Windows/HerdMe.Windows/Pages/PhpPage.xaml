@@ -7,7 +7,7 @@
     <ScrollViewer>
         <StackPanel Padding="32" Spacing="16" MaxWidth="900" HorizontalAlignment="Left">
             <Grid>
-                <TextBlock x:Uid="PhpPageTitle" Text="PHP" Style="{StaticResource TitleTextBlockStyle}" />
+                <TextBlock x:Uid="PhpPageTitle" AutomationProperties.AutomationId="PhpPageRoot" Text="PHP" Style="{StaticResource TitleTextBlockStyle}" />
                 <Button HorizontalAlignment="Right" Click="Refresh_Click">
                     <ToolTipService.ToolTip>
                         <ToolTip><TextBlock x:Uid="PhpRefreshTooltip" Text="Refresh PHP status" /></ToolTip>

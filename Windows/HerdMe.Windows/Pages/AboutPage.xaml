@@ -7,7 +7,7 @@
     AutomationProperties.Name="About HerdMe">
     <ScrollViewer>
         <StackPanel Padding="32" Spacing="16" MaxWidth="820" HorizontalAlignment="Left">
-            <TextBlock Text="HerdMe" Style="{StaticResource TitleTextBlockStyle}" />
+            <TextBlock AutomationProperties.AutomationId="AboutPageRoot" Text="HerdMe" Style="{StaticResource TitleTextBlockStyle}" />
             <TextBlock x:Uid="AboutPageDescription" Text="Open-source local development for PHP and Laravel" Style="{StaticResource SubtitleTextBlockStyle}" />
             <TextBlock x:Name="VersionText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">

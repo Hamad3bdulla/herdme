@@ -6,7 +6,7 @@
     Loaded="Page_Loaded">
     <ScrollViewer>
         <StackPanel Padding="32" Spacing="16" MaxWidth="900" HorizontalAlignment="Left">
-            <TextBlock x:Uid="DebuggerPageTitle" Text="Debugger" Style="{StaticResource TitleTextBlockStyle}" />
+            <TextBlock x:Uid="DebuggerPageTitle" AutomationProperties.AutomationId="DebuggerPageRoot" Text="Debugger" Style="{StaticResource TitleTextBlockStyle}" />
 
             <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
                 <StackPanel Spacing="12">

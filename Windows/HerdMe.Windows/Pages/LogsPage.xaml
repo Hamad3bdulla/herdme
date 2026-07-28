@@ -13,7 +13,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid>
-            <TextBlock x:Uid="LogsPageTitle" Text="Logs" Style="{StaticResource TitleTextBlockStyle}" />
+            <TextBlock x:Uid="LogsPageTitle" AutomationProperties.AutomationId="LogsPageRoot" Text="Logs" Style="{StaticResource TitleTextBlockStyle}" />
             <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
                 <ComboBox
                     x:Name="SourceBox"
