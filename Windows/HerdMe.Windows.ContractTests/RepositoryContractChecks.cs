@@ -541,6 +541,30 @@ internal static partial class ContractChecks
                 ),
             "the Windows tray icon is created with the H.NotifyIcon generated icon source API"
         );
+        Check(
+            !appCodeBehind.Contains("Resources[\"OpenHerdMeCommand\"]", StringComparison.Ordinal)
+                && !appCodeBehind.Contains("Resources[\"QuitHerdMeCommand\"]", StringComparison.Ordinal)
+                && !appCodeBehind.Contains("Resources[\"StartAllCommand\"]", StringComparison.Ordinal)
+                && !appCodeBehind.Contains("Resources[\"StopAllCommand\"]", StringComparison.Ordinal)
+                && appCodeBehind.Contains("new XamlUICommand", StringComparison.Ordinal)
+                && appCodeBehind.Contains(
+                    "AppLocalization.Get(\"TrayOpenCommand.Label\")",
+                    StringComparison.Ordinal
+                )
+                && appCodeBehind.Contains(
+                    "AppLocalization.Get(\"TrayQuitCommand.Label\")",
+                    StringComparison.Ordinal
+                )
+                && appCodeBehind.Contains(
+                    "AppLocalization.Get(\"TrayStartAllCommand.Label\")",
+                    StringComparison.Ordinal
+                )
+                && appCodeBehind.Contains(
+                    "AppLocalization.Get(\"TrayStopAllCommand.Label\")",
+                    StringComparison.Ordinal
+                ),
+            "the Windows tray commands are constructed from localized strings at runtime"
+        );
 
         var projectDocument = XDocument.Load(
             Path.Combine(projectRoot, "HerdMe.Windows.csproj")

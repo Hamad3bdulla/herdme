@@ -81,17 +81,33 @@ public partial class App : Application
 
     private void InitializeTrayIcon()
     {
-        var openCommand = (XamlUICommand)Resources["OpenHerdMeCommand"];
+        var openCommand = new XamlUICommand
+        {
+            Label = AppLocalization.Get("TrayOpenCommand.Label"),
+            IconSource = new SymbolIconSource { Symbol = Symbol.OpenPane }
+        };
         openCommand.ExecuteRequested += (_, _) =>
         {
             MainWindow.AppWindow.Show();
             MainWindow.Activate();
         };
-        var quitCommand = (XamlUICommand)Resources["QuitHerdMeCommand"];
+        var quitCommand = new XamlUICommand
+        {
+            Label = AppLocalization.Get("TrayQuitCommand.Label"),
+            IconSource = new SymbolIconSource { Symbol = Symbol.ClosePane }
+        };
         quitCommand.ExecuteRequested += QuitCommand_ExecuteRequested;
-        var startCommand = (XamlUICommand)Resources["StartAllCommand"];
+        var startCommand = new XamlUICommand
+        {
+            Label = AppLocalization.Get("TrayStartAllCommand.Label"),
+            IconSource = new SymbolIconSource { Symbol = Symbol.Play }
+        };
         startCommand.ExecuteRequested += StartCommand_ExecuteRequested;
-        var stopCommand = (XamlUICommand)Resources["StopAllCommand"];
+        var stopCommand = new XamlUICommand
+        {
+            Label = AppLocalization.Get("TrayStopAllCommand.Label"),
+            IconSource = new SymbolIconSource { Symbol = Symbol.Stop }
+        };
         stopCommand.ExecuteRequested += StopCommand_ExecuteRequested;
 
         var contextMenu = new MenuFlyout { AreOpenCloseAnimationsEnabled = false };
