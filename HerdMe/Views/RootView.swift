@@ -197,10 +197,39 @@ private struct WindowSizeController: NSViewRepresentable {
                 default: 730
                 }
             let current = window.contentView?.frame.size ?? window.frame.size
-            guard current.width + 1 < preferredWidth else { return }
-            window.setContentSize(
-                NSSize(width: preferredWidth, height: max(current.height, 527))
+            let visibleFrame = (window.screen ?? NSScreen.main)?.visibleFrame
+            let maximumContentSize = visibleFrame.map {
+                window.contentRect(forFrameRect: $0).size
+            }
+            let targetSize = NSSize(
+                width: min(
+                    max(current.width, preferredWidth),
+                    maximumContentSize?.width ?? .greatestFiniteMagnitude
+                ),
+                height: min(
+                    max(current.height, 527),
+                    maximumContentSize?.height ?? .greatestFiniteMagnitude
+                )
             )
+            if abs(current.width - targetSize.width) >= 1
+                || abs(current.height - targetSize.height) >= 1
+            {
+                window.setContentSize(targetSize)
+            }
+
+            guard let visibleFrame else { return }
+            var constrainedFrame = window.frame
+            constrainedFrame.origin.x = min(
+                max(constrainedFrame.minX, visibleFrame.minX),
+                visibleFrame.maxX - constrainedFrame.width
+            )
+            constrainedFrame.origin.y = min(
+                max(constrainedFrame.minY, visibleFrame.minY),
+                visibleFrame.maxY - constrainedFrame.height
+            )
+            if constrainedFrame != window.frame {
+                window.setFrame(constrainedFrame, display: true)
+            }
         }
     }
 }
