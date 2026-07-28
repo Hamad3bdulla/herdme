@@ -31,7 +31,7 @@ final class HerdMeUITests: XCTestCase {
             XCTAssertTrue(button.waitForExistence(timeout: 5), "Missing sidebar page: \(title)")
             XCTAssertEqual(button.label, title)
             click(button, in: app.windows.firstMatch)
-            XCTAssertTrue(button.isSelected, "Sidebar did not select: \(title)")
+            XCTAssertTrue(waitForSelection(of: button), "Sidebar did not select: \(title)")
         }
         XCTAssertFalse(app.buttons["onboarding.setup"].exists)
         retainScreenshot(named: "application-shell", from: app)
@@ -57,7 +57,7 @@ final class HerdMeUITests: XCTestCase {
             XCTAssertTrue(button.waitForExistence(timeout: 5), "Missing Arabic sidebar page: \(title)")
             XCTAssertEqual(button.label, title)
             click(button, in: window)
-            XCTAssertTrue(button.isSelected, "Arabic sidebar did not select: \(title)")
+            XCTAssertTrue(waitForSelection(of: button), "Arabic sidebar did not select: \(title)")
         }
 
         let generalButton = app.buttons["sidebar.general"]
@@ -118,7 +118,11 @@ final class HerdMeUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        if element.isHittable {
+        let hittable = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "hittable == true"),
+            object: element
+        )
+        if XCTWaiter.wait(for: [hittable], timeout: 3) == .completed {
             element.click()
             return
         }
@@ -134,11 +138,15 @@ final class HerdMeUITests: XCTestCase {
         )
         guard !elementFrame.isEmpty, windowFrame.intersects(elementFrame) else { return }
 
-        let offset = CGVector(
-            dx: (elementFrame.midX - windowFrame.minX) / windowFrame.width,
-            dy: (elementFrame.midY - windowFrame.minY) / windowFrame.height
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    }
+
+    private func waitForSelection(of element: XCUIElement) -> Bool {
+        let selected = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "selected == true"),
+            object: element
         )
-        window.coordinate(withNormalizedOffset: offset).click()
+        return XCTWaiter.wait(for: [selected], timeout: 3) == .completed
     }
 
     private func retainScreenshot(named name: String, from app: XCUIApplication) {
