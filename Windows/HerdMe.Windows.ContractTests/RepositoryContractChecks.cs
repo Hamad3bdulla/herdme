@@ -477,6 +477,24 @@ internal static partial class ContractChecks
                 $"{Path.GetRelativePath(repositoryRoot, xamlPath)} has unique x:Name values"
             );
 
+            var symbolIcons = documentRoot.DescendantsAndSelf()
+                .Where(element => element.Name.LocalName == "SymbolIcon")
+                .ToArray();
+            Check(
+                symbolIcons.All(element => element.Attribute("FontSize") is null),
+                $"{Path.GetRelativePath(repositoryRoot, xamlPath)} sizes icons with FontIcon instead of unsupported SymbolIcon.FontSize"
+            );
+            Check(
+                symbolIcons.All(element =>
+                    !string.Equals(
+                        element.Attribute("Symbol")?.Value,
+                        "Code",
+                        StringComparison.Ordinal
+                    )
+                ),
+                $"{Path.GetRelativePath(repositoryRoot, xamlPath)} uses only supported Symbol enum values for code icons"
+            );
+
             var handlers = documentRoot.DescendantsAndSelf()
                 .SelectMany(element => element.Attributes())
                 .Where(attribute =>

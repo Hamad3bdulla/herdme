@@ -25,7 +25,7 @@
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Folder" /></NavigationViewItem.Icon>
             </NavigationViewItem>
             <NavigationViewItem x:Uid="NavPhp" AutomationProperties.AutomationId="NavPhp" Content="PHP" Tag="php">
-                <NavigationViewItem.Icon><SymbolIcon Symbol="Code" /></NavigationViewItem.Icon>
+                <NavigationViewItem.Icon><FontIcon Glyph="&#xE943;" /></NavigationViewItem.Icon>
             </NavigationViewItem>
             <NavigationViewItem x:Uid="NavNode" AutomationProperties.AutomationId="NavNode" Content="Node" Tag="node">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Library" /></NavigationViewItem.Icon>

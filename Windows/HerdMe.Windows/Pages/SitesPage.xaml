@@ -147,7 +147,7 @@
                         <ProgressRing x:Name="ScanProgress" Width="18" Height="18" />
                     </StackPanel>
                     <StackPanel x:Name="EmptyState" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-                        <SymbolIcon Symbol="Folder" FontSize="36" />
+                        <FontIcon Glyph="&#xE8B7;" FontSize="36" />
                         <TextBlock x:Uid="SitesEmptyState" Text="No sites found" Style="{StaticResource SubtitleTextBlockStyle}" />
                     </StackPanel>
                 </Grid>
@@ -156,7 +156,7 @@
             <Border Grid.Column="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
                 <Grid>
                     <StackPanel x:Name="NoSelectionState" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-                        <SymbolIcon Symbol="Globe" FontSize="42" />
+                        <FontIcon Glyph="&#xE774;" FontSize="42" />
                         <TextBlock x:Uid="SitesNoSelection" Text="Select a site" Style="{StaticResource SubtitleTextBlockStyle}" />
                     </StackPanel>
 
