@@ -1075,8 +1075,9 @@ internal static partial class ContractChecks
             localizationSource.Contains("Microsoft.Windows.ApplicationModel.Resources", StringComparison.Ordinal)
                 && localizationSource.Contains("new ResourceLoader(", StringComparison.Ordinal)
                 && localizationSource.Contains("HerdMe.Windows.pri", StringComparison.Ordinal)
-                && localizationSource.Contains("ms-resource://HerdMe.Windows/Resources/", StringComparison.Ordinal)
-                && localizationSource.Contains("Loader.Value.GetStringForUri", StringComparison.Ordinal)
+                && localizationSource.Contains("\"Resources\"", StringComparison.Ordinal)
+                && localizationSource.Contains("Loader.Value.GetString(key)", StringComparison.Ordinal)
+                && localizationSource.Contains("COMException or FileNotFoundException", StringComparison.Ordinal)
                 && !localizationSource.Contains("new ResourceLoader()", StringComparison.Ordinal)
                 && !localizationSource.Contains("MainResourceMap.GetValue", StringComparison.Ordinal)
                 && localizationSource.Contains("ApplicationLanguages.Languages", StringComparison.Ordinal),

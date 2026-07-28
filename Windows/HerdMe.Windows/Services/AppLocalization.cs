@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.ApplicationModel.Resources;
 using Microsoft.Windows.Globalization;
@@ -7,9 +8,9 @@ namespace HerdMe.Windows.Services;
 
 public static class AppLocalization
 {
-    private const string ResourceUriPrefix = "ms-resource://HerdMe.Windows/Resources/";
     private static readonly Lazy<ResourceLoader> Loader = new(() => new ResourceLoader(
-        Path.Combine(AppContext.BaseDirectory, "HerdMe.Windows.pri")
+        Path.Combine(AppContext.BaseDirectory, "HerdMe.Windows.pri"),
+        "Resources"
     ));
 
     public static string LanguageTag => ApplicationLanguages.Languages.FirstOrDefault()
@@ -22,8 +23,18 @@ public static class AppLocalization
     public static string Get(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        var value = Loader.Value.GetStringForUri(new Uri($"{ResourceUriPrefix}{key}"));
-        return string.IsNullOrWhiteSpace(value) ? key : value;
+        try
+        {
+            var value = Loader.Value.GetString(key);
+            return string.IsNullOrWhiteSpace(value) ? key : value;
+        }
+        catch (Exception error) when (error is COMException or FileNotFoundException)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"HerdMe could not resolve the localized resource '{key}': {error.Message}"
+            );
+            return key;
+        }
     }
 
     public static string Format(string key, params object?[] arguments)
