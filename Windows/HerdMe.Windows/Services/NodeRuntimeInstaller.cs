@@ -81,10 +81,11 @@ public sealed class NodeRuntimeInstaller
     }
 
     public async Task<string> EnsureActiveRuntimeAsync(
-        string fallbackMajor = "22",
+        string? fallbackMajor = null,
         CancellationToken cancellationToken = default
     )
     {
+        fallbackMajor ??= RuntimeCatalog.DefaultNodeMajor;
         var active = LoadSettings().ActiveVersion;
         if (!string.IsNullOrWhiteSpace(active))
         {

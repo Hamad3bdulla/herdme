@@ -9,14 +9,14 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         PhpRuntimeLaunchContract Contract
     );
 
-    private readonly CoreClient coreClient = new();
+    private readonly CoreClient coreClient;
     private readonly PhpRuntimeInstaller runtimeInstaller;
     private readonly PhpRuntimePolicy runtimePolicy;
     private readonly Dictionary<string, PhpFastCgiProcess> phpProcesses = new(StringComparer.Ordinal);
     private readonly LocalHttpSiteServer httpServer = new();
     private readonly LocalHttpSiteServer httpsServer = new();
-    private readonly WindowsCertificateManager certificateManager = new();
-    private readonly WindowsHostsManager hostsManager = new();
+    private readonly WindowsCertificateManager certificateManager;
+    private readonly WindowsHostsManager hostsManager;
     private readonly SemaphoreSlim operationLock = new(1, 1);
     private readonly object healthMonitorLock = new();
     private volatile IReadOnlyList<PhpFastCgiProcess> phpProcessSnapshot = [];
@@ -26,10 +26,19 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
     private Task? healthMonitorTask;
     private int recoveryEnabled;
 
-    public WindowsLocalEnvironment()
+    public WindowsLocalEnvironment(
+        CoreClient? coreClient = null,
+        PhpRuntimeInstaller? runtimeInstaller = null,
+        PhpRuntimePolicy? runtimePolicy = null,
+        WindowsCertificateManager? certificateManager = null,
+        WindowsHostsManager? hostsManager = null
+    )
     {
-        runtimeInstaller = new PhpRuntimeInstaller(coreClient);
-        runtimePolicy = new PhpRuntimePolicy(coreClient);
+        this.coreClient = coreClient ?? new CoreClient();
+        this.runtimeInstaller = runtimeInstaller ?? new PhpRuntimeInstaller(this.coreClient);
+        this.runtimePolicy = runtimePolicy ?? new PhpRuntimePolicy(this.coreClient);
+        this.certificateManager = certificateManager ?? new WindowsCertificateManager();
+        this.hostsManager = hostsManager ?? new WindowsHostsManager();
     }
 
     public bool IsRunning => phpProcessSnapshot.Count > 0
@@ -141,10 +150,14 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
     {
         Volatile.Write(ref recoveryEnabled, 0);
         configuredSites = [];
-        await CancelHealthMonitorAsync();
         await operationLock.WaitAsync();
         try
         {
+            // A StartAsync that already owned the lock may have re-enabled
+            // recovery and created a new monitor while StopAsync was waiting.
+            Volatile.Write(ref recoveryEnabled, 0);
+            configuredSites = [];
+            await CancelHealthMonitorAsync();
             await StopCoreAsync();
         }
         finally
@@ -334,31 +347,12 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
                 }
                 if (recoveryError is not null)
                 {
-                    await LogRecoveryFailureAsync(recoveryError);
+                    await ApplicationDiagnostics.WriteEnvironmentRecoveryFailureAsync(recoveryError);
                     await Task.Delay(TimeSpan.FromSeconds(8), cancellationToken);
                 }
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
-    }
-
-    private static async Task LogRecoveryFailureAsync(Exception error)
-    {
-        try
-        {
-            var directory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "HerdMe",
-                "Log"
-            );
-            await BoundedLog.AppendLineAsync(
-                Path.Combine(directory, "environment.log"),
-                $"[{DateTimeOffset.Now:O}] Automatic recovery failed: {error.Message}"
-            );
-        }
-        catch (IOException)
         {
         }
     }

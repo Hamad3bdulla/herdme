@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MailView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var mail: MailCoordinator
     @State private var selectedMessageID: CapturedMail.ID?
     @State private var selectedMessage: CapturedMail?
     @State private var isLoadingMessage = false
@@ -15,10 +16,18 @@ struct MailView: View {
         case raw = "Raw"
 
         var id: String { rawValue }
+
+        var localizedTitle: String {
+            switch self {
+            case .preview: String(localized: "Preview")
+            case .text: String(localized: "Text")
+            case .raw: String(localized: "Raw")
+            }
+        }
     }
 
     private var filteredMessages: [CapturedMailSummary] {
-        model.mailMessages.filter { $0.matchesSearch(search) }
+        mail.messages.filter { $0.matchesSearch(search) }
     }
 
     var body: some View {
@@ -31,22 +40,22 @@ struct MailView: View {
                         Spacer()
                         HStack(spacing: 5) {
                             Circle()
-                                .fill(model.isMailServerRunning ? .green : .secondary)
+                                .fill(mail.isServerRunning ? .green : .secondary)
                                 .frame(width: 8, height: 8)
-                            Text(model.isMailServerRunning ? "Running" : "Stopped")
+                            Text(mail.isServerRunning ? "Running" : "Stopped")
                                 .foregroundStyle(.secondary)
                         }
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("Mail server")
-                        .accessibilityValue(model.isMailServerRunning ? "Running" : "Stopped")
+                        .accessibilityValue(mail.isServerRunning ? "Running" : "Stopped")
                         Button {
-                            model.isMailServerRunning ? model.stopMailServer() : model.startMailServer()
+                            mail.isServerRunning ? model.stopMailServer() : model.startMailServer()
                         } label: {
-                            Image(systemName: model.isMailServerRunning ? "stop.fill" : "play.fill")
+                            Image(systemName: mail.isServerRunning ? "stop.fill" : "play.fill")
                         }
                         .buttonStyle(.borderless)
-                        .help(model.isMailServerRunning ? "Stop mail server" : "Start mail server")
-                        .accessibilityLabel(model.isMailServerRunning ? "Stop mail server" : "Start mail server")
+                        .help(mail.isServerRunning ? "Stop mail server" : "Start mail server")
+                        .accessibilityLabel(mail.isServerRunning ? "Stop mail server" : "Start mail server")
                     }
                     PanelDivider()
                     SettingRow("SMTP Port") {
@@ -73,7 +82,7 @@ struct MailView: View {
                         HStack {
                             Text("Inbox").font(.headline)
                             Spacer()
-                            Text("\(model.mailMessages.count)")
+                            Text("\(mail.messages.count)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Button {
@@ -83,7 +92,7 @@ struct MailView: View {
                                 Image(systemName: "trash")
                             }
                             .buttonStyle(.borderless)
-                            .disabled(model.mailMessages.isEmpty)
+                            .disabled(mail.messages.isEmpty)
                             .help("Delete all messages")
                             .accessibilityLabel("Delete all messages")
                         }
@@ -93,7 +102,7 @@ struct MailView: View {
                             .textFieldStyle(.roundedBorder)
                             .padding(.bottom, 8)
 
-                        if model.mailMessages.isEmpty {
+                        if mail.messages.isEmpty {
                             EmptyStateView(symbol: "tray", title: "Inbox is empty", message: "")
                         } else if filteredMessages.isEmpty {
                             EmptyStateView(symbol: "magnifyingglass", title: "No matching messages", message: "")
@@ -143,7 +152,7 @@ struct MailView: View {
                             Text("To: " + message.recipients.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
                             Divider()
                             Picker("View", selection: $detailTab) {
-                                ForEach(DetailTab.allCases) { tab in Text(tab.rawValue).tag(tab) }
+                                ForEach(DetailTab.allCases) { tab in Text(tab.localizedTitle).tag(tab) }
                             }
                             .pickerStyle(.segmented)
                             .labelsHidden()
@@ -182,11 +191,12 @@ struct MailView: View {
             }
         }
         .onAppear {
-            selectedMessageID = selectedMessageID ?? model.mailMessages.first?.id
+            selectedMessageID = selectedMessageID ?? mail.messages.first?.id
         }
-        .onChange(of: model.mailMessages.first?.id) { newestMessageID in
+        .onChange(of: mail.messages.first?.id) { newestMessageID in
             if let newestMessageID,
-               filteredMessages.contains(where: { $0.id == newestMessageID }) {
+                filteredMessages.contains(where: { $0.id == newestMessageID })
+            {
                 selectedMessageID = newestMessageID
             } else if !filteredMessages.contains(where: { $0.id == selectedMessageID }) {
                 selectedMessageID = filteredMessages.first?.id

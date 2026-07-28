@@ -8,9 +8,12 @@ enum PHPFPMError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .executableMissing:
-            "Install a HerdMe-managed PHP runtime with PHP-FPM before starting sites."
-        case let .startupFailed(logPath):
-            "PHP-FPM could not be started. Check \(logPath) for details."
+            String(localized: "Install a HerdMe-managed PHP runtime with PHP-FPM before starting sites.")
+        case .startupFailed(let logPath):
+            String.localizedStringWithFormat(
+                String(localized: "PHP-FPM could not be started. Check %@ for details."),
+                logPath
+            )
         }
     }
 }
@@ -44,9 +47,10 @@ final class PHPFPMManager: @unchecked Sendable {
         lock.lock()
         let active = Array(runtimes.values)
         lock.unlock()
-        return !active.isEmpty && active.allSatisfy {
-            $0.process.isRunning && Self.canConnect(port: $0.port)
-        }
+        return !active.isEmpty
+            && active.allSatisfy {
+                $0.process.isRunning && Self.canConnect(port: $0.port)
+            }
     }
 
     func start(
@@ -136,7 +140,8 @@ final class PHPFPMManager: @unchecked Sendable {
         arguments.append(contentsOf: ["--nodaemonize", "--fpm-config", configurationURL.path])
         process.arguments = arguments
         var environment = ProcessInfo.processInfo.environment
-        environment["PATH"] = rootURL.appendingPathComponent("bin").path
+        environment["PATH"] =
+            rootURL.appendingPathComponent("bin").path
             + ":" + (environment["PATH"] ?? "")
         process.environment = environment
         process.standardOutput = outputHandle
@@ -221,16 +226,18 @@ final class PHPFPMManager: @unchecked Sendable {
 
     private func cleanupStaleProcesses() async {
         let configurationDirectory = rootURL.appendingPathComponent("Runtime/fpm", isDirectory: true)
-        let pidFiles = ((try? fileManager.contentsOfDirectory(
-            at: configurationDirectory,
-            includingPropertiesForKeys: nil
-        )) ?? []).filter { $0.pathExtension == "pid" }
+        let pidFiles =
+            ((try? fileManager.contentsOfDirectory(
+                at: configurationDirectory,
+                includingPropertiesForKeys: nil
+            )) ?? []).filter { $0.pathExtension == "pid" }
 
         for pidURL in pidFiles {
             defer { try? fileManager.removeItem(at: pidURL) }
             guard let text = try? String(contentsOf: pidURL, encoding: .utf8),
-                  let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)),
-                  pid > 1 else {
+                let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)),
+                pid > 1
+            else {
                 continue
             }
             let command = Self.command(for: pid)
@@ -269,32 +276,33 @@ final class PHPFPMManager: @unchecked Sendable {
         let errorLog = quoted(errorLogURL.path)
         let maximumChildren = maximumChildren(logicalProcessorCount: logicalProcessorCount)
         return """
-        [global]
-        pid = \(pid)
-        error_log = \(errorLog)
-        daemonize = no
-        log_level = notice
+            [global]
+            pid = \(pid)
+            error_log = \(errorLog)
+            daemonize = no
+            log_level = notice
 
-        [herdme]
-        listen = 127.0.0.1:\(port)
-        listen.allowed_clients = 127.0.0.1
-        pm = dynamic
-        pm.max_children = \(maximumChildren)
-        pm.start_servers = 2
-        pm.min_spare_servers = 1
-        pm.max_spare_servers = 4
-        pm.max_requests = 500
-        clear_env = no
-        catch_workers_output = yes
-        decorate_workers_output = no
-        security.limit_extensions = .php
-        php_admin_flag[log_errors] = on
-        php_admin_value[error_log] = \(errorLog)
-        """
+            [herdme]
+            listen = 127.0.0.1:\(port)
+            listen.allowed_clients = 127.0.0.1
+            pm = dynamic
+            pm.max_children = \(maximumChildren)
+            pm.start_servers = 2
+            pm.min_spare_servers = 1
+            pm.max_spare_servers = 4
+            pm.max_requests = 500
+            clear_env = no
+            catch_workers_output = yes
+            decorate_workers_output = no
+            security.limit_extensions = .php
+            php_admin_flag[log_errors] = on
+            php_admin_value[error_log] = \(errorLog)
+            """
     }
 
     private static func quoted(_ value: String) -> String {
-        "\"" + value
+        "\""
+            + value
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"") + "\""
     }

@@ -12,15 +12,16 @@ namespace HerdMe.Windows.Pages;
 
 public sealed partial class MailPage : Page
 {
-    private readonly MailCaptureService mail = AppServices.Mail;
+    private readonly MailCaptureService mail;
     private readonly List<CapturedMail> allMessages = [];
     private bool previewConfigured;
     private Guid? previewMessageId;
 
     public ObservableCollection<CapturedMail> Messages { get; } = [];
 
-    public MailPage()
+    public MailPage(MailCaptureService mail)
     {
+        this.mail = mail;
         InitializeComponent();
     }
 
@@ -119,9 +120,13 @@ public sealed partial class MailPage : Page
 
     private void ShowMessage(CapturedMail? message)
     {
-        SubjectText.Text = message?.Subject ?? "Select a message";
-        SenderText.Text = message is null ? string.Empty : "From: " + message.Sender;
-        RecipientText.Text = message is null ? string.Empty : "To: " + message.RecipientsText;
+        SubjectText.Text = message?.Subject ?? AppLocalization.Get("MailSelectMessage");
+        SenderText.Text = message is null
+            ? string.Empty
+            : AppLocalization.Format("MailFrom", message.Sender);
+        RecipientText.Text = message is null
+            ? string.Empty
+            : AppLocalization.Format("MailTo", message.RecipientsText);
         BodyText.Text = message?.Body ?? string.Empty;
         RawText.Text = message?.Raw ?? string.Empty;
         DeleteButton.IsEnabled = message is not null;
@@ -246,7 +251,9 @@ public sealed partial class MailPage : Page
 
     private void UpdateServerState()
     {
-        ServerStatusText.Text = mail.IsRunning ? $"Running on 127.0.0.1:{mail.Port}" : "Stopped";
+        ServerStatusText.Text = mail.IsRunning
+            ? AppLocalization.Format("MailRunningOn", mail.Port)
+            : AppLocalization.Get("MailStopped");
         ServerButtonIcon.Symbol = mail.IsRunning ? Symbol.Stop : Symbol.Play;
     }
 
@@ -257,7 +264,7 @@ public sealed partial class MailPage : Page
             XamlRoot = XamlRoot,
             Title = "HerdMe",
             Content = message,
-            CloseButtonText = "OK"
+            CloseButtonText = AppLocalization.Get("CommonOk")
         };
         await dialog.ShowAsync();
     }

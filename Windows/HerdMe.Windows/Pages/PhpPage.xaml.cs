@@ -7,18 +7,25 @@ namespace HerdMe.Windows.Pages;
 
 public sealed partial class PhpPage : Page
 {
-    private readonly CoreClient coreClient = new();
+    private readonly CoreClient coreClient;
     private readonly PhpRuntimePolicy runtimePolicy;
     private readonly PhpRuntimeInstaller runtimeInstaller;
-    private readonly ComposerToolManager toolManager = new();
+    private readonly ComposerToolManager toolManager;
     private PhpRuntimeSettings settings;
     private bool loaded;
 
-    public PhpPage()
+    public PhpPage(
+        CoreClient coreClient,
+        PhpRuntimePolicy runtimePolicy,
+        PhpRuntimeInstaller runtimeInstaller,
+        ComposerToolManager toolManager
+    )
     {
+        this.coreClient = coreClient;
+        this.runtimePolicy = runtimePolicy;
+        this.runtimeInstaller = runtimeInstaller;
+        this.toolManager = toolManager;
         InitializeComponent();
-        runtimePolicy = new PhpRuntimePolicy(coreClient);
-        runtimeInstaller = new PhpRuntimeInstaller(coreClient);
         settings = runtimePolicy.Load();
         var availableCycles = PhpRuntimeInstaller.SupportedCycles
             .Concat(runtimeInstaller.InstalledCycles().Where(cycle =>
@@ -29,7 +36,7 @@ public sealed partial class PhpPage : Page
         foreach (var cycle in availableCycles) PhpCycleBox.Items.Add(cycle);
         PhpCycleBox.SelectedItem = availableCycles.Contains(settings.PhpCycle, StringComparer.Ordinal)
             ? settings.PhpCycle
-            : "8.4";
+            : RuntimeCatalog.DefaultPhpCycle;
         MemoryLimitBox.Value = settings.MemoryLimitMegabytes;
         UploadLimitBox.Value = settings.MaxUploadMegabytes;
     }
@@ -53,7 +60,7 @@ public sealed partial class PhpPage : Page
     private async Task RefreshAsync()
     {
         RuntimeProgress.IsActive = true;
-        RuntimeStatusText.Text = "Checking";
+        RuntimeStatusText.Text = AppLocalization.Get("PhpCheckingStatus");
         ExtensionDetailText.Text = string.Empty;
         InstallPhpButton.Visibility = Visibility.Collapsed;
         InstallToolsButton.Visibility = Visibility.Visible;
@@ -79,14 +86,22 @@ public sealed partial class PhpPage : Page
                 runtimeInstaller.InstalledVersion(selectedCycle),
                 latestVersion
             );
-            InstallPhpButtonText.Text = action.Label;
+            InstallPhpButtonText.Text = action.IsUpdateAvailable
+                ? AppLocalization.Get("CommonUpdate")
+                : AppLocalization.Get("CommonInstall");
             InstallPhpButton.Visibility = action.IsVisible ? Visibility.Visible : Visibility.Collapsed;
             if (phpPath is null)
             {
-                PhpPathText.Text = "No usable PHP executable was found.";
-                RuntimeStatusText.Text = "PHP unavailable";
-                ComposerVersionText.Text = "Composer: Not installed";
-                LaravelInstallerVersionText.Text = "Laravel Installer: Not installed";
+                PhpPathText.Text = AppLocalization.Get("PhpNoUsableExecutable");
+                RuntimeStatusText.Text = AppLocalization.Get("PhpUnavailable");
+                ComposerVersionText.Text = AppLocalization.Format(
+                    "PhpComposerVersion",
+                    AppLocalization.Get("CommonNotInstalled")
+                );
+                LaravelInstallerVersionText.Text = AppLocalization.Format(
+                    "PhpLaravelInstallerVersion",
+                    AppLocalization.Get("CommonNotInstalled")
+                );
                 InstallToolsButton.IsEnabled = false;
                 return;
             }
@@ -94,13 +109,25 @@ public sealed partial class PhpPage : Page
             PhpPathText.Text = phpPath;
             var contract = await runtimePolicy.PrepareLaunchAsync(phpPath);
             RuntimeStatusText.Text = PhpRuntimeInstaller.IsSupportedCycle(selectedCycle)
-                ? "Ready for Laravel projects"
-                : "Legacy PHP runtime";
+                ? AppLocalization.Get("PhpReadyForLaravel")
+                : AppLocalization.Get("PhpLegacyRuntime");
             ExtensionDetailText.Text = string.Join(", ", contract.Extensions.Required);
             var toolVersions = await toolManager.InstalledVersionsAsync(selectedCycle);
-            ComposerVersionText.Text = "Composer: " + (toolVersions.Composer is null ? "Not installed" : $"v{toolVersions.Composer}");
-            LaravelInstallerVersionText.Text = "Laravel Installer: " + (toolVersions.Laravel is null ? "Not installed" : $"v{toolVersions.Laravel}");
-            InstallToolsButtonText.Text = toolVersions.Laravel is null ? "Install" : "Update";
+            ComposerVersionText.Text = AppLocalization.Format(
+                "PhpComposerVersion",
+                toolVersions.Composer is null
+                    ? AppLocalization.Get("CommonNotInstalled")
+                    : $"v{toolVersions.Composer}"
+            );
+            LaravelInstallerVersionText.Text = AppLocalization.Format(
+                "PhpLaravelInstallerVersion",
+                toolVersions.Laravel is null
+                    ? AppLocalization.Get("CommonNotInstalled")
+                    : $"v{toolVersions.Laravel}"
+            );
+            InstallToolsButtonText.Text = toolVersions.Laravel is null
+                ? AppLocalization.Get("CommonInstall")
+                : AppLocalization.Get("CommonUpdate");
             var updateAvailable = toolVersions.Composer is null || toolVersions.Laravel is null;
             if (!updateAvailable)
             {
@@ -129,13 +156,13 @@ public sealed partial class PhpPage : Page
         }
         catch (Exception error)
         {
-            RuntimeStatusText.Text = "Blocked";
+            RuntimeStatusText.Text = AppLocalization.Get("PhpBlocked");
             ExtensionDetailText.Text = error.Message;
             var selectedCycle = PhpCycleBox.SelectedItem?.ToString() ?? settings.PhpCycle;
             if (runtimeInstaller.IsInstalled(selectedCycle)
                 && PhpRuntimeInstaller.IsSupportedCycle(selectedCycle))
             {
-                InstallPhpButtonText.Text = "Repair";
+                InstallPhpButtonText.Text = AppLocalization.Get("PhpRepair");
                 InstallPhpButton.Visibility = Visibility.Visible;
             }
         }
@@ -150,18 +177,24 @@ public sealed partial class PhpPage : Page
         var cycle = PhpCycleBox.SelectedItem?.ToString() ?? settings.PhpCycle;
         InstallToolsButton.IsEnabled = false;
         RuntimeProgress.IsActive = true;
-        RuntimeStatusText.Text = "Installing Composer and Laravel Installer";
+        RuntimeStatusText.Text = AppLocalization.Get("PhpInstallingTools");
         try
         {
             var versions = await toolManager.InstallOrUpdateAsync(cycle);
-            ComposerVersionText.Text = $"Composer: v{versions.Composer}";
-            LaravelInstallerVersionText.Text = $"Laravel Installer: v{versions.Laravel}";
+            ComposerVersionText.Text = AppLocalization.Format(
+                "PhpComposerVersion",
+                $"v{versions.Composer}"
+            );
+            LaravelInstallerVersionText.Text = AppLocalization.Format(
+                "PhpLaravelInstallerVersion",
+                $"v{versions.Laravel}"
+            );
             InstallToolsButton.Visibility = Visibility.Collapsed;
-            RuntimeStatusText.Text = "Ready for Laravel 13";
+            RuntimeStatusText.Text = AppLocalization.Get("PhpReadyForLaravel13");
         }
         catch (Exception error)
         {
-            RuntimeStatusText.Text = "Tool installation failed";
+            RuntimeStatusText.Text = AppLocalization.Get("PhpToolInstallationFailed");
             ExtensionDetailText.Text = error.Message;
         }
         finally
@@ -173,21 +206,24 @@ public sealed partial class PhpPage : Page
 
     private async void InstallPhp_Click(object sender, RoutedEventArgs e)
     {
-        var cycle = PhpCycleBox.SelectedItem?.ToString() ?? "8.4";
+        var cycle = PhpCycleBox.SelectedItem?.ToString() ?? RuntimeCatalog.DefaultPhpCycle;
         InstallPhpButton.IsEnabled = false;
         RuntimeProgress.IsActive = true;
-        RuntimeStatusText.Text = "Installing";
+        RuntimeStatusText.Text = AppLocalization.Get("PhpInstalling");
         try
         {
             var release = await runtimeInstaller.InstallAsync(cycle);
             settings.PhpCycle = cycle;
             runtimePolicy.Save(settings);
-            RuntimeStatusText.Text = $"PHP {release.Version} installed";
+            RuntimeStatusText.Text = AppLocalization.Format(
+                "PhpVersionInstalled",
+                release.Version
+            );
             await RefreshAsync();
         }
         catch (Exception error)
         {
-            RuntimeStatusText.Text = "Install failed";
+            RuntimeStatusText.Text = AppLocalization.Get("PhpInstallFailed");
             ExtensionDetailText.Text = error.Message;
         }
         finally
@@ -210,6 +246,6 @@ public sealed partial class PhpPage : Page
         settings = runtimePolicy.Load();
         MemoryLimitBox.Value = settings.MemoryLimitMegabytes;
         UploadLimitBox.Value = settings.MaxUploadMegabytes;
-        SaveStatusText.Text = "Saved for the next local PHP start.";
+        SaveStatusText.Text = AppLocalization.Get("PhpSavedForNextStart");
     }
 }

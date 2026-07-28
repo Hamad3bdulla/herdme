@@ -1,0 +1,147 @@
+name: Portable core fuzzing
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "41 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portable-core-fuzzing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable-core:
+    name: Portable core with libFuzzer, ASan, and UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Configure fuzz targets
+        run: |
+          clang++ --version
+          cmake \
+            -S Core \
+            -B build/core-fuzz \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DBUILD_TESTING=OFF \
+            -DHERDME_FUZZING_ENGINE=libfuzzer
+
+      - name: Build fuzz targets
+        run: cmake --build build/core-fuzz --parallel 2
+
+      - name: Run bounded fuzz campaigns
+        env:
+          ASAN_OPTIONS: abort_on_error=1:detect_leaks=1:strict_string_checks=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          mkdir -p build/fuzz-artifacts build/fuzz-logs
+          for target in dns-label php-modules json; do
+            build/core-fuzz/herdme-${target}-fuzzer \
+              Core/fuzz/corpus/${target} \
+              -artifact_prefix=build/fuzz-artifacts/${target}- \
+              -max_len=65536 \
+              -max_total_time=30 \
+              -print_final_stats=1 \
+              -rss_limit_mb=2048 \
+              -timeout=5 \
+              2>&1 | tee build/fuzz-logs/${target}.log
+          done
+
+      - name: Upload fuzzing failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: HerdMe-${{ github.run_number }}-core-fuzzing-failure
+          path: |
+            build/fuzz-artifacts
+            build/fuzz-logs
+          if-no-files-found: warn
+          retention-days: 14
+
+  swift-parsers:
+    name: Swift parsers with libFuzzer, ASan, and UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Show Swift toolchain
+        run: swiftc --version
+
+      - name: Build Swift parser fuzz targets
+        run: |
+          mkdir -p build/swift-fuzz
+          swiftc \
+            -parse-as-library \
+            -O \
+            -g \
+            -warnings-as-errors \
+            -sanitize=fuzzer,address,undefined \
+            -DHERDME_FUZZ_MIME \
+            HerdMe/Services/MailMIMEParser.swift \
+            Fuzzing/Swift/ParserFuzzer.swift \
+            -o build/swift-fuzz/herdme-mime-fuzzer
+          swiftc \
+            -parse-as-library \
+            -O \
+            -g \
+            -warnings-as-errors \
+            -sanitize=fuzzer,address,undefined \
+            -DHERDME_FUZZ_PHP_SERIALIZATION \
+            HerdMe/Services/PHPSerializationParser.swift \
+            Fuzzing/Swift/ParserFuzzer.swift \
+            -o build/swift-fuzz/herdme-php-serialization-fuzzer
+          swiftc \
+            -parse-as-library \
+            -O \
+            -g \
+            -warnings-as-errors \
+            -sanitize=fuzzer,address,undefined \
+            -DHERDME_FUZZ_FASTCGI \
+            HerdMe/Services/FastCGIWireProtocol.swift \
+            Fuzzing/Swift/ParserFuzzer.swift \
+            -o build/swift-fuzz/herdme-fastcgi-fuzzer
+
+      - name: Run bounded Swift fuzz campaigns
+        env:
+          ASAN_OPTIONS: abort_on_error=1:detect_leaks=1:strict_string_checks=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          mkdir -p build/swift-fuzz-artifacts build/swift-fuzz-logs
+          for target in mime php-serialization fastcgi; do
+            build/swift-fuzz/herdme-${target}-fuzzer \
+              Fuzzing/Corpus/${target} \
+              -artifact_prefix=build/swift-fuzz-artifacts/${target}- \
+              -max_len=65536 \
+              -max_total_time=30 \
+              -print_final_stats=1 \
+              -rss_limit_mb=2048 \
+              -timeout=5 \
+              2>&1 | tee build/swift-fuzz-logs/${target}.log
+          done
+
+      - name: Upload Swift fuzzing failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: HerdMe-${{ github.run_number }}-swift-fuzzing-failure
+          path: |
+            build/swift-fuzz-artifacts
+            build/swift-fuzz-logs
+          if-no-files-found: warn
+          retention-days: 14

@@ -32,7 +32,8 @@ struct MailHTMLPreview: NSViewRepresentable {
             decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
         ) {
             guard navigationAction.navigationType == .other,
-                  navigationAction.request.url?.scheme == "about" else {
+                navigationAction.request.url?.scheme == "about"
+            else {
                 decisionHandler(.cancel)
                 return
             }

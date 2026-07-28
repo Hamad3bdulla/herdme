@@ -11,21 +11,26 @@ namespace HerdMe.Windows;
 
 public sealed partial class MainWindow : Window
 {
+    private readonly AppServices services;
     private string? pendingLogSitePath;
     private string? configurationLoadWarning;
 
-    public MainWindow(bool skipOnboarding = false)
+    public MainWindow(AppServices services, bool skipOnboarding = false)
     {
+        this.services = services;
         InitializeComponent();
+        Onboarding.Configure(services.InitialSetup);
+        RootLayout.Language = AppLocalization.LanguageTag;
+        RootLayout.FlowDirection = AppLocalization.LayoutDirection;
         ResizeWindow();
-        var siteSettings = AppServices.SiteSettings.Load();
-        _ = AppServices.Services.LoadInstances();
+        var siteSettings = services.SiteSettings.Load();
+        _ = services.Services.LoadInstances();
         configurationLoadWarning = string.Join(
             Environment.NewLine + Environment.NewLine,
             new[]
             {
-                AppServices.SiteSettings.LastLoadWarning,
-                AppServices.Services.LastLoadWarning
+                services.SiteSettings.LastLoadWarning,
+                services.Services.LastLoadWarning
             }.Where(message => !string.IsNullOrWhiteSpace(message))
         );
         if (string.IsNullOrWhiteSpace(configurationLoadWarning)) configurationLoadWarning = null;
@@ -80,39 +85,100 @@ public sealed partial class MainWindow : Window
 
         switch (tag)
         {
+            case "dashboard":
+                ContentFrame.Content = new DashboardPage(
+                    services.Core,
+                    services.SiteSettings,
+                    services.Environment,
+                    services.Services,
+                    services.Mail,
+                    services.Dumps,
+                    services.Hosts,
+                    services.Certificates
+                );
+                break;
             case "general":
-                ContentFrame.Navigate(typeof(GeneralPage));
+                ContentFrame.Content = new GeneralPage(
+                    services.Core,
+                    services.PhpInstaller,
+                    services.RuntimePolicy,
+                    services.Startup,
+                    services.Hosts,
+                    services.Certificates,
+                    services.SiteSettings,
+                    services.Updates
+                );
                 break;
             case "sites":
-                ContentFrame.Navigate(typeof(SitesPage));
+                ContentFrame.Content = new SitesPage(
+                    services.Core,
+                    services.Environment,
+                    services.SiteSettings,
+                    services.ProjectCreator,
+                    services.SiteRuntimes,
+                    services.PhpInstaller,
+                    services.RuntimePolicy,
+                    services.NodeInstaller,
+                    services.ComposerTools,
+                    services.Services
+                );
                 break;
             case "php":
-                ContentFrame.Navigate(typeof(PhpPage));
+                ContentFrame.Content = new PhpPage(
+                    services.Core,
+                    services.RuntimePolicy,
+                    services.PhpInstaller,
+                    services.ComposerTools
+                );
                 break;
             case "node":
-                ContentFrame.Navigate(typeof(NodePage));
+                ContentFrame.Content = new NodePage(services.NodeInstaller);
                 break;
             case "services":
-                ContentFrame.Navigate(typeof(ServicesPage));
+                ContentFrame.Content = new ServicesPage(
+                    services.Services,
+                    services.Core,
+                    services.SiteSettings
+                );
                 break;
             case "mail":
-                ContentFrame.Navigate(typeof(MailPage));
+                ContentFrame.Content = new MailPage(services.Mail);
                 break;
             case "dumps":
-                ContentFrame.Navigate(typeof(DumpsPage));
+                ContentFrame.Content = new DumpsPage(services.Dumps);
                 break;
             case "logs":
-                ContentFrame.Navigate(typeof(LogsPage), pendingLogSitePath);
+                ContentFrame.Content = new LogsPage(
+                    services.Core,
+                    services.SiteSettings,
+                    pendingLogSitePath
+                );
                 pendingLogSitePath = null;
                 break;
             case "debugger":
-                ContentFrame.Navigate(typeof(DebuggerPage));
+                ContentFrame.Content = new DebuggerPage(
+                    services.Core,
+                    services.RuntimePolicy,
+                    services.PhpInstaller,
+                    services.Xdebug,
+                    services.SiteSettings,
+                    services.Environment
+                );
                 break;
             case "about":
-                ContentFrame.Navigate(typeof(AboutPage));
+                ContentFrame.Content = new AboutPage(services.SiteSettings, services.Updates);
                 break;
             default:
-                ContentFrame.Navigate(typeof(GeneralPage));
+                ContentFrame.Content = new GeneralPage(
+                    services.Core,
+                    services.PhpInstaller,
+                    services.RuntimePolicy,
+                    services.Startup,
+                    services.Hosts,
+                    services.Certificates,
+                    services.SiteSettings,
+                    services.Updates
+                );
                 break;
         }
     }
@@ -125,13 +191,29 @@ public sealed partial class MainWindow : Window
             .First(item => string.Equals(item.Tag?.ToString(), "logs", StringComparison.Ordinal));
         if (ReferenceEquals(Navigation.SelectedItem, logsItem))
         {
-            ContentFrame.Navigate(typeof(LogsPage), pendingLogSitePath);
+            ContentFrame.Content = new LogsPage(
+                services.Core,
+                services.SiteSettings,
+                pendingLogSitePath
+            );
             pendingLogSitePath = null;
         }
         else
         {
             Navigation.SelectedItem = logsItem;
         }
+    }
+
+    public void NavigateToPage(string tag)
+    {
+        var item = Navigation.MenuItems
+            .OfType<NavigationViewItem>()
+            .FirstOrDefault(candidate => string.Equals(
+                candidate.Tag?.ToString(),
+                tag,
+                StringComparison.Ordinal
+            ));
+        if (item is not null) Navigation.SelectedItem = item;
     }
 
     private void Onboarding_SetupCompleted(object sender, EventArgs e)

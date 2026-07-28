@@ -78,6 +78,9 @@ public sealed class SiteRecord
     [JsonPropertyName("nodeVersion")]
     public string? NodeVersion { get; init; }
 
+    [JsonIgnore]
+    public string? GitSummary { get; set; }
+
     public string Runtime => PhpVersion is not null
         ? $"PHP {PhpVersion}"
         : NodeVersion is not null ? $"Node {NodeVersion}" : "Default";

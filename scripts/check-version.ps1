@@ -52,6 +52,7 @@ if ($releases.Count -eq 0) {
     throw "The release manifest must contain at least one release."
 }
 $semanticVersionPattern = '^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+(?:[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$'
+$identities = @{}
 
 for ($index = 0; $index -lt $releases.Count; $index++) {
     $entry = $releases[$index]
@@ -76,6 +77,12 @@ for ($index = 0; $index -lt $releases.Count; $index++) {
     if ($null -eq $downloads -or $null -eq $downloads.Value) {
         throw "$label.downloadURLs must contain both platform artifacts."
     }
+    $channel = ("$($entry.channel)").ToLowerInvariant()
+    $identity = "$($entry.version)|$($entry.build)|$channel"
+    if ($identities.ContainsKey($identity)) {
+        throw "$label duplicates another release identity."
+    }
+    $identities[$identity] = $true
     $macOSValue = $downloads.Value.PSObject.Properties["macOS"]
     $windowsValue = $downloads.Value.PSObject.Properties["windowsX64"]
     $macOSUri = $null
@@ -97,9 +104,20 @@ for ($index = 0; $index -lt $releases.Count; $index++) {
     if ($macOSUri.AbsoluteUri -eq $windowsUri.AbsoluteUri) {
         throw "$label must not use the same artifact for macOS and Windows."
     }
+    $expectedMacOS = "HerdMe-$($entry.version)-macOS.zip"
+    $expectedWindows = "HerdMe-$($entry.version)-win-x64-setup.exe"
+    if ([Uri]::UnescapeDataString($macOSUri.Segments[-1]) -ne $expectedMacOS) {
+        throw "$label.downloadURLs.macOS must end with $expectedMacOS."
+    }
+    if ([Uri]::UnescapeDataString($windowsUri.Segments[-1]) -ne $expectedWindows) {
+        throw "$label.downloadURLs.windowsX64 must end with $expectedWindows."
+    }
 }
 
 $release = $releases[0]
+if (("$($release.channel)").ToLowerInvariant() -ne "stable") {
+    throw "releases[0].channel must be stable."
+}
 
 $publicKeyPath = Join-Path $repoRoot "HerdMe\Resources\release-public-key.txt"
 $feedUrlPath = Join-Path $repoRoot "HerdMe\Resources\release-feed-url.txt"

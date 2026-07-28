@@ -16,7 +16,7 @@ enum SiteRuntimeStoreError: LocalizedError {
     case invalidVersion
 
     var errorDescription: String? {
-        "The selected runtime version is invalid."
+        String(localized: "The selected runtime version is invalid.")
     }
 }
 

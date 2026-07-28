@@ -16,7 +16,8 @@ final class SMTPServer: @unchecked Sendable {
     ) throws {
         guard listener == nil else { return }
         guard let rawPort = UInt16(exactly: port), rawPort > 0,
-              let networkPort = NWEndpoint.Port(rawValue: rawPort) else {
+            let networkPort = NWEndpoint.Port(rawValue: rawPort)
+        else {
             throw LocalListenerError.invalidPort(service: "SMTP")
         }
         let parameters = NWParameters.tcp
@@ -39,7 +40,7 @@ final class SMTPServer: @unchecked Sendable {
             switch state {
             case .ready:
                 onStateChange(true, nil)
-            case let .failed(error):
+            case .failed(let error):
                 NSLog("HerdMe SMTP listener failed: %@", error.localizedDescription)
                 self?.listener = nil
                 onStateChange(false, error.localizedDescription)
@@ -60,7 +61,7 @@ final class SMTPServer: @unchecked Sendable {
         let activeSessions = Array(sessions.values)
         sessions.removeAll()
         sessionsLock.unlock()
-        activeSessions.forEach { $0.stop() }
+        for session in activeSessions { session.stop() }
     }
 
     private func removeSession(_ identifier: UUID) {
@@ -85,8 +86,9 @@ struct SMTPMessageBuffer {
     mutating func append(_ line: String) -> Bool {
         let lineBytes = line.utf8.count + 2
         guard !isTooLarge,
-              lineBytes <= limit,
-              byteCount <= limit - lineBytes else {
+            lineBytes <= limit,
+            byteCount <= limit - lineBytes
+        else {
             isTooLarge = true
             return false
         }
@@ -223,9 +225,11 @@ private final class SMTPSession: @unchecked Sendable {
         } else if uppercased == "NOOP" {
             send("250 2.0.0 OK\r\n")
         } else if uppercased == "QUIT" {
-            connection.send(content: Data("221 2.0.0 Bye\r\n".utf8), completion: .contentProcessed { [weak self] _ in
-                self?.connection.cancel()
-            })
+            connection.send(
+                content: Data("221 2.0.0 Bye\r\n".utf8),
+                completion: .contentProcessed { [weak self] _ in
+                    self?.connection.cancel()
+                })
         } else {
             send("502 5.5.1 Command not implemented\r\n")
         }

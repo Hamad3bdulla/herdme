@@ -3,6 +3,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <libproc.h>
+#include <limits.h>
 #include <netinet/in.h>
 #include <poll.h>
 #include <pwd.h>
@@ -69,6 +71,10 @@
 #define HERDME_DNS_LISTEN_PORT 53
 #endif
 
+#ifndef HERDME_RELAY_IDLE_TIMEOUT_MILLISECONDS
+#define HERDME_RELAY_IDLE_TIMEOUT_MILLISECONDS 300000
+#endif
+
 struct routing_config {
     uint16_t http_port;
     uint16_t https_port;
@@ -97,8 +103,8 @@ static bool valid_tld(const char *value) {
     }
     for (size_t index = 0; index < length; index++) {
         char character = value[index];
-        bool valid = (character >= 'a' && character <= 'z')
-            || (character >= '0' && character <= '9') || character == '-';
+        bool valid =
+            (character >= 'a' && character <= 'z') || (character >= '0' && character <= '9') || character == '-';
         if (!valid) return false;
     }
     return true;
@@ -108,8 +114,8 @@ static bool parse_port(const char *value, uint16_t *port, bool allow_disabled) {
     char *end = NULL;
     errno = 0;
     long parsed = strtol(value, &end, 10);
-    if (errno != 0 || end == value || *end != '\0'
-        || ((!allow_disabled || parsed != 0) && (parsed < 1024 || parsed > 65535))) {
+    if (errno != 0 || end == value || *end != '\0' ||
+        ((!allow_disabled || parsed != 0) && (parsed < 1024 || parsed > 65535))) {
         return false;
     }
     *port = (uint16_t)parsed;
@@ -171,12 +177,8 @@ static bool load_config(const char *path, struct routing_config *config) {
 }
 
 static int resolver_contents(char *buffer, size_t capacity) {
-    return snprintf(
-        buffer,
-        capacity,
-        "# Managed by HerdMe\nnameserver 127.0.0.1\nport %d\nsearch_order 1\ntimeout 1\n",
-        HERDME_DNS_LISTEN_PORT
-    );
+    return snprintf(buffer, capacity, "# Managed by HerdMe\nnameserver 127.0.0.1\nport %d\nsearch_order 1\ntimeout 1\n",
+                    HERDME_DNS_LISTEN_PORT);
 }
 
 static bool write_all_file(int descriptor, const char *bytes, size_t length) {
@@ -199,13 +201,11 @@ static bool resolver_file_matches(int directory, const char *name, const char *e
     struct stat metadata;
     char contents[RESOLVER_CONTENT_LIMIT];
     ssize_t count = read(descriptor, contents, sizeof(contents) - 1);
-    bool matches = fstat(descriptor, &metadata) == 0
-        && S_ISREG(metadata.st_mode)
+    bool matches = fstat(descriptor, &metadata) == 0 && S_ISREG(metadata.st_mode)
 #ifndef HERDME_NETWORK_HELPER_TEST
-        && metadata.st_uid == 0
+                   && metadata.st_uid == 0
 #endif
-        && count >= 0
-        && (size_t)count < sizeof(contents);
+                   && count >= 0 && (size_t)count < sizeof(contents);
     close(descriptor);
     if (!matches) return false;
     contents[count] = '\0';
@@ -217,9 +217,8 @@ static bool reconcile_resolver(const char *tld) {
     if (mkdir(HERDME_RESOLVER_DIRECTORY, 0755) != 0 && errno != EEXIST) return false;
 
     struct stat directory_metadata;
-    if (lstat(HERDME_RESOLVER_DIRECTORY, &directory_metadata) != 0
-        || !S_ISDIR(directory_metadata.st_mode)
-        || (directory_metadata.st_mode & (S_IWGRP | S_IWOTH)) != 0
+    if (lstat(HERDME_RESOLVER_DIRECTORY, &directory_metadata) != 0 || !S_ISDIR(directory_metadata.st_mode) ||
+        (directory_metadata.st_mode & (S_IWGRP | S_IWOTH)) != 0
 #ifndef HERDME_NETWORK_HELPER_TEST
         || directory_metadata.st_uid != 0
 #endif
@@ -246,38 +245,26 @@ static bool reconcile_resolver(const char *tld) {
     struct dirent *entry;
     while ((entry = readdir(scan)) != NULL) {
         if (entry->d_name[0] == '.' || strcmp(entry->d_name, tld) == 0) continue;
-        if (valid_tld(entry->d_name)
-            && resolver_file_matches(directory, entry->d_name, expected)) {
+        if (valid_tld(entry->d_name) && resolver_file_matches(directory, entry->d_name, expected)) {
             (void)unlinkat(directory, entry->d_name, 0);
         }
     }
     closedir(scan);
 
     char temporary[TLD_LIMIT + 32];
-    int temporary_length = snprintf(
-        temporary,
-        sizeof(temporary),
-        ".herdme-%ld",
-        (long)getpid()
-    );
+    int temporary_length = snprintf(temporary, sizeof(temporary), ".herdme-%ld", (long)getpid());
     if (temporary_length <= 0 || (size_t)temporary_length >= sizeof(temporary)) {
         close(directory);
         return false;
     }
     (void)unlinkat(directory, temporary, 0);
-    int output = openat(
-        directory,
-        temporary,
-        O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
-        0644
-    );
+    int output = openat(directory, temporary, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0644);
     if (output < 0) {
         close(directory);
         return false;
     }
-    bool succeeded = write_all_file(output, expected, (size_t)expected_length)
-        && fsync(output) == 0
-        && fchmod(output, 0644) == 0;
+    bool succeeded =
+        write_all_file(output, expected, (size_t)expected_length) && fsync(output) == 0 && fchmod(output, 0644) == 0;
 #ifndef HERDME_NETWORK_HELPER_TEST
     succeeded = succeeded && fchown(output, 0, 0) == 0;
 #endif
@@ -335,10 +322,7 @@ static bool bind_listeners(struct network_listeners *listeners) {
     listeners->http = -1;
     listeners->https = -1;
     listeners->dns = -1;
-    struct timespec retry_delay = {
-        .tv_sec = 0,
-        .tv_nsec = HERDME_BIND_RETRY_NANOSECONDS
-    };
+    struct timespec retry_delay = {.tv_sec = 0, .tv_nsec = HERDME_BIND_RETRY_NANOSECONDS};
     for (int attempt = 0; attempt < HERDME_BIND_RETRY_COUNT; attempt++) {
         listeners->http = bind_loopback_socket(SOCK_STREAM, HERDME_HTTP_LISTEN_PORT);
         listeners->https = bind_loopback_socket(SOCK_STREAM, HERDME_HTTPS_LISTEN_PORT);
@@ -393,26 +377,41 @@ static void relay_connection(int client, uint16_t target_port) {
     int upstream = connect_loopback(target_port);
     if (upstream < 0) return;
 
-    struct pollfd descriptors[2] = {
-        { .fd = client, .events = POLLIN },
-        { .fd = upstream, .events = POLLIN }
-    };
+    struct pollfd descriptors[2] = {{.fd = client, .events = POLLIN}, {.fd = upstream, .events = POLLIN}};
     uint8_t buffer[64 * 1024];
     int readable = 2;
     while (readable > 0) {
-        int result = poll(descriptors, 2, -1);
+        int result = poll(descriptors, 2, HERDME_RELAY_IDLE_TIMEOUT_MILLISECONDS);
         if (result < 0) {
             if (errno == EINTR) continue;
             break;
         }
+        if (result == 0) break;
         for (int index = 0; index < 2; index++) {
-            if (!(descriptors[index].revents & (POLLIN | POLLHUP | POLLERR))) continue;
+            short events = descriptors[index].revents;
+            if (events & POLLNVAL) {
+                readable = 0;
+                break;
+            }
+            if (!(events & (POLLIN | POLLHUP | POLLERR))) continue;
             int source = descriptors[index].fd;
             int destination = descriptors[1 - index].fd;
-            ssize_t count = recv(source, buffer, sizeof(buffer), 0);
+            ssize_t count;
+            do {
+                count = recv(source, buffer, sizeof(buffer), 0);
+            } while (count < 0 && errno == EINTR);
             if (count > 0) {
-                if (!send_all(destination, buffer, (size_t)count)) readable = 0;
+                if (!send_all(destination, buffer, (size_t)count)) {
+                    readable = 0;
+                    break;
+                }
             } else {
+                // Once the upstream server is done, close the client immediately.
+                // Waiting for a browser's final FIN leaves one worker in FIN_WAIT_2.
+                if (index == 1) {
+                    readable = 0;
+                    break;
+                }
                 if (descriptors[index].events != 0) {
                     descriptors[index].events = 0;
                     shutdown(destination, SHUT_WR);
@@ -424,13 +423,8 @@ static void relay_connection(int client, uint16_t target_port) {
     close(upstream);
 }
 
-static void accept_connection(
-    int listener,
-    uint16_t target_port,
-    int http_listener,
-    int https_listener,
-    int dns_socket
-) {
+static void accept_connection(int listener, uint16_t target_port, int http_listener, int https_listener,
+                              int dns_socket) {
     int client = accept(listener, NULL, NULL);
     if (client < 0) return;
     if (target_port == 0) {
@@ -454,17 +448,11 @@ static bool domain_matches(const char *domain, const char *tld) {
     size_t tld_length = strlen(tld);
     if (domain_length == tld_length) return strcmp(domain, tld) == 0;
     if (domain_length <= tld_length + 1) return false;
-    return domain[domain_length - tld_length - 1] == '.'
-        && strcmp(domain + domain_length - tld_length, tld) == 0;
+    return domain[domain_length - tld_length - 1] == '.' && strcmp(domain + domain_length - tld_length, tld) == 0;
 }
 
-static size_t dns_response(
-    const uint8_t *query,
-    size_t query_length,
-    const char *tld,
-    uint8_t *response,
-    size_t capacity
-) {
+static size_t dns_response(const uint8_t *query, size_t query_length, const char *tld, uint8_t *response,
+                           size_t capacity) {
     if (query_length < 17 || capacity < query_length || (query[2] & 0x80) != 0) return 0;
     size_t index = 12;
     char domain[256] = {0};
@@ -505,11 +493,7 @@ static size_t dns_response(
     size_t output = question_end;
     if (!has_answer) return output;
 
-    const uint8_t answer[] = {
-        0xC0, 0x0C, 0x00, 0x01, 0x00, 0x01,
-        0x00, 0x00, 0x00, 0x01, 0x00, 0x04,
-        127, 0, 0, 1
-    };
+    const uint8_t answer[] = {0xC0, 0x0C, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x04, 127, 0, 0, 1};
     memcpy(response + output, answer, sizeof(answer));
     return output + sizeof(answer);
 }
@@ -519,31 +503,11 @@ static void answer_dns(int descriptor, const char *tld) {
     uint8_t response[DNS_PACKET_LIMIT];
     struct sockaddr_storage client;
     socklen_t client_length = sizeof(client);
-    ssize_t count = recvfrom(
-        descriptor,
-        query,
-        sizeof(query),
-        0,
-        (struct sockaddr *)&client,
-        &client_length
-    );
+    ssize_t count = recvfrom(descriptor, query, sizeof(query), 0, (struct sockaddr *)&client, &client_length);
     if (count <= 0) return;
-    size_t response_length = dns_response(
-        query,
-        (size_t)count,
-        tld,
-        response,
-        sizeof(response)
-    );
+    size_t response_length = dns_response(query, (size_t)count, tld, response, sizeof(response));
     if (response_length == 0) return;
-    sendto(
-        descriptor,
-        response,
-        response_length,
-        0,
-        (struct sockaddr *)&client,
-        client_length
-    );
+    sendto(descriptor, response, response_length, 0, (struct sockaddr *)&client, client_length);
 }
 
 static bool parse_identity(const char *value, unsigned long *identity) {
@@ -558,28 +522,20 @@ static bool parse_identity(const char *value, unsigned long *identity) {
 extern char **environ;
 
 #ifndef HERDME_NETWORK_HELPER_TEST
-static bool console_user(
-    unsigned long *target_uid,
-    unsigned long *target_gid,
-    char *configuration_path,
-    size_t configuration_capacity
-) {
+static bool console_user(unsigned long *target_uid, unsigned long *target_gid, char *configuration_path,
+                         size_t configuration_capacity) {
     struct stat console;
     if (stat("/dev/console", &console) != 0 || console.st_uid == 0) return false;
 
     struct passwd password;
     struct passwd *result = NULL;
     char buffer[16 * 1024];
-    if (getpwuid_r(console.st_uid, &password, buffer, sizeof(buffer), &result) != 0
-        || result == NULL || password.pw_dir == NULL || password.pw_dir[0] != '/') {
+    if (getpwuid_r(console.st_uid, &password, buffer, sizeof(buffer), &result) != 0 || result == NULL ||
+        password.pw_dir == NULL || password.pw_dir[0] != '/') {
         return false;
     }
-    int length = snprintf(
-        configuration_path,
-        configuration_capacity,
-        "%s/Library/Application Support/HerdMe/Runtime/network-helper.conf",
-        password.pw_dir
-    );
+    int length = snprintf(configuration_path, configuration_capacity,
+                          "%s/Library/Application Support/HerdMe/Runtime/network-helper.conf", password.pw_dir);
     if (length <= 0 || (size_t)length >= configuration_capacity) return false;
     *target_uid = (unsigned long)console.st_uid;
     *target_gid = (unsigned long)console.st_gid;
@@ -610,28 +566,80 @@ static bool run_launchctl(char *const arguments[]) {
     return result == child && WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
+static size_t signal_legacy_processes(int signal_number) {
+    int required_bytes = proc_listpids(PROC_ALL_PIDS, 0, NULL, 0);
+    if (required_bytes <= 0) return SIZE_MAX;
+    size_t capacity = (size_t)required_bytes + (64 * sizeof(pid_t));
+    if (capacity > INT_MAX) return SIZE_MAX;
+
+    pid_t *processes = calloc(1, capacity);
+    if (processes == NULL) return SIZE_MAX;
+    int listed_bytes = proc_listpids(PROC_ALL_PIDS, 0, processes, (int)capacity);
+    if (listed_bytes < 0) {
+        free(processes);
+        return SIZE_MAX;
+    }
+
+    char canonical_legacy_path[PATH_MAX];
+    const char *legacy_path = realpath(HERDME_LEGACY_HELPER, canonical_legacy_path);
+    if (legacy_path == NULL) legacy_path = HERDME_LEGACY_HELPER;
+
+    size_t matching_processes = 0;
+    size_t process_count = (size_t)listed_bytes / sizeof(pid_t);
+    for (size_t index = 0; index < process_count; index++) {
+        pid_t process = processes[index];
+        if (process <= 1 || process == getpid()) continue;
+        char process_path[PROC_PIDPATHINFO_MAXSIZE];
+        if (proc_pidpath(process, process_path, sizeof(process_path)) <= 0 || strcmp(process_path, legacy_path) != 0) {
+            continue;
+        }
+        matching_processes++;
+        if (signal_number != 0) (void)kill(process, signal_number);
+    }
+    free(processes);
+    return matching_processes;
+}
+
+static bool terminate_legacy_processes(void) {
+    size_t remaining = signal_legacy_processes(SIGTERM);
+    if (remaining == SIZE_MAX) return false;
+    struct timespec delay = {.tv_sec = 0, .tv_nsec = 50000000L};
+    for (int attempt = 0; attempt < 10 && remaining > 0; attempt++) {
+        while (nanosleep(&delay, &delay) != 0 && errno == EINTR) {}
+        delay.tv_sec = 0;
+        delay.tv_nsec = 50000000L;
+        remaining = signal_legacy_processes(0);
+        if (remaining == SIZE_MAX) return false;
+    }
+    if (remaining == 0) return true;
+
+    remaining = signal_legacy_processes(SIGKILL);
+    if (remaining == SIZE_MAX) return false;
+    for (int attempt = 0; attempt < 10 && remaining > 0; attempt++) {
+        while (nanosleep(&delay, &delay) != 0 && errno == EINTR) {}
+        delay.tv_sec = 0;
+        delay.tv_nsec = 50000000L;
+        remaining = signal_legacy_processes(0);
+        if (remaining == SIZE_MAX) return false;
+    }
+    return remaining == 0;
+}
+
 static bool legacy_service_can_be_restored(void) {
-    return safe_legacy_file(HERDME_LEGACY_HELPER, true)
-        && safe_legacy_file(HERDME_LEGACY_PLIST, false);
+    return safe_legacy_file(HERDME_LEGACY_HELPER, true) && safe_legacy_file(HERDME_LEGACY_PLIST, false);
 }
 
 static void retire_legacy_service(void) {
     char service_target[] = "system/" HERDME_LEGACY_LABEL;
-    char *arguments[] = { HERDME_LAUNCHCTL_PATH, "bootout", service_target, NULL };
+    char *arguments[] = {HERDME_LAUNCHCTL_PATH, "bootout", service_target, NULL};
     (void)run_launchctl(arguments);
 }
 
 static bool restore_legacy_service(void) {
     char service_target[] = "system/" HERDME_LEGACY_LABEL;
-    char *enable_arguments[] = {
-        HERDME_LAUNCHCTL_PATH, "enable", service_target, NULL
-    };
-    char *bootstrap_arguments[] = {
-        HERDME_LAUNCHCTL_PATH, "bootstrap", "system", HERDME_LEGACY_PLIST, NULL
-    };
-    char *kickstart_arguments[] = {
-        HERDME_LAUNCHCTL_PATH, "kickstart", "-k", service_target, NULL
-    };
+    char *enable_arguments[] = {HERDME_LAUNCHCTL_PATH, "enable", service_target, NULL};
+    char *bootstrap_arguments[] = {HERDME_LAUNCHCTL_PATH, "bootstrap", "system", HERDME_LEGACY_PLIST, NULL};
+    char *kickstart_arguments[] = {HERDME_LAUNCHCTL_PATH, "kickstart", "-k", service_target, NULL};
     bool enabled = run_launchctl(enable_arguments);
     bool bootstrapped = run_launchctl(bootstrap_arguments);
     bool started = run_launchctl(kickstart_arguments);
@@ -645,9 +653,7 @@ static bool remove_safe_legacy_file(const char *path, bool must_be_executable) {
 
 static bool finalize_legacy_service(void) {
     char service_target[] = "system/" HERDME_LEGACY_LABEL;
-    char *disable_arguments[] = {
-        HERDME_LAUNCHCTL_PATH, "disable", service_target, NULL
-    };
+    char *disable_arguments[] = {HERDME_LAUNCHCTL_PATH, "disable", service_target, NULL};
     if (!run_launchctl(disable_arguments)) return false;
     bool removed_plist = remove_safe_legacy_file(HERDME_LEGACY_PLIST, false);
     if (removed_plist) {
@@ -656,18 +662,11 @@ static bool finalize_legacy_service(void) {
     return removed_plist;
 }
 
-static int run_network_worker(
-    const char *config_path,
-    struct routing_config config,
-    unsigned long target_uid,
-    unsigned long target_gid,
-    bool managed,
-    struct network_listeners listeners,
-    int ready_descriptor
-) {
+static int run_network_worker(const char *config_path, struct routing_config config, unsigned long target_uid,
+                              unsigned long target_gid, bool managed, struct network_listeners listeners,
+                              int ready_descriptor) {
 #ifndef HERDME_NETWORK_HELPER_TEST
-    if (setgroups(0, NULL) != 0 || setgid((gid_t)target_gid) != 0
-        || setuid((uid_t)target_uid) != 0) {
+    if (setgroups(0, NULL) != 0 || setgid((gid_t)target_gid) != 0 || setuid((uid_t)target_uid) != 0) {
         close(ready_descriptor);
         close_listeners(&listeners);
         return EXIT_FAILURE;
@@ -690,11 +689,9 @@ static int run_network_worker(
     signal(SIGCHLD, SIG_IGN);
 
     int exit_status = EXIT_SUCCESS;
-    struct pollfd descriptors[3] = {
-        { .fd = listeners.http, .events = POLLIN },
-        { .fd = listeners.https, .events = POLLIN },
-        { .fd = listeners.dns, .events = POLLIN }
-    };
+    struct pollfd descriptors[3] = {{.fd = listeners.http, .events = POLLIN},
+                                    {.fd = listeners.https, .events = POLLIN},
+                                    {.fd = listeners.dns, .events = POLLIN}};
     while (keep_running) {
         int result = poll(descriptors, 3, 1000);
         if (result < 0) {
@@ -707,8 +704,7 @@ static int run_network_worker(
 #ifndef HERDME_NETWORK_HELPER_TEST
         if (managed) {
             struct stat console;
-            if (stat("/dev/console", &console) != 0
-                || console.st_uid != (uid_t)target_uid) {
+            if (stat("/dev/console", &console) != 0 || console.st_uid != (uid_t)target_uid) {
                 exit_status = EXIT_FAILURE;
                 break;
             }
@@ -717,22 +713,10 @@ static int run_network_worker(
         (void)managed;
 #endif
         if (descriptors[0].revents & POLLIN) {
-            accept_connection(
-                listeners.http,
-                config.http_port,
-                listeners.http,
-                listeners.https,
-                listeners.dns
-            );
+            accept_connection(listeners.http, config.http_port, listeners.http, listeners.https, listeners.dns);
         }
         if (descriptors[1].revents & POLLIN) {
-            accept_connection(
-                listeners.https,
-                config.https_port,
-                listeners.http,
-                listeners.https,
-                listeners.dns
-            );
+            accept_connection(listeners.https, config.https_port, listeners.http, listeners.https, listeners.dns);
         }
         if (descriptors[2].revents & POLLIN) answer_dns(listeners.dns, config.tld);
     }
@@ -753,12 +737,7 @@ int main(int argc, char **argv) {
 #ifndef HERDME_NETWORK_HELPER_TEST
     if (argc == 2 && strcmp(argv[1], "--managed") == 0) {
         managed = true;
-        if (!console_user(
-            &target_uid,
-            &target_gid,
-            managed_configuration,
-            sizeof(managed_configuration)
-        )) {
+        if (!console_user(&target_uid, &target_gid, managed_configuration, sizeof(managed_configuration))) {
             return EXIT_FAILURE;
         }
         config_path = managed_configuration;
@@ -781,8 +760,7 @@ int main(int argc, char **argv) {
             if (!parse_identity(argv[index + 1], &target_gid)) return EXIT_FAILURE;
         } else return EXIT_FAILURE;
     }
-    if (config_path == NULL || strlen(config_path) >= CONFIG_PATH_LIMIT
-        || target_uid == 0 || target_gid == 0) {
+    if (config_path == NULL || strlen(config_path) >= CONFIG_PATH_LIMIT || target_uid == 0 || target_gid == 0) {
         return EXIT_FAILURE;
     }
 #ifndef HERDME_NETWORK_HELPER_TEST
@@ -795,6 +773,10 @@ int main(int argc, char **argv) {
 
     bool legacy_retired = managed && legacy_service_can_be_restored();
     if (legacy_retired) retire_legacy_service();
+    if (managed && !terminate_legacy_processes()) {
+        if (!legacy_retired) return EXIT_FAILURE;
+        return restore_legacy_service() ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
 
     struct network_listeners listeners;
     if (!bind_listeners(&listeners)) {
@@ -816,15 +798,7 @@ int main(int argc, char **argv) {
     pid_t worker = fork();
     if (worker == 0) {
         close(readiness[0]);
-        int result = run_network_worker(
-            config_path,
-            config,
-            target_uid,
-            target_gid,
-            managed,
-            listeners,
-            readiness[1]
-        );
+        int result = run_network_worker(config_path, config, target_uid, target_gid, managed, listeners, readiness[1]);
         _exit(result);
     }
     close(readiness[1]);

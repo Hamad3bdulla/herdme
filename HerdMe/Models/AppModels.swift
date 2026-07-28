@@ -11,7 +11,44 @@ enum PortPresentation {
     }
 }
 
+struct ProductLink: Identifiable, Equatable, Sendable {
+    let title: String
+    let address: String
+    let systemImage: String
+
+    var id: String { address }
+
+    var url: URL? {
+        guard let url = URL(string: address),
+            url.scheme == "https",
+            url.host != nil
+        else { return nil }
+        return url
+    }
+}
+
+enum ProductLinks {
+    static let repository = ProductLink(
+        title: String(localized: "Repository"),
+        address: "https://github.com/Hamad3bdulla/herdme",
+        systemImage: "chevron.left.forwardslash.chevron.right"
+    )
+    static let documentation = ProductLink(
+        title: String(localized: "Documentation"),
+        address: "https://github.com/Hamad3bdulla/herdme/tree/master/docs",
+        systemImage: "book.closed"
+    )
+    static let releaseNotes = ProductLink(
+        title: String(localized: "Release Notes"),
+        address: "https://github.com/Hamad3bdulla/herdme/releases",
+        systemImage: "doc.text"
+    )
+
+    static let all = [repository, documentation, releaseNotes]
+}
+
 enum SidebarPage: String, CaseIterable, Identifiable {
+    case dashboard = "Dashboard"
     case general = "General"
     case sites = "Sites"
     case php = "PHP"
@@ -25,8 +62,25 @@ enum SidebarPage: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var localizedTitle: String {
+        switch self {
+        case .dashboard: String(localized: "Dashboard")
+        case .general: String(localized: "General")
+        case .sites: String(localized: "Sites")
+        case .php: String(localized: "PHP")
+        case .node: String(localized: "Node")
+        case .services: String(localized: "Services")
+        case .mail: String(localized: "Mail")
+        case .dumps: String(localized: "Dumps")
+        case .debugger: String(localized: "Debugger")
+        case .logs: String(localized: "Logs")
+        case .about: String(localized: "About")
+        }
+    }
+
     var symbol: String {
         switch self {
+        case .dashboard: "gauge.with.dots.needle.67percent"
         case .general: "person.crop.circle"
         case .sites: "server.rack"
         case .php: "chevron.left.forwardslash.chevron.right"
@@ -42,6 +96,7 @@ enum SidebarPage: String, CaseIterable, Identifiable {
 
     var tint: Color {
         switch self {
+        case .dashboard: Color(red: 0.16, green: 0.55, blue: 0.36)
         case .general, .sites: .gray
         case .php: Color(red: 0.37, green: 0.40, blue: 0.58)
         case .node: Color(red: 0.27, green: 0.58, blue: 0.29)
@@ -52,7 +107,7 @@ enum SidebarPage: String, CaseIterable, Identifiable {
     }
 
     static var visibleCases: [SidebarPage] {
-        [.general, .sites, .php, .node, .services, .mail, .dumps, .debugger, .logs, .about]
+        [.dashboard, .general, .sites, .php, .node, .services, .mail, .dumps, .debugger, .logs, .about]
     }
 }
 
@@ -92,8 +147,9 @@ struct SiteProject: Identifiable, Hashable, Sendable {
 
     private static func isValidDNSLabel(_ value: String) -> Bool {
         guard !value.isEmpty, value.utf8.count <= 63,
-              value.first?.isASCII == true, value.first?.isLetter == true || value.first?.isNumber == true,
-              value.last?.isASCII == true, value.last?.isLetter == true || value.last?.isNumber == true else {
+            value.first?.isASCII == true, value.first?.isLetter == true || value.first?.isNumber == true,
+            value.last?.isASCII == true, value.last?.isLetter == true || value.last?.isNumber == true
+        else {
             return false
         }
         return value.utf8.allSatisfy {
@@ -184,6 +240,25 @@ struct ServiceInstance: Identifiable, Hashable, Codable, Sendable {
     }
 }
 
+enum AppTheme: String, CaseIterable, Codable, Sendable {
+    case automatic = "auto"
+    case light
+    case dark
+
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self).lowercased()
+        self = Self(rawValue: value) ?? .automatic
+    }
+
+    var localizedTitle: String {
+        switch self {
+        case .automatic: String(localized: "Auto", comment: "Follow the system appearance")
+        case .light: String(localized: "Light", comment: "Use the light appearance")
+        case .dark: String(localized: "Dark", comment: "Use the dark appearance")
+        }
+    }
+}
+
 struct AppConfiguration: Codable {
     var configSchemaVersion: Int
     var parkPaths: [String]
@@ -194,7 +269,7 @@ struct AppConfiguration: Codable {
     var automaticUpdates: Bool
     var updateChannel: String
     var ide: String
-    var theme: String
+    var theme: AppTheme
     var smtpPort: Int
     var dumpPort: Int
     var sitePreviews: Bool
@@ -212,7 +287,7 @@ struct AppConfiguration: Codable {
         automaticUpdates: Bool,
         updateChannel: String,
         ide: String,
-        theme: String,
+        theme: AppTheme,
         smtpPort: Int,
         dumpPort: Int,
         sitePreviews: Bool,
@@ -241,10 +316,11 @@ struct AppConfiguration: Codable {
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         let defaults = Self.default
-        configSchemaVersion = try values.decodeIfPresent(
-            Int.self,
-            forKey: .configSchemaVersion
-        ) ?? 0
+        configSchemaVersion =
+            try values.decodeIfPresent(
+                Int.self,
+                forKey: .configSchemaVersion
+            ) ?? 0
         parkPaths = try values.decodeIfPresent([String].self, forKey: .parkPaths) ?? defaults.parkPaths
         tld = try values.decodeIfPresent(String.self, forKey: .tld) ?? defaults.tld
         selectedPHP = try values.decodeIfPresent(String.self, forKey: .selectedPHP) ?? defaults.selectedPHP
@@ -253,20 +329,22 @@ struct AppConfiguration: Codable {
         automaticUpdates = try values.decodeIfPresent(Bool.self, forKey: .automaticUpdates) ?? defaults.automaticUpdates
         updateChannel = try values.decodeIfPresent(String.self, forKey: .updateChannel) ?? defaults.updateChannel
         ide = try values.decodeIfPresent(String.self, forKey: .ide) ?? defaults.ide
-        theme = try values.decodeIfPresent(String.self, forKey: .theme) ?? defaults.theme
+        theme = try values.decodeIfPresent(AppTheme.self, forKey: .theme) ?? defaults.theme
         smtpPort = try values.decodeIfPresent(Int.self, forKey: .smtpPort) ?? defaults.smtpPort
         dumpPort = try values.decodeIfPresent(Int.self, forKey: .dumpPort) ?? defaults.dumpPort
         sitePreviews = try values.decodeIfPresent(Bool.self, forKey: .sitePreviews) ?? defaults.sitePreviews
         serviceInstances = try values.decodeIfPresent([ServiceInstance].self, forKey: .serviceInstances) ?? []
-        independenceMigrationVersion = try values.decodeIfPresent(
-            Int.self,
-            forKey: .independenceMigrationVersion
-        ) ?? 0
+        independenceMigrationVersion =
+            try values.decodeIfPresent(
+                Int.self,
+                forKey: .independenceMigrationVersion
+            ) ?? 0
         // A missing key belongs to an installation created before onboarding existed.
-        onboardingCompleted = try values.decodeIfPresent(
-            Bool.self,
-            forKey: .onboardingCompleted
-        ) ?? true
+        onboardingCompleted =
+            try values.decodeIfPresent(
+                Bool.self,
+                forKey: .onboardingCompleted
+            ) ?? true
     }
 
     static var `default`: AppConfiguration {
@@ -275,13 +353,13 @@ struct AppConfiguration: Codable {
             configSchemaVersion: ConfigurationStore.currentConfigSchemaVersion,
             parkPaths: [home.appendingPathComponent("HerdMe").path],
             tld: "test",
-            selectedPHP: "8.4",
+            selectedPHP: RuntimeCatalog.defaultPHPCycle,
             startAutomatically: false,
             launchAtLogin: false,
             automaticUpdates: true,
             updateChannel: "Stable",
             ide: "VSCode",
-            theme: "Auto",
+            theme: .automatic,
             smtpPort: 2525,
             dumpPort: 9912,
             sitePreviews: true,
@@ -313,35 +391,43 @@ enum OnboardingStage: String, CaseIterable, Equatable {
 
     var title: String {
         switch self {
-        case .welcome: "Welcome to HerdMe"
-        case .localDomains: "Setting up local .test domains"
-        case .certificate: "Trusting the local HTTPS certificate"
-        case .php: "Installing PHP 8.4"
-        case .composer: "Installing Composer and Laravel Installer"
-        case .node: "Installing Node.js 22"
-        case .finishing: "Finishing setup"
-        case .completed: "HerdMe is ready"
+        case .welcome: String(localized: "Welcome to HerdMe")
+        case .localDomains: String(localized: "Setting up local .test domains")
+        case .certificate: String(localized: "Trusting the local HTTPS certificate")
+        case .php:
+            String.localizedStringWithFormat(
+                String(localized: "Installing PHP %@"),
+                RuntimeCatalog.defaultPHPCycle
+            )
+        case .composer: String(localized: "Installing Composer and Laravel Installer")
+        case .node:
+            String.localizedStringWithFormat(
+                String(localized: "Installing Node.js %@"),
+                RuntimeCatalog.defaultNodeMajor
+            )
+        case .finishing: String(localized: "Finishing setup")
+        case .completed: String(localized: "HerdMe is ready")
         }
     }
 
     var detail: String {
         switch self {
         case .welcome:
-            "HerdMe needs to prepare the local development environment. macOS may ask for administrator approval."
+            String(localized: "HerdMe needs to prepare the local development environment. macOS may ask for administrator approval.")
         case .localDomains:
-            "Preparing private routing for projects that use the .test domain."
+            String(localized: "Preparing private routing for projects that use the .test domain.")
         case .certificate:
-            "Adding the HerdMe local certificate authority to the system keychain."
+            String(localized: "Adding the HerdMe local certificate authority to the system keychain.")
         case .php:
-            "Installing the default runtime and checking every extension required by Laravel."
+            String(localized: "Installing the default runtime and checking every extension required by Laravel.")
         case .composer:
-            "Preparing the managed PHP tools used to create Laravel projects."
+            String(localized: "Preparing the managed PHP tools used to create Laravel projects.")
         case .node:
-            "Preparing the default JavaScript runtime and npm."
+            String(localized: "Preparing the default JavaScript runtime and npm.")
         case .finishing:
-            "Saving the verified setup and refreshing the local environment."
+            String(localized: "Saving the verified setup and refreshing the local environment.")
         case .completed:
-            "The default local development environment has been installed successfully."
+            String(localized: "The default local development environment has been installed successfully.")
         }
     }
 }
@@ -352,6 +438,16 @@ enum EnvironmentStatus: String {
     case conflict = "Port Conflict"
     case starting = "Starting"
     case stopping = "Stopping"
+
+    var localizedTitle: String {
+        switch self {
+        case .running: String(localized: "Running")
+        case .stopped: String(localized: "Stopped")
+        case .conflict: String(localized: "Port Conflict")
+        case .starting: String(localized: "Starting")
+        case .stopping: String(localized: "Stopping")
+        }
+    }
 
     var color: Color {
         switch self {
@@ -408,7 +504,8 @@ struct CapturedMail: Identifiable, Hashable, Codable, Sendable {
         }
 
         let content = MailMIMEParser.parse(raw)
-        let body = content.plainText?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body =
+            content.plainText?.trimmingCharacters(in: .whitespacesAndNewlines)
             ?? content.html.map(MailMIMEParser.plainText(fromHTML:))
             ?? rawBody
         return CapturedMail(

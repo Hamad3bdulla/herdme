@@ -3,6 +3,8 @@ import SwiftUI
 
 struct OnboardingView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var securityCoordinator: SecuritySetupCoordinator
+    @State private var isShowingFailureDetails = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -26,11 +28,11 @@ struct OnboardingView: View {
 
     @ViewBuilder
     private var content: some View {
-        if model.onboardingStage == .welcome {
+        if securityCoordinator.onboardingStage == .welcome {
             welcome
-        } else if let error = model.onboardingError {
+        } else if let error = securityCoordinator.onboardingError {
             failure(error)
-        } else if model.onboardingStage == .completed {
+        } else if securityCoordinator.onboardingStage == .completed {
             completed
         } else {
             progress
@@ -40,19 +42,27 @@ struct OnboardingView: View {
     private var welcome: some View {
         VStack(spacing: 20) {
             appIcon
-            Text(model.onboardingStage.title)
+            Text(securityCoordinator.onboardingStage.title)
                 .font(.system(size: 34, weight: .bold))
-            Text(model.onboardingStage.detail)
+                .accessibilityIdentifier("onboarding.welcome.title")
+            Text(securityCoordinator.onboardingStage.detail)
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
-            Text("PHP 8.4  |  Composer  |  Laravel Installer  |  Node.js 22  |  HTTPS")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
+            Text(
+                verbatim: String.localizedStringWithFormat(
+                    String(localized: "PHP %@  |  Composer  |  Laravel Installer  |  Node.js %@  |  HTTPS"),
+                    RuntimeCatalog.defaultPHPCycle,
+                    RuntimeCatalog.defaultNodeMajor
+                )
+            )
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.secondary)
             primaryButton("Set up HerdMe", systemImage: "arrow.right") {
                 model.beginInitialSetup()
             }
+            .accessibilityIdentifier("onboarding.setup")
         }
     }
 
@@ -63,10 +73,10 @@ struct OnboardingView: View {
                 .controlSize(.large)
                 .tint(Color(red: 0.93, green: 0.12, blue: 0.16))
                 .frame(width: 44, height: 44)
-            Text(model.onboardingStage.title)
+            Text(securityCoordinator.onboardingStage.title)
                 .font(.system(size: 24, weight: .semibold))
                 .multilineTextAlignment(.center)
-            Text(model.onboardingStage.detail)
+            Text(securityCoordinator.onboardingStage.detail)
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -80,19 +90,48 @@ struct OnboardingView: View {
         }
     }
 
-    private func failure(_ message: String) -> some View {
+    private func failure(_ failure: ErrorPresentation) -> some View {
         VStack(spacing: 20) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 42))
                 .foregroundStyle(Color(red: 0.93, green: 0.12, blue: 0.16))
             Text("Setup could not finish")
                 .font(.system(size: 26, weight: .bold))
-            Text(message)
+            Text(failure.message)
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
+                .textSelection(.enabled)
+            if let details = failure.technicalDetails {
+                DisclosureGroup(
+                    "Technical Details",
+                    isExpanded: $isShowingFailureDetails
+                ) {
+                    VStack(alignment: .trailing, spacing: 6) {
+                        ScrollView {
+                            Text(details)
+                                .font(.system(.caption, design: .monospaced))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+                        }
+                        .frame(maxHeight: 130)
+                        Button {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(details, forType: .string)
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Copy Technical Details")
+                        .accessibilityLabel("Copy Technical Details")
+                    }
+                    .padding(.top, 6)
+                }
+                .frame(maxWidth: 460)
+            }
             primaryButton("Try Again", systemImage: "arrow.clockwise") {
+                isShowingFailureDetails = false
                 model.beginInitialSetup()
             }
         }
@@ -103,9 +142,9 @@ struct OnboardingView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 52))
                 .foregroundStyle(.green)
-            Text(model.onboardingStage.title)
+            Text(securityCoordinator.onboardingStage.title)
                 .font(.system(size: 30, weight: .bold))
-            Text(model.onboardingStage.detail)
+            Text(securityCoordinator.onboardingStage.detail)
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -124,7 +163,7 @@ struct OnboardingView: View {
     }
 
     private func primaryButton(
-        _ title: String,
+        _ title: LocalizedStringKey,
         systemImage: String,
         action: @escaping () -> Void
     ) -> some View {
@@ -140,16 +179,28 @@ struct OnboardingView: View {
     }
 
     private var progressValue: Double {
-        guard let index = OnboardingStage.installationStages.firstIndex(of: model.onboardingStage) else {
+        guard
+            let index = OnboardingStage.installationStages.firstIndex(
+                of: securityCoordinator.onboardingStage
+            )
+        else {
             return 0
         }
         return Double(index + 1) / Double(OnboardingStage.installationStages.count)
     }
 
     private var progressLabel: String {
-        guard let index = OnboardingStage.installationStages.firstIndex(of: model.onboardingStage) else {
-            return "Preparing"
+        guard
+            let index = OnboardingStage.installationStages.firstIndex(
+                of: securityCoordinator.onboardingStage
+            )
+        else {
+            return String(localized: "Preparing")
         }
-        return "Step \(index + 1) of \(OnboardingStage.installationStages.count)"
+        return String.localizedStringWithFormat(
+            String(localized: "Step %lld of %lld"),
+            Int64(index + 1),
+            Int64(OnboardingStage.installationStages.count)
+        )
     }
 }

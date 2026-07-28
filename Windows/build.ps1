@@ -16,6 +16,9 @@ $project = Join-Path $PSScriptRoot "HerdMe.Windows\HerdMe.Windows.csproj"
 $contractProject = Join-Path $PSScriptRoot "HerdMe.Windows.ContractTests\HerdMe.Windows.ContractTests.csproj"
 $runtimeDirectory = Join-Path $PSScriptRoot "HerdMe.Windows\Runtime"
 $runtimeIdentifier = "win-x64"
+$nativeBuildLog = Join-Path $repoRoot "build\windows-native-build.log"
+$nativeBuildBinaryLog = Join-Path $repoRoot "build\windows-native-build.binlog"
+$nativeBuildLogDirectory = Split-Path -Parent $nativeBuildLog
 
 cmake -S (Join-Path $repoRoot "Core") -B $coreBuild -A $Architecture -DBUILD_TESTING=ON
 if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed." }
@@ -60,6 +63,14 @@ if (-not $SkipTests) {
             --no-build `
             --no-restore
         if ($LASTEXITCODE -ne 0) { throw "The Windows contract tests failed." }
+
+        $contractAssembly = Join-Path `
+            (Split-Path -Parent $contractProject) `
+            "bin\$Configuration\net8.0\HerdMe.Windows.ContractTests.dll"
+        dotnet $contractAssembly
+        if ($LASTEXITCODE -ne 0) {
+            throw "The direct Windows contract assembly execution failed."
+        }
     }
     finally {
         $env:HERDME_CORE_TEST_EXECUTABLE = $previousCoreTestExecutable
@@ -83,14 +94,40 @@ if (-not $SkipTests) {
 }
 
 New-Item -ItemType Directory -Force -Path $runtimeDirectory | Out-Null
+New-Item -ItemType Directory -Force -Path $nativeBuildLogDirectory | Out-Null
 Copy-Item $coreExecutable (Join-Path $runtimeDirectory "herdme-core.exe") -Force
 
 dotnet build $project `
     --configuration $Configuration `
     --runtime $runtimeIdentifier `
     -p:Platform=$Architecture `
-    -p:TreatWarningsAsErrors=true
-if ($LASTEXITCODE -ne 0) { throw "The native WinUI build failed." }
+    -p:TreatWarningsAsErrors=true `
+    "-bl:$nativeBuildBinaryLog" `
+    "-flp:logfile=$nativeBuildLog;verbosity=diagnostic"
+if ($LASTEXITCODE -ne 0) {
+    $diagnostics = @(
+        if (Test-Path -LiteralPath $nativeBuildLog -PathType Leaf) {
+            Select-String `
+                -LiteralPath $nativeBuildLog `
+                -Pattern "(^|\s)(error|fatal error)\s+[A-Z]+[0-9]+\s*:|:\s+error\s+" `
+                -CaseSensitive:$false |
+            Select-Object -Last 20 |
+            ForEach-Object { $_.Line.Trim() }
+        }
+    )
+    $detail = if ($diagnostics.Count -eq 0) {
+        if (Test-Path -LiteralPath $nativeBuildBinaryLog -PathType Leaf) {
+            "No structured compiler error was found; inspect build/windows-native-build.binlog."
+        } elseif (Test-Path -LiteralPath $nativeBuildLog -PathType Leaf) {
+            "MSBuild failed without a structured compiler error; inspect build/windows-native-build.log."
+        } else {
+            "MSBuild failed before it could produce the native build diagnostic logs."
+        }
+    } else {
+        $diagnostics -join [Environment]::NewLine
+    }
+    throw "The native WinUI build failed.$([Environment]::NewLine)$detail"
+}
 
 $builtExecutable = Get-ChildItem (Join-Path $PSScriptRoot "HerdMe.Windows\bin") `
     -Recurse `

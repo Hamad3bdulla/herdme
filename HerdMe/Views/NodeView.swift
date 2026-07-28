@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NodeView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var runtimeCoordinator: RuntimeCoordinator
 
     var body: some View {
         PageContainer("Node.js") {
@@ -19,13 +20,13 @@ struct NodeView: View {
                     }
                     .padding(.horizontal, 8)
 
-                    ForEach(Array(model.nodeVersions.enumerated()), id: \.element.id) { index, runtime in
+                    ForEach(Array(runtimeCoordinator.nodeVersions.enumerated()), id: \.element.id) { index, runtime in
                         HStack {
                             Text(runtime.cycle).frame(width: 150, alignment: .leading)
                             Text(runtime.installedVersion ?? "Not installed")
                                 .foregroundStyle(runtime.isInstalled ? .primary : .secondary)
                             Spacer()
-                            if model.runtimeOperation == "node-\(runtime.cycle)" {
+                            if runtimeCoordinator.operation == "node-\(runtime.cycle)" {
                                 ProgressView()
                                     .controlSize(.small)
                                 Text("Working...")
@@ -38,7 +39,7 @@ struct NodeView: View {
                                 Menu {
                                     Button("Use") { model.activateNode(runtime.cycle) }
                                         .disabled(runtime.isActive)
-                                    if model.isNodeUpdateAvailable(runtime) {
+                                    if runtimeCoordinator.isNodeUpdateAvailable(runtime) {
                                         Button("Update") { model.installNode(runtime.cycle) }
                                     }
                                     Divider()

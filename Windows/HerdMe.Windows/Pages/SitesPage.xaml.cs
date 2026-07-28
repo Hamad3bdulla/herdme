@@ -2,11 +2,13 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
 
@@ -14,24 +16,58 @@ namespace HerdMe.Windows.Pages;
 
 public sealed partial class SitesPage : Page
 {
-    private readonly CoreClient coreClient = new();
-    private readonly WindowsLocalEnvironment environment = AppServices.Environment;
-    private readonly SiteConfigurationStore settingsStore = AppServices.SiteSettings;
-    private readonly LaravelProjectCreator projectCreator = new();
+    private sealed record DisplayOption(string Value, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    private readonly CoreClient coreClient;
+    private readonly WindowsLocalEnvironment environment;
+    private readonly SiteConfigurationStore settingsStore;
+    private readonly LaravelProjectCreator projectCreator;
     private CancellationTokenSource? projectCreationCancellation;
-    private readonly SiteRuntimeStore siteRuntimeStore = new();
-    private readonly PhpRuntimeInstaller phpInstaller = new();
-    private readonly NodeRuntimeInstaller nodeInstaller = new();
+    private readonly SiteRuntimeStore siteRuntimeStore;
+    private readonly PhpRuntimeInstaller phpInstaller;
+    private readonly PhpRuntimePolicy runtimePolicy;
+    private readonly NodeRuntimeInstaller nodeInstaller;
+    private readonly ComposerToolManager composerTools;
+    private readonly WindowsServiceManager serviceManager;
+    private readonly SiteScanGeneration siteScanGeneration = new();
     private bool loaded;
     private bool suppressPreviewToggle;
     private SiteRecord? selectedSite;
+    private CancellationTokenSource? artisanCancellation;
+    private CancellationTokenSource? npmCancellation;
+    private CancellationTokenSource? siteDetailsCancellation;
+    private CancellationTokenSource? gitInspectionCancellation;
 
     public ObservableCollection<string> Roots { get; } = [];
     public ObservableCollection<SiteRecord> Sites { get; } = [];
     public ObservableCollection<SiteRecord> VisibleSites { get; } = [];
 
-    public SitesPage()
+    public SitesPage(
+        CoreClient coreClient,
+        WindowsLocalEnvironment environment,
+        SiteConfigurationStore settingsStore,
+        LaravelProjectCreator projectCreator,
+        SiteRuntimeStore siteRuntimeStore,
+        PhpRuntimeInstaller phpInstaller,
+        PhpRuntimePolicy runtimePolicy,
+        NodeRuntimeInstaller nodeInstaller,
+        ComposerToolManager composerTools,
+        WindowsServiceManager serviceManager
+    )
     {
+        this.coreClient = coreClient;
+        this.environment = environment;
+        this.settingsStore = settingsStore;
+        this.projectCreator = projectCreator;
+        this.siteRuntimeStore = siteRuntimeStore;
+        this.phpInstaller = phpInstaller;
+        this.runtimePolicy = runtimePolicy;
+        this.nodeInstaller = nodeInstaller;
+        this.composerTools = composerTools;
+        this.serviceManager = serviceManager;
         InitializeComponent();
         var settings = settingsStore.Load();
         foreach (var root in settings.Roots) Roots.Add(root);
@@ -53,7 +89,13 @@ public sealed partial class SitesPage : Page
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
+        loaded = false;
+        siteScanGeneration.Invalidate();
+        CancelGitInspection();
         projectCreationCancellation?.Cancel();
+        artisanCancellation?.Cancel();
+        npmCancellation?.Cancel();
+        siteDetailsCancellation?.Cancel();
     }
 
     private async void Environment_Click(object sender, RoutedEventArgs e)
@@ -63,14 +105,14 @@ public sealed partial class SitesPage : Page
         {
             if (environment.IsRunning)
             {
-                EnvironmentStatusText.Text = "Stopping";
+                EnvironmentStatusText.Text = AppLocalization.Get("SitesEnvironmentStopping");
                 await environment.StopAsync();
                 SaveSettings(startAutomatically: false);
             }
             else
             {
                 if (Sites.Count == 0) await ScanAsync();
-                EnvironmentStatusText.Text = "Starting";
+                EnvironmentStatusText.Text = AppLocalization.Get("SitesEnvironmentStarting");
                 await environment.StartAsync(Sites);
                 SaveSettings(startAutomatically: true);
             }
@@ -82,7 +124,7 @@ public sealed partial class SitesPage : Page
                 XamlRoot = XamlRoot,
                 Title = "HerdMe",
                 Content = error.Message,
-                CloseButtonText = "OK"
+                CloseButtonText = AppLocalization.Get("SitesOk")
             };
             await dialog.ShowAsync();
         }
@@ -98,9 +140,13 @@ public sealed partial class SitesPage : Page
     {
         var running = environment.IsRunning;
         EnvironmentStatusText.Text = running
-            ? "Running"
-            : environment.IsDegraded ? "Recovering" : "Stopped";
-        EnvironmentButtonText.Text = running ? "Stop all" : "Start all";
+            ? AppLocalization.Get("SitesEnvironmentRunning")
+            : environment.IsDegraded
+                ? AppLocalization.Get("SitesEnvironmentRecovering")
+                : AppLocalization.Get("SitesEnvironmentStopped");
+        EnvironmentButtonText.Text = AppLocalization.Get(
+            running ? "SitesEnvironmentStopAll" : "SitesEnvironmentStartAll"
+        );
         EnvironmentButtonIcon.Symbol = running ? Symbol.Stop : Symbol.Play;
         EnvironmentEndpointText.Text = running
             ? environment.HttpsPort is not null ? "HTTPS" : "HTTP"
@@ -135,7 +181,7 @@ public sealed partial class SitesPage : Page
         if (SiteConfigurationStore.BelongsToOtherHerd(folder.Path))
         {
             await ShowErrorAsync(
-                "HerdMe does not link projects inside another application's folders. Choose a HerdMe-owned folder instead."
+                AppLocalization.Get("SitesLinkOtherApplicationRejected")
             );
             return;
         }
@@ -151,10 +197,71 @@ public sealed partial class SitesPage : Page
     private async void UnlinkSelectedSite_Click(object sender, RoutedEventArgs e)
     {
         if (selectedSite is not { Linked: true } site) return;
+        await UnlinkSiteAsync(site);
+    }
+
+    private async Task UnlinkSiteAsync(SiteRecord site)
+    {
         var settings = settingsStore.Load();
         settings.LinkedSites.RemoveAll(path => path.Equals(site.Path, StringComparison.OrdinalIgnoreCase));
         settingsStore.Save(settings);
         await ScanAsync();
+    }
+
+    private async void MoveSelectedSiteToRecycleBin_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not { Linked: false } site) return;
+        await MoveSiteToRecycleBinAsync(site);
+    }
+
+    private async void RemoveSiteFromMenu_Click(object sender, RoutedEventArgs e)
+    {
+        if (SiteFromMenu(sender) is not { } site) return;
+        if (site.Linked)
+        {
+            await UnlinkSiteAsync(site);
+        }
+        else
+        {
+            await MoveSiteToRecycleBinAsync(site);
+        }
+    }
+
+    private async Task MoveSiteToRecycleBinAsync(SiteRecord site)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Format("SitesMoveToRecycleBinTitle", site.Name),
+            Content = AppLocalization.Get("SitesMoveToRecycleBinMessage"),
+            PrimaryButtonText = AppLocalization.Get("SitesMoveToRecycleBin"),
+            CloseButtonText = AppLocalization.Get("CommonCancel"),
+            DefaultButton = ContentDialogButton.Primary
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+        try
+        {
+            await SiteRemovalService.MoveToRecycleBinAsync(site, settingsStore.Load().Roots);
+            await ScanAsync(throwOnError: true);
+            UpdateEnvironmentState();
+        }
+        catch (SiteRemovalException error)
+        {
+            var key = error.Failure switch
+            {
+                SiteRemovalFailure.LinkedProject => "SitesRemoveLinkedRejected",
+                SiteRemovalFailure.OutsideParkedFolder => "SitesRemoveOutsideRootRejected",
+                _ => "SitesRemoveUnavailable"
+            };
+            await ShowErrorAsync(AppLocalization.Get(key));
+        }
+        catch (Exception error) when (error is IOException
+            or UnauthorizedAccessException
+            or OperationCanceledException)
+        {
+            await ShowErrorAsync(error.Message);
+        }
     }
 
     private async void CreateLaravel_Click(object sender, RoutedEventArgs e)
@@ -162,42 +269,67 @@ public sealed partial class SitesPage : Page
         var parent = RootList.SelectedItem as string ?? Roots.FirstOrDefault();
         if (parent is null)
         {
-            await ShowErrorAsync("Add a site folder before creating a Laravel project.");
+            await ShowErrorAsync(AppLocalization.Get("SitesAddFolderBeforeCreate"));
             return;
         }
-        var nameBox = new TextBox { Header = "Project name", PlaceholderText = "my-app" };
+        var nameBox = new TextBox
+        {
+            Header = AppLocalization.Get("SitesProjectNameField"),
+            PlaceholderText = "my-app"
+        };
+        var starterOptions = new[]
+        {
+            new DisplayOption("None", AppLocalization.Get("SitesStarterNone")),
+            new DisplayOption("React", "React"),
+            new DisplayOption("Vue", "Vue"),
+            new DisplayOption("Svelte", "Svelte"),
+            new DisplayOption("Livewire", "Livewire"),
+            new DisplayOption("Custom", AppLocalization.Get("SitesStarterCustom"))
+        };
         var starterBox = new ComboBox
         {
-            Header = "Starter kit",
-            ItemsSource = new[] { "None", "React", "Vue", "Svelte", "Livewire", "Custom" },
+            Header = AppLocalization.Get("SitesStarterKitField"),
+            ItemsSource = starterOptions,
             SelectedIndex = 0,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         var customStarterBox = new TextBox
         {
-            Header = "Custom Composer package",
+            Header = AppLocalization.Get("SitesCustomComposerPackageField"),
             PlaceholderText = "vendor/package",
             Visibility = Visibility.Collapsed
         };
         starterBox.SelectionChanged += (_, _) =>
         {
-            customStarterBox.Visibility = starterBox.SelectedItem?.ToString() == "Custom"
+            customStarterBox.Visibility = (starterBox.SelectedItem as DisplayOption)?.Value == "Custom"
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         };
+        var testingOptions = new[]
+        {
+            new DisplayOption("Pest", "Pest"),
+            new DisplayOption("PHPUnit", "PHPUnit")
+        };
         var testingBox = new ComboBox
         {
-            Header = "Testing framework",
-            ItemsSource = new[] { "Pest", "PHPUnit" },
+            Header = AppLocalization.Get("SitesTestingFrameworkField"),
+            ItemsSource = testingOptions,
             SelectedIndex = 0,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
-        var boostToggle = new ToggleSwitch { Header = "Install Laravel Boost", IsOn = true };
-        var gitToggle = new ToggleSwitch { Header = "Initialize Git repository" };
+        var boostToggle = new ToggleSwitch
+        {
+            Header = AppLocalization.Get("SitesInstallBoostField"),
+            IsOn = true
+        };
+        var gitToggle = new ToggleSwitch
+        {
+            Header = AppLocalization.Get("SitesInitializeGitField")
+        };
         var content = new StackPanel { Spacing = 12, MinWidth = 380 };
         content.Children.Add(new TextBlock
         {
-            Text = $"Location: {parent}",
+            Text = AppLocalization.Format("SitesProjectLocation", parent),
             TextWrapping = TextWrapping.Wrap,
             Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
         });
@@ -210,10 +342,10 @@ public sealed partial class SitesPage : Page
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
-            Title = "Create Laravel project",
+            Title = AppLocalization.Get("SitesCreateLaravelDialogTitle"),
             Content = content,
-            PrimaryButtonText = "Create",
-            CloseButtonText = "Cancel",
+            PrimaryButtonText = AppLocalization.Get("SitesCreate"),
+            CloseButtonText = AppLocalization.Get("SitesCancel"),
             DefaultButton = ContentDialogButton.Primary
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
@@ -221,17 +353,17 @@ public sealed partial class SitesPage : Page
         var request = new LaravelProjectRequest(
             nameBox.Text,
             parent,
-            starterBox.SelectedItem?.ToString() ?? "None",
-            testingBox.SelectedItem?.ToString() ?? "Pest",
+            (starterBox.SelectedItem as DisplayOption)?.Value ?? "None",
+            (testingBox.SelectedItem as DisplayOption)?.Value ?? "Pest",
             boostToggle.IsOn,
             gitToggle.IsOn,
-            starterBox.SelectedItem?.ToString() == "Custom" ? customStarterBox.Text : null
+            (starterBox.SelectedItem as DisplayOption)?.Value == "Custom" ? customStarterBox.Text : null
         );
         var stages = LaravelProjectCreationStages.For(request);
         var statusText = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
-            Text = LaravelProjectCreationStages.Detail(stages[0])
+            Text = LocalizedStageDetail(stages[0])
         };
         var stageRows = new Dictionary<LaravelProjectCreationStage, TextBlock>();
         var progressContent = new StackPanel { Spacing = 10, MinWidth = 420 };
@@ -249,8 +381,8 @@ public sealed partial class SitesPage : Page
         var progressDialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
-            Title = "Creating Laravel project",
-            CloseButtonText = "Cancel",
+            Title = AppLocalization.Get("SitesCreatingLaravelDialogTitle"),
+            CloseButtonText = AppLocalization.Get("SitesCancel"),
             Content = new ScrollViewer
             {
                 Content = progressContent,
@@ -275,7 +407,7 @@ public sealed partial class SitesPage : Page
             args.Cancel = true;
             if (cancellation.IsCancellationRequested) return;
             cancellation.Cancel();
-            statusText.Text = "Cancelling and removing the incomplete project...";
+            statusText.Text = AppLocalization.Get("SitesCancellingProjectCreation");
             progressDialog.CloseButtonText = string.Empty;
         };
 
@@ -292,32 +424,32 @@ public sealed partial class SitesPage : Page
             currentStage = LaravelProjectCreationStage.Completed;
             UpdateProjectCreationProgress(stages, stageRows, statusText, currentStage);
             progressRing.IsActive = false;
-            progressDialog.Title = "Laravel project created";
-            progressDialog.CloseButtonText = "Done";
+            progressDialog.Title = AppLocalization.Get("SitesLaravelCreatedTitle");
+            progressDialog.CloseButtonText = AppLocalization.Get("SitesDone");
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
             UpdateProjectCreationFailure(stageRows, currentStage);
             progressRing.IsActive = false;
-            progressDialog.Title = "Laravel project creation cancelled";
-            statusText.Text = "Creation was cancelled and the incomplete project was removed.";
-            progressDialog.CloseButtonText = "Close";
+            progressDialog.Title = AppLocalization.Get("SitesLaravelCreationCancelledTitle");
+            statusText.Text = AppLocalization.Get("SitesLaravelCreationCancelledMessage");
+            progressDialog.CloseButtonText = AppLocalization.Get("SitesClose");
         }
         catch (Exception error)
         {
             UpdateProjectCreationFailure(stageRows, currentStage);
             progressRing.IsActive = false;
-            progressDialog.Title = "Laravel project could not be created";
+            progressDialog.Title = AppLocalization.Get("SitesLaravelCreationFailedTitle");
             var failure = CommandErrorPresenter.Present(
                 error.Message,
-                "Laravel Installer could not finish creating the site."
+                AppLocalization.Get("SitesLaravelCreationFallback")
             );
             statusText.Text = failure.Message;
             if (failure.TechnicalDetails is not null)
             {
                 progressContent.Children.Add(new Expander
                 {
-                    Header = "Technical details",
+                    Header = AppLocalization.Get("SitesTechnicalDetails"),
                     IsExpanded = false,
                     Content = new ScrollViewer
                     {
@@ -331,7 +463,7 @@ public sealed partial class SitesPage : Page
                     }
                 });
             }
-            progressDialog.CloseButtonText = "Close";
+            progressDialog.CloseButtonText = AppLocalization.Get("SitesClose");
         }
         finally
         {
@@ -358,13 +490,21 @@ public sealed partial class SitesPage : Page
         for (var index = 0; index < stages.Count; index++)
         {
             var stage = stages[index];
-            var prefix = index < currentIndex ? "Completed" : index == currentIndex ? "In progress" : "Pending";
-            rows[stage].Text = $"{prefix}: {LaravelProjectCreationStages.Title(stage)}";
+            var prefix = AppLocalization.Get(
+                index < currentIndex
+                    ? "SitesProgressCompleted"
+                    : index == currentIndex ? "SitesProgressInProgress" : "SitesProgressPending"
+            );
+            rows[stage].Text = AppLocalization.Format(
+                "SitesProgressRow",
+                prefix,
+                LocalizedStageTitle(stage)
+            );
             rows[stage].FontWeight = index == currentIndex
                 ? Microsoft.UI.Text.FontWeights.SemiBold
                 : Microsoft.UI.Text.FontWeights.Normal;
         }
-        statusText.Text = LaravelProjectCreationStages.Detail(current);
+        statusText.Text = LocalizedStageDetail(current);
     }
 
     private static void UpdateProjectCreationFailure(
@@ -372,8 +512,22 @@ public sealed partial class SitesPage : Page
         LaravelProjectCreationStage current
     )
     {
-        rows[current].Text = $"Failed: {LaravelProjectCreationStages.Title(current)}";
+        rows[current].Text = AppLocalization.Format(
+            "SitesProgressRow",
+            AppLocalization.Get("SitesProgressFailed"),
+            LocalizedStageTitle(current)
+        );
         rows[current].FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+    }
+
+    private static string LocalizedStageTitle(LaravelProjectCreationStage stage)
+    {
+        return AppLocalization.Get(LaravelProjectCreationStages.TitleKey(stage));
+    }
+
+    private static string LocalizedStageDetail(LaravelProjectCreationStage stage)
+    {
+        return AppLocalization.Get(LaravelProjectCreationStages.DetailKey(stage));
     }
 
     private async void AddRoot_Click(object sender, RoutedEventArgs e)
@@ -382,7 +536,7 @@ public sealed partial class SitesPage : Page
         if (path.Length > 0 && SiteConfigurationStore.BelongsToOtherHerd(path))
         {
             await ShowErrorAsync(
-                "HerdMe does not park another application's folders. Choose a HerdMe-owned folder instead."
+                AppLocalization.Get("SitesParkOtherApplicationRejected")
             );
             return;
         }
@@ -403,28 +557,30 @@ public sealed partial class SitesPage : Page
     private async Task ConfigureSiteAsync(SiteRecord site)
     {
         var path = site.Path;
-        var phpDefault = "Default";
-        var phpVersions = new List<string> { phpDefault };
-        phpVersions.AddRange(phpInstaller.InstalledCycles());
-        var nodeDefault = "Default";
-        var nodeVersions = new List<string> { nodeDefault };
-        nodeVersions.AddRange(nodeInstaller.InstalledVersions());
+        var phpOptions = new List<DisplayOption>
+        {
+            new(string.Empty, AppLocalization.Get("SitesRuntimeDefault"))
+        };
+        phpOptions.AddRange(phpInstaller.InstalledCycles().Select(version => new DisplayOption(version, version)));
+        var nodeOptions = new List<DisplayOption>
+        {
+            new(string.Empty, AppLocalization.Get("SitesRuntimeDefault"))
+        };
+        nodeOptions.AddRange(nodeInstaller.InstalledVersions().Select(version => new DisplayOption(version, version)));
         var phpBox = new ComboBox
         {
             Header = "PHP",
-            ItemsSource = phpVersions,
-            SelectedItem = site.PhpVersion is not null && phpVersions.Contains(site.PhpVersion)
-                ? site.PhpVersion
-                : phpDefault,
+            ItemsSource = phpOptions,
+            SelectedItem = phpOptions.FirstOrDefault(option => option.Value == site.PhpVersion)
+                ?? phpOptions[0],
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         var nodeBox = new ComboBox
         {
             Header = "Node.js",
-            ItemsSource = nodeVersions,
-            SelectedItem = site.NodeVersion is not null && nodeVersions.Contains(site.NodeVersion)
-                ? site.NodeVersion
-                : nodeDefault,
+            ItemsSource = nodeOptions,
+            SelectedItem = nodeOptions.FirstOrDefault(option => option.Value == site.NodeVersion)
+                ?? nodeOptions[0],
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         var content = new StackPanel { Spacing = 12, MinWidth = 340 };
@@ -435,8 +591,8 @@ public sealed partial class SitesPage : Page
             XamlRoot = XamlRoot,
             Title = site.Name,
             Content = content,
-            PrimaryButtonText = "Save",
-            CloseButtonText = "Cancel",
+            PrimaryButtonText = AppLocalization.Get("SitesSave"),
+            CloseButtonText = AppLocalization.Get("SitesCancel"),
             DefaultButton = ContentDialogButton.Primary
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
@@ -444,10 +600,10 @@ public sealed partial class SitesPage : Page
         try
         {
             if (wasRunning) await environment.StopAsync();
-            var php = phpBox.SelectedItem?.ToString();
-            var node = nodeBox.SelectedItem?.ToString();
-            siteRuntimeStore.SetPhp(path, php == phpDefault ? null : php);
-            siteRuntimeStore.SetNode(path, node == nodeDefault ? null : node);
+            var php = (phpBox.SelectedItem as DisplayOption)?.Value;
+            var node = (nodeBox.SelectedItem as DisplayOption)?.Value;
+            siteRuntimeStore.SetPhp(path, string.IsNullOrEmpty(php) ? null : php);
+            siteRuntimeStore.SetNode(path, string.IsNullOrEmpty(node) ? null : node);
             await ScanAsync();
             if (wasRunning) await environment.StartAsync(Sites);
         }
@@ -484,6 +640,8 @@ public sealed partial class SitesPage : Page
 
     private async Task ScanAsync(bool throwOnError = false)
     {
+        var generation = siteScanGeneration.Begin();
+        CancelGitInspection();
         var selectedPath = selectedSite?.Path;
         if (Roots.Count == 0)
         {
@@ -516,23 +674,92 @@ public sealed partial class SitesPage : Page
                 tld,
                 normalizedSettings.LinkedSites
             );
+            if (!siteScanGeneration.IsCurrent(generation)) return;
             foreach (var site in scanned)
             {
                 Sites.Add(site);
             }
-            await environment.SynchronizeSitesAsync(Sites);
             ApplyFilter(selectedPath);
+            SiteCountText.Text = AppLocalization.Format("SitesCount", Sites.Count);
+            await environment.SynchronizeSitesAsync(scanned);
+            if (!siteScanGeneration.IsCurrent(generation)) return;
+            StartGitInspection(scanned, generation);
         }
         catch (Exception error)
         {
+            if (!siteScanGeneration.IsCurrent(generation)) return;
             if (throwOnError) throw;
             await ShowErrorAsync(error.Message);
         }
         finally
         {
-            ScanProgress.IsActive = false;
-            SiteCountText.Text = Sites.Count == 1 ? "1 site" : $"{Sites.Count} sites";
+            if (siteScanGeneration.IsCurrent(generation))
+            {
+                ScanProgress.IsActive = false;
+                SiteCountText.Text = AppLocalization.Format("SitesCount", Sites.Count);
+            }
         }
+    }
+
+    private void StartGitInspection(IReadOnlyList<SiteRecord> sites, int generation)
+    {
+        var cancellation = new CancellationTokenSource();
+        gitInspectionCancellation = cancellation;
+        _ = InspectGitStatusesInBackgroundAsync(sites, generation, cancellation);
+    }
+
+    private async Task InspectGitStatusesInBackgroundAsync(
+        IReadOnlyList<SiteRecord> sites,
+        int generation,
+        CancellationTokenSource cancellation
+    )
+    {
+        try
+        {
+            var statuses = await SitePresentation.InspectGitStatusesAsync(
+                sites,
+                cancellation.Token
+            );
+            if (cancellation.IsCancellationRequested
+                || !siteScanGeneration.IsCurrent(generation)) return;
+
+            foreach (var site in Sites)
+            {
+                if (statuses.TryGetValue(site.Path, out var git))
+                {
+                    site.GitSummary = GitSummary(git);
+                }
+            }
+            ApplyFilter(selectedSite?.Path);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception error)
+        {
+            if (!siteScanGeneration.IsCurrent(generation)) return;
+            await DiagnosticLog.WriteFailureAsync(
+                "site-git",
+                "inspect",
+                "Git status inspection failed after the site list was loaded.",
+                error.ToString()
+            );
+        }
+        finally
+        {
+            if (ReferenceEquals(gitInspectionCancellation, cancellation))
+            {
+                gitInspectionCancellation = null;
+            }
+            cancellation.Dispose();
+        }
+    }
+
+    private void CancelGitInspection()
+    {
+        var cancellation = gitInspectionCancellation;
+        gitInspectionCancellation = null;
+        cancellation?.Cancel();
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -572,17 +799,242 @@ public sealed partial class SitesPage : Page
         SiteNameText.Text = site.Name;
         DomainText.Text = site.Domain;
         FrameworkText.Text = site.Framework;
-        RuntimeText.Text = SitePresentation.RuntimeLabel(site);
-        RegistrationText.Text = site.Linked ? "Linked" : "Parked";
+        var phpCycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
+        var phpVersion = phpInstaller.InstalledVersion(phpCycle);
+        var nodeVersion = site.NodeVersion ?? nodeInstaller.LoadSettings().ActiveVersion;
+        RuntimeText.Text = AppLocalization.Format(
+            "SitesRuntimeDetails",
+            phpVersion is null ? phpCycle : $"{phpCycle} ({phpVersion})",
+            string.IsNullOrWhiteSpace(nodeVersion)
+                ? AppLocalization.Get("SitesProjectNodeRuntime")
+                : nodeVersion
+        );
+        RegistrationText.Text = AppLocalization.Get(site.Linked ? "SitesLinked" : "SitesParked");
         PathText.Text = site.Path;
-        UnlinkButton.IsEnabled = site.Linked;
+        UnlinkButton.Visibility = site.Linked ? Visibility.Visible : Visibility.Collapsed;
+        RemoveSiteButton.Visibility = site.Linked ? Visibility.Collapsed : Visibility.Visible;
+        ArtisanButton.IsEnabled = site.Framework == "Laravel"
+            && File.Exists(Path.Combine(site.Path, "artisan"));
+        NpmButton.IsEnabled = File.Exists(Path.Combine(site.Path, "package.json"));
         UrlButton.Content = SitePresentation.DisplayAddress(
             site,
             environment.IsRunning,
             environment.HttpPort,
             environment.HttpsPort
         );
+        _ = RefreshSiteDetailsAsync(site);
         _ = RefreshPreviewAsync();
+    }
+
+    private async Task RefreshSiteDetailsAsync(SiteRecord site)
+    {
+        siteDetailsCancellation?.Cancel();
+        siteDetailsCancellation?.Dispose();
+        using var cancellation = new CancellationTokenSource();
+        siteDetailsCancellation = cancellation;
+        EnvironmentFileText.Text = AppLocalization.Get("SitesDetailsChecking");
+        LogsText.Text = AppLocalization.Get("SitesDetailsChecking");
+        RoutesText.Text = AppLocalization.Get("SitesDetailsChecking");
+        GitText.Text = AppLocalization.Get("SitesDetailsChecking");
+        AssociatedServicesText.Text = AppLocalization.Get("SitesDetailsChecking");
+        try
+        {
+            var services = serviceManager.LoadInstances();
+            var details = await Task.Run(
+                () => InspectSiteDetails(site.Path, services, cancellation.Token),
+                cancellation.Token
+            );
+            if (cancellation.IsCancellationRequested || !IsSelected(site)) return;
+            EnvironmentFileText.Text = details.EnvironmentUnreadable
+                ? AppLocalization.Get("SitesDetailsUnreadable")
+                : AppLocalization.Get(
+                    details.EnvironmentExists ? "SitesDetailsPresent" : "SitesDetailsMissing"
+                );
+            LogsText.Text = details.LogFileCount == 0
+                ? AppLocalization.Get("SitesDetailsNoLogs")
+                : details.LatestLogName is { } latest
+                    ? AppLocalization.Format("SitesDetailsLogsLatest", details.LogFileCount, latest)
+                    : AppLocalization.Format("SitesDetailsLogsCount", details.LogFileCount);
+            RoutesText.Text = details.RouteFileNames.Count == 0
+                ? AppLocalization.Get("SitesDetailsNoRoutes")
+                : string.Join(", ", details.RouteFileNames);
+            GitText.Text = !details.IsGitRepository
+                ? AppLocalization.Get("SitesDetailsNotGit")
+                : details.GitChangeCount == 0
+                    ? AppLocalization.Format(
+                        "SitesDetailsGitClean",
+                        details.GitBranch ?? AppLocalization.Get("SitesDetailsDetached")
+                    )
+                    : AppLocalization.Format(
+                        "SitesDetailsGitChanges",
+                        details.GitBranch ?? AppLocalization.Get("SitesDetailsDetached"),
+                        details.GitChangeCount
+                    );
+            AssociatedServicesText.Text = details.AssociatedServices.Count == 0
+                ? AppLocalization.Get("SitesDetailsNoServices")
+                : string.Join(", ", details.AssociatedServices);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception error) when (error is IOException
+            or UnauthorizedAccessException
+            or InvalidDataException
+            or Win32Exception)
+        {
+            if (!cancellation.IsCancellationRequested && IsSelected(site))
+            {
+                GitText.Text = AppLocalization.Get("SitesDetailsUnavailable");
+                await DiagnosticLog.WriteFailureAsync(
+                    "site-details",
+                    "inspect",
+                    $"The details for {site.Name} could not be inspected.",
+                    error.ToString()
+                );
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(siteDetailsCancellation, cancellation))
+            {
+                siteDetailsCancellation = null;
+            }
+        }
+    }
+
+    private sealed record SiteDetailsResult(
+        bool EnvironmentExists,
+        bool EnvironmentUnreadable,
+        int LogFileCount,
+        string? LatestLogName,
+        IReadOnlyList<string> RouteFileNames,
+        bool IsGitRepository,
+        string? GitBranch,
+        int GitChangeCount,
+        IReadOnlyList<string> AssociatedServices
+    );
+
+    private static SiteDetailsResult InspectSiteDetails(
+        string sitePath,
+        IReadOnlyList<ManagedServiceInstance> services,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var environmentPath = Path.Combine(sitePath, ".env");
+        var environmentExists = File.Exists(environmentPath);
+        var environmentUnreadable = false;
+        IReadOnlyDictionary<string, string> environmentValues = new Dictionary<string, string>();
+        if (environmentExists)
+        {
+            try
+            {
+                var attributes = File.GetAttributes(environmentPath);
+                if ((attributes & FileAttributes.ReparsePoint) != 0
+                    || new FileInfo(environmentPath).Length > 4 * 1_024 * 1_024)
+                {
+                    environmentUnreadable = true;
+                }
+                else
+                {
+                    environmentValues = ParseEnvironment(File.ReadAllText(environmentPath, new UTF8Encoding(false, true)));
+                }
+            }
+            catch (Exception error) when (error is IOException
+                or UnauthorizedAccessException
+                or DecoderFallbackException)
+            {
+                environmentUnreadable = true;
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var logsPath = Path.Combine(sitePath, "storage", "logs");
+        var logs = Directory.Exists(logsPath)
+            ? Directory.EnumerateFiles(logsPath, "*", SearchOption.TopDirectoryOnly)
+                .Select(path => new FileInfo(path))
+                .OrderByDescending(file => file.LastWriteTimeUtc)
+                .ToArray()
+            : [];
+        var routesPath = Path.Combine(sitePath, "routes");
+        var routes = Directory.Exists(routesPath)
+            ? Directory.EnumerateFiles(routesPath, "*.php", SearchOption.TopDirectoryOnly)
+                .Select(Path.GetFileName)
+                .Where(name => name is not null)
+                .Select(name => name!)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToArray()
+            : [];
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var git = SitePresentation.InspectGitAsync(sitePath, cancellationToken)
+            .GetAwaiter()
+            .GetResult();
+        var associated = services.Where(service => MatchesService(service, environmentValues))
+            .Select(service => $"{service.Name} ({service.Port})")
+            .ToArray();
+        return new SiteDetailsResult(
+            environmentExists,
+            environmentUnreadable,
+            logs.Length,
+            logs.FirstOrDefault()?.Name,
+            routes,
+            git.IsRepository,
+            git.Branch,
+            git.ChangeCount,
+            associated
+        );
+    }
+
+    private static IReadOnlyDictionary<string, string> ParseEnvironment(string contents)
+    {
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var line in contents.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var value = line.TrimStart();
+            if (value.Length == 0 || value.StartsWith('#')) continue;
+            var separator = value.IndexOf('=');
+            if (separator <= 0) continue;
+            var key = value[..separator].Trim();
+            var item = value[(separator + 1)..].Trim();
+            if (item.Length >= 2
+                && (item[0] == '"' && item[^1] == '"' || item[0] == '\'' && item[^1] == '\''))
+            {
+                item = item[1..^1];
+            }
+            if (key.Length > 0) values[key] = item;
+        }
+        return values;
+    }
+
+    private static string? GitSummary(SiteGitStatus status)
+    {
+        if (!status.IsRepository) return null;
+        var branch = status.Branch ?? AppLocalization.Get("SitesDetailsDetached");
+        return status.ChangeCount == 0
+            ? AppLocalization.Format("SitesDetailsGitClean", branch)
+            : AppLocalization.Format("SitesDetailsGitChanges", branch, status.ChangeCount);
+    }
+
+    private static bool MatchesService(
+        ManagedServiceInstance service,
+        IReadOnlyDictionary<string, string> environment
+    )
+    {
+        var port = service.Port.ToString();
+        return service.DefinitionId switch
+        {
+            "mysql" or "mariadb" => Value("DB_PORT") == port && Value("DB_CONNECTION") == "mysql",
+            "postgresql" => Value("DB_PORT") == port && Value("DB_CONNECTION") == "pgsql",
+            "mongodb" => Value("MONGODB_URI")?.Contains($":{port}", StringComparison.Ordinal) == true,
+            "redis" or "valkey" => Value("REDIS_PORT") == port,
+            "meilisearch" => Value("MEILISEARCH_HOST")?.Contains($":{port}", StringComparison.Ordinal) == true,
+            "typesense" => Value("TYPESENSE_PORT") == port,
+            "minio" or "rustfs" => Value("AWS_ENDPOINT")?.Contains($":{port}", StringComparison.Ordinal) == true,
+            _ => false
+        };
+
+        string? Value(string key) => environment.TryGetValue(key, out var value) ? value : null;
     }
 
     private Uri SiteUri(SiteRecord site)
@@ -598,10 +1050,15 @@ public sealed partial class SitesPage : Page
     private async Task RefreshPreviewAsync()
     {
         var site = selectedSite;
-        PreviewBorder.Visibility = PreviewToggle.IsOn && site is not null
+        if (site is null)
+        {
+            PreviewBorder.Visibility = Visibility.Collapsed;
+            return;
+        }
+        PreviewBorder.Visibility = PreviewToggle.IsOn
             ? Visibility.Visible
             : Visibility.Collapsed;
-        if (!PreviewToggle.IsOn || site is null) return;
+        if (!PreviewToggle.IsOn) return;
         PreviewFailureState.Visibility = Visibility.Collapsed;
         SitePreview.Visibility = Visibility.Visible;
         try
@@ -716,6 +1173,42 @@ public sealed partial class SitesPage : Page
         }
     }
 
+    private void CopySelectedSiteLink_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not null) CopyText(SiteUri(selectedSite).AbsoluteUri);
+    }
+
+    private void CopySelectedSitePath_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not null) CopyText(selectedSite.Path);
+    }
+
+    private void CopySiteLinkFromMenu_Click(object sender, RoutedEventArgs e)
+    {
+        if (SiteFromMenu(sender) is { } site) CopyText(SiteUri(site).AbsoluteUri);
+    }
+
+    private void CopySitePathFromMenu_Click(object sender, RoutedEventArgs e)
+    {
+        if (SiteFromMenu(sender) is { } site) CopyText(site.Path);
+    }
+
+    private SiteRecord? SiteFromMenu(object sender)
+    {
+        if (sender is not FrameworkElement { Tag: string path }) return null;
+        return Sites.FirstOrDefault(site =>
+            site.Path.Equals(path, StringComparison.OrdinalIgnoreCase)
+        );
+    }
+
+    private static void CopyText(string value)
+    {
+        var package = new DataPackage();
+        package.SetText(value);
+        Clipboard.SetContent(package);
+        Clipboard.Flush();
+    }
+
     private async void OpenFolder_Click(object sender, RoutedEventArgs e)
     {
         if (selectedSite is null) return;
@@ -732,6 +1225,158 @@ public sealed partial class SitesPage : Page
         {
             await ShowErrorAsync(error.Message);
         }
+    }
+
+    private async void EditEnvironment_Click(object sender, RoutedEventArgs e)
+    {
+        var site = selectedSite;
+        if (site is null) return;
+
+        ProjectEnvironmentDocument document;
+        try
+        {
+            document = await Task.Run(() => ProjectEnvironmentFile.Load(site.Path));
+        }
+        catch (Exception error) when (error is IOException
+            or UnauthorizedAccessException
+            or InvalidDataException
+            or InvalidOperationException)
+        {
+            await ShowErrorAsync(error.Message);
+            return;
+        }
+        if (!IsSelected(site)) return;
+
+        var pathText = new TextBlock
+        {
+            Text = Path.Combine(site.Path, ".env"),
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"),
+            FontSize = 12,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                "TextFillColorSecondaryBrush"
+            ],
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            IsTextSelectionEnabled = true
+        };
+        var statusText = new TextBlock
+        {
+            Text = EnvironmentDocumentStatus(document),
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                "TextFillColorSecondaryBrush"
+            ]
+        };
+        var editor = new TextBox
+        {
+            Header = AppLocalization.Get("SitesEnvironmentContentsField"),
+            Text = document.Contents,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.NoWrap,
+            IsSpellCheckEnabled = false,
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"),
+            MinWidth = 640,
+            Height = 420,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        };
+        var content = new StackPanel { Spacing = 10, MinWidth = 640 };
+        content.Children.Add(pathText);
+        content.Children.Add(statusText);
+        content.Children.Add(editor);
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Format("SitesEnvironmentDialogTitle", site.Name),
+            Content = content,
+            PrimaryButtonText = AppLocalization.Get("SitesSave"),
+            CloseButtonText = AppLocalization.Get("SitesClose"),
+            DefaultButton = ContentDialogButton.Primary,
+            IsPrimaryButtonEnabled = false
+        };
+        var isDirty = false;
+        var discardArmed = false;
+        editor.TextChanged += (_, _) =>
+        {
+            isDirty = !string.Equals(editor.Text, document.Contents, StringComparison.Ordinal);
+            discardArmed = false;
+            dialog.IsPrimaryButtonEnabled = isDirty;
+            statusText.Text = isDirty
+                ? AppLocalization.Get("SitesEnvironmentStatusUnsaved")
+                : EnvironmentDocumentStatus(document);
+            statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                "TextFillColorSecondaryBrush"
+            ];
+        };
+        dialog.PrimaryButtonClick += async (_, args) =>
+        {
+            args.Cancel = true;
+            if (!isDirty) return;
+            var deferral = args.GetDeferral();
+            editor.IsEnabled = false;
+            dialog.IsPrimaryButtonEnabled = false;
+            try
+            {
+                var editedContents = editor.Text;
+                var expectedRevision = document.Revision;
+                document = await Task.Run(() => ProjectEnvironmentFile.Save(
+                    site.Path,
+                    editedContents,
+                    expectedRevision
+                ));
+                isDirty = false;
+                discardArmed = false;
+                statusText.Text = AppLocalization.Get("SitesEnvironmentStatusSaved");
+                statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                    "SystemFillColorSuccessBrush"
+                ];
+            }
+            catch (ProjectEnvironmentChangedException)
+            {
+                statusText.Text = AppLocalization.Get("SitesEnvironmentExternalChange");
+                statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                    "SystemFillColorCriticalBrush"
+                ];
+            }
+            catch (Exception error) when (error is IOException
+                or UnauthorizedAccessException
+                or InvalidDataException
+                or InvalidOperationException)
+            {
+                statusText.Text = error.Message;
+                statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                    "SystemFillColorCriticalBrush"
+                ];
+            }
+            finally
+            {
+                editor.IsEnabled = true;
+                dialog.IsPrimaryButtonEnabled = isDirty;
+                deferral.Complete();
+            }
+        };
+        dialog.CloseButtonClick += (_, args) =>
+        {
+            if (!isDirty || discardArmed) return;
+            args.Cancel = true;
+            discardArmed = true;
+            statusText.Text = AppLocalization.Get("SitesEnvironmentConfirmDiscard");
+            statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                "SystemFillColorCautionBrush"
+            ];
+        };
+        await dialog.ShowAsync();
+    }
+
+    private static string EnvironmentDocumentStatus(ProjectEnvironmentDocument document)
+    {
+        if (document.LoadedFromExample)
+        {
+            return AppLocalization.Get("SitesEnvironmentStatusFromExample");
+        }
+        return AppLocalization.Get(
+            document.Exists ? "SitesEnvironmentStatusLoaded" : "SitesEnvironmentStatusMissing"
+        );
     }
 
     private void OpenLogs_Click(object sender, RoutedEventArgs e)
@@ -771,6 +1416,412 @@ public sealed partial class SitesPage : Page
         }
     }
 
+    private async void Artisan_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not { } site) return;
+
+        var presetOptions = ArtisanCommandCatalog.Presets.Select(preset => new DisplayOption(
+            preset.Id,
+            AppLocalization.Get(ArtisanPresetTitleKey(preset.Id))
+        )).ToArray();
+        var presetBox = new ComboBox
+        {
+            Header = AppLocalization.Get("SitesArtisanCommandField"),
+            ItemsSource = presetOptions,
+            SelectedIndex = 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var customBox = new TextBox
+        {
+            Header = AppLocalization.Get("SitesArtisanCustomCommandField"),
+            PlaceholderText = "route:list --path=api",
+            Visibility = Visibility.Collapsed
+        };
+        presetBox.SelectionChanged += (_, _) =>
+        {
+            customBox.Visibility = (presetBox.SelectedItem as DisplayOption)?.Value == "custom"
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        };
+        var statusText = new TextBlock
+        {
+            Text = AppLocalization.Get("SitesArtisanReady"),
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+        };
+        var progressRing = new ProgressRing { Width = 18, Height = 18 };
+        var statusRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        statusRow.Children.Add(progressRing);
+        statusRow.Children.Add(statusText);
+        var outputBox = new TextBox
+        {
+            Text = AppLocalization.Get("SitesArtisanOutputPlaceholder"),
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.NoWrap,
+            MinHeight = 280,
+            MaxHeight = 420,
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
+        };
+        ScrollViewer.SetVerticalScrollBarVisibility(outputBox, ScrollBarVisibility.Auto);
+        ScrollViewer.SetHorizontalScrollBarVisibility(outputBox, ScrollBarVisibility.Auto);
+        var runButton = new Button { Content = AppLocalization.Get("SitesRun") };
+        var cancelButton = new Button
+        {
+            Content = AppLocalization.Get("SitesCancel"),
+            IsEnabled = false
+        };
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        buttons.Children.Add(cancelButton);
+        buttons.Children.Add(runButton);
+        var content = new StackPanel { Spacing = 12, MinWidth = 620 };
+        content.Children.Add(presetBox);
+        content.Children.Add(customBox);
+        content.Children.Add(statusRow);
+        content.Children.Add(outputBox);
+        content.Children.Add(buttons);
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Format("SitesArtisanDialogTitle", site.Name),
+            Content = content,
+            CloseButtonText = AppLocalization.Get("SitesClose")
+        };
+
+        var running = false;
+        cancelButton.Click += (_, _) =>
+        {
+            if (!running) return;
+            statusText.Text = AppLocalization.Get("SitesArtisanCancelling");
+            artisanCancellation?.Cancel();
+        };
+        dialog.Closing += (_, args) =>
+        {
+            if (!running) return;
+            args.Cancel = true;
+            statusText.Text = AppLocalization.Get("SitesArtisanCancelling");
+            artisanCancellation?.Cancel();
+        };
+        runButton.Click += async (_, _) =>
+        {
+            if (running) return;
+            if (presetBox.SelectedItem is not DisplayOption selectedPreset) return;
+            ArtisanCommandSpec command;
+            try
+            {
+                command = ArtisanCommandCatalog.Resolve(
+                    selectedPreset.Value,
+                    customBox.Text
+                );
+            }
+            catch (ArgumentException error)
+            {
+                statusText.Text = AppLocalization.Get("SitesArtisanFailed");
+                outputBox.Text = error.Message;
+                return;
+            }
+
+            using var cancellation = new CancellationTokenSource();
+            artisanCancellation = cancellation;
+            running = true;
+            runButton.IsEnabled = false;
+            cancelButton.IsEnabled = true;
+            presetBox.IsEnabled = false;
+            customBox.IsEnabled = false;
+            progressRing.IsActive = true;
+            statusText.Text = AppLocalization.Get("SitesArtisanValidatingPhp");
+            outputBox.Text = string.Empty;
+            try
+            {
+                var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
+                var php = phpInstaller.PhpExecutable(cycle);
+                await runtimePolicy.PrepareLaunchAsync(php, cycle, cancellation.Token);
+                var environmentVariables = composerTools.ManagedEnvironment(cycle);
+                statusText.Text = AppLocalization.Get("SitesArtisanRunning");
+                var result = await ArtisanCommandRunner.RunAsync(
+                    php,
+                    site.Path,
+                    command.Arguments,
+                    environmentVariables,
+                    command.Timeout,
+                    new Progress<string>(chunk => AppendCommandOutput(outputBox, chunk)),
+                    cancellation.Token
+                );
+                statusText.Text = result.ExitCode == 0
+                    ? AppLocalization.Get("SitesArtisanCompleted")
+                    : AppLocalization.Format("SitesArtisanFailedExit", result.ExitCode);
+                if (outputBox.Text.Length == 0) outputBox.Text = result.Output;
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                statusText.Text = AppLocalization.Get("SitesArtisanCancelled");
+            }
+            catch (Exception error)
+            {
+                statusText.Text = AppLocalization.Get(
+                    error is TimeoutException ? "SitesArtisanTimedOut" : "SitesArtisanFailed"
+                );
+                AppendCommandOutput(outputBox, error.Message);
+                await DiagnosticLog.WriteFailureAsync(
+                    "artisan",
+                    "run",
+                    $"The Artisan command for {site.Name} failed.",
+                    error.ToString()
+                );
+            }
+            finally
+            {
+                running = false;
+                progressRing.IsActive = false;
+                runButton.IsEnabled = true;
+                cancelButton.IsEnabled = false;
+                presetBox.IsEnabled = true;
+                customBox.IsEnabled = true;
+                if (ReferenceEquals(artisanCancellation, cancellation)) artisanCancellation = null;
+            }
+        };
+
+        await dialog.ShowAsync();
+    }
+
+    private async void Npm_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not { } site) return;
+
+        IReadOnlyList<NpmScript> discoveredScripts;
+        try
+        {
+            discoveredScripts = await Task.Run(() => NpmScriptCatalog.Discover(site.Path));
+        }
+        catch (Exception error) when (error is IOException
+            or UnauthorizedAccessException
+            or InvalidDataException
+            or ArgumentException
+            or NpmScriptException)
+        {
+            await ShowErrorAsync(NpmErrorMessage(error));
+            return;
+        }
+
+        var scriptBox = new ComboBox
+        {
+            Header = AppLocalization.Get("SitesNpmScriptField"),
+            ItemsSource = discoveredScripts.Select(script => new DisplayOption(script.Name, script.Name)).ToArray(),
+            SelectedIndex = 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinWidth = 520
+        };
+        var reloadButton = new Button
+        {
+            Content = new SymbolIcon(Symbol.Refresh),
+            VerticalAlignment = VerticalAlignment.Bottom
+        };
+        ToolTipService.SetToolTip(
+            reloadButton,
+            AppLocalization.Get("SitesNpmReloadTooltip")
+        );
+        var scriptRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        scriptRow.Children.Add(scriptBox);
+        scriptRow.Children.Add(reloadButton);
+
+        var statusText = new TextBlock
+        {
+            Text = AppLocalization.Get("SitesNpmReady"),
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+        };
+        var progressRing = new ProgressRing { Width = 18, Height = 18 };
+        var statusRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        statusRow.Children.Add(progressRing);
+        statusRow.Children.Add(statusText);
+        var outputBox = new TextBox
+        {
+            Text = AppLocalization.Get("SitesNpmOutputPlaceholder"),
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.NoWrap,
+            MinHeight = 280,
+            MaxHeight = 420,
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
+        };
+        ScrollViewer.SetVerticalScrollBarVisibility(outputBox, ScrollBarVisibility.Auto);
+        ScrollViewer.SetHorizontalScrollBarVisibility(outputBox, ScrollBarVisibility.Auto);
+        var runButton = new Button { Content = AppLocalization.Get("SitesRun") };
+        var cancelButton = new Button
+        {
+            Content = AppLocalization.Get("SitesCancel"),
+            IsEnabled = false
+        };
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        buttons.Children.Add(cancelButton);
+        buttons.Children.Add(runButton);
+        var content = new StackPanel { Spacing = 12, MinWidth = 620 };
+        content.Children.Add(scriptRow);
+        content.Children.Add(statusRow);
+        content.Children.Add(outputBox);
+        content.Children.Add(buttons);
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Format("SitesNpmDialogTitle", site.Name),
+            Content = content,
+            CloseButtonText = AppLocalization.Get("SitesClose")
+        };
+
+        var running = false;
+        reloadButton.Click += async (_, _) =>
+        {
+            if (running) return;
+            reloadButton.IsEnabled = false;
+            scriptBox.IsEnabled = false;
+            progressRing.IsActive = true;
+            statusText.Text = AppLocalization.Get("SitesNpmLoading");
+            try
+            {
+                var reloaded = await Task.Run(() => NpmScriptCatalog.Discover(site.Path));
+                scriptBox.ItemsSource = reloaded
+                    .Select(script => new DisplayOption(script.Name, script.Name))
+                    .ToArray();
+                scriptBox.SelectedIndex = 0;
+                statusText.Text = AppLocalization.Get("SitesNpmReady");
+                outputBox.Text = string.Empty;
+            }
+            catch (Exception error) when (error is IOException
+                or UnauthorizedAccessException
+                or InvalidDataException
+                or ArgumentException
+                or NpmScriptException)
+            {
+                scriptBox.ItemsSource = Array.Empty<DisplayOption>();
+                statusText.Text = AppLocalization.Get("SitesNpmUnavailable");
+                outputBox.Text = NpmErrorMessage(error);
+            }
+            finally
+            {
+                progressRing.IsActive = false;
+                reloadButton.IsEnabled = true;
+                scriptBox.IsEnabled = true;
+            }
+        };
+        cancelButton.Click += (_, _) =>
+        {
+            if (!running) return;
+            statusText.Text = AppLocalization.Get("SitesNpmCancelling");
+            npmCancellation?.Cancel();
+        };
+        dialog.Closing += (_, args) =>
+        {
+            if (!running) return;
+            args.Cancel = true;
+            statusText.Text = AppLocalization.Get("SitesNpmCancelling");
+            npmCancellation?.Cancel();
+        };
+        runButton.Click += async (_, _) =>
+        {
+            if (running || scriptBox.SelectedItem is not DisplayOption selectedScript) return;
+
+            using var cancellation = new CancellationTokenSource();
+            npmCancellation = cancellation;
+            running = true;
+            runButton.IsEnabled = false;
+            cancelButton.IsEnabled = true;
+            reloadButton.IsEnabled = false;
+            scriptBox.IsEnabled = false;
+            progressRing.IsActive = true;
+            statusText.Text = AppLocalization.Get("SitesNpmPreparingNode");
+            outputBox.Text = string.Empty;
+            try
+            {
+                var invocation = NpmScriptRunner.CreateInvocation(
+                    nodeInstaller,
+                    site.Path,
+                    site.NodeVersion,
+                    selectedScript.Value
+                );
+                statusText.Text = AppLocalization.Get("SitesNpmRunning");
+                var result = await NpmScriptRunner.RunAsync(
+                    invocation,
+                    new Progress<string>(chunk => AppendCommandOutput(outputBox, chunk)),
+                    cancellation.Token
+                );
+                statusText.Text = result.ExitCode == 0
+                    ? AppLocalization.Get("SitesNpmCompleted")
+                    : AppLocalization.Format("SitesNpmFailedExit", result.ExitCode);
+                if (outputBox.Text.Length == 0) outputBox.Text = result.Output;
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                statusText.Text = AppLocalization.Get("SitesNpmCancelled");
+            }
+            catch (Exception error)
+            {
+                statusText.Text = AppLocalization.Get(
+                    error is NpmScriptException { ResourceKey: "SitesNpmErrorTimedOut" }
+                        ? "SitesNpmTimedOut"
+                        : "SitesNpmFailed"
+                );
+                AppendCommandOutput(outputBox, NpmErrorMessage(error));
+                await DiagnosticLog.WriteFailureAsync(
+                    "npm-script",
+                    "run",
+                    $"The npm script for {site.Name} failed.",
+                    error.ToString()
+                );
+            }
+            finally
+            {
+                running = false;
+                progressRing.IsActive = false;
+                runButton.IsEnabled = true;
+                cancelButton.IsEnabled = false;
+                reloadButton.IsEnabled = true;
+                scriptBox.IsEnabled = true;
+                if (ReferenceEquals(npmCancellation, cancellation)) npmCancellation = null;
+            }
+        };
+
+        await dialog.ShowAsync();
+    }
+
+    private static string NpmErrorMessage(Exception error)
+    {
+        return error is NpmScriptException npmError
+            ? AppLocalization.Format(
+                npmError.ResourceKey,
+                npmError.ResourceArguments.ToArray()
+            )
+            : error.Message;
+    }
+
+    private static string ArtisanPresetTitleKey(string presetId) => presetId switch
+    {
+        "route-list" => "SitesArtisanPresetRouteList",
+        "migrate-status" => "SitesArtisanPresetMigrationStatus",
+        "migrate" => "SitesArtisanPresetMigrate",
+        "queue-work" => "SitesArtisanPresetQueueWorker",
+        "custom" => "SitesArtisanPresetCustom",
+        _ => throw new ArgumentOutOfRangeException(nameof(presetId), presetId, null)
+    };
+
+    private static void AppendCommandOutput(TextBox outputBox, string value)
+    {
+        const int maximumCharacters = 1 * 1_024 * 1_024;
+        if (value.Length == 0) return;
+        var combined = outputBox.Text + value;
+        outputBox.Text = combined.Length > maximumCharacters
+            ? combined[^maximumCharacters..]
+            : combined;
+        outputBox.Select(outputBox.Text.Length, 0);
+    }
+
     private void SaveSettings(bool? startAutomatically = null, bool? showPreviews = null)
     {
         settingsStore.UpdateSites(
@@ -788,7 +1839,7 @@ public sealed partial class SitesPage : Page
             XamlRoot = XamlRoot,
             Title = "HerdMe",
             Content = message,
-            CloseButtonText = "OK"
+            CloseButtonText = AppLocalization.Get("SitesOk")
         };
         await dialog.ShowAsync();
     }

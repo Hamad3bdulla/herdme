@@ -8,12 +8,13 @@ namespace HerdMe.Windows.Pages;
 
 public sealed partial class DumpsPage : Page
 {
-    private readonly DumpCaptureService capture = AppServices.Dumps;
+    private readonly DumpCaptureService capture;
 
     public ObservableCollection<CapturedDump> Dumps { get; } = [];
 
-    public DumpsPage()
+    public DumpsPage(DumpCaptureService capture)
     {
+        this.capture = capture;
         InitializeComponent();
     }
 
@@ -53,7 +54,7 @@ public sealed partial class DumpsPage : Page
                 XamlRoot = XamlRoot,
                 Title = "HerdMe",
                 Content = error.Message,
-                CloseButtonText = "OK"
+                CloseButtonText = AppLocalization.Get("CommonOk")
             };
             await dialog.ShowAsync();
         }
@@ -85,15 +86,15 @@ public sealed partial class DumpsPage : Page
 
     private void ShowDump(CapturedDump? dump)
     {
-        SourceText.Text = dump?.Source ?? "Select a dump";
+        SourceText.Text = dump?.Source ?? AppLocalization.Get("DumpsSelectDump");
         SummaryText.Text = dump?.Summary ?? string.Empty;
     }
 
     private void UpdateServerState()
     {
         ServerStatusText.Text = capture.IsRunning
-            ? $"Running on 127.0.0.1:{capture.Port}"
-            : "Stopped";
+            ? AppLocalization.Format("DumpsRunningOn", capture.Port)
+            : AppLocalization.Get("DumpsStopped");
         ServerButtonIcon.Symbol = capture.IsRunning ? Symbol.Stop : Symbol.Play;
     }
 }

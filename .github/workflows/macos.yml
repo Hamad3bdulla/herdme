@@ -20,30 +20,153 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Select the latest stable Xcode
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
         with:
           xcode-version: latest-stable
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Install XcodeGen and repository linters
+        run: brew install xcodegen actionlint shellcheck
+
+      - name: Lint workflows, scripts, and source
+        run: |
+          actionlint -color
+          xcrun swift-format lint --strict --recursive --parallel HerdMe HerdMeTests HerdMeUITests
+          find Core Tools -type f \( \
+            -name '*.c' -o \
+            -name '*.cc' -o \
+            -name '*.cpp' -o \
+            -name '*.h' -o \
+            -name '*.hpp' \
+          \) -print0 | xargs -0 xcrun clang-format --dry-run --Werror
+          shellcheck \
+            scripts/check-macos-coverage.sh \
+            scripts/check-version.sh \
+            scripts/sign-update-manifest.sh \
+            scripts/test-release-asset-set.sh \
+            scripts/test-release-tag.sh \
+            scripts/test-live-laravel.sh \
+            scripts/test-localization.sh \
+            scripts/test-update-manifest.sh \
+            scripts/test-workflow-security.sh \
+            scripts/test-xcode-schemes.sh \
+            scripts/verify-release-tag.sh \
+            scripts/verify-release-asset-set.sh \
+            scripts/verify-signed-update-manifest.sh
+          bash -n \
+            scripts/check-macos-coverage.sh \
+            scripts/test-release-asset-set.sh \
+            scripts/test-release-tag.sh \
+            scripts/test-live-laravel.sh \
+            scripts/test-localization.sh \
+            scripts/test-update-manifest.sh \
+            scripts/test-workflow-security.sh \
+            scripts/test-xcode-schemes.sh \
+            scripts/verify-release-tag.sh \
+            scripts/verify-release-asset-set.sh
+          zsh -n \
+            scripts/package-macos.sh \
+            Tools/NetworkHelper/test-network-helper.sh
 
       - name: Verify release version metadata
         run: ./scripts/check-version.sh
 
+      - name: Test update feed signing and tamper rejection
+        run: |
+          ./scripts/test-update-manifest.sh
+          ./scripts/test-release-asset-set.sh
+          ./scripts/test-release-tag.sh
+          ./scripts/test-workflow-security.sh
+
+      - name: Verify Arabic localization coverage
+        run: ./scripts/test-localization.sh
+
       - name: Generate the Xcode project
         run: xcodegen generate
 
-      - name: Run macOS tests
+      - name: Verify isolated Xcode test schemes
+        run: ./scripts/test-xcode-schemes.sh
+
+      - name: Run Debug macOS unit tests with coverage
         run: |
+          mkdir -p build
           xcodebuild \
             -project HerdMe.xcodeproj \
             -scheme HerdMe \
             -configuration Debug \
             -destination 'platform=macOS' \
             -derivedDataPath build/macos-tests \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            -enableCodeCoverage YES \
+            -resultBundlePath build/macos-tests-debug.xcresult \
+            -only-testing:HerdMeTests \
+            test
+
+      - name: Enforce macOS code coverage
+        run: |
+          ./scripts/check-macos-coverage.sh \
+            build/macos-tests-debug.xcresult \
+            build/macos-coverage.json
+
+      - name: Upload macOS coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: HerdMe-${{ github.run_number }}-macOS-coverage
+          path: build/macos-coverage.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Enable macOS UI automation
+        run: |
+          sudo -n /usr/sbin/DevToolsSecurity -enable
+          /usr/sbin/DevToolsSecurity -status | tee build/devtools-security-status.txt
+          grep -q 'Developer mode is currently enabled' build/devtools-security-status.txt
+
+      - name: Run isolated macOS UI tests
+        run: |
+          xcodebuild \
+            -project HerdMe.xcodeproj \
+            -scheme HerdMeUITests \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/macos-ui-tests \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 60 \
+            -maximum-test-execution-time-allowance 120 \
+            -resultBundlePath build/macos-ui-tests.xcresult \
+            test
+
+      - name: Upload macOS UI test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: HerdMe-${{ github.run_number }}-macOS-UI-tests
+          path: |
+            build/macos-ui-tests.xcresult
+            build/devtools-security-status.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Run Release macOS tests
+        run: |
+          xcodebuild \
+            -project HerdMe.xcodeproj \
+            -scheme HerdMe \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/macos-tests \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            ENABLE_TESTABILITY=YES \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=YES \
+            ENABLE_HARDENED_RUNTIME=NO \
+            -only-testing:HerdMeTests \
             test
 
       - name: Build and test the portable core
@@ -56,7 +179,7 @@ jobs:
         run: ./scripts/package-macos.sh Release
 
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: HerdMe-${{ github.run_number }}-macOS
           path: |
@@ -73,7 +196,9 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Select the latest stable Xcode
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
@@ -85,6 +210,9 @@ jobs:
 
       - name: Generate the Xcode project
         run: xcodegen generate
+
+      - name: Verify isolated Xcode test schemes
+        run: ./scripts/test-xcode-schemes.sh
 
       - name: Analyze the macOS application
         run: |
@@ -118,10 +246,13 @@ jobs:
             -configuration Debug \
             -destination 'platform=macOS' \
             -derivedDataPath build/macos-asan-ubsan \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=YES \
+            ENABLE_HARDENED_RUNTIME=NO \
             SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            -parallel-testing-enabled NO \
             -enableAddressSanitizer YES \
             -enableUndefinedBehaviorSanitizer YES \
+            -resultBundlePath build/macos-asan-ubsan.xcresult \
             test
 
       - name: Run macOS tests with Thread Sanitizer
@@ -132,10 +263,24 @@ jobs:
             -configuration Debug \
             -destination 'platform=macOS' \
             -derivedDataPath build/macos-tsan \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=YES \
+            ENABLE_HARDENED_RUNTIME=NO \
             SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            -parallel-testing-enabled NO \
             -enableThreadSanitizer YES \
+            -resultBundlePath build/macos-tsan.xcresult \
             test
+
+      - name: Upload sanitizer failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: HerdMe-${{ github.run_number }}-macOS-sanitizer-diagnostics
+          path: |
+            build/macos-asan-ubsan.xcresult
+            build/macos-tsan.xcresult
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Run portable core with Address and Undefined Behavior Sanitizers
         env:

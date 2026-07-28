@@ -8,37 +8,52 @@ internal static class DiagnosticLog
 {
     private static readonly ConcurrentDictionary<string, string> LastFailures =
         new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates =
+        new(StringComparer.Ordinal);
 
     internal static async Task<bool> WriteFailureAsync(
         string area,
         string eventName,
         string message,
         string? exception = null,
-        string? supportRoot = null
+        string? supportRoot = null,
+        string? deduplicationScope = null,
+        IReadOnlyDictionary<string, string?>? context = null
     )
     {
-        var deduplicationKey = area + "|" + eventName;
-        var fingerprint = message + "|" + exception;
-        if (LastFailures.TryGetValue(deduplicationKey, out var previous) && previous == fingerprint)
-        {
-            return true;
-        }
-
         var root = supportRoot ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "HerdMe"
         );
-        var payload = JsonSerializer.Serialize(new
-        {
-            timestamp = DateTimeOffset.UtcNow,
-            level = "error",
+        root = Path.GetFullPath(root);
+        var rootKey = OperatingSystem.IsWindows() ? root.ToUpperInvariant() : root;
+        var deduplicationKey = string.Join(
+            '\u001f',
+            rootKey,
             area,
-            @event = eventName,
-            message,
-            exception
-        });
+            eventName,
+            deduplicationScope ?? string.Empty
+        );
+        var fingerprint = JsonSerializer.Serialize(new { message, exception, context });
+        var gate = Gates.GetOrAdd(deduplicationKey, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync();
         try
         {
+            if (LastFailures.TryGetValue(deduplicationKey, out var previous)
+                && previous == fingerprint)
+            {
+                return true;
+            }
+            var payload = JsonSerializer.Serialize(new
+            {
+                timestamp = DateTimeOffset.UtcNow,
+                level = "error",
+                area,
+                @event = eventName,
+                message,
+                exception,
+                context
+            });
             await BoundedLog.AppendLineAsync(Path.Combine(root, "Log", "diagnostics.jsonl"), payload);
             LastFailures[deduplicationKey] = fingerprint;
             return true;
@@ -47,6 +62,10 @@ internal static class DiagnosticLog
         {
             Debug.WriteLine($"HerdMe could not write its diagnostic log: {error.Message}");
             return false;
+        }
+        finally
+        {
+            gate.Release();
         }
     }
 }

@@ -4,9 +4,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:views="using:HerdMe.Windows.Views"
     Title="HerdMe">
-    <Grid>
+    <Grid x:Name="RootLayout">
         <NavigationView
             x:Name="Navigation"
+            AutomationProperties.AutomationId="NavigationRoot"
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="False"
             IsTitleBarAutoPaddingEnabled="True"
@@ -14,35 +15,38 @@
             PaneDisplayMode="Left"
             SelectionChanged="Navigation_SelectionChanged">
             <NavigationView.MenuItems>
-            <NavigationViewItem Content="General" Tag="general">
+            <NavigationViewItem x:Uid="NavDashboard" AutomationProperties.AutomationId="NavDashboard" Content="Dashboard" Tag="dashboard">
+                <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem x:Uid="NavGeneral" AutomationProperties.AutomationId="NavGeneral" Content="General" Tag="general">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItem Content="Sites" Tag="sites">
+            <NavigationViewItem x:Uid="NavSites" AutomationProperties.AutomationId="NavSites" Content="Sites" Tag="sites">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Folder" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItem Content="PHP" Tag="php">
+            <NavigationViewItem x:Uid="NavPhp" AutomationProperties.AutomationId="NavPhp" Content="PHP" Tag="php">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Code" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItem Content="Node" Tag="node">
+            <NavigationViewItem x:Uid="NavNode" AutomationProperties.AutomationId="NavNode" Content="Node" Tag="node">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Library" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItem Content="Services" Tag="services">
+            <NavigationViewItem x:Uid="NavServices" AutomationProperties.AutomationId="NavServices" Content="Services" Tag="services">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItem Content="Mail" Tag="mail">
+            <NavigationViewItem x:Uid="NavMail" AutomationProperties.AutomationId="NavMail" Content="Mail" Tag="mail">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Mail" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItem Content="Dumps" Tag="dumps">
+            <NavigationViewItem x:Uid="NavDumps" AutomationProperties.AutomationId="NavDumps" Content="Dumps" Tag="dumps">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="View" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItem Content="Debugger" Tag="debugger">
+            <NavigationViewItem x:Uid="NavDebugger" AutomationProperties.AutomationId="NavDebugger" Content="Debugger" Tag="debugger">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Repair" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItem Content="Logs" Tag="logs">
+            <NavigationViewItem x:Uid="NavLogs" AutomationProperties.AutomationId="NavLogs" Content="Logs" Tag="logs">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Document" /></NavigationViewItem.Icon>
             </NavigationViewItem>
             <NavigationViewItemSeparator />
-            <NavigationViewItem Content="About" Tag="about">
+            <NavigationViewItem x:Uid="NavAbout" AutomationProperties.AutomationId="NavAbout" Content="About" Tag="about">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Help" /></NavigationViewItem.Icon>
             </NavigationViewItem>
             </NavigationView.MenuItems>

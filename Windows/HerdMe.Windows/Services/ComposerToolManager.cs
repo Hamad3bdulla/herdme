@@ -12,16 +12,24 @@ public sealed partial class ComposerToolManager
     private readonly CoreClient coreClient;
     private readonly PhpRuntimeInstaller phpInstaller;
     private readonly PhpRuntimePolicy phpPolicy;
+    private readonly NodeRuntimeInstaller nodeInstaller;
 
-    public ComposerToolManager(string? supportRoot = null, CoreClient? coreClient = null)
+    public ComposerToolManager(
+        string? supportRoot = null,
+        CoreClient? coreClient = null,
+        PhpRuntimeInstaller? phpInstaller = null,
+        PhpRuntimePolicy? phpPolicy = null,
+        NodeRuntimeInstaller? nodeInstaller = null
+    )
     {
         SupportRoot = supportRoot ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "HerdMe"
         );
         this.coreClient = coreClient ?? new CoreClient();
-        phpInstaller = new PhpRuntimeInstaller(this.coreClient, SupportRoot);
-        phpPolicy = new PhpRuntimePolicy(this.coreClient);
+        this.phpInstaller = phpInstaller ?? new PhpRuntimeInstaller(this.coreClient, SupportRoot);
+        this.phpPolicy = phpPolicy ?? new PhpRuntimePolicy(this.coreClient);
+        this.nodeInstaller = nodeInstaller ?? new NodeRuntimeInstaller(SupportRoot);
     }
 
     public string SupportRoot { get; }
@@ -219,7 +227,6 @@ public sealed partial class ComposerToolManager
             Path.Combine(SupportRoot, "bin"),
             Path.Combine(ComposerHome, "vendor", "bin")
         };
-        var nodeInstaller = new NodeRuntimeInstaller(SupportRoot);
         var activeNode = nodeInstaller.LoadSettings().ActiveVersion;
         if (!string.IsNullOrWhiteSpace(activeNode))
         {

@@ -12,12 +12,15 @@ enum ProcessRunnerError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case let .timedOut(seconds, output):
+        case .timedOut(let seconds, let output):
             let summary = output.trimmingCharacters(in: .whitespacesAndNewlines)
-            let message = "The command timed out after \(Int(seconds)) seconds."
+            let message = String.localizedStringWithFormat(
+                String(localized: "The command timed out after %lld seconds."),
+                Int64(seconds)
+            )
             return summary.isEmpty ? message : message + "\n" + summary
         case .cancelled:
-            return "The command was cancelled."
+            return String(localized: "The command was cancelled.")
         }
     }
 }
@@ -30,7 +33,8 @@ enum ProcessRunner {
         environment: [String: String]? = nil,
         standardInput: Data? = nil,
         timeout: TimeInterval = 15 * 60,
-        cancellationRequested: @Sendable () -> Bool = { false }
+        cancellationRequested: @Sendable () -> Bool = { false },
+        outputReceived: @escaping @Sendable (Data) -> Void = { _ in }
     ) throws -> ProcessResult {
         if cancellationRequested() {
             throw ProcessRunnerError.cancelled(output: "")
@@ -57,8 +61,10 @@ enum ProcessRunner {
         readerGroup.enter()
         DispatchQueue.global(qos: .userInitiated).async {
             while let chunk = try? pipe.fileHandleForReading.read(upToCount: 65_536),
-                  !chunk.isEmpty {
+                !chunk.isEmpty
+            {
                 capture.append(chunk)
+                outputReceived(chunk)
             }
             readerGroup.leave()
         }
@@ -99,10 +105,10 @@ enum ProcessRunner {
 
     private static func stop(_ process: Process, termination: DispatchSemaphore) {
         let descendants = descendantProcessIdentifiers(of: process.processIdentifier)
-        descendants.forEach { kill($0, SIGTERM) }
+        for descendant in descendants { kill(descendant, SIGTERM) }
         if process.isRunning { process.terminate() }
         if termination.wait(timeout: .now() + 1) == .timedOut {
-            descendants.forEach { kill($0, SIGKILL) }
+            for descendant in descendants { kill(descendant, SIGKILL) }
             if process.isRunning { kill(process.processIdentifier, SIGKILL) }
             _ = termination.wait(timeout: .now() + 1)
         }

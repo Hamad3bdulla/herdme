@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SidebarView: View {
-    @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var navigation: AppNavigation
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -10,9 +10,9 @@ struct SidebarView: View {
             ForEach(SidebarPage.visibleCases) { page in
                 Button {
                     if page == .logs {
-                        model.showApplicationLogs()
+                        navigation.showApplicationLogs()
                     } else {
-                        model.selectedPage = page
+                        navigation.selectedPage = page
                     }
                 } label: {
                     HStack(spacing: 9) {
@@ -25,21 +25,22 @@ struct SidebarView: View {
                         }
                         .frame(width: 22, height: 22)
 
-                        Text(page.rawValue)
-                            .font(.system(size: 14, weight: model.selectedPage == page ? .medium : .regular))
+                        Text(page.localizedTitle)
+                            .font(.system(size: 14, weight: navigation.selectedPage == page ? .medium : .regular))
                             .lineLimit(1)
                         Spacer()
                     }
-                    .foregroundStyle(model.selectedPage == page ? Color.white : Color.secondary)
+                    .foregroundStyle(navigation.selectedPage == page ? Color.white : Color.secondary)
                     .padding(.horizontal, 8)
                     .frame(height: 34)
-                    .background(model.selectedPage == page ? Color.accentColor : Color.clear)
+                    .background(navigation.selectedPage == page ? Color.accentColor : Color.clear)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(page.rawValue)
-                .accessibilityAddTraits(model.selectedPage == page ? .isSelected : [])
+                .accessibilityLabel(page.localizedTitle)
+                .accessibilityIdentifier("sidebar.\(page.rawValue.lowercased())")
+                .accessibilityAddTraits(navigation.selectedPage == page ? .isSelected : [])
                 .padding(.horizontal, 10)
             }
 

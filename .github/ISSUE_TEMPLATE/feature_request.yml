@@ -1,0 +1,46 @@
+name: Feature request
+description: Propose a focused improvement to HerdMe's supported workflow
+title: "[Feature]: "
+labels: []
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the developer workflow that is currently difficult or impossible.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the user-visible result rather than only an implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform scope
+      options:
+        - macOS and Windows
+        - macOS
+        - Windows x64
+        - Portable Core or shared contracts
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance evidence
+      description: Explain how the feature can be tested, including native hardware when needed.
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope checks
+      options:
+        - label: This keeps HerdMe an independent open-source implementation.
+          required: true
+        - label: This request is not for Expose, extra shortcuts, third-party integrations, or Forge integration.
+          required: true

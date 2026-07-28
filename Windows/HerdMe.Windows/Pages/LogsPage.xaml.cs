@@ -1,16 +1,17 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using HerdMe.Windows.Models;
+using HerdMe.Windows.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Navigation;
 
 namespace HerdMe.Windows.Pages;
 
 public sealed partial class LogsPage : Page
 {
     private readonly DispatcherTimer refreshTimer = new() { Interval = TimeSpan.FromSeconds(1) };
-    private readonly CoreClient coreClient = new();
+    private readonly CoreClient coreClient;
+    private readonly SiteConfigurationStore siteSettings;
     private string currentContent = string.Empty;
     private string? requestedSitePath;
     private bool loadingSources;
@@ -29,16 +30,17 @@ public sealed partial class LogsPage : Page
 
     private string LogRoot => SelectedSource.RootPath;
 
-    public LogsPage()
+    public LogsPage(
+        CoreClient coreClient,
+        SiteConfigurationStore siteSettings,
+        string? requestedSitePath = null
+    )
     {
+        this.coreClient = coreClient;
+        this.siteSettings = siteSettings;
+        this.requestedSitePath = requestedSitePath;
         InitializeComponent();
         refreshTimer.Tick += RefreshTimer_Tick;
-    }
-
-    protected override void OnNavigatedTo(NavigationEventArgs e)
-    {
-        base.OnNavigatedTo(e);
-        requestedSitePath = e.Parameter as string;
     }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
@@ -90,7 +92,7 @@ public sealed partial class LogsPage : Page
     {
         if (LogList.SelectedItem is not LogFileRecord log)
         {
-            LogTitleText.Text = "Select a log";
+            LogTitleText.Text = AppLocalization.Get("LogsSelectLog");
             currentContent = string.Empty;
             LogContentText.Text = string.Empty;
             return;
@@ -173,7 +175,7 @@ public sealed partial class LogsPage : Page
         }
         else
         {
-            LogTitleText.Text = "Select a log";
+            LogTitleText.Text = AppLocalization.Get("LogsSelectLog");
             currentContent = string.Empty;
             ApplySearch();
         }
@@ -212,7 +214,7 @@ public sealed partial class LogsPage : Page
 
         try
         {
-            var settings = AppServices.SiteSettings.Load();
+            var settings = siteSettings.Load();
             var sites = await coreClient.ScanAsync(settings.Roots, settings.Tld, settings.LinkedSites);
             foreach (var site in sites.Where(site =>
                          site.Framework.Equals("Laravel", StringComparison.OrdinalIgnoreCase)))

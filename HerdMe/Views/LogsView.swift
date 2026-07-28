@@ -28,6 +28,8 @@ struct LogsView: View {
     private static let applicationSourceID = "__herdme_application_logs__"
 
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var navigation: AppNavigation
+    @EnvironmentObject private var sitesCoordinator: SitesCoordinator
     @State private var files: [LocalLogFile] = []
     @State private var selectedFileID: LocalLogFile.ID?
     @State private var content = ""
@@ -55,7 +57,7 @@ struct LogsView: View {
     }
 
     private var siteSources: [LogSource] {
-        model.sites
+        sitesCoordinator.sites
             .filter { $0.framework == "Laravel" }
             .map { site in
                 LogSource(
@@ -69,13 +71,13 @@ struct LogsView: View {
     }
 
     private var selectedSource: LogSource {
-        siteSources.first { $0.id == model.selectedLogSiteID } ?? applicationSource
+        siteSources.first { $0.id == navigation.selectedLogSiteID } ?? applicationSource
     }
 
     private var sourceSelection: Binding<String> {
         Binding(
             get: { selectedSource.id },
-            set: { model.selectedLogSiteID = $0 == Self.applicationSourceID ? nil : $0 }
+            set: { navigation.selectedLogSiteID = $0 == Self.applicationSourceID ? nil : $0 }
         )
     }
 
@@ -106,7 +108,7 @@ struct LogsView: View {
             if autoScroll { reloadFiles() }
         }
         .onChange(of: selectedFileID) { _ in reloadFiles(forceContent: true) }
-        .onChange(of: model.selectedLogSiteID) { _ in resetForSelectedSource() }
+        .onChange(of: navigation.selectedLogSiteID) { _ in resetForSelectedSource() }
     }
 
     private var toolbar: some View {
@@ -140,7 +142,9 @@ struct LogsView: View {
             .buttonStyle(.borderless)
             .help("Open log folder")
             .accessibilityLabel("Open log folder")
-            Button { reloadFiles() } label: {
+            Button {
+                reloadFiles()
+            } label: {
                 Image(systemName: "arrow.clockwise")
             }
             .buttonStyle(.borderless)
@@ -218,45 +222,53 @@ struct LogsView: View {
         let previousVersion = loadedContentVersion
 
         reloadTask = Task { @MainActor in
-            let snapshot = await Task.detached(priority: .utility) {
-                let files = store.files()
-                let selectedFile = files.first(where: { $0.id == requestedFileID }) ?? files.first
-                let version = selectedFile.map {
-                    LogContentVersion(id: $0.id, size: $0.size, modifiedAt: $0.modifiedAt)
-                }
-                let shouldLoad = forceContent || version != previousVersion
-                guard shouldLoad else {
-                    return LogSnapshot(
-                        files: files,
-                        selectedFileID: selectedFile?.id,
-                        contentVersion: version,
-                        content: "",
-                        didLoadContent: false
-                    )
-                }
-                guard let selectedFile else {
-                    return LogSnapshot(
-                        files: files,
-                        selectedFileID: nil,
-                        contentVersion: nil,
-                        content: "",
-                        didLoadContent: true
-                    )
-                }
-                let content: String
-                do {
-                    content = try store.contents(of: selectedFile)
-                } catch {
-                    content = error.localizedDescription
-                }
-                return LogSnapshot(
-                    files: files,
-                    selectedFileID: selectedFile.id,
-                    contentVersion: version,
-                    content: content,
-                    didLoadContent: true
-                )
-            }.value
+            guard
+                let snapshot = try? await AsyncProcessLifecycle.runDetached(
+                    priority: .utility,
+                    operation: {
+                        try Task.checkCancellation()
+                        let files = store.files()
+                        let selectedFile = files.first(where: { $0.id == requestedFileID }) ?? files.first
+                        let version = selectedFile.map {
+                            LogContentVersion(id: $0.id, size: $0.size, modifiedAt: $0.modifiedAt)
+                        }
+                        let shouldLoad = forceContent || version != previousVersion
+                        let snapshot: LogSnapshot
+                        if !shouldLoad {
+                            snapshot = LogSnapshot(
+                                files: files,
+                                selectedFileID: selectedFile?.id,
+                                contentVersion: version,
+                                content: "",
+                                didLoadContent: false
+                            )
+                        } else if let selectedFile {
+                            let content: String
+                            do {
+                                content = try store.contents(of: selectedFile)
+                            } catch {
+                                content = error.localizedDescription
+                            }
+                            snapshot = LogSnapshot(
+                                files: files,
+                                selectedFileID: selectedFile.id,
+                                contentVersion: version,
+                                content: content,
+                                didLoadContent: true
+                            )
+                        } else {
+                            snapshot = LogSnapshot(
+                                files: files,
+                                selectedFileID: nil,
+                                contentVersion: nil,
+                                content: "",
+                                didLoadContent: true
+                            )
+                        }
+                        try Task.checkCancellation()
+                        return snapshot
+                    })
+            else { return }
 
             guard !Task.isCancelled, reloadToken == token else { return }
             files = snapshot.files
@@ -287,7 +299,8 @@ struct LogsView: View {
                 withIntermediateDirectories: true
             )
         }
-        let directory = FileManager.default.fileExists(atPath: source.rootURL.path)
+        let directory =
+            FileManager.default.fileExists(atPath: source.rootURL.path)
             ? source.rootURL
             : source.fallbackURL
         NSWorkspace.shared.open(directory)

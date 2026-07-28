@@ -14,7 +14,9 @@ Windows hardware.
   their published SHA-256 digests, verifies the portable ZIP and its SHA-256
   sidecar, builds the Setup executable, verifies its SHA-256 sidecar, performs
   an isolated silent install/core-health/uninstall cycle, requires the app-local
-  Windows App Runtime and WinUI DLLs, starts the app, rejects a second process, and observes loopback
+  Windows App Runtime and WinUI DLLs, starts the app, rejects a second process,
+  selects all eleven navigation items through Windows UI Automation, verifies
+  each page root appears while the process remains alive, and observes loopback
   listeners on ports 2525 and 9912. It must also reject non-loopback capture
   bindings and complete live SMTP and VarDumper exchanges against the running
   app without leaving acceptance records behind.
@@ -29,12 +31,14 @@ Windows hardware.
   and finishing in order. Approve the native UAC/trust prompts and confirm no
   Command Prompt or PowerShell window appears.
 - [ ] Cancel one approval or disconnect the network, confirm the exact failed
-  step stays visible, then restore the prerequisite and retry successfully.
+  step stays visible, expand and copy the technical details, then restore the
+  prerequisite and retry successfully.
 - [ ] After success, restart HerdMe and confirm the wizard does not return.
   Also open an installation upgraded from an older settings file and confirm it
   goes directly to the normal application.
-- [ ] Verify General, Sites, PHP, Node, Services, Mail, Dumps, Debugger, Logs,
-  and About render without clipping at 100%, 125%, and 150% display scaling.
+- [ ] Verify Dashboard, General, Sites, PHP, Node, Services, Mail, Dumps,
+  Debugger, Logs, and About render without clipping at 100%, 125%, and 150%
+  display scaling.
 - [ ] Close the window, reopen it from the tray, and quit from the tray.
 - [ ] Launch a second copy and confirm the existing window comes to the front.
 - [ ] Enable launch at sign-in, sign out and back in, and confirm HerdMe starts
@@ -46,7 +50,10 @@ Windows hardware.
 ## Sites and runtimes
 
 - [ ] Add a sites folder and a direct project link, then verify search and safe
-  unlink without deleting the project.
+  unlink without deleting the linked project. Move one direct child of a Park
+  root to the Recycle Bin and confirm the site disappears after the environment
+  refresh. Confirm HerdMe refuses to delete a linked project, a project outside
+  every Park root, a nested directory, a symbolic link, or a junction.
 - [ ] Try to add, link, and create a project inside `%USERPROFILE%\Herd` and
   `%LOCALAPPDATA%\Herd`; confirm every operation is rejected while an adjacent
   `HerdMe` folder remains accepted.
@@ -59,6 +66,11 @@ Windows hardware.
 - [ ] Download an asset larger than 2MB, seek within it using a browser or
   `Range: bytes=...`, and confirm `206`, `Content-Range`, `HEAD`, and `416`
   behavior without truncation.
+- [ ] In Edge or Chrome DevTools, show the Network `Connection ID` column and
+  load a Laravel page with at least two local static assets over HTTPS. Confirm
+  multiple HTTP/1.1 responses reuse one connection, no request stays `Pending`,
+  navigation remains responsive, and a reload after more than five idle seconds
+  opens a fresh connection cleanly.
 - [ ] Create a junction inside a disposable site's `public` directory that
   targets a folder outside the site, request a file through it, and confirm
   HerdMe returns `403` without exposing the file contents.
@@ -74,11 +86,21 @@ Windows hardware.
 - [ ] With the site environment running, terminate one managed `php-cgi.exe`
   process in Task Manager and confirm HerdMe reports recovery, restarts the PHP
   pool and HTTP/HTTPS listeners, and serves the sites again without user action.
+- [ ] Start the site environment and immediately press Stop while startup is
+  still completing. Confirm it remains stopped for at least five seconds (two
+  health-monitor intervals), no managed `php-cgi.exe` process returns, and no
+  HerdMe HTTP or HTTPS listener is restored.
 - [ ] Confirm the site thumbnail uses a desktop-width viewport and HTTPS opens
   the selected site in the default browser.
 - [ ] Stop the selected site or make WebView2 unavailable, confirm the preview
   shows a compact retry state instead of a blank panel, and confirm the reason
   is written once to `%LOCALAPPDATA%\HerdMe\Log\diagnostics.jsonl`.
+- [ ] Force environment startup and recovery failures, a background-component
+  startup failure, one managed-service automatic-start failure, and a
+  recoverable WinUI exception. Confirm `diagnostics.jsonl` contains one JSON
+  object per failure with `timestamp`, `level`, `area`, `event`, `message`,
+  `exception`, and the expected `context`, while service stdout/stderr remains
+  available in its raw service log.
 
 ## Trust and local domains
 
@@ -93,6 +115,10 @@ Windows hardware.
   write access denied and confirm the plaintext source remains for recovery.
 - [ ] Install local-domain hosts entries through the UAC helper, then verify
   `.test` sites resolve while unrelated hosts-file entries remain unchanged.
+- [ ] While a hosts approval prompt is open, change an unrelated disposable
+  hosts entry from an elevated editor, then approve HerdMe. Confirm HerdMe
+  rejects the stale candidate and preserves the newer unrelated entry. Repeat
+  after restoring the entry and confirm the retry succeeds without a console.
 - [ ] Remove HerdMe domain entries and verify the backup and unrelated entries
   remain intact.
 
@@ -159,4 +185,6 @@ before they can be marked installable.
   confirm Start Menu and optional desktop shortcuts, upgrade it in place, then
   uninstall it and confirm `%LOCALAPPDATA%\HerdMe` user data remains intact.
 - [ ] Confirm About displays the MIT license and third-party acknowledgements,
-  with no activation, subscription, license key, or paid feature gate.
+  with no activation, subscription, license key, or paid feature gate. Open the
+  repository, documentation, and release-note links; copy the version; then
+  check for updates on both Stable and Beta channels.

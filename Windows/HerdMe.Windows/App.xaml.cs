@@ -8,6 +8,7 @@ namespace HerdMe.Windows;
 public partial class App : Application
 {
     public static MainWindow MainWindow { get; private set; } = null!;
+    private readonly AppServices services = null!;
     private readonly SingleInstanceCoordinator singleInstance = null!;
     private TaskbarIcon? trayIcon;
     private volatile bool exitRequested;
@@ -31,6 +32,7 @@ public partial class App : Application
             Environment.Exit(0);
             return;
         }
+        services = new AppServices();
         InitializeComponent();
         UnhandledException += App_UnhandledException;
     }
@@ -42,7 +44,7 @@ public partial class App : Application
             "--acceptance",
             StringComparer.OrdinalIgnoreCase
         );
-        MainWindow = new MainWindow(skipOnboarding: acceptanceRun);
+        MainWindow = new MainWindow(services, skipOnboarding: acceptanceRun);
         MainWindow.InitialSetupCompleted += (_, _) => _ = StartBackgroundServicesOnceAsync();
         MainWindow.Closed += MainWindow_Closed;
         if (!MainWindow.RequiresOnboarding
@@ -106,63 +108,49 @@ public partial class App : Application
         singleInstance.WakeListener();
         trayIcon?.Dispose();
         trayIcon = null;
-        await AppServices.Dumps.StopAsync();
-        await AppServices.Mail.StopAsync();
-        await AppServices.Environment.StopAsync();
-        await AppServices.Services.StopAllAsync();
+        await services.Dumps.StopAsync();
+        await services.Mail.StopAsync();
+        await services.Environment.StopAsync();
+        await services.Services.StopAllAsync();
         MainWindow.Close();
         singleInstance.Dispose();
     }
 
     private async void StartCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)
     {
-        var settings = AppServices.SiteSettings.Load();
+        var settings = services.SiteSettings.Load();
         settings.StartAutomatically = true;
-        AppServices.SiteSettings.Save(settings);
+        services.SiteSettings.Save(settings);
         await StartConfiguredEnvironmentAsync();
-        await AppServices.Services.StartEnabledAsync();
+        await services.Services.StartEnabledAsync();
     }
 
     private async void StopCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)
     {
-        var settings = AppServices.SiteSettings.Load();
+        var settings = services.SiteSettings.Load();
         settings.StartAutomatically = false;
-        AppServices.SiteSettings.Save(settings);
-        await AppServices.Environment.StopAsync();
-        await AppServices.Services.StopAllAsync();
+        services.SiteSettings.Save(settings);
+        await services.Environment.StopAsync();
+        await services.Services.StopAllAsync();
     }
 
-    private static async Task StartConfiguredEnvironmentAsync()
+    private async Task StartConfiguredEnvironmentAsync()
     {
         try
         {
-            await AppServices.Environment.StartConfiguredAsync(AppServices.SiteSettings);
+            await services.Environment.StartConfiguredAsync(services.SiteSettings);
         }
         catch (Exception error)
         {
-            try
-            {
-                var logDirectory = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "HerdMe",
-                    "Log"
-                );
-                await BoundedLog.AppendLineAsync(
-                    Path.Combine(logDirectory, "environment.log"),
-                    $"[{DateTimeOffset.Now:O}] Automatic start failed: {error.Message}"
-                );
-            }
-            catch (IOException)
-            {
-            }
+            await ApplicationDiagnostics.WriteEnvironmentStartupFailureAsync(error);
         }
     }
 
-    private static async Task StartBackgroundServicesAsync()
+    private async Task StartBackgroundServicesAsync()
     {
-        await StartAndLogAsync("mail capture", () => AppServices.Mail.StartAsync());
-        await StartAndLogAsync("dump capture", () => AppServices.Dumps.StartAsync());
-        await StartAndLogAsync("managed services", () => AppServices.Services.StartEnabledAsync());
+        await StartAndLogAsync("mail capture", () => services.Mail.StartAsync());
+        await StartAndLogAsync("dump capture", () => services.Dumps.StartAsync());
+        await StartAndLogAsync("managed services", () => services.Services.StartEnabledAsync());
         await StartConfiguredEnvironmentAsync();
     }
 
@@ -187,21 +175,7 @@ public partial class App : Application
 
     private static async Task LogStartupFailureAsync(string component, Exception error)
     {
-        try
-        {
-            var logDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "HerdMe",
-                "Log"
-            );
-            await BoundedLog.AppendLineAsync(
-                Path.Combine(logDirectory, "startup.log"),
-                $"[{DateTimeOffset.Now:O}] {component} failed: {error.Message}"
-            );
-        }
-        catch (IOException)
-        {
-        }
+        await ApplicationDiagnostics.WriteBackgroundServiceStartupFailureAsync(component, error);
     }
 
     private void App_UnhandledException(
@@ -216,21 +190,7 @@ public partial class App : Application
 
     private async Task ReportUnhandledExceptionAsync(Exception error)
     {
-        try
-        {
-            var logDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "HerdMe",
-                "Log"
-            );
-            await BoundedLog.AppendLineAsync(
-                Path.Combine(logDirectory, "unhandled.log"),
-                $"[{DateTimeOffset.Now:O}] {error}"
-            );
-        }
-        catch (Exception logError) when (logError is IOException or UnauthorizedAccessException)
-        {
-        }
+        await ApplicationDiagnostics.WriteUnhandledExceptionAsync(error);
 
         if (Interlocked.Exchange(ref reportingUnhandledError, 1) != 0) return;
         try

@@ -14,7 +14,11 @@ function Find-HerdMeSignTool {
 }
 
 function Get-HerdMeSigningThumbprint {
-    $thumbprint = ($env:HERDME_WINDOWS_SIGNING_THUMBPRINT -replace '\s', '').ToUpperInvariant()
+    $configuredThumbprint = $env:HERDME_WINDOWS_SIGNING_THUMBPRINT
+    if ([string]::IsNullOrWhiteSpace($configuredThumbprint)) {
+        throw "HERDME_WINDOWS_SIGNING_THUMBPRINT must be a 40-character SHA-1 certificate thumbprint."
+    }
+    $thumbprint = ($configuredThumbprint -replace '\s', '').ToUpperInvariant()
     if ($thumbprint -notmatch '^[0-9A-F]{40}$') {
         throw "HERDME_WINDOWS_SIGNING_THUMBPRINT must be a 40-character SHA-1 certificate thumbprint."
     }
@@ -27,9 +31,10 @@ function Get-HerdMeTimestampUri {
     if (
         [string]::IsNullOrWhiteSpace($timestampUrl) -or
         -not [Uri]::TryCreate($timestampUrl, [UriKind]::Absolute, [ref]$timestampUri) -or
-        $timestampUri.Scheme -notin @([Uri]::UriSchemeHttp, [Uri]::UriSchemeHttps)
+        $timestampUri.Scheme -ne [Uri]::UriSchemeHttps -or
+        [string]::IsNullOrWhiteSpace($timestampUri.Host)
     ) {
-        throw "HERDME_WINDOWS_TIMESTAMP_URL must be an absolute HTTP or HTTPS RFC 3161 timestamp URL."
+        throw "HERDME_WINDOWS_TIMESTAMP_URL must be an absolute HTTPS RFC 3161 timestamp URL."
     }
     return $timestampUri
 }
@@ -42,9 +47,10 @@ function Assert-HerdMeAuthenticodeSignature(
     if (
         $signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
         $null -eq $signature.SignerCertificate -or
-        $signature.SignerCertificate.Thumbprint -ne $ExpectedThumbprint
+        $signature.SignerCertificate.Thumbprint -ne $ExpectedThumbprint -or
+        $null -eq $signature.TimeStamperCertificate
     ) {
-        throw "The expected Authenticode certificate was not applied to $Path"
+        throw "The expected timestamped Authenticode certificate was not applied to $Path"
     }
 }
 

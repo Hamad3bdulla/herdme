@@ -4,30 +4,44 @@ struct ErrorPresentation: Equatable {
     let message: String
     let technicalDetails: String?
 
-    init(_ rawValue: String, fallback: String = "The operation could not be completed.") {
+    init(
+        _ rawValue: String,
+        fallback: String = String(localized: "The operation could not be completed.")
+    ) {
         let extracted = Self.extractDetails(from: rawValue)
         let cleaned = Self.clean(extracted.details)
         let normalized = cleaned.lowercased()
 
         if normalized.contains("no space left on device")
-            || normalized.contains("not enough space on the disk") {
-            message = "There is not enough free disk space to finish the operation. Free some space and try again."
+            || normalized.contains("not enough space on the disk")
+        {
+            message = String(localized: "There is not enough free disk space to finish the operation. Free some space and try again.")
         } else if normalized.contains("could not be opened in append mode")
-            || normalized.contains("unexpectedvalueexception") && normalized.contains("streamhandler") {
-            message = "Laravel could not write to the new project's log files. Check disk space and folder permissions, then try again."
+            || normalized.contains("unexpectedvalueexception") && normalized.contains("streamhandler")
+        {
+            message = String(
+                localized:
+                    "Laravel could not write to the new project's log files. Check disk space and folder permissions, then try again.")
         } else if normalized.contains("permission denied")
             || normalized.contains("operation not permitted")
-            || normalized.contains("access is denied") {
-            message = "HerdMe does not have permission to write the required files. Choose a writable folder and try again."
+            || normalized.contains("access is denied")
+        {
+            message = String(
+                localized: "HerdMe does not have permission to write the required files. Choose a writable folder and try again.")
         } else if normalized.contains("could not resolve host")
             || normalized.contains("network is unreachable")
-            || normalized.contains("connection timed out") {
-            message = "The download server could not be reached. Check the network connection and try again."
+            || normalized.contains("connection timed out")
+        {
+            message = String(localized: "The download server could not be reached. Check the network connection and try again.")
         } else if normalized.contains("untrusted tap")
-            && normalized.contains("brew trust --formula") {
-            message = "Homebrew blocked the verified runtime formula. HerdMe could not approve it automatically; review Logs/homebrew.log and try again."
+            && normalized.contains("brew trust --formula")
+        {
+            message = String(
+                localized:
+                    "Homebrew blocked the verified runtime formula. HerdMe could not approve it automatically; review Logs/homebrew.log and try again."
+            )
         } else if Self.isPlainMessage(cleaned) {
-            message = cleaned
+            message = Bundle.main.localizedString(forKey: cleaned, value: cleaned, table: nil)
         } else {
             message = fallback
         }
@@ -43,16 +57,25 @@ struct ErrorPresentation: Equatable {
 
     private static func extractDetails(from rawValue: String) -> (context: String?, details: String) {
         guard let data = rawValue.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
             return (nil, rawValue)
         }
 
         var context: [String] = []
         if let directory = object["directory"] as? String, !directory.isEmpty {
-            context.append("Project folder: \(directory)")
+            context.append(
+                String.localizedStringWithFormat(
+                    String(localized: "Project folder: %@"),
+                    directory
+                ))
         }
         if let log = object["log"] as? String, !log.isEmpty {
-            context.append("Installer log: \(log)")
+            context.append(
+                String.localizedStringWithFormat(
+                    String(localized: "Installer log: %@"),
+                    log
+                ))
         }
         let details = object["tail"] as? String ?? rawValue
         return (context.isEmpty ? nil : context.joined(separator: "\n"), details)
@@ -65,7 +88,8 @@ struct ErrorPresentation: Equatable {
             with: "",
             options: .regularExpression
         )
-        return withoutANSI
+        return
+            withoutANSI
             .replacingOccurrences(of: "\r\n", with: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -98,7 +122,7 @@ struct ProjectCreationFailure: Equatable {
         } else {
             let presentation = ErrorPresentation(
                 error.localizedDescription,
-                fallback: "The site could not be created."
+                fallback: String(localized: "The site could not be created.")
             )
             message = presentation.message
             technicalDetails = presentation.technicalDetails

@@ -10,6 +10,8 @@ public sealed class WindowsHostsManager
     private const string BeginMarker = "# BEGIN HerdMe local sites";
     private const string EndMarker = "# END HerdMe local sites";
     private const string HelperArgument = "--apply-hosts";
+    internal const long MaximumStagedHostsBytes = 1_048_576;
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     public async Task EnsureMappingsAsync(
         IEnumerable<string> domains,
@@ -27,7 +29,7 @@ public sealed class WindowsHostsManager
     public async Task<bool> HasManagedMappingsAsync(CancellationToken cancellationToken = default)
     {
         if (!OperatingSystem.IsWindows()) return false;
-        var current = await File.ReadAllTextAsync(HostsPath(), cancellationToken);
+        var current = await ReadHostsTextAsync(HostsPath(), cancellationToken);
         return ContainsManagedBlock(current);
     }
 
@@ -41,9 +43,13 @@ public sealed class WindowsHostsManager
             throw new PlatformNotSupportedException("Windows hosts configuration requires Windows.");
         }
         var hostsPath = HostsPath();
-        var current = await File.ReadAllTextAsync(hostsPath, cancellationToken);
+        var current = await ReadHostsTextAsync(hostsPath, cancellationToken);
         var updated = Render(current, domains);
         if (NormalizeNewlines(current) == NormalizeNewlines(updated)) return;
+        if (Encoding.UTF8.GetByteCount(updated) > MaximumStagedHostsBytes)
+        {
+            throw new InvalidDataException("The Windows hosts file is too large to update safely.");
+        }
 
         var supportPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -125,7 +131,60 @@ public sealed class WindowsHostsManager
 
         try
         {
-            File.Copy(arguments[2], arguments[3], overwrite: true);
+            var candidate = ReadStagedCandidate(arguments[2]);
+            if ((File.GetAttributes(arguments[3]) & FileAttributes.ReparsePoint) != 0)
+            {
+                exitCode = 2;
+                return true;
+            }
+            using (var destination = new FileStream(
+                arguments[3],
+                FileMode.Open,
+                FileAccess.ReadWrite,
+                FileShare.None
+            ))
+            {
+                string current;
+                using (var reader = new StreamReader(
+                    destination,
+                    StrictUtf8,
+                    detectEncodingFromByteOrderMarks: true,
+                    bufferSize: 4_096,
+                    leaveOpen: true
+                ))
+                {
+                    try
+                    {
+                        current = reader.ReadToEnd();
+                    }
+                    catch (DecoderFallbackException error)
+                    {
+                        throw new InvalidDataException(
+                            "The Windows hosts file is not valid UTF-8 and was left unchanged.",
+                            error
+                        );
+                    }
+                }
+                if (!IsAllowedHostsUpdate(current, candidate))
+                {
+                    exitCode = 2;
+                    return true;
+                }
+
+                destination.Position = 0;
+                destination.SetLength(0);
+                using (var writer = new StreamWriter(
+                    destination,
+                    new UTF8Encoding(false),
+                    bufferSize: 4_096,
+                    leaveOpen: true
+                ))
+                {
+                    writer.Write(candidate);
+                    writer.Flush();
+                }
+                destination.Flush(flushToDisk: true);
+            }
             var flush = new ProcessStartInfo
             {
                 FileName = "ipconfig.exe",
@@ -140,7 +199,12 @@ public sealed class WindowsHostsManager
             process.WaitForExit();
             if (process.ExitCode != 0) exitCode = 1;
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException or Win32Exception)
+        catch (Exception error) when (
+            error is IOException
+                or UnauthorizedAccessException
+                or Win32Exception
+                or InvalidDataException
+        )
         {
             exitCode = 1;
         }
@@ -154,26 +218,126 @@ public sealed class WindowsHostsManager
         string windowsPath
     )
     {
-        var cachePath = Path.GetFullPath(Path.Combine(supportPath, "Cache", "hosts"));
-        var sourcePath = Path.GetFullPath(source);
-        var expectedDestination = Path.GetFullPath(Path.Combine(
-            windowsPath,
-            "System32",
-            "drivers",
-            "etc",
-            "hosts"
-        ));
-        var cachePrefix = cachePath.TrimEnd(
-            Path.DirectorySeparatorChar,
-            Path.AltDirectorySeparatorChar
-        ) + Path.DirectorySeparatorChar;
-        return sourcePath.StartsWith(cachePrefix, StringComparison.OrdinalIgnoreCase)
-            && Path.GetFileName(sourcePath).StartsWith("hosts-", StringComparison.Ordinal)
-            && destination.Length > 0
-            && Path.GetFullPath(destination).Equals(
-                expectedDestination,
-                StringComparison.OrdinalIgnoreCase
+        try
+        {
+            var cachePath = Path.GetFullPath(Path.Combine(supportPath, "Cache", "hosts"));
+            var sourcePath = Path.GetFullPath(source);
+            var expectedDestination = Path.GetFullPath(Path.Combine(
+                windowsPath,
+                "System32",
+                "drivers",
+                "etc",
+                "hosts"
+            ));
+            var cachePrefix = cachePath.TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar
+            ) + Path.DirectorySeparatorChar;
+            return sourcePath.StartsWith(cachePrefix, StringComparison.OrdinalIgnoreCase)
+                && Path.GetFileName(sourcePath).StartsWith("hosts-", StringComparison.Ordinal)
+                && destination.Length > 0
+                && Path.GetFullPath(destination).Equals(
+                    expectedDestination,
+                    StringComparison.OrdinalIgnoreCase
+                );
+        }
+        catch (Exception error) when (
+            error is ArgumentException or NotSupportedException or PathTooLongException
+        )
+        {
+            return false;
+        }
+    }
+
+    internal static string ReadStagedCandidate(string path)
+    {
+        var attributes = File.GetAttributes(path);
+        if ((attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
+        {
+            throw new InvalidDataException(
+                "The staged Windows hosts update must be a regular file."
             );
+        }
+
+        using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.None,
+            bufferSize: 4_096,
+            FileOptions.SequentialScan
+        );
+        if (stream.Length > MaximumStagedHostsBytes)
+        {
+            throw new InvalidDataException("The staged Windows hosts update is too large.");
+        }
+
+        using var reader = new StreamReader(
+            stream,
+            StrictUtf8,
+            detectEncodingFromByteOrderMarks: true
+        );
+        try
+        {
+            return reader.ReadToEnd();
+        }
+        catch (DecoderFallbackException error)
+        {
+            throw new InvalidDataException(
+                "The staged Windows hosts update is not valid UTF-8.",
+                error
+            );
+        }
+    }
+
+    private static async Task<string> ReadHostsTextAsync(
+        string path,
+        CancellationToken cancellationToken
+    )
+    {
+        await using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete,
+            bufferSize: 4_096,
+            FileOptions.Asynchronous | FileOptions.SequentialScan
+        );
+        if (stream.Length > MaximumStagedHostsBytes)
+        {
+            throw new InvalidDataException("The Windows hosts file is too large to update safely.");
+        }
+
+        using var reader = new StreamReader(
+            stream,
+            StrictUtf8,
+            detectEncodingFromByteOrderMarks: true
+        );
+        try
+        {
+            return await reader.ReadToEndAsync(cancellationToken);
+        }
+        catch (DecoderFallbackException error)
+        {
+            throw new InvalidDataException(
+                "The Windows hosts file is not valid UTF-8 and was left unchanged.",
+                error
+            );
+        }
+    }
+
+    internal static bool IsAllowedHostsUpdate(string current, string candidate)
+    {
+        try
+        {
+            var domains = ManagedDomains(candidate);
+            return NormalizeNewlines(Render(current, domains))
+                .Equals(NormalizeNewlines(candidate), StringComparison.Ordinal);
+        }
+        catch (InvalidDataException)
+        {
+            return false;
+        }
     }
 
     internal static bool ContainsManagedBlock(string content)
@@ -185,21 +349,35 @@ public sealed class WindowsHostsManager
 
     public static string Render(string current, IEnumerable<string> domains)
     {
-        var kept = new List<string>();
-        var insideManagedBlock = false;
-        foreach (var line in NormalizeNewlines(current).Split('\n'))
+        var lines = NormalizeNewlines(current).Split('\n');
+        var beginMarkers = lines
+            .Select((line, index) => (Line: line, Index: index))
+            .Where(item => item.Line.Trim().Equals(BeginMarker, StringComparison.Ordinal))
+            .Select(item => item.Index)
+            .ToArray();
+        var endMarkers = lines
+            .Select((line, index) => (Line: line, Index: index))
+            .Where(item => item.Line.Trim().Equals(EndMarker, StringComparison.Ordinal))
+            .Select(item => item.Index)
+            .ToArray();
+        if (
+            beginMarkers.Length != endMarkers.Length
+            || beginMarkers.Length > 1
+            || (beginMarkers.Length == 1 && beginMarkers[0] >= endMarkers[0])
+        )
         {
-            if (line.Trim().Equals(BeginMarker, StringComparison.Ordinal))
-            {
-                insideManagedBlock = true;
-                continue;
-            }
-            if (line.Trim().Equals(EndMarker, StringComparison.Ordinal))
-            {
-                insideManagedBlock = false;
-                continue;
-            }
-            if (!insideManagedBlock) kept.Add(line.TrimEnd());
+            throw new InvalidDataException("The Windows hosts file contains a malformed HerdMe block.");
+        }
+
+        var kept = new List<string>();
+        for (var index = 0; index < lines.Length; index++)
+        {
+            if (
+                beginMarkers.Length == 1
+                && index >= beginMarkers[0]
+                && index <= endMarkers[0]
+            ) continue;
+            kept.Add(lines[index].TrimEnd());
         }
         while (kept.Count > 0 && string.IsNullOrWhiteSpace(kept[^1])) kept.RemoveAt(kept.Count - 1);
 
@@ -217,6 +395,52 @@ public sealed class WindowsHostsManager
             kept.Add(EndMarker);
         }
         return string.Join("\r\n", kept) + "\r\n";
+    }
+
+    private static IReadOnlyList<string> ManagedDomains(string candidate)
+    {
+        var lines = NormalizeNewlines(candidate).Split('\n');
+        var beginMarkers = lines
+            .Select((line, index) => (Line: line, Index: index))
+            .Where(item => item.Line.Trim().Equals(BeginMarker, StringComparison.Ordinal))
+            .Select(item => item.Index)
+            .ToArray();
+        var endMarkers = lines
+            .Select((line, index) => (Line: line, Index: index))
+            .Where(item => item.Line.Trim().Equals(EndMarker, StringComparison.Ordinal))
+            .Select(item => item.Index)
+            .ToArray();
+        if (beginMarkers.Length == 0 && endMarkers.Length == 0) return [];
+        if (
+            beginMarkers.Length != 1
+            || endMarkers.Length != 1
+            || beginMarkers[0] >= endMarkers[0]
+        )
+        {
+            throw new InvalidDataException("The staged Windows hosts file contains malformed HerdMe markers.");
+        }
+
+        const string mappingPrefix = "127.0.0.1\t";
+        var domains = new List<string>();
+        for (var index = beginMarkers[0] + 1; index < endMarkers[0]; index++)
+        {
+            var line = lines[index];
+            if (!line.StartsWith(mappingPrefix, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("The staged HerdMe hosts block contains an invalid mapping.");
+            }
+            var domain = line[mappingPrefix.Length..];
+            if (
+                domain.Length == 0
+                || !domain.Equals(domain.Trim().TrimEnd('.').ToLowerInvariant(), StringComparison.Ordinal)
+                || Uri.CheckHostName(domain) != UriHostNameType.Dns
+            )
+            {
+                throw new InvalidDataException("The staged HerdMe hosts block contains an invalid domain.");
+            }
+            domains.Add(domain);
+        }
+        return domains;
     }
 
     private static string NormalizeNewlines(string value)

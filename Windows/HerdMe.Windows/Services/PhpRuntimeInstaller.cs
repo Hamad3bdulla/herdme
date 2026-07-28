@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using HerdMe.Windows.Models;
 
 namespace HerdMe.Windows.Services;
 
@@ -17,9 +18,8 @@ public sealed class PhpRuntimeInstaller
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly CoreClient coreClient;
 
-    public static IReadOnlyList<string> SupportedCycles { get; } = Array.AsReadOnly(
-        new[] { "8.5", "8.4", "8.3", "8.2", "8.1", "8.0" }
-    );
+    public static IReadOnlyList<string> SupportedCycles { get; } =
+        RuntimeCatalog.InstallablePhpCycles;
 
     public PhpRuntimeInstaller(CoreClient? coreClient = null, string? supportRoot = null)
     {

@@ -9,7 +9,8 @@ final class HerdMeApplicationDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
-              let icon = NSImage(contentsOf: iconURL) else { return }
+            let icon = NSImage(contentsOf: iconURL)
+        else { return }
         NSApplication.shared.applicationIconImage = icon
     }
 
@@ -32,8 +33,9 @@ struct HerdMeApp: App {
     private let singleInstanceGuard: SingleInstanceGuard?
 
     init() {
-        let configurationStore = ConfigurationStore()
-        if Self.isRunningUnitTests {
+        let environment = ProcessInfo.processInfo.environment
+        let configurationStore = AppExecutionContext.configurationStore(environment: environment)
+        if AppExecutionContext.isTesting(environment: environment) {
             singleInstanceGuard = nil
         } else {
             let guardInstance = SingleInstanceGuard(
@@ -52,6 +54,15 @@ struct HerdMeApp: App {
         Window("HerdMe", id: "main") {
             RootView()
                 .environmentObject(model)
+                .environmentObject(model.applicationSettings)
+                .environmentObject(model.navigation)
+                .environmentObject(model.mail)
+                .environmentObject(model.dumpsCoordinator)
+                .environmentObject(model.services)
+                .environmentObject(model.runtime)
+                .environmentObject(model.sitesCoordinator)
+                .environmentObject(model.environment)
+                .environmentObject(model.security)
                 .frame(minWidth: 730, idealWidth: 730, minHeight: 527, idealHeight: 527)
                 .onAppear { applicationDelegate.model = model }
         }
@@ -60,7 +71,7 @@ struct HerdMeApp: App {
         .commands {
             CommandGroup(replacing: .appSettings) {
                 Button("Settings...") {
-                    model.selectedPage = .general
+                    model.navigation.selectedPage = .general
                     NSApplication.shared.activate(ignoringOtherApps: true)
                 }
                 .keyboardShortcut(",", modifiers: .command)
@@ -70,6 +81,7 @@ struct HerdMeApp: App {
         Window("Create a New Site", id: "create-site") {
             CreateSiteWizardView()
                 .environmentObject(model)
+                .environmentObject(model.navigation)
                 .frame(minWidth: 800, idealWidth: 800, minHeight: 600, idealHeight: 600)
         }
         .defaultSize(width: 800, height: 600)
@@ -78,8 +90,13 @@ struct HerdMeApp: App {
         MenuBarExtra {
             MenuBarContentView()
                 .environmentObject(model)
+                .environmentObject(model.applicationSettings)
+                .environmentObject(model.navigation)
+                .environmentObject(model.runtime)
+                .environmentObject(model.environment)
         } label: {
-            Image(systemName: "h.square.fill")
+            EnvironmentMenuBarStatusLabel()
+                .environmentObject(model.environment)
         }
         .menuBarExtraStyle(.menu)
     }
@@ -91,9 +108,4 @@ struct HerdMeApp: App {
             .activate(options: [.activateAllWindows])
     }
 
-    private static var isRunningUnitTests: Bool {
-        let environment = ProcessInfo.processInfo.environment
-        return environment["XCTestConfigurationFilePath"] != nil
-            || environment["XCTestBundlePath"] != nil
-    }
 }

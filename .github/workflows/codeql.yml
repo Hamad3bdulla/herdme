@@ -33,17 +33,19 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
+        uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           languages: ${{ matrix.language }}
           build-mode: manual
 
       - name: Install XcodeGen
         if: matrix.language == 'swift'
-        run: brew install xcodegen
+        run: arch -arm64 /opt/homebrew/bin/brew install xcodegen
 
       - name: Build Swift application
         if: matrix.language == 'swift'
@@ -66,7 +68,7 @@ jobs:
 
       - name: Install .NET 8
         if: matrix.language == 'csharp'
-        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: 8.0.x
 
@@ -75,7 +77,18 @@ jobs:
         shell: pwsh
         run: ./Windows/build.ps1 -Architecture x64 -Configuration Release
 
+      - name: Upload C# build failure diagnostics
+        if: failure() && matrix.language == 'csharp'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: HerdMe-${{ github.run_number }}-codeql-csharp-build-diagnostics
+          path: |
+            build/windows-native-build.log
+            build/windows-native-build.binlog
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Analyze
-        uses: github/codeql-action/analyze@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
+        uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           category: /language:${{ matrix.language }}

@@ -1,14 +1,87 @@
 namespace HerdMe.Windows.Services;
 
-public static class AppServices
+public sealed class AppServices
 {
-    public static WindowsLocalEnvironment Environment { get; } = new();
+    public AppServices()
+    {
+        Core = new CoreClient();
+        SiteSettings = new SiteConfigurationStore();
+        Hosts = new WindowsHostsManager();
+        Certificates = new WindowsCertificateManager();
+        RuntimePolicy = new PhpRuntimePolicy(Core);
+        PhpInstaller = new PhpRuntimeInstaller(Core);
+        NodeInstaller = new NodeRuntimeInstaller();
+        ComposerTools = new ComposerToolManager(
+            coreClient: Core,
+            phpInstaller: PhpInstaller,
+            phpPolicy: RuntimePolicy,
+            nodeInstaller: NodeInstaller
+        );
+        ProjectCreator = new LaravelProjectCreator(
+            ComposerTools,
+            PhpInstaller,
+            RuntimePolicy,
+            NodeInstaller
+        );
+        Environment = new WindowsLocalEnvironment(
+            Core,
+            PhpInstaller,
+            RuntimePolicy,
+            Certificates,
+            Hosts
+        );
+        Mail = new MailCaptureService();
+        Dumps = new DumpCaptureService();
+        Services = new WindowsServiceManager();
+        Startup = new WindowsStartupManager();
+        Updates = AppUpdateManager.Configured();
+        Xdebug = new XdebugManager();
+        SiteRuntimes = new SiteRuntimeStore();
+        InitialSetup = new InitialSetupManager(
+            SiteSettings,
+            Hosts,
+            Certificates,
+            Core,
+            PhpInstaller,
+            RuntimePolicy,
+            ComposerTools,
+            NodeInstaller
+        );
+    }
 
-    public static MailCaptureService Mail { get; } = new();
+    public CoreClient Core { get; }
 
-    public static DumpCaptureService Dumps { get; } = new();
+    public SiteConfigurationStore SiteSettings { get; }
 
-    public static WindowsServiceManager Services { get; } = new();
+    public WindowsHostsManager Hosts { get; }
 
-    public static SiteConfigurationStore SiteSettings { get; } = new();
+    public WindowsCertificateManager Certificates { get; }
+
+    public PhpRuntimePolicy RuntimePolicy { get; }
+
+    public PhpRuntimeInstaller PhpInstaller { get; }
+
+    public NodeRuntimeInstaller NodeInstaller { get; }
+
+    public ComposerToolManager ComposerTools { get; }
+
+    public LaravelProjectCreator ProjectCreator { get; }
+
+    public WindowsLocalEnvironment Environment { get; }
+
+    public MailCaptureService Mail { get; }
+
+    public DumpCaptureService Dumps { get; }
+
+    public WindowsServiceManager Services { get; }
+
+    public WindowsStartupManager Startup { get; }
+
+    public AppUpdateManager Updates { get; }
+
+    public XdebugManager Xdebug { get; }
+
+    public SiteRuntimeStore SiteRuntimes { get; }
+
+    public InitialSetupManager InitialSetup { get; }
 }

@@ -20,9 +20,9 @@ void print_usage() {
               << "  herdme-core support-path\n";
 }
 
-}  // namespace
+} // namespace
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     if (argc < 2) {
         print_usage();
         return 0;
@@ -36,9 +36,7 @@ int main(int argc, char* argv[]) {
     if (command == "php-extensions") {
         std::ostringstream module_output;
         module_output << std::cin.rdbuf();
-        std::cout << herdme::php_extensions_json(
-            herdme::inspect_php_module_output(module_output.str())
-        ) << '\n';
+        std::cout << herdme::php_extensions_json(herdme::inspect_php_module_output(module_output.str())) << '\n';
         return 0;
     }
     if (command == "support-path") {

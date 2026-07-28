@@ -46,20 +46,23 @@ enum ServiceCredentialError: LocalizedError {
     case keychainReadFailed(OSStatus)
     case keychainWriteFailed(OSStatus)
     case keychainDeleteFailed(OSStatus)
+    case interactionRequired
     case invalidStoredValue
 
     var errorDescription: String? {
         switch self {
         case .randomGenerationFailed:
-            "HerdMe could not generate secure credentials for this service."
+            String(localized: "HerdMe could not generate secure credentials for this service.")
         case .keychainReadFailed:
-            "HerdMe could not read this service's credentials from Keychain."
+            String(localized: "HerdMe could not read this service's credentials from Keychain.")
         case .keychainWriteFailed:
-            "HerdMe could not save this service's credentials in Keychain."
+            String(localized: "HerdMe could not save this service's credentials in Keychain.")
         case .keychainDeleteFailed:
-            "HerdMe could not remove this service's credentials from Keychain."
+            String(localized: "HerdMe could not remove this service's credentials from Keychain.")
+        case .interactionRequired:
+            String(localized: "Open HerdMe and start this service once to allow Keychain access.")
         case .invalidStoredValue:
-            "This service's saved credentials are invalid. Delete and add the service again."
+            String(localized: "This service's saved credentials are invalid. Delete and add the service again.")
         }
     }
 }
@@ -90,6 +93,7 @@ final class ServiceCredentialStore: @unchecked Sendable {
             guard credentials.isValid else { throw ServiceCredentialError.invalidStoredValue }
             return credentials
         }
+        guard allowInteraction else { throw ServiceCredentialError.interactionRequired }
 
         let credentials = try ServiceCredentials.generate(for: identifier)
         let encoder = JSONEncoder()

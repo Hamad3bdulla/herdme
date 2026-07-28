@@ -6,9 +6,10 @@ struct ExecutableLocator {
     func find(_ name: String) -> URL? {
         let fileManager = FileManager.default
         var directories = [managedRoot.appendingPathComponent("bin", isDirectory: true).path]
-        directories.append(contentsOf: (ProcessInfo.processInfo.environment["PATH"] ?? "")
-            .split(separator: ":")
-            .map(String.init))
+        directories.append(
+            contentsOf: (ProcessInfo.processInfo.environment["PATH"] ?? "")
+                .split(separator: ":")
+                .map(String.init))
 
         for directory in directories {
             let candidate = URL(fileURLWithPath: directory, isDirectory: true).appendingPathComponent(name)

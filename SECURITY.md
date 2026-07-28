@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes are applied to the latest release and the `main` branch. Older
+Security fixes are applied to the latest release and the default branch. Older
 development builds may be asked to upgrade before a report can be reproduced.
 
 ## Reporting a vulnerability

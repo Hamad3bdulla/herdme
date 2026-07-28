@@ -2,12 +2,25 @@ import SwiftUI
 
 struct ServicesView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var services: ServicesCoordinator
     @State private var showingAddService = false
     @State private var environmentService: ServiceInstance?
 
     var body: some View {
         PageContainer("Services") {
-            if model.configuration.serviceInstances.isEmpty {
+            if ServiceCatalog.all.isEmpty {
+                SettingsPanel {
+                    EmptyStateView(
+                        symbol: "exclamationmark.triangle.fill",
+                        title: "Services Unavailable",
+                        message: LocalizedStringKey(
+                            RuntimeCatalog.loadIssue
+                                ?? "The bundled service catalog could not be loaded."
+                        )
+                    )
+                    .frame(minHeight: 310)
+                }
+            } else if model.configuration.serviceInstances.isEmpty {
                 SettingsPanel {
                     EmptyStateView(
                         symbol: "externaldrive.badge.plus",
@@ -21,23 +34,32 @@ struct ServicesView: View {
                 }
             } else {
                 SettingsPanel {
-                    VStack(spacing: 0) {
-                        HStack {
-                            Text("Service").fontWeight(.medium)
-                            Spacer()
-                            Text("Port").fontWeight(.medium).frame(width: 80)
-                            Text("Status").fontWeight(.medium).frame(width: 100)
-                            Text("Auto").fontWeight(.medium).frame(width: 58)
-                            Spacer().frame(width: 58)
+                    Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 0) {
+                        GridRow {
+                            Text("Service")
+                                .frame(minWidth: 140, maxWidth: .infinity, alignment: .leading)
+                            Text("Port")
+                                .frame(width: 64, alignment: .trailing)
+                            Text("Status")
+                                .frame(width: 92, alignment: .leading)
+                            Text("Auto")
+                                .frame(width: 46, alignment: .center)
+                            Color.clear
+                                .frame(width: 28, height: 1)
+                                .accessibilityHidden(true)
                         }
-                        .padding(.bottom, 10)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 8)
 
                         ForEach(model.configuration.serviceInstances) { instance in
+                            let definition = ServiceCatalog.all.first(where: { $0.id == instance.definitionID })
+                            let state = services.state(for: instance)
+                            let isOperating = services.operation == instance.id
                             Divider()
-                            HStack {
-                                let definition = ServiceCatalog.all.first(where: { $0.id == instance.definitionID })
-                                let state = model.serviceState(for: instance)
-                                let isOperating = model.serviceOperation == instance.id
+                                .gridCellColumns(5)
+                                .gridCellUnsizedAxes(.horizontal)
+                            GridRow(alignment: .center) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Label(instance.name, systemImage: definition?.symbol ?? "externaldrive")
                                     Text(
@@ -50,34 +72,50 @@ struct ServicesView: View {
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                                 }
-                                Spacer()
-                                Text(PortPresentation.number(instance.port)).frame(width: 80)
+                                .frame(minWidth: 140, maxWidth: .infinity, alignment: .leading)
+
+                                Text(PortPresentation.number(instance.port))
+                                    .font(.body.monospacedDigit())
+                                    .frame(width: 64, alignment: .trailing)
+
                                 Group {
                                     if isOperating {
                                         ProgressView()
                                             .controlSize(.small)
+                                            .accessibilityLabel("Updating \(instance.name)")
                                     } else {
-                                        Text(state.rawValue)
-                                            .foregroundStyle(state.isRunning ? .green : .secondary)
+                                        HStack(spacing: 6) {
+                                            Circle()
+                                                .fill(state.isRunning ? Color.green : Color.secondary)
+                                                .frame(width: 7, height: 7)
+                                            Text(state.localizedTitle)
+                                                .lineLimit(1)
+                                        }
+                                        .foregroundStyle(state.isRunning ? .green : .secondary)
                                     }
                                 }
-                                .frame(width: 100)
-                                Toggle("Start automatically", isOn: Binding(
-                                    get: { instance.startAutomatically },
-                                    set: { model.setServiceAutomaticStart(instance, enabled: $0) }
-                                ))
+                                .frame(width: 92, alignment: .leading)
+
+                                Toggle(
+                                    "Start automatically",
+                                    isOn: Binding(
+                                        get: { instance.startAutomatically },
+                                        set: { model.setServiceAutomaticStart(instance, enabled: $0) }
+                                    )
+                                )
                                 .labelsHidden()
                                 .toggleStyle(.switch)
                                 .controlSize(.small)
-                                .frame(width: 58)
+                                .frame(width: 46)
                                 .help("Start this service automatically with the local environment")
+
                                 Menu {
                                     switch state {
                                     case .notInstalled:
                                         Button("Install") { model.installService(instance) }
                                     case .stopped:
                                         Button("Start") { model.startService(instance) }
-                                        if model.isServiceUpdateAvailable(instance) {
+                                        if services.isUpdateAvailable(for: instance) {
                                             Button("Update") { model.installService(instance) }
                                         }
                                     case .running:
@@ -104,13 +142,18 @@ struct ServicesView: View {
                                     Button("Delete", role: .destructive) { model.removeService(instance) }
                                 } label: {
                                     Image(systemName: "ellipsis.circle")
+                                        .frame(width: 18, height: 18)
                                 }
-                                .frame(width: 58)
+                                .menuStyle(.borderlessButton)
+                                .frame(width: 28)
                                 .disabled(isOperating)
+                                .help("Service actions")
+                                .accessibilityLabel("Actions for \(instance.name)")
                             }
-                            .frame(height: 52)
+                            .frame(minHeight: 54)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 Button {
@@ -123,8 +166,13 @@ struct ServicesView: View {
             }
         }
         .sheet(isPresented: $showingAddService) {
-            AddServiceSheet(isPresented: $showingAddService)
+            if let definition = ServiceCatalog.all.first {
+                AddServiceSheet(
+                    isPresented: $showingAddService,
+                    initialDefinition: definition
+                )
                 .environmentObject(model)
+            }
         }
         .sheet(item: $environmentService) { instance in
             ServiceEnvironmentSheet(instance: instance)
@@ -139,6 +187,7 @@ struct ServicesView: View {
 
 private struct ServiceEnvironmentSheet: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var sitesCoordinator: SitesCoordinator
     @Environment(\.dismiss) private var dismiss
     let instance: ServiceInstance
     @State private var selectedSiteID = ""
@@ -146,7 +195,7 @@ private struct ServiceEnvironmentSheet: View {
     @State private var errorMessage: String?
 
     private var selectedSite: SiteProject? {
-        model.sites.first(where: { $0.id == selectedSiteID })
+        sitesCoordinator.sites.first(where: { $0.id == selectedSiteID })
     }
 
     var body: some View {
@@ -154,7 +203,7 @@ private struct ServiceEnvironmentSheet: View {
             Text("Add \(instance.name) to .env")
                 .font(.title2.weight(.semibold))
 
-            if model.sites.isEmpty {
+            if sitesCoordinator.sites.isEmpty {
                 EmptyStateView(
                     symbol: "folder.badge.questionmark",
                     title: "No Sites Available",
@@ -162,7 +211,7 @@ private struct ServiceEnvironmentSheet: View {
                 )
             } else {
                 Picker("Site", selection: $selectedSiteID) {
-                    ForEach(model.sites) { site in
+                    ForEach(sitesCoordinator.sites) { site in
                         Text(site.name).tag(site.id)
                     }
                 }
@@ -190,7 +239,7 @@ private struct ServiceEnvironmentSheet: View {
             HStack {
                 Spacer()
                 Button(update == nil ? "Cancel" : "Done") { dismiss() }
-                if !model.sites.isEmpty, update == nil {
+                if !sitesCoordinator.sites.isEmpty, update == nil {
                     Button("Add to .env") { writeEnvironment() }
                         .buttonStyle(.borderedProminent)
                         .disabled(selectedSite == nil)
@@ -202,7 +251,9 @@ private struct ServiceEnvironmentSheet: View {
         .frame(minHeight: 230)
         .onAppear {
             if selectedSiteID.isEmpty {
-                selectedSiteID = model.selectedSite?.id ?? model.sites.first?.id ?? ""
+                selectedSiteID =
+                    sitesCoordinator
+                    .selectedSite(identifier: model.selectedSiteID)?.id ?? ""
             }
         }
     }
@@ -221,9 +272,16 @@ private struct ServiceEnvironmentSheet: View {
 private struct AddServiceSheet: View {
     @EnvironmentObject private var model: AppModel
     @Binding var isPresented: Bool
-    @State private var selected = ServiceCatalog.all[0]
-    @State private var name = ServiceCatalog.all[0].name
-    @State private var port = ServiceCatalog.all[0].defaultPort
+    @State private var selected: ServiceDefinition
+    @State private var name: String
+    @State private var port: Int
+
+    init(isPresented: Binding<Bool>, initialDefinition: ServiceDefinition) {
+        _isPresented = isPresented
+        _selected = State(initialValue: initialDefinition)
+        _name = State(initialValue: initialDefinition.name)
+        _port = State(initialValue: initialDefinition.defaultPort)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -235,7 +293,8 @@ private struct AddServiceSheet: View {
             }
             .onChange(of: selected) { value in
                 name = value.name
-                port = model.suggestedServicePort(startingAt: value.defaultPort)
+                port =
+                    model.suggestedServicePort(startingAt: value.defaultPort)
                     ?? value.defaultPort
             }
             TextField("Service Name", text: $name)
@@ -259,7 +318,8 @@ private struct AddServiceSheet: View {
         .padding(24)
         .frame(width: 420)
         .onAppear {
-            port = model.suggestedServicePort(startingAt: selected.defaultPort)
+            port =
+                model.suggestedServicePort(startingAt: selected.defaultPort)
                 ?? selected.defaultPort
         }
     }

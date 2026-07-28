@@ -15,6 +15,9 @@ if (-not [Environment]::Is64BitOperatingSystem -or -not [Environment]::Is64BitPr
     throw "The native Windows acceptance suite requires Windows x64 hardware."
 }
 
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $releaseMode = if ([string]::IsNullOrWhiteSpace($env:HERDME_RELEASE_MODE)) {
     "local"
@@ -23,6 +26,9 @@ $releaseMode = if ([string]::IsNullOrWhiteSpace($env:HERDME_RELEASE_MODE)) {
 }
 if ($releaseMode -notin @("local", "public")) {
     throw "HERDME_RELEASE_MODE must be local or public."
+}
+if ($releaseMode -eq "public" -and $SkipLiveReleaseChecks) {
+    throw "Public release acceptance cannot skip live runtime and service release checks."
 }
 $publishDirectory = Join-Path $repoRoot "build\windows-portable-win-x64"
 $executable = Join-Path $publishDirectory "HerdMe.Windows.exe"
@@ -34,8 +40,19 @@ $checksumFile = "$archive.sha256"
 $installer = Join-Path $repoRoot "dist\HerdMe-$version-win-x64-setup.exe"
 $installerChecksumFile = "$installer.sha256"
 $installerTestDirectory = Join-Path $repoRoot "build\windows-installer-acceptance"
+$startupRegistryPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+$startupValueName = "HerdMe"
 if ($releaseMode -eq "public") {
     . (Join-Path $PSScriptRoot "sign-windows-artifact.ps1")
+}
+
+function Get-HerdMeStartupValue {
+    $properties = Get-ItemProperty `
+        -LiteralPath $startupRegistryPath `
+        -Name $startupValueName `
+        -ErrorAction SilentlyContinue
+    if ($null -eq $properties) { return $null }
+    return [string]$properties.$startupValueName
 }
 
 & (Join-Path $PSScriptRoot "package-portable.ps1") `
@@ -95,6 +112,9 @@ if ($installerChecksumParts[0].ToLowerInvariant() -ne $actualInstallerHash) {
 if (Test-Path -LiteralPath $installerTestDirectory) {
     Remove-Item -LiteralPath $installerTestDirectory -Recurse -Force
 }
+if ($null -ne (Get-HerdMeStartupValue)) {
+    throw "Windows installer acceptance requires no pre-existing HerdMe startup value."
+}
 $installProcess = Start-Process `
     -FilePath $installer `
     -ArgumentList @(
@@ -107,6 +127,9 @@ $installProcess = Start-Process `
     -PassThru
 if ($installProcess.ExitCode -ne 0) {
     throw "The Windows installer acceptance run failed with exit code $($installProcess.ExitCode)."
+}
+if ($null -ne (Get-HerdMeStartupValue)) {
+    throw "The Windows installer enabled launch at login without user consent."
 }
 $installedExecutable = Join-Path $installerTestDirectory "HerdMe.Windows.exe"
 $installedCore = Join-Path $installerTestDirectory "Runtime\herdme-core.exe"
@@ -133,6 +156,13 @@ $uninstallers = @(Get-ChildItem -LiteralPath $installerTestDirectory -Filter "un
 if ($uninstallers.Count -ne 1) {
     throw "The Windows installer did not create exactly one uninstaller."
 }
+New-Item -ItemType Directory -Path $startupRegistryPath -Force | Out-Null
+New-ItemProperty `
+    -LiteralPath $startupRegistryPath `
+    -Name $startupValueName `
+    -Value "`"$installedExecutable`" --background" `
+    -PropertyType String `
+    -Force | Out-Null
 $uninstallProcess = Start-Process `
     -FilePath $uninstallers[0].FullName `
     -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART") `
@@ -144,6 +174,9 @@ if ($uninstallProcess.ExitCode -ne 0) {
 if (Test-Path -LiteralPath $installedExecutable -PathType Leaf) {
     throw "The Windows uninstaller left the application executable installed."
 }
+if ($null -ne (Get-HerdMeStartupValue)) {
+    throw "The Windows uninstaller left HerdMe enabled at login."
+}
 if (Test-Path -LiteralPath $installerTestDirectory) {
     Remove-Item -LiteralPath $installerTestDirectory -Recurse -Force
 }
@@ -152,6 +185,91 @@ function Get-HerdMeProcesses {
     @(Get-Process -Name "HerdMe.Windows" -ErrorAction SilentlyContinue | Where-Object {
         try { $_.Path -eq $executable } catch { $false }
     })
+}
+
+function Wait-AutomationElementById(
+    [System.Windows.Automation.AutomationElement]$Root,
+    [string]$AutomationId,
+    [int]$TimeoutSeconds = 10
+) {
+    $condition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+        $AutomationId
+    )
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $element = $Root.FindFirst(
+            [System.Windows.Automation.TreeScope]::Descendants,
+            $condition
+        )
+        if ($null -ne $element) { return $element }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+
+    throw "The WinUI element '$AutomationId' did not become available."
+}
+
+function Select-AutomationElement(
+    [System.Windows.Automation.AutomationElement]$Element,
+    [string]$AutomationId
+) {
+    $patternObject = $null
+    if ($Element.TryGetCurrentPattern(
+        [System.Windows.Automation.SelectionItemPattern]::Pattern,
+        [ref]$patternObject
+    )) {
+        ([System.Windows.Automation.SelectionItemPattern]$patternObject).Select()
+        return
+    }
+
+    $patternObject = $null
+    if ($Element.TryGetCurrentPattern(
+        [System.Windows.Automation.InvokePattern]::Pattern,
+        [ref]$patternObject
+    )) {
+        ([System.Windows.Automation.InvokePattern]$patternObject).Invoke()
+        return
+    }
+
+    throw "The WinUI navigation element '$AutomationId' is not selectable."
+}
+
+function Assert-WinUiNavigation(
+    [System.Diagnostics.Process]$Process
+) {
+    $window = [System.Windows.Automation.AutomationElement]::FromHandle(
+        [IntPtr]$Process.MainWindowHandle
+    )
+    if ($null -eq $window) {
+        throw "The native HerdMe window is unavailable to UI Automation."
+    }
+
+    $navigation = Wait-AutomationElementById $window "NavigationRoot"
+    $pages = @(
+        @{ Navigation = "NavDashboard"; Page = "DashboardPageRoot" },
+        @{ Navigation = "NavGeneral"; Page = "GeneralPageRoot" },
+        @{ Navigation = "NavSites"; Page = "SitesPageRoot" },
+        @{ Navigation = "NavPhp"; Page = "PhpPageRoot" },
+        @{ Navigation = "NavNode"; Page = "NodePageRoot" },
+        @{ Navigation = "NavServices"; Page = "ServicesPageRoot" },
+        @{ Navigation = "NavMail"; Page = "MailPageRoot" },
+        @{ Navigation = "NavDumps"; Page = "DumpsPageRoot" },
+        @{ Navigation = "NavDebugger"; Page = "DebuggerPageRoot" },
+        @{ Navigation = "NavLogs"; Page = "LogsPageRoot" },
+        @{ Navigation = "NavAbout"; Page = "AboutPageRoot" }
+    )
+
+    foreach ($page in $pages) {
+        $navigationItem = Wait-AutomationElementById $navigation $page.Navigation
+        Select-AutomationElement $navigationItem $page.Navigation
+        $null = Wait-AutomationElementById $window $page.Page
+        Start-Sleep -Milliseconds 300
+        $Process.Refresh()
+        if ($Process.HasExited) {
+            throw "HerdMe exited while opening '$($page.Navigation)'."
+        }
+        Write-Host "Verified WinUI page: $($page.Page)"
+    }
 }
 
 function Assert-ResponsePrefix(
@@ -348,6 +466,8 @@ try {
     if ($processes.Count -ne 1 -or $processes[0].Id -ne $primary.Id) {
         throw "Launching HerdMe twice did not preserve a single primary process."
     }
+
+    Assert-WinUiNavigation $primary
 
     $deadline = [DateTime]::UtcNow.AddSeconds(15)
     do {

@@ -3,10 +3,14 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var applicationSettings: ApplicationSettingsCoordinator
+    @EnvironmentObject private var navigation: AppNavigation
+    @EnvironmentObject private var securityCoordinator: SecuritySetupCoordinator
+    @Environment(\.locale) private var locale
 
     var body: some View {
         Group {
-            if model.isPresentingOnboarding {
+            if securityCoordinator.isPresentingOnboarding {
                 OnboardingView()
             } else {
                 HStack(spacing: 0) {
@@ -18,8 +22,9 @@ struct RootView: View {
                 }
             }
         }
+        .environment(\.layoutDirection, AppLocalization.layoutDirection(for: locale))
         .herdTheme(model.configuration.theme)
-        .background(WindowSizeController(page: model.selectedPage))
+        .background(WindowSizeController(page: navigation.selectedPage))
         .overlay(alignment: .top) {
             if let error = model.lastError {
                 ErrorBanner(presentation: ErrorPresentation(error)) {
@@ -32,7 +37,7 @@ struct RootView: View {
             }
         }
         .animation(.easeOut(duration: 0.18), value: model.lastError != nil)
-        .alert(item: $model.updateNotice) { notice in
+        .alert(item: $applicationSettings.updateNotice) { notice in
             if let downloadURL = notice.downloadURL {
                 return Alert(
                     title: Text(notice.title),
@@ -53,7 +58,8 @@ struct RootView: View {
 
     @ViewBuilder
     private var page: some View {
-        switch model.selectedPage {
+        switch navigation.selectedPage {
+        case .dashboard: DashboardView()
         case .general: GeneralView()
         case .sites: SitesView()
         case .php: PHPView()
@@ -152,6 +158,10 @@ private struct ErrorDetailsView: View {
 private struct WindowSizeController: NSViewRepresentable {
     let page: SidebarPage
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func makeNSView(context: Context) -> NSView {
         NSView(frame: .zero)
     }
@@ -159,14 +169,38 @@ private struct WindowSizeController: NSViewRepresentable {
     func updateNSView(_ view: NSView, context: Context) {
         DispatchQueue.main.async {
             guard let window = view.window else { return }
-            let widePages: Set<SidebarPage> = [.sites, .services, .mail, .dumps, .debugger, .logs]
-            let width: CGFloat = widePages.contains(page) ? 900 : 730
-            let target = NSSize(width: width, height: 527)
-            let current = window.contentView?.frame.size ?? .zero
-            window.contentMinSize = NSSize(width: 730, height: 527)
-            if abs(current.width - width) > 1 || abs(current.height - target.height) > 1 {
-                window.setContentSize(target)
+            context.coordinator.update(window: window, page: page)
+        }
+    }
+
+    @MainActor
+    final class Coordinator {
+        private weak var window: NSWindow?
+        private var lastPage: SidebarPage?
+
+        func update(window: NSWindow, page: SidebarPage) {
+            if self.window !== window {
+                self.window = window
+                lastPage = nil
+                window.setFrameAutosaveName("HerdMeMainWindow")
+                window.contentMinSize = NSSize(width: 730, height: 527)
             }
+            guard lastPage != page else { return }
+            lastPage = page
+
+            let preferredWidth: CGFloat =
+                switch page {
+                case .dashboard: 980
+                case .sites: 1_100
+                case .services: 980
+                case .mail, .dumps, .debugger, .logs: 900
+                default: 730
+                }
+            let current = window.contentView?.frame.size ?? window.frame.size
+            guard current.width + 1 < preferredWidth else { return }
+            window.setContentSize(
+                NSSize(width: preferredWidth, height: max(current.height, 527))
+            )
         }
     }
 }

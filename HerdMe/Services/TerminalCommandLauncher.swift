@@ -1,15 +1,21 @@
 import AppKit
 import Foundation
 
+@MainActor
+protocol TerminalCommandLaunching {
+    @discardableResult
+    func open(command: String, title: String) throws -> URL
+}
+
 enum TerminalCommandError: LocalizedError {
     case couldNotOpen
 
     var errorDescription: String? {
-        "HerdMe could not open the command in Terminal."
+        String(localized: "HerdMe could not open the command in Terminal.")
     }
 }
 
-struct TerminalCommandLauncher {
+struct TerminalCommandLauncher: TerminalCommandLaunching {
     let rootURL: URL
     private let fileManager: FileManager
 
@@ -29,11 +35,11 @@ struct TerminalCommandLauncher {
         }
         let url = directory.appendingPathComponent(String(safeTitle) + "-" + UUID().uuidString + ".command")
         let script = """
-        #!/bin/zsh
-        /bin/rm -f -- \(Self.shellQuote(url.path))
-        \(command)
+            #!/bin/zsh
+            /bin/rm -f -- \(Self.shellQuote(url.path))
+            \(command)
 
-        """
+            """
         try script.write(to: url, atomically: true, encoding: .utf8)
         try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
         guard NSWorkspace.shared.open(url) else {
@@ -43,7 +49,7 @@ struct TerminalCommandLauncher {
         return url
     }
 
-    static func shellQuote(_ value: String) -> String {
+    nonisolated static func shellQuote(_ value: String) -> String {
         "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }

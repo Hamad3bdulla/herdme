@@ -17,6 +17,8 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
 {
     private const int MaximumHeaderSize = 1 * 1_024 * 1_024;
     private const int MaximumBodySize = 32 * 1_024 * 1_024;
+    private const int MaximumPersistentRequests = 100;
+    private static readonly TimeSpan PersistentIdleTimeout = TimeSpan.FromSeconds(5);
     private readonly FastCgiClient fastCgiClient = new();
     private readonly ConcurrentDictionary<int, Task> sessions = new();
     private CancellationTokenSource? cancellation;
@@ -137,14 +139,45 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                     );
                     stream = secureStream;
                 }
-                request = await ReadRequestAsync(stream, cancellationToken);
-                var host = request.Header("Host")?.Split(':', 2)[0];
-                if (host is null || !routes.TryGetValue(NormalizeHost(host), out var route))
+                var reader = new HttpRequestReader(stream);
+                for (var requestCount = 0; requestCount < MaximumPersistentRequests; requestCount++)
                 {
-                    await WriteErrorAsync(stream, "404 Not Found", cancellationToken);
-                    return;
+                    request = null;
+                    using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                        cancellationToken
+                    );
+                    if (requestCount > 0) requestCancellation.CancelAfter(PersistentIdleTimeout);
+                    try
+                    {
+                        request = await reader.ReadAsync(
+                            allowCleanEndOfStream: requestCount > 0,
+                            requestCancellation.Token
+                        );
+                    }
+                    catch (OperationCanceledException) when (
+                        requestCount > 0 && !cancellationToken.IsCancellationRequested
+                    )
+                    {
+                        return;
+                    }
+                    if (request is null) return;
+
+                    var host = request.Header("Host")?.Split(':', 2)[0];
+                    if (host is null || !routes.TryGetValue(NormalizeHost(host), out var route))
+                    {
+                        await WriteErrorAsync(stream, "404 Not Found", cancellationToken);
+                        return;
+                    }
+                    var keepAlive = request.AllowsPersistentConnection
+                        && requestCount + 1 < MaximumPersistentRequests;
+                    if (!await WriteResponseAsync(
+                        stream,
+                        request,
+                        route,
+                        keepAlive,
+                        cancellationToken
+                    )) return;
                 }
-                await WriteResponseAsync(stream, request, route, cancellationToken);
             }
             catch (HttpRequestException error)
             {
@@ -170,10 +203,11 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         }
     }
 
-    private async Task WriteResponseAsync(
+    private async Task<bool> WriteResponseAsync(
         Stream destination,
         HttpRequestData request,
         SiteRoute route,
+        bool keepAlive,
         CancellationToken cancellationToken
     )
     {
@@ -184,16 +218,16 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             if (request.Method is not ("GET" or "HEAD"))
             {
                 await destination.WriteAsync(ErrorResponse("405 Method Not Allowed"), cancellationToken);
-                return;
+                return false;
             }
-            await WriteStaticFileAsync(
+            return await WriteStaticFileAsync(
                 destination,
                 route.DocumentRoot,
                 resource.StaticFile,
                 request,
+                keepAlive,
                 cancellationToken
             );
-            return;
         }
 
         var parameters = FastCgiParameters(
@@ -203,7 +237,11 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             resource,
             certificate is not null
         );
-        var writer = new FastCgiHttpResponseWriter(destination, request.Method == "HEAD");
+        var writer = new FastCgiHttpResponseWriter(
+            destination,
+            request.Method == "HEAD",
+            keepAlive
+        );
         try
         {
             var result = await fastCgiClient.PerformStreamingAsync(
@@ -215,6 +253,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             );
             await writer.CompleteAsync();
             if (result.StandardError.Length > 0) WritePhpLog(result.StandardError);
+            return writer.KeepsConnectionAlive;
         }
         catch (Exception error) when (writer.HasStarted && error is not OperationCanceledException)
         {
@@ -222,11 +261,12 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         }
     }
 
-    private static async Task WriteStaticFileAsync(
+    private static async Task<bool> WriteStaticFileAsync(
         Stream destination,
         string documentRoot,
         string path,
         HttpRequestData request,
+        bool keepAlive,
         CancellationToken cancellationToken
     )
     {
@@ -253,12 +293,12 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                         ("Accept-Ranges", "bytes"),
                         ("Content-Length", "0"),
                         ("Cache-Control", "no-cache"),
-                        ("Connection", "close")
+                        ("Connection", keepAlive ? "keep-alive" : "close")
                     ]
                 ),
                 cancellationToken
             );
-            return;
+            return keepAlive;
         }
 
         var headers = new List<(string, string)>
@@ -267,7 +307,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             ("Content-Length", selectedRange.Length.ToString()),
             ("Accept-Ranges", "bytes"),
             ("Cache-Control", "no-cache"),
-            ("Connection", "close")
+            ("Connection", keepAlive ? "keep-alive" : "close")
         };
         if (selectedRange.IsPartial)
         {
@@ -283,7 +323,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             MakeResponseHead(selectedRange.IsPartial ? "206 Partial Content" : "200 OK", headers),
             cancellationToken
         );
-        if (request.Method == "HEAD" || selectedRange.Length == 0) return;
+        if (request.Method == "HEAD" || selectedRange.Length == 0) return keepAlive;
 
         file.Seek(selectedRange.Offset, SeekOrigin.Begin);
         var buffer = new byte[64 * 1_024];
@@ -298,6 +338,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             await destination.WriteAsync(buffer.AsMemory(0, count), cancellationToken);
             remaining -= count;
         }
+        return keepAlive;
     }
 
     private static bool TrySelectByteRange(string? value, long fileSize, out ByteRange selectedRange)
@@ -511,102 +552,8 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         }
     }
 
-    private static async Task<HttpRequestData> ReadRequestAsync(
-        Stream stream,
-        CancellationToken cancellationToken
-    )
-    {
-        using var received = new MemoryStream();
-        var buffer = new byte[16 * 1_024];
-        var headerEnd = -1;
-        while (headerEnd < 0)
-        {
-            var count = await stream.ReadAsync(buffer, cancellationToken);
-            if (count == 0) throw new HttpRequestException("400 Bad Request");
-            received.Write(buffer, 0, count);
-            if (received.Length > MaximumHeaderSize) throw new HttpRequestException("431 Request Header Fields Too Large");
-            headerEnd = IndexOf(received.GetBuffer().AsSpan(0, (int)received.Length), "\r\n\r\n"u8);
-        }
-
-        var data = received.ToArray();
-        var bodyOffset = headerEnd + 4;
-        var headerText = Encoding.UTF8.GetString(data, 0, headerEnd);
-        var lines = headerText.Split("\r\n", StringSplitOptions.None);
-        var requestLine = lines[0].Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
-        if (requestLine.Length != 3 || !requestLine[2].StartsWith("HTTP/", StringComparison.Ordinal))
-        {
-            throw new HttpRequestException("400 Bad Request");
-        }
-        var headers = new List<KeyValuePair<string, string>>();
-        foreach (var line in lines.Skip(1))
-        {
-            var separator = line.IndexOf(':');
-            if (separator <= 0) throw new HttpRequestException("400 Bad Request");
-            headers.Add(new KeyValuePair<string, string>(
-                line[..separator].Trim(),
-                line[(separator + 1)..].Trim()
-            ));
-        }
-        var chunked = headers.Any(header =>
-            header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase)
-            && header.Value.Split(',').Any(value => value.Trim().Equals("chunked", StringComparison.OrdinalIgnoreCase)));
-        var unsupportedTransferCoding = headers
-            .Where(header => header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase))
-            .SelectMany(header => header.Value.Split(','))
-            .Select(value => value.Trim())
-            .Any(value => !value.Equals("chunked", StringComparison.OrdinalIgnoreCase)
-                && !value.Equals("identity", StringComparison.OrdinalIgnoreCase));
-        if (unsupportedTransferCoding)
-        {
-            throw new HttpRequestException("501 Not Implemented");
-        }
-        var contentLengthText = headers.FirstOrDefault(header =>
-            header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase)
-        ).Value;
-        if (chunked && !string.IsNullOrEmpty(contentLengthText))
-        {
-            throw new HttpRequestException("400 Bad Request");
-        }
-        if (!string.IsNullOrEmpty(contentLengthText)
-            && !int.TryParse(contentLengthText, out _))
-        {
-            throw new HttpRequestException("400 Bad Request");
-        }
-        var contentLength = string.IsNullOrEmpty(contentLengthText) ? 0 : int.Parse(contentLengthText);
-        if (contentLength < 0 || contentLength > MaximumBodySize)
-        {
-            throw new HttpRequestException("413 Payload Too Large");
-        }
-        byte[] body;
-        if (chunked)
-        {
-            var reader = new RequestBodyReader(data.AsMemory(bodyOffset), stream);
-            body = await ReadChunkedBodyAsync(reader, cancellationToken);
-        }
-        else
-        {
-            body = new byte[contentLength];
-        }
-        var bufferedBody = Math.Min(contentLength, data.Length - bodyOffset);
-        if (!chunked && bufferedBody > 0) Array.Copy(data, bodyOffset, body, 0, bufferedBody);
-        var offset = bufferedBody;
-        while (!chunked && offset < body.Length)
-        {
-            var count = await stream.ReadAsync(body.AsMemory(offset), cancellationToken);
-            if (count == 0) throw new HttpRequestException("400 Bad Request");
-            offset += count;
-        }
-        return new HttpRequestData(
-            requestLine[0].ToUpperInvariant(),
-            requestLine[1],
-            requestLine[2],
-            headers,
-            body
-        );
-    }
-
     private static async Task<byte[]> ReadChunkedBodyAsync(
-        RequestBodyReader reader,
+        HttpRequestReader reader,
         CancellationToken cancellationToken
     )
     {
@@ -649,7 +596,11 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         }
     }
 
-    private static ParsedFastCgiHead ParseFastCgiResponseHead(ReadOnlySpan<byte> response)
+    private static ParsedFastCgiHead ParseFastCgiResponseHead(
+        ReadOnlySpan<byte> response,
+        bool allowKeepAlive,
+        bool headOnly
+    )
     {
         string headerText;
         try
@@ -704,12 +655,15 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             header.Item1.Equals("Location", StringComparison.OrdinalIgnoreCase))) status = "302 Found";
         if (!headers.Any(header => header.Item1.Equals("Content-Type", StringComparison.OrdinalIgnoreCase)))
             headers.Add(("Content-Type", "text/html; charset=utf-8"));
-        headers.Add(("Connection", "close"));
         var statusCode = int.Parse(status.AsSpan(0, 3), CultureInfo.InvariantCulture);
+        var bodyForbidden = statusCode is >= 100 and < 200 or 204 or 304;
+        var keepAlive = allowKeepAlive && (contentLength is not null || bodyForbidden || headOnly);
+        headers.Add(("Connection", keepAlive ? "keep-alive" : "close"));
         return new ParsedFastCgiHead(
             MakeResponseHead(status, headers),
             contentLength,
-            statusCode is >= 100 and < 200 or 204 or 304
+            bodyForbidden,
+            keepAlive
         );
     }
 
@@ -844,18 +798,25 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         private static readonly byte[] AlternateHeaderDelimiter = "\n\n"u8.ToArray();
         private readonly Stream destination;
         private readonly bool headOnly;
+        private readonly bool allowKeepAlive;
         private readonly MemoryStream headerBuffer = new();
         private long? declaredContentLength;
         private long bodyBytes;
         private bool bodyForbidden;
 
-        public FastCgiHttpResponseWriter(Stream destination, bool headOnly)
+        public FastCgiHttpResponseWriter(
+            Stream destination,
+            bool headOnly,
+            bool allowKeepAlive
+        )
         {
             this.destination = destination;
             this.headOnly = headOnly;
+            this.allowKeepAlive = allowKeepAlive;
         }
 
         public bool HasStarted { get; private set; }
+        public bool KeepsConnectionAlive { get; private set; }
 
         public async ValueTask WriteAsync(
             ReadOnlyMemory<byte> content,
@@ -885,9 +846,14 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 throw new InvalidDataException("PHP returned CGI headers larger than 1MB.");
             }
 
-            var parsed = ParseFastCgiResponseHead(buffered.AsSpan(0, delimiter.Index));
+            var parsed = ParseFastCgiResponseHead(
+                buffered.AsSpan(0, delimiter.Index),
+                allowKeepAlive,
+                headOnly
+            );
             declaredContentLength = parsed.ContentLength;
             bodyForbidden = parsed.BodyForbidden;
+            KeepsConnectionAlive = parsed.KeepAlive;
             var bodyOffset = delimiter.Index + delimiter.Length;
             var bufferedBody = buffered.AsSpan(bodyOffset).ToArray();
             headerBuffer.SetLength(0);
@@ -946,7 +912,8 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     private sealed record ParsedFastCgiHead(
         byte[] ResponseHead,
         long? ContentLength,
-        bool BodyForbidden
+        bool BodyForbidden,
+        bool KeepAlive
     );
 
     private sealed class HttpResponseStartedException : Exception
@@ -968,27 +935,182 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         public string? Header(string name) => Headers.FirstOrDefault(header =>
             header.Key.Equals(name, StringComparison.OrdinalIgnoreCase)
         ).Value;
+
+        public bool AllowsPersistentConnection
+        {
+            get
+            {
+                var connectionTokens = Headers
+                    .Where(header => header.Key.Equals("Connection", StringComparison.OrdinalIgnoreCase))
+                    .SelectMany(header => header.Value.Split(','))
+                    .Select(value => value.Trim());
+                if (connectionTokens.Any(value => value.Equals("close", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return false;
+                }
+                if (Protocol.Equals("HTTP/1.1", StringComparison.OrdinalIgnoreCase)) return true;
+                return Protocol.Equals("HTTP/1.0", StringComparison.OrdinalIgnoreCase)
+                    && connectionTokens.Any(value => value.Equals("keep-alive", StringComparison.OrdinalIgnoreCase));
+            }
+        }
     }
 
-    private sealed class RequestBodyReader
+    private sealed class HttpRequestReader
     {
-        private readonly ReadOnlyMemory<byte> buffered;
         private readonly Stream stream;
-        private int offset;
+        private byte[] buffered = new byte[16 * 1_024];
+        private int start;
+        private int count;
 
-        public RequestBodyReader(ReadOnlyMemory<byte> buffered, Stream stream)
+        public HttpRequestReader(Stream stream)
         {
-            this.buffered = buffered;
             this.stream = stream;
+        }
+
+        public async Task<HttpRequestData?> ReadAsync(
+            bool allowCleanEndOfStream,
+            CancellationToken cancellationToken
+        )
+        {
+            var headerEnd = FindHeaderEnd();
+            while (headerEnd < 0)
+            {
+                if (count > MaximumHeaderSize)
+                {
+                    throw new HttpRequestException("431 Request Header Fields Too Large");
+                }
+                if (!await ReadMoreAsync(cancellationToken))
+                {
+                    if (allowCleanEndOfStream && count == 0) return null;
+                    throw new HttpRequestException("400 Bad Request");
+                }
+                headerEnd = FindHeaderEnd();
+            }
+            if (headerEnd > MaximumHeaderSize)
+            {
+                throw new HttpRequestException("431 Request Header Fields Too Large");
+            }
+
+            string headerText;
+            try
+            {
+                headerText = new UTF8Encoding(false, true).GetString(buffered, start, headerEnd);
+            }
+            catch (DecoderFallbackException error)
+            {
+                throw new HttpRequestException("400 Bad Request", error);
+            }
+            var lines = headerText.Split("\r\n", StringSplitOptions.None);
+            var requestLine = lines[0].Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
+            if (requestLine.Length != 3 || !requestLine[2].StartsWith("HTTP/", StringComparison.Ordinal))
+            {
+                throw new HttpRequestException("400 Bad Request");
+            }
+            if (requestLine[2] is not ("HTTP/1.0" or "HTTP/1.1"))
+            {
+                throw new HttpRequestException("505 HTTP Version Not Supported");
+            }
+            if (!IsValidHeaderName(requestLine[0])
+                || requestLine[1].Any(character => character is <= ' ' or '\u007f'))
+            {
+                throw new HttpRequestException("400 Bad Request");
+            }
+            var headers = new List<KeyValuePair<string, string>>();
+            foreach (var line in lines.Skip(1))
+            {
+                var separator = line.IndexOf(':');
+                if (separator <= 0) throw new HttpRequestException("400 Bad Request");
+                var name = line[..separator];
+                var value = line[(separator + 1)..].Trim();
+                if (!IsValidHeaderName(name) || !IsValidHeaderValue(value))
+                {
+                    throw new HttpRequestException("400 Bad Request");
+                }
+                headers.Add(new KeyValuePair<string, string>(
+                    name,
+                    value
+                ));
+            }
+
+            var hostHeaders = headers
+                .Where(header => header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (hostHeaders.Length > 1
+                || requestLine[2] == "HTTP/1.1" && hostHeaders.Length != 1
+                || hostHeaders.Any(header => string.IsNullOrWhiteSpace(header.Value)))
+            {
+                throw new HttpRequestException("400 Bad Request");
+            }
+
+            var transferEncodingHeaders = headers
+                .Where(header => header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            var transferCodings = transferEncodingHeaders
+                .SelectMany(header => header.Value.Split(','))
+                .Select(value => value.Trim())
+                .ToArray();
+            if (transferCodings.Any(string.IsNullOrEmpty))
+            {
+                throw new HttpRequestException("400 Bad Request");
+            }
+            if (transferCodings.Any(value =>
+                !value.Equals("chunked", StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new HttpRequestException("501 Not Implemented");
+            }
+            if (transferCodings.Length > 1 || requestLine[2] == "HTTP/1.0" && transferCodings.Length > 0)
+            {
+                throw new HttpRequestException("400 Bad Request");
+            }
+
+            var contentLengthHeaders = headers
+                .Where(header => header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (contentLengthHeaders.Length > 1 || transferCodings.Length > 0 && contentLengthHeaders.Length > 0)
+            {
+                throw new HttpRequestException("400 Bad Request");
+            }
+            var contentLengthText = contentLengthHeaders.FirstOrDefault().Value;
+            if (!string.IsNullOrEmpty(contentLengthText)
+                && !int.TryParse(
+                    contentLengthText,
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out _
+                ))
+            {
+                throw new HttpRequestException("400 Bad Request");
+            }
+            var contentLength = string.IsNullOrEmpty(contentLengthText)
+                ? 0
+                : int.Parse(contentLengthText, NumberStyles.None, CultureInfo.InvariantCulture);
+            if (contentLength < 0 || contentLength > MaximumBodySize)
+            {
+                throw new HttpRequestException("413 Payload Too Large");
+            }
+
+            Consume(headerEnd + 4);
+            var body = transferCodings.Length == 1
+                ? await ReadChunkedBodyAsync(this, cancellationToken)
+                : await ReadExactlyAsync(contentLength, cancellationToken);
+            return new HttpRequestData(
+                requestLine[0].ToUpperInvariant(),
+                requestLine[1],
+                requestLine[2],
+                headers,
+                body
+            );
         }
 
         public async Task<int> ReadByteAsync(CancellationToken cancellationToken)
         {
-            if (offset < buffered.Length) return buffered.Span[offset++];
-            var one = new byte[1];
-            var count = await stream.ReadAsync(one, cancellationToken);
-            if (count == 0) throw new HttpRequestException("400 Bad Request");
-            return one[0];
+            if (count == 0 && !await ReadMoreAsync(cancellationToken))
+            {
+                throw new HttpRequestException("400 Bad Request");
+            }
+            var value = buffered[start];
+            Consume(1);
+            return value;
         }
 
         public async Task<string> ReadLineAsync(int maximumLength, CancellationToken cancellationToken)
@@ -1016,21 +1138,86 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             CancellationToken cancellationToken
         )
         {
-            if (offset < buffered.Length)
-            {
-                var available = Math.Min(count, buffered.Length - offset);
-                await destination.WriteAsync(buffered.Slice(offset, available), cancellationToken);
-                offset += available;
-                count -= available;
-            }
-            var transfer = new byte[Math.Min(16 * 1_024, Math.Max(1, count))];
             while (count > 0)
             {
-                var read = await stream.ReadAsync(transfer.AsMemory(0, Math.Min(count, transfer.Length)), cancellationToken);
-                if (read == 0) throw new HttpRequestException("400 Bad Request");
-                await destination.WriteAsync(transfer.AsMemory(0, read), cancellationToken);
-                count -= read;
+                if (this.count == 0 && !await ReadMoreAsync(cancellationToken))
+                {
+                    throw new HttpRequestException("400 Bad Request");
+                }
+                var available = Math.Min(count, this.count);
+                await destination.WriteAsync(
+                    buffered.AsMemory(start, available),
+                    cancellationToken
+                );
+                Consume(available);
+                count -= available;
             }
+        }
+
+        private int FindHeaderEnd()
+        {
+            return buffered.AsSpan(start, count).IndexOf("\r\n\r\n"u8);
+        }
+
+        private async Task<byte[]> ReadExactlyAsync(
+            int length,
+            CancellationToken cancellationToken
+        )
+        {
+            var output = new byte[length];
+            var offset = 0;
+            while (offset < output.Length)
+            {
+                if (count > 0)
+                {
+                    var available = Math.Min(output.Length - offset, count);
+                    buffered.AsSpan(start, available).CopyTo(output.AsSpan(offset));
+                    Consume(available);
+                    offset += available;
+                    continue;
+                }
+                var read = await stream.ReadAsync(output.AsMemory(offset), cancellationToken);
+                if (read == 0) throw new HttpRequestException("400 Bad Request");
+                offset += read;
+            }
+            return output;
+        }
+
+        private async Task<bool> ReadMoreAsync(CancellationToken cancellationToken)
+        {
+            PrepareWriteSpace();
+            var read = await stream.ReadAsync(
+                buffered.AsMemory(start + count, buffered.Length - start - count),
+                cancellationToken
+            );
+            count += read;
+            return read > 0;
+        }
+
+        private void PrepareWriteSpace()
+        {
+            if (start > 0 && start + count == buffered.Length)
+            {
+                buffered.AsSpan(start, count).CopyTo(buffered);
+                start = 0;
+            }
+            if (start + count < buffered.Length) return;
+            var maximumCapacity = MaximumHeaderSize + 4;
+            if (buffered.Length >= maximumCapacity)
+            {
+                throw new HttpRequestException("431 Request Header Fields Too Large");
+            }
+            Array.Resize(
+                ref buffered,
+                Math.Min(maximumCapacity, checked(buffered.Length * 2))
+            );
+        }
+
+        private void Consume(int length)
+        {
+            start += length;
+            count -= length;
+            if (count == 0) start = 0;
         }
     }
 
@@ -1094,6 +1281,12 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     private sealed class HttpRequestException : Exception
     {
         public HttpRequestException(string status) : base(status)
+        {
+            Status = status;
+        }
+
+        public HttpRequestException(string status, Exception innerException)
+            : base(status, innerException)
         {
             Status = status;
         }

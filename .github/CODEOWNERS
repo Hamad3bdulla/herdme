@@ -1,0 +1,12 @@
+* @Hamad3bdulla
+
+/.github/ @Hamad3bdulla
+/HerdMe/Services/AppUpdateManager.swift @Hamad3bdulla
+/HerdMe/Services/CertificateSecretStore.swift @Hamad3bdulla
+/HerdMe/Services/DomainResolverManager.swift @Hamad3bdulla
+/Tools/NetworkHelper/ @Hamad3bdulla
+/Windows/HerdMe.Windows/Services/WindowsCertificateManager.cs @Hamad3bdulla
+/Windows/HerdMe.Windows/Services/WindowsHostsManager.cs @Hamad3bdulla
+/Windows/sign-windows-artifact.ps1 @Hamad3bdulla
+/scripts/sign-update-manifest.ps1 @Hamad3bdulla
+/scripts/sign-update-manifest.sh @Hamad3bdulla

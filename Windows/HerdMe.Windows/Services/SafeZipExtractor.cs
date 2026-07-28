@@ -9,6 +9,14 @@ public static class SafeZipExtractor
     private const int MaximumEntryPathCharacters = 1_024;
     private const int UnixFileTypeMask = 0xF000;
     private const int UnixSymbolicLink = 0xA000;
+    private static readonly HashSet<string> ReservedWindowsDeviceNames = new(
+        [
+            "CON", "PRN", "AUX", "NUL", "CLOCK$", "CONIN$", "CONOUT$",
+            "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+        ],
+        StringComparer.OrdinalIgnoreCase
+    );
 
     public static async Task ExtractAsync(
         string archivePath,
@@ -117,11 +125,18 @@ public static class SafeZipExtractor
             segment is "." or ".."
             || segment.Contains(':')
             || segment.EndsWith(' ')
-            || segment.EndsWith('.')))
+            || segment.EndsWith('.')
+            || IsReservedWindowsDeviceName(segment)))
         {
             throw new InvalidDataException("The ZIP archive contains an unsafe path.");
         }
         return string.Join('/', segments) + (IsDirectoryPath(normalized) ? "/" : string.Empty);
+    }
+
+    private static bool IsReservedWindowsDeviceName(string segment)
+    {
+        var stem = segment.Split('.', 2)[0];
+        return ReservedWindowsDeviceNames.Contains(stem);
     }
 
     private static bool IsDirectory(ZipArchiveEntry entry) => IsDirectoryPath(entry.FullName);

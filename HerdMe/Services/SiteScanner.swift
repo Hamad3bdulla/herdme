@@ -18,20 +18,26 @@ struct SiteScanner {
 
         for path in paths {
             let root = URL(fileURLWithPath: NSString(string: path).expandingTildeInPath)
-            guard let children = try? fileManager.contentsOfDirectory(
-                at: root,
-                includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-                options: [.skipsHiddenFiles]
-            ) else { continue }
+            guard
+                let children = try? fileManager.contentsOfDirectory(
+                    at: root,
+                    includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+                    options: [.skipsHiddenFiles]
+                )
+            else { continue }
 
-            for child in children.sorted(by: { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }) {
+            for child in children.sorted(by: {
+                $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending
+            }) {
                 let values = try? child.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
                 guard values?.isDirectory == true || values?.isSymbolicLink == true else { continue }
                 let resolved = child.resolvingSymlinksInPath()
-                guard !IndependentPathPolicy.belongsToOtherHerd(
-                    resolved,
-                    homeDirectory: homeDirectory
-                ) else { continue }
+                guard
+                    !IndependentPathPolicy.belongsToOtherHerd(
+                        resolved,
+                        homeDirectory: homeDirectory
+                    )
+                else { continue }
                 guard seen.insert(resolved.path).inserted else { continue }
                 sites.append(
                     SiteProject(
@@ -71,16 +77,80 @@ enum SiteLinkError: LocalizedError {
     case notLinked
 
     var errorDescription: String? {
-        "HerdMe can only unlink projects that were registered through a symbolic link."
+        String(localized: "HerdMe can only unlink projects that were registered through a symbolic link.")
     }
 }
 
 struct SiteLinkManager {
     static func unlink(_ site: SiteProject, fileManager: FileManager = .default) throws {
         guard site.isLinked, let registrationPath = site.registrationPath,
-              (try? registrationPath.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true else {
+            (try? registrationPath.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true
+        else {
             throw SiteLinkError.notLinked
         }
         try fileManager.removeItem(at: registrationPath)
+    }
+}
+
+enum SiteRemovalError: LocalizedError {
+    case linkedProject
+    case outsideParkedFolder
+    case unavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .linkedProject:
+            String(localized: "Unlink this project instead. HerdMe will not delete the original linked folder.")
+        case .outsideParkedFolder:
+            String(localized: "HerdMe can only move a direct child of a configured sites folder to Trash.")
+        case .unavailable:
+            String(localized: "The site folder is missing or is not a removable project folder.")
+        }
+    }
+}
+
+struct SiteRemovalManager {
+    static func removableURL(
+        for site: SiteProject,
+        parkPaths: [String],
+        fileManager: FileManager = .default
+    ) throws -> URL {
+        guard !site.isLinked else { throw SiteRemovalError.linkedProject }
+        guard let registrationPath = site.registrationPath else {
+            throw SiteRemovalError.outsideParkedFolder
+        }
+
+        let candidate = registrationPath.standardizedFileURL
+        let parentPath = candidate.deletingLastPathComponent().path
+        let allowedParents = Set(
+            parkPaths.map {
+                URL(
+                    fileURLWithPath: NSString(string: $0).expandingTildeInPath,
+                    isDirectory: true
+                ).standardizedFileURL.path
+            })
+        guard allowedParents.contains(parentPath), candidate.path != "/" else {
+            throw SiteRemovalError.outsideParkedFolder
+        }
+
+        let values = try? candidate.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        guard values?.isDirectory == true, values?.isSymbolicLink != true else {
+            throw SiteRemovalError.unavailable
+        }
+        return candidate
+    }
+
+    static func moveToTrash(
+        _ site: SiteProject,
+        parkPaths: [String],
+        fileManager: FileManager = .default
+    ) throws {
+        let candidate = try removableURL(
+            for: site,
+            parkPaths: parkPaths,
+            fileManager: fileManager
+        )
+        var resultingURL: NSURL?
+        try fileManager.trashItem(at: candidate, resultingItemURL: &resultingURL)
     }
 }

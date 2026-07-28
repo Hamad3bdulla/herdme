@@ -7,12 +7,23 @@ enum DatabaseAuthenticationError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case let .clientMissing(name):
-            "The \(name) runtime is missing its command-line client, so HerdMe cannot secure this database."
-        case let .migrationUnavailable(name):
-            "HerdMe could not migrate the existing \(name) data to managed authentication. The data was preserved unchanged."
-        case let .verificationFailed(name):
-            "HerdMe could not verify managed authentication for \(name). The service was stopped and its data was preserved."
+        case .clientMissing(let name):
+            String.localizedStringWithFormat(
+                String(localized: "The %@ runtime is missing its command-line client, so HerdMe cannot secure this database."),
+                name
+            )
+        case .migrationUnavailable(let name):
+            String.localizedStringWithFormat(
+                String(
+                    localized: "HerdMe could not migrate the existing %@ data to managed authentication. The data was preserved unchanged."),
+                name
+            )
+        case .verificationFailed(let name):
+            String.localizedStringWithFormat(
+                String(
+                    localized: "HerdMe could not verify managed authentication for %@. The service was stopped and its data was preserved."),
+                name
+            )
         }
     }
 }
@@ -82,12 +93,14 @@ enum DatabaseServiceAuthenticator {
             let body = line.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? line
             let fields = body.split(whereSeparator: \.isWhitespace)
             guard let kind = fields.first,
-                  (kind == "local" && fields.count >= 4 || kind.hasPrefix("host") && fields.count >= 5),
-                  fields.last == "trust" else {
+                kind == "local" && fields.count >= 4 || kind.hasPrefix("host") && fields.count >= 5,
+                fields.last == "trust"
+            else {
                 return line
             }
             guard let trustRange = body.range(of: "trust", options: .backwards),
-                  let swiftRange = Range(NSRange(trustRange, in: body), in: line) else {
+                let swiftRange = Range(NSRange(trustRange, in: body), in: line)
+            else {
                 return line
             }
             changed = true
@@ -110,16 +123,20 @@ enum DatabaseServiceAuthenticator {
     ) async throws {
         let binURL = executable.deletingLastPathComponent()
         let names = instance.definitionID == "mariadb" ? ["mariadb", "mysql"] : ["mysql"]
-        guard let client = names.map({ binURL.appendingPathComponent($0) })
-            .first(where: { fileManager.isExecutableFile(atPath: $0.path) }) else {
+        guard
+            let client = names.map({ binURL.appendingPathComponent($0) })
+                .first(where: { fileManager.isExecutableFile(atPath: $0.path) })
+        else {
             throw DatabaseAuthenticationError.clientMissing(instance.name)
         }
 
-        guard try await waitForMySQL(
-            client: client,
-            instance: instance,
-            credentials: credentials
-        ) else {
+        guard
+            try await waitForMySQL(
+                client: client,
+                instance: instance,
+                credentials: credentials
+            )
+        else {
             throw DatabaseAuthenticationError.migrationUnavailable(instance.name)
         }
 
@@ -129,7 +146,8 @@ enum DatabaseServiceAuthenticator {
             username: credentials.username,
             password: credentials.secret
         ), !mysqlLogin(client: client, instance: instance, username: credentials.username, password: nil),
-           !mysqlSocketLogin(client: client, instance: instance, username: "root", password: nil) {
+            !mysqlSocketLogin(client: client, instance: instance, username: "root", password: nil)
+        {
             try writeMarker(markerURL, fileManager: fileManager)
             return
         }
@@ -153,13 +171,15 @@ enum DatabaseServiceAuthenticator {
         guard bootstrap.status == 0 else {
             throw DatabaseAuthenticationError.migrationUnavailable(instance.name)
         }
-        guard mysqlLogin(
-            client: client,
-            instance: instance,
-            username: credentials.username,
-            password: credentials.secret
-        ), !mysqlLogin(client: client, instance: instance, username: credentials.username, password: nil),
-              !mysqlSocketLogin(client: client, instance: instance, username: "root", password: nil) else {
+        guard
+            mysqlLogin(
+                client: client,
+                instance: instance,
+                username: credentials.username,
+                password: credentials.secret
+            ), !mysqlLogin(client: client, instance: instance, username: credentials.username, password: nil),
+            !mysqlSocketLogin(client: client, instance: instance, username: "root", password: nil)
+        else {
             throw DatabaseAuthenticationError.verificationFailed(instance.name)
         }
         try writeMarker(markerURL, fileManager: fileManager)
@@ -230,7 +250,8 @@ enum DatabaseServiceAuthenticator {
         let client = binURL.appendingPathComponent("psql")
         let pgControl = binURL.appendingPathComponent("pg_ctl")
         guard fileManager.isExecutableFile(atPath: client.path),
-              fileManager.isExecutableFile(atPath: pgControl.path) else {
+            fileManager.isExecutableFile(atPath: pgControl.path)
+        else {
             throw DatabaseAuthenticationError.clientMissing(instance.name)
         }
 
@@ -267,11 +288,13 @@ enum DatabaseServiceAuthenticator {
         }
 
         if !passwordWorks {
-            guard let bootstrapUser = try await waitForPostgreSQLBootstrapUser(
-                client: client,
-                instance: instance,
-                dataURL: dataURL
-            ) else {
+            guard
+                let bootstrapUser = try await waitForPostgreSQLBootstrapUser(
+                    client: client,
+                    instance: instance,
+                    dataURL: dataURL
+                )
+            else {
                 throw DatabaseAuthenticationError.migrationUnavailable(instance.name)
             }
             let exists = postgreSQLLocalCommand(
@@ -281,16 +304,19 @@ enum DatabaseServiceAuthenticator {
                 command: "SELECT 1 FROM pg_roles WHERE rolname = '\(credentials.username)'",
                 dataURL: dataURL
             ).output.split(whereSeparator: \.isWhitespace).contains("1")
-            let roleCommand = exists
+            let roleCommand =
+                exists
                 ? "ALTER ROLE \"\(credentials.username)\" WITH LOGIN SUPERUSER PASSWORD '\(credentials.secret)'"
                 : "CREATE ROLE \"\(credentials.username)\" WITH LOGIN SUPERUSER PASSWORD '\(credentials.secret)'"
-            guard postgreSQLLocalCommand(
-                client: client,
-                instance: instance,
-                username: bootstrapUser,
-                command: roleCommand,
-                dataURL: dataURL
-            ).status == 0 else {
+            guard
+                postgreSQLLocalCommand(
+                    client: client,
+                    instance: instance,
+                    username: bootstrapUser,
+                    command: roleCommand,
+                    dataURL: dataURL
+                ).status == 0
+            else {
                 throw DatabaseAuthenticationError.migrationUnavailable(instance.name)
             }
         }
@@ -304,19 +330,21 @@ enum DatabaseServiceAuthenticator {
         _ = run(pgControl, arguments: ["reload", "-D", dataURL.path])
         try await Task.sleep(for: .milliseconds(200))
 
-        let verified = postgreSQLLogin(
-            client: client,
-            instance: instance,
-            username: credentials.username,
-            password: credentials.secret,
-            dataURL: dataURL
-        ) && !postgreSQLLogin(
-            client: client,
-            instance: instance,
-            username: credentials.username,
-            password: nil,
-            dataURL: dataURL
-        )
+        let verified =
+            postgreSQLLogin(
+                client: client,
+                instance: instance,
+                username: credentials.username,
+                password: credentials.secret,
+                dataURL: dataURL
+            )
+            && !postgreSQLLogin(
+                client: client,
+                instance: instance,
+                username: credentials.username,
+                password: nil,
+                dataURL: dataURL
+            )
         guard verified else {
             try? Data(original.utf8).write(to: hbaURL, options: .atomic)
             if let permissions { try? fileManager.setAttributes([.posixPermissions: permissions], ofItemAtPath: hbaURL.path) }

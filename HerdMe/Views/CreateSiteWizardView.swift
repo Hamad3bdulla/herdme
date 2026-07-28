@@ -1,9 +1,54 @@
 import AppKit
 import SwiftUI
 
+enum CreateSiteWizardStep: Int, CaseIterable, Identifiable {
+    case template
+    case starter
+    case configure
+
+    var id: Self { self }
+
+    static func visibleSteps(isNewProject: Bool) -> [Self] {
+        isNewProject ? allCases : [.template, .starter]
+    }
+
+    func next(isNewProject: Bool) -> Self? {
+        switch self {
+        case .template:
+            .starter
+        case .starter:
+            isNewProject ? .configure : nil
+        case .configure:
+            nil
+        }
+    }
+
+    var previous: Self? {
+        switch self {
+        case .template:
+            nil
+        case .starter:
+            .template
+        case .configure:
+            .starter
+        }
+    }
+
+    func title(isNewProject: Bool) -> String {
+        switch self {
+        case .template:
+            String(localized: "Template")
+        case .starter:
+            isNewProject ? String(localized: "Starter") : String(localized: "Project")
+        case .configure:
+            String(localized: "Configure")
+        }
+    }
+}
+
 struct CreateSiteWizardView: View {
     @EnvironmentObject private var model: AppModel
-    @State private var step = 0
+    @State private var step = CreateSiteWizardStep.template
     @State private var template = SiteTemplate.laravel
     @State private var starterKit = StarterKit.none
     @State private var customStarterKit = ""
@@ -31,6 +76,13 @@ struct CreateSiteWizardView: View {
         case laravel = "New Laravel Project"
         case existing = "Link existing project"
         var id: String { rawValue }
+
+        var localizedTitle: String {
+            switch self {
+            case .laravel: String(localized: "New Laravel Project")
+            case .existing: String(localized: "Link existing project")
+            }
+        }
     }
 
     var body: some View {
@@ -43,11 +95,14 @@ struct CreateSiteWizardView: View {
             .frame(height: 58)
             Divider()
 
+            wizardProgress
+            Divider()
+
             Group {
                 switch step {
-                case 0: templateStep
-                case 1: starterStep
-                default: configurationStep
+                case .template: templateStep
+                case .starter: starterStep
+                case .configure: configurationStep
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -60,19 +115,18 @@ struct CreateSiteWizardView: View {
                     Button("Cancel") { closeWindow() }
                         .keyboardShortcut(.cancelAction)
                     Spacer()
-                    if step > 0 && !(step == 1 && template == .existing) {
-                        Button("Previous") { step -= 1 }
+                    if let previousStep = step.previous {
+                        Button("Previous") { step = previousStep }
                     }
-                    if step == 0 || (step == 1 && template == .laravel) {
-                        Button("Next") { step += 1 }
+                    if step == .template || (step == .starter && template == .laravel) {
+                        Button("Next") { advance() }
                             .buttonStyle(.borderedProminent)
                             .keyboardShortcut(.defaultAction)
                             .disabled(
-                                template == .existing && existingURL == nil
-                                    || step == 1 && starterKit == .custom
-                                        && customStarterKit.trimmingCharacters(
-                                            in: .whitespacesAndNewlines
-                                        ).isEmpty
+                                step == .starter && starterKit == .custom
+                                    && customStarterKit.trimmingCharacters(
+                                        in: .whitespacesAndNewlines
+                                    ).isEmpty
                             )
                     } else if template == .existing {
                         Button("Link Project") { linkExisting() }
@@ -100,6 +154,56 @@ struct CreateSiteWizardView: View {
         .onChange(of: starterKit) { _ in updateFocusedField() }
     }
 
+    private var isNewProject: Bool { template == .laravel }
+
+    private var visibleSteps: [CreateSiteWizardStep] {
+        CreateSiteWizardStep.visibleSteps(isNewProject: isNewProject)
+    }
+
+    private var wizardProgress: some View {
+        let currentIndex = visibleSteps.firstIndex(of: step) ?? 0
+        return HStack(spacing: 10) {
+            ForEach(Array(visibleSteps.enumerated()), id: \.element) { index, item in
+                let isCurrent = item == step
+                let isCompleted = index < currentIndex
+
+                HStack(spacing: 7) {
+                    ZStack {
+                        Circle()
+                            .fill(isCurrent || isCompleted ? Color.accentColor : Color.secondary.opacity(0.18))
+                        if isCompleted {
+                            Image(systemName: "checkmark")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.white)
+                        } else {
+                            Text(String(index + 1))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(isCurrent ? Color.white : Color.secondary)
+                        }
+                    }
+                    .frame(width: 20, height: 20)
+
+                    Text(item.title(isNewProject: isNewProject))
+                        .font(.caption.weight(isCurrent ? .semibold : .regular))
+                        .foregroundStyle(isCurrent ? Color.primary : Color.secondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(item.title(isNewProject: isNewProject))
+                .accessibilityValue(isCurrent ? "Current step" : isCompleted ? "Completed" : "Upcoming")
+
+                if index < visibleSteps.count - 1 {
+                    Rectangle()
+                        .fill(index < currentIndex ? Color.accentColor : Color.secondary.opacity(0.18))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 1)
+                }
+            }
+        }
+        .padding(.horizontal, 24)
+        .frame(height: 46)
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
     private var templateStep: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Choose a Template for Your New Site").font(.title2.weight(.semibold))
@@ -118,10 +222,13 @@ struct CreateSiteWizardView: View {
                 Text("Which Starter Kit Would You Like To Install?").font(.title2.weight(.semibold))
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 130))], spacing: 24) {
                     ForEach(StarterKit.allCases) { kit in
-                        Button { starterKit = kit } label: {
+                        Button {
+                            starterKit = kit
+                        } label: {
                             VStack(spacing: 8) {
-                                Image(systemName: kit.symbol).font(.system(size: 42)).foregroundStyle(kit == starterKit ? Color.accentColor : Color.secondary)
-                                Text(kit.rawValue)
+                                Image(systemName: kit.symbol).font(.system(size: 42)).foregroundStyle(
+                                    kit == starterKit ? Color.accentColor : Color.secondary)
+                                Text(kit.localizedTitle)
                                     .font(.callout)
                                     .foregroundStyle(kit == starterKit ? Color.accentColor : Color.primary)
                             }
@@ -183,8 +290,12 @@ struct CreateSiteWizardView: View {
                     HStack {
                         Text(projectParent.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~"))
                         Spacer()
-                        Button { chooseProjectParent() } label: { Image(systemName: "chevron.up.chevron.down") }
-                            .buttonStyle(.borderless)
+                        Button {
+                            chooseProjectParent()
+                        } label: {
+                            Image(systemName: "chevron.up.chevron.down")
+                        }
+                        .buttonStyle(.borderless)
                     }
                     .padding(7)
                     .background(Color(nsColor: .controlBackgroundColor))
@@ -312,7 +423,7 @@ struct CreateSiteWizardView: View {
         if isCreating {
             ProgressView()
                 .controlSize(.small)
-            Text(creationStage?.title ?? "Starting...")
+            Text(creationStage?.title ?? String(localized: "Starting..."))
                 .foregroundStyle(.secondary)
         } else if createdSiteURL != nil {
             Button("Done") { closeWindow() }
@@ -327,10 +438,12 @@ struct CreateSiteWizardView: View {
     }
 
     private func templateCard(_ value: SiteTemplate, symbol: String, tint: Color) -> some View {
-        Button { template = value } label: {
+        Button {
+            template = value
+        } label: {
             VStack(spacing: 12) {
                 Image(systemName: symbol).font(.system(size: 54)).foregroundStyle(tint)
-                Text(value.rawValue).font(.title3)
+                Text(value.localizedTitle).font(.title3)
             }
             .frame(width: 180, height: 150)
             .background(template == value ? Color.accentColor.opacity(0.16) : Color.clear)
@@ -339,9 +452,13 @@ struct CreateSiteWizardView: View {
         .buttonStyle(.plain)
     }
 
-    private func labeledField<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+    private func labeledField<Content: View>(
+        _ label: LocalizedStringKey,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         HStack {
-            Text("\(label):").frame(width: 150, alignment: .trailing)
+            (Text(label) + Text(verbatim: ":"))
+                .frame(width: 150, alignment: .trailing)
             content()
         }
     }
@@ -367,13 +484,18 @@ struct CreateSiteWizardView: View {
     }
 
     private func updateFocusedField() {
-        if step == 1, template == .laravel, starterKit == .custom {
+        if step == .starter, template == .laravel, starterKit == .custom {
             focusedField = .customStarterKit
-        } else if step >= 2, template == .laravel {
+        } else if step == .configure, template == .laravel {
             focusedField = .projectName
         } else {
             focusedField = nil
         }
+    }
+
+    private func advance() {
+        guard let nextStep = step.next(isNewProject: isNewProject) else { return }
+        step = nextStep
     }
 
     private func linkExisting() {
@@ -459,8 +581,9 @@ struct CreateSiteWizardView: View {
 
     private func creationState(for stage: ProjectCreationStage) -> CreationStageState {
         guard let creationStage,
-              let stageIndex = creationStages.firstIndex(of: stage),
-              let currentIndex = creationStages.firstIndex(of: creationStage) else {
+            let stageIndex = creationStages.firstIndex(of: stage),
+            let currentIndex = creationStages.firstIndex(of: creationStage)
+        else {
             return .pending
         }
         if createdSiteURL != nil || stageIndex < currentIndex { return .completed }

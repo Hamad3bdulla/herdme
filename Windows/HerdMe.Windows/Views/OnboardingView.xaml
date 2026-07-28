@@ -30,22 +30,26 @@
                         Text="H" />
                 </Border>
                 <TextBlock
+                    x:Uid="OnboardingWelcomeTitle"
                     HorizontalAlignment="Center"
                     FontSize="36"
                     FontWeight="Bold"
                     Text="Welcome to HerdMe" />
                 <TextBlock
+                    x:Uid="OnboardingWelcomeDescription"
                     HorizontalAlignment="Center"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     Text="HerdMe needs to prepare the local development environment. Windows will ask for administrator approval."
                     TextAlignment="Center"
                     TextWrapping="Wrap" />
                 <TextBlock
+                    x:Uid="OnboardingSetupSummary"
+                    x:Name="SetupSummaryText"
                     HorizontalAlignment="Center"
                     FontSize="12"
                     FontWeight="SemiBold"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="PHP 8.4  |  Composer  |  Laravel Installer  |  Node.js 22  |  HTTPS" />
+                    Text="" />
                 <Button
                     HorizontalAlignment="Center"
                     Padding="20,9"
@@ -54,7 +58,7 @@
                     CornerRadius="6"
                     Foreground="White">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="Set up HerdMe" />
+                        <TextBlock x:Uid="OnboardingSetupButton" Text="Set up HerdMe" />
                         <FontIcon FontSize="13" Glyph="&#xE72A;" />
                     </StackPanel>
                 </Button>
@@ -113,6 +117,7 @@
                     Foreground="#FFED1F2B"
                     Glyph="&#xE7BA;" />
                 <TextBlock
+                    x:Uid="OnboardingFailureTitle"
                     HorizontalAlignment="Center"
                     FontSize="28"
                     FontWeight="Bold"
@@ -123,6 +128,38 @@
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     TextAlignment="Center"
                     TextWrapping="Wrap" />
+                <Expander
+                    x:Name="FailureDetailsExpander"
+                    x:Uid="OnboardingFailureDetails"
+                    HorizontalAlignment="Stretch"
+                    Header="Technical Details"
+                    IsExpanded="False">
+                    <StackPanel Spacing="8">
+                        <TextBox
+                            x:Name="FailureDetailsText"
+                            MaxHeight="140"
+                            AcceptsReturn="True"
+                            FontFamily="Consolas"
+                            FontSize="12"
+                            IsReadOnly="True"
+                            ScrollViewer.VerticalScrollBarVisibility="Auto"
+                            TextWrapping="Wrap" />
+                        <Button
+                            x:Uid="OnboardingCopyFailureDetailsButton"
+                            HorizontalAlignment="Right"
+                            AutomationProperties.Name="Copy Technical Details"
+                            Click="CopyFailureDetails_Click">
+                            <ToolTipService.ToolTip>
+                                <ToolTip>
+                                    <TextBlock
+                                        x:Uid="OnboardingCopyFailureDetailsTooltip"
+                                        Text="Copy Technical Details" />
+                                </ToolTip>
+                            </ToolTipService.ToolTip>
+                            <FontIcon FontSize="13" Glyph="&#xE8C8;" />
+                        </Button>
+                    </StackPanel>
+                </Expander>
                 <Button
                     HorizontalAlignment="Center"
                     Padding="20,9"
@@ -131,7 +168,7 @@
                     CornerRadius="6"
                     Foreground="White">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="Try Again" />
+                        <TextBlock x:Uid="OnboardingTryAgainButton" Text="Try Again" />
                         <FontIcon FontSize="13" Glyph="&#xE72C;" />
                     </StackPanel>
                 </Button>
@@ -150,11 +187,13 @@
                     Foreground="#FF188038"
                     Glyph="&#xE73E;" />
                 <TextBlock
+                    x:Uid="OnboardingCompletedTitle"
                     HorizontalAlignment="Center"
                     FontSize="32"
                     FontWeight="Bold"
                     Text="HerdMe is ready" />
                 <TextBlock
+                    x:Uid="OnboardingCompletedDescription"
                     HorizontalAlignment="Center"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     Text="The default local development environment has been installed successfully."
@@ -168,7 +207,7 @@
                     CornerRadius="6"
                     Foreground="White">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="Open HerdMe" />
+                        <TextBlock x:Uid="OnboardingOpenButton" Text="Open HerdMe" />
                         <FontIcon FontSize="13" Glyph="&#xE72A;" />
                     </StackPanel>
                 </Button>

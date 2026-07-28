@@ -72,6 +72,7 @@ xcodebuild \
     -project HerdMe.xcodeproj \
     -scheme HerdMe \
     -configuration "$configuration" \
+    -destination "generic/platform=macOS" \
     -derivedDataPath "$derived_data" \
     "${build_settings[@]}" \
     build
@@ -158,6 +159,18 @@ helper_signing_details=$(codesign -d --verbose=4 "$helper" 2>&1)
     echo "The local network helper has an unexpected signing identifier." >&2
     exit 1
 }
+portable_core="$application/Contents/Helpers/herdme-core"
+if [[ ! -x "$portable_core" ]]; then
+    echo "Required portable HerdMe Core is missing from the application." >&2
+    exit 1
+fi
+lipo "$portable_core" -verify_arch arm64 x86_64
+codesign --verify --strict "$portable_core"
+core_signing_details=$(codesign -d --verbose=4 "$portable_core" 2>&1)
+[[ "$core_signing_details" == *"Identifier=app.herdme.core"* ]] || {
+    echo "The portable HerdMe Core has an unexpected signing identifier." >&2
+    exit 1
+}
 network_daemon="$application/Contents/Library/LaunchDaemons/app.herdme.network-service.plist"
 if [[ ! -f "$network_daemon" ]]; then
     echo "Required SMAppService network daemon plist is missing from the application." >&2
@@ -181,13 +194,20 @@ if [[ "$release_mode" == "public" ]]; then
     application_signing_details=$(codesign -d --verbose=4 "$application" 2>&1)
     application_team=$(sed -n 's/^TeamIdentifier=//p' <<< "$application_signing_details")
     helper_team=$(sed -n 's/^TeamIdentifier=//p' <<< "$helper_signing_details")
-    [[ -n "$application_team" && "$helper_team" == "$application_team" ]] || {
-        echo "The application and local network helper must use the same TeamIdentifier." >&2
+    core_team=$(sed -n 's/^TeamIdentifier=//p' <<< "$core_signing_details")
+    [[ -n "$application_team" && "$helper_team" == "$application_team" \
+        && "$core_team" == "$application_team" ]] || {
+        echo "The application and native helpers must use the same TeamIdentifier." >&2
         exit 1
     }
     [[ "$helper_signing_details" == *"Authority=Developer ID Application:"* \
         && "$helper_signing_details" == *"runtime"* ]] || {
         echo "The public local network helper must use Developer ID and hardened runtime." >&2
+        exit 1
+    }
+    [[ "$core_signing_details" == *"Authority=Developer ID Application:"* \
+        && "$core_signing_details" == *"runtime"* ]] || {
+        echo "The public portable Core must use Developer ID and hardened runtime." >&2
         exit 1
     }
 fi
@@ -198,6 +218,11 @@ build_number=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" \
     "$application/Contents/Info.plist")
 expected_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
 expected_build_number=$(tr -d '[:space:]' < "$repository_root/BUILD_NUMBER")
+core_version=$("$portable_core" --version)
+if [[ "$core_version" != "$expected_version" ]]; then
+    echo "The portable HerdMe Core version does not match the application." >&2
+    exit 1
+fi
 if [[ "$version" != "$expected_version" || "$build_number" != "$expected_build_number" ]]; then
     echo "Built bundle version $version ($build_number) does not match VERSION $expected_version ($expected_build_number)." >&2
     exit 1
@@ -207,6 +232,52 @@ zip_path="$output_directory/$artifact_base.zip"
 dmg_path="$output_directory/$artifact_base.dmg"
 runnable_application="$output_directory/HerdMe.app"
 legacy_runnable_application="$output_directory/HerdMe 2.app"
+package_temporary_directory=$(mktemp -d "${TMPDIR:-/tmp}/herdme-package.XXXXXX")
+dmg_staging_directory="$package_temporary_directory/dmg"
+dmg_mount_directory="$package_temporary_directory/mount"
+dmg_is_attached=0
+
+cleanup_package() {
+    if (( dmg_is_attached )); then
+        hdiutil detach "$dmg_mount_directory" >/dev/null 2>&1 || true
+    fi
+    rm -r "$package_temporary_directory" 2>/dev/null || true
+}
+trap cleanup_package EXIT INT TERM
+
+create_dmg() {
+    rm -r "$dmg_staging_directory" 2>/dev/null || true
+    mkdir -p "$dmg_staging_directory"
+    ditto "$application" "$dmg_staging_directory/HerdMe.app"
+    ln -s /Applications "$dmg_staging_directory/Applications"
+    hdiutil create \
+        -volname "HerdMe" \
+        -srcfolder "$dmg_staging_directory" \
+        -format UDZO \
+        -ov \
+        "$dmg_path"
+}
+
+verify_dmg_layout() {
+    mkdir -p "$dmg_mount_directory"
+    hdiutil attach \
+        -nobrowse \
+        -readonly \
+        -mountpoint "$dmg_mount_directory" \
+        "$dmg_path" >/dev/null
+    dmg_is_attached=1
+    [[ -d "$dmg_mount_directory/HerdMe.app" ]] || {
+        echo "The DMG does not contain HerdMe.app." >&2
+        exit 1
+    }
+    [[ -L "$dmg_mount_directory/Applications" \
+        && "$(readlink "$dmg_mount_directory/Applications")" == "/Applications" ]] || {
+        echo "The DMG does not contain the required Applications shortcut." >&2
+        exit 1
+    }
+    hdiutil detach "$dmg_mount_directory" >/dev/null
+    dmg_is_attached=0
+}
 
 mkdir -p "$output_directory"
 rm -f "$zip_path" "$dmg_path"
@@ -216,15 +287,7 @@ for stale_application in "$runnable_application" "$legacy_runnable_application";
     fi
 done
 ditto -c -k --sequesterRsrc --keepParent "$application" "$zip_path"
-hdiutil create \
-    -volname "HerdMe" \
-    -srcfolder "$application" \
-    -format UDZO \
-    -ov \
-    "$dmg_path"
-
-unzip -tq "$zip_path" >/dev/null
-hdiutil verify "$dmg_path" >/dev/null
+create_dmg
 
 if [[ "$release_mode" == "public" ]]; then
     xcrun notarytool submit "$zip_path" \
@@ -235,12 +298,7 @@ if [[ "$release_mode" == "public" ]]; then
 
     rm -f "$zip_path" "$dmg_path"
     ditto -c -k --sequesterRsrc --keepParent "$application" "$zip_path"
-    hdiutil create \
-        -volname "HerdMe" \
-        -srcfolder "$application" \
-        -format UDZO \
-        -ov \
-        "$dmg_path"
+    create_dmg
     codesign --force \
         --sign "$HERDME_DEVELOPER_ID_APPLICATION" \
         --timestamp \
@@ -254,6 +312,10 @@ if [[ "$release_mode" == "public" ]]; then
     spctl --assess --type execute --verbose=4 "$application"
     spctl --assess --type open --context context:primary-signature --verbose=4 "$dmg_path"
 fi
+
+unzip -tq "$zip_path" >/dev/null
+hdiutil verify "$dmg_path" >/dev/null
+verify_dmg_layout
 
 # Keep the directly runnable output identical to the final stapled application.
 ditto "$application" "$runnable_application"

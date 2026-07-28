@@ -11,36 +11,75 @@ enum LocalEnvironmentError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .phpMissing:
-            "Install and activate a HerdMe-managed PHP version before starting sites."
+            String(localized: "Install and activate a HerdMe-managed PHP version before starting sites.")
         case .noSites:
-            "No local sites were found to start."
+            String(localized: "No local sites were found to start.")
         case .noAvailablePort:
-            "HerdMe could not find an available local development port."
+            String(localized: "HerdMe could not find an available local development port.")
         case .unhealthy:
-            "The local site environment did not become healthy in time."
-        case let .processFailed(site):
-            "The local server for " + site + " could not be started."
+            String(localized: "The local site environment did not become healthy in time.")
+        case .processFailed(let site):
+            String.localizedStringWithFormat(
+                String(localized: "The local server for %@ could not be started."),
+                site
+            )
         }
     }
 }
 
-final class LocalEnvironmentEngine: @unchecked Sendable {
+protocol LocalEnvironmentRunning: Sendable {
+    var isRunning: Bool { get }
+    var hasManagedState: Bool { get }
+    var ports: [String: Int] { get }
+    var proxyPort: Int? { get }
+    var httpsProxyPort: Int? { get }
+    var httpsStartupError: String? { get }
+    var httpsStartupNeedsApproval: Bool { get }
+
+    func start(
+        sites: [SiteProject],
+        defaultPHP: URL?,
+        defaultPHPCycle: String?,
+        tld: String,
+        debuggerSettings: DebuggerSettings,
+        phpRequestSettings: PHPRequestSettings,
+        enableHTTPS: Bool
+    ) async throws -> [String: Int]
+    func stopAll() async
+    func stopAllImmediately()
+}
+
+final class LocalEnvironmentEngine: LocalEnvironmentRunning, @unchecked Sendable {
     let rootURL: URL
     private let fileManager = FileManager.default
     private let phpValidator = PHPRuntimeValidator()
-    private let fpmManager: PHPFPMManager
-    private var gateways: [String: LocalFastCGIGateway] = [:]
-    private let httpProxy = LocalHTTPProxy()
-    private let httpsProxy = LocalHTTPProxy()
+    private let fpmManager: any ProcessRunning
+    private let gatewayFactory: FastCGIListenerFactory
+    private var gateways: [String: any FastCGIListening] = [:]
+    private let httpProxy: any HTTPListening
+    private let httpsProxy: any HTTPListening
     private let certificateManager: LocalCertificateManager
     private(set) var ports: [String: Int] = [:]
     private(set) var proxyPort: Int?
     private(set) var httpsProxyPort: Int?
     private(set) var httpsStartupError: String?
+    private(set) var httpsStartupNeedsApproval = false
 
-    init(rootURL: URL, certificateManager: LocalCertificateManager? = nil) {
+    init(
+        rootURL: URL,
+        certificateManager: LocalCertificateManager? = nil,
+        fpmManager: (any ProcessRunning)? = nil,
+        gatewayFactory: @escaping FastCGIListenerFactory = {
+            LocalFastCGIGateway(documentRoot: $0, fpmPort: $1)
+        },
+        httpProxy: (any HTTPListening)? = nil,
+        httpsProxy: (any HTTPListening)? = nil
+    ) {
         self.rootURL = rootURL
-        fpmManager = PHPFPMManager(rootURL: rootURL)
+        self.fpmManager = fpmManager ?? PHPFPMManager(rootURL: rootURL)
+        self.gatewayFactory = gatewayFactory
+        self.httpProxy = httpProxy ?? LocalHTTPProxy()
+        self.httpsProxy = httpsProxy ?? LocalHTTPProxy()
         self.certificateManager = certificateManager ?? LocalCertificateManager(rootURL: rootURL)
     }
 
@@ -76,6 +115,7 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
         if isRunning { return ports }
         if hasManagedState { await stopAll() }
         httpsStartupError = nil
+        httpsStartupNeedsApproval = false
 
         let logsDirectory = rootURL.appendingPathComponent("Log/sites", isDirectory: true)
         try fileManager.createDirectory(at: logsDirectory, withIntermediateDirectories: true)
@@ -123,7 +163,7 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
                 let startMessage = "\n[HerdMe] Starting " + site.name + " with PHP-FPM on 127.0.0.1:\(fpmPort)\n"
                 try outputHandle.write(contentsOf: Data(startMessage.utf8))
 
-                let gateway = LocalFastCGIGateway(documentRoot: documentRoot, fpmPort: fpmPort)
+                let gateway = gatewayFactory(documentRoot, fpmPort)
                 let gatewayPort = try gateway.start(preferredPort: 8_790 + index)
                 gateways[site.id] = gateway
                 ports[site.id] = gatewayPort
@@ -133,7 +173,12 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
                 guard let port = ports[site.id] else { continue }
                 routes[site.domain(tld: tld)] = port
             }
-            proxyPort = try httpProxy.start(routes: routes)
+            proxyPort = try httpProxy.start(
+                routes: routes,
+                identity: nil,
+                preferredPort: 80,
+                fallbackPort: 8_080
+            )
             if enableHTTPS {
                 do {
                     let identity = try certificateManager.prepareIdentity(
@@ -150,10 +195,14 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
                 } catch {
                     httpsProxyPort = nil
                     httpsStartupError = error.localizedDescription
+                    if case CertificateSecretError.interactionRequired = error {
+                        httpsStartupNeedsApproval = true
+                    }
                 }
             } else {
                 httpsProxyPort = nil
                 httpsStartupError = "HTTPS is waiting for explicit Keychain approval."
+                httpsStartupNeedsApproval = true
             }
             guard try await waitUntilHealthy() else { throw LocalEnvironmentError.unhealthy }
             return ports
@@ -168,10 +217,12 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
         httpsProxy.stop()
         proxyPort = nil
         httpsProxyPort = nil
-        gateways.values.forEach { $0.stop() }
+        for gateway in gateways.values { gateway.stop() }
         gateways.removeAll()
         await fpmManager.stopAll()
         ports.removeAll()
+        httpsStartupError = nil
+        httpsStartupNeedsApproval = false
     }
 
     func stopAllImmediately() {
@@ -179,11 +230,12 @@ final class LocalEnvironmentEngine: @unchecked Sendable {
         httpsProxy.stop()
         proxyPort = nil
         httpsProxyPort = nil
-        gateways.values.forEach { $0.stop() }
+        for gateway in gateways.values { gateway.stop() }
         gateways.removeAll()
         fpmManager.stopAllImmediately()
         ports.removeAll()
         httpsStartupError = nil
+        httpsStartupNeedsApproval = false
     }
 
     static func documentRoot(for site: SiteProject) -> URL {

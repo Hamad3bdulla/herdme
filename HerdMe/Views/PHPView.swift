@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PHPView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var runtimeCoordinator: RuntimeCoordinator
 
     var body: some View {
         PageContainer("PHP") {
@@ -19,11 +20,11 @@ struct PHPView: View {
                     }
                     .padding(.horizontal, 8)
 
-                    ForEach(Array(model.phpVersions.enumerated()), id: \.element.id) { index, runtime in
+                    ForEach(Array(runtimeCoordinator.phpVersions.enumerated()), id: \.element.id) { index, runtime in
                         HStack {
                             Text(runtime.installedVersion.map { "\(runtime.cycle) (\($0))" } ?? runtime.cycle)
                             Spacer()
-                            if model.runtimeOperation == "php-\(runtime.cycle)" {
+                            if runtimeCoordinator.operation == "php-\(runtime.cycle)" {
                                 ProgressView()
                                     .controlSize(.small)
                                 Text("Working...")
@@ -35,11 +36,11 @@ struct PHPView: View {
                                     .frame(width: 80, alignment: .leading)
                             }
                             if runtime.isInstalled {
-                                if model.isPHPUpdateAvailable(runtime) {
+                                if runtimeCoordinator.isPHPUpdateAvailable(runtime) {
                                     Button("Update") { model.installPHP(runtime.cycle) }
                                 }
                                 Button("Use") { model.setActivePHP(runtime.cycle) }
-                                .disabled(runtime.isActive)
+                                    .disabled(runtime.isActive)
                             } else {
                                 Button("Install") {
                                     model.installPHP(runtime.cycle)
@@ -57,17 +58,17 @@ struct PHPView: View {
                 VStack(spacing: 8) {
                     SettingRow("Composer") {
                         HStack(spacing: 8) {
-                            if model.runtimeOperation == "composer" {
+                            if runtimeCoordinator.operation == "composer" {
                                 ProgressView().controlSize(.small)
                                 Text("Updating")
                                     .foregroundStyle(.secondary)
                             } else {
-                                Text(model.composerVersion.map { "v\($0)" } ?? "Not installed")
+                                Text(runtimeCoordinator.composerVersion.map { "v\($0)" } ?? "Not installed")
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
-                                if model.composerVersion == nil {
+                                if runtimeCoordinator.composerVersion == nil {
                                     Button("Install") { model.updateComposer() }
-                                } else if model.isComposerUpdateAvailable {
+                                } else if runtimeCoordinator.isComposerUpdateAvailable {
                                     Button("Update") { model.updateComposer() }
                                 }
                             }
@@ -76,17 +77,17 @@ struct PHPView: View {
                     PanelDivider()
                     SettingRow("Laravel Installer") {
                         HStack(spacing: 8) {
-                            if model.runtimeOperation == "laravel-installer" {
+                            if runtimeCoordinator.operation == "laravel-installer" {
                                 ProgressView().controlSize(.small)
                                 Text("Updating")
                                     .foregroundStyle(.secondary)
                             } else {
-                                Text(model.laravelInstallerVersion.map { "v\($0)" } ?? "Not installed")
+                                Text(runtimeCoordinator.laravelInstallerVersion.map { "v\($0)" } ?? "Not installed")
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
-                                if model.laravelInstallerVersion == nil {
+                                if runtimeCoordinator.laravelInstallerVersion == nil {
                                     Button("Install") { model.updateLaravelInstaller() }
-                                } else if model.isLaravelInstallerUpdateAvailable {
+                                } else if runtimeCoordinator.isLaravelInstallerUpdateAvailable {
                                     Button("Update") { model.updateLaravelInstaller() }
                                 }
                             }
@@ -98,13 +99,13 @@ struct PHPView: View {
             SettingsPanel {
                 VStack(spacing: 8) {
                     SettingRow("Max File Upload Size:", detail: "Maximum upload size accepted by PHP, in MB.") {
-                        TextField("", value: $model.phpRequestSettings.maxUploadMegabytes, format: .number)
+                        TextField("", value: $runtimeCoordinator.phpRequestSettings.maxUploadMegabytes, format: .number)
                             .frame(width: 100)
                             .onSubmit { model.persistPHPRequestSettings() }
                     }
                     PanelDivider()
                     SettingRow("Memory Limit:", detail: "Maximum memory available to PHP scripts, in MB.") {
-                        TextField("", value: $model.phpRequestSettings.memoryLimitMegabytes, format: .number)
+                        TextField("", value: $runtimeCoordinator.phpRequestSettings.memoryLimitMegabytes, format: .number)
                             .frame(width: 100)
                             .onSubmit { model.persistPHPRequestSettings() }
                     }

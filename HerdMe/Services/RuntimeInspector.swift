@@ -1,6 +1,10 @@
 import Foundation
 
-struct RuntimeInspector {
+protocol NodeRuntimeInspecting {
+    func nodeVersions() -> [RuntimeVersion]
+}
+
+struct RuntimeInspector: NodeRuntimeInspecting {
     private let locator: ExecutableLocator
     private let managedRoot: URL
 
@@ -21,10 +25,11 @@ struct RuntimeInspector {
                 let executable = runtime.appendingPathComponent("bin/php")
                 guard FileManager.default.isExecutableFile(atPath: executable.path) else { return }
                 let cycle = runtime.lastPathComponent
-                let version = commandOutput(
-                    executable: executable.path,
-                    arguments: ["-r", "echo PHP_VERSION;"]
-                ) ?? cycle
+                let version =
+                    commandOutput(
+                        executable: executable.path,
+                        arguments: ["-r", "echo PHP_VERSION;"]
+                    ) ?? cycle
                 result[cycle] = version
             }
         let known = Set(PHPRuntimeSupport.installableCycles + installed.keys)
@@ -45,14 +50,23 @@ struct RuntimeInspector {
         let activeCycle = activeVersion?.split(separator: ".").first.map(String.init)
         let runtimesRoot = managedRoot.appendingPathComponent("Runtimes/node", isDirectory: true)
         let installed = ((try? FileManager.default.contentsOfDirectory(at: runtimesRoot, includingPropertiesForKeys: nil)) ?? [])
-            .filter { !$0.lastPathComponent.hasPrefix(".") && FileManager.default.isExecutableFile(atPath: $0.appendingPathComponent("bin/node").path) }
+            .filter {
+                !$0.lastPathComponent.hasPrefix(".")
+                    && FileManager.default.isExecutableFile(atPath: $0.appendingPathComponent("bin/node").path)
+            }
             .reduce(into: [String: String]()) { result, url in
                 let version = url.lastPathComponent
                 if let cycle = version.split(separator: ".").first.map(String.init) {
-                    result[cycle] = max(result[cycle] ?? "", version)
+                    if let current = result[cycle] {
+                        if VersionComparison.isNewer(version, than: current) {
+                            result[cycle] = version
+                        }
+                    } else {
+                        result[cycle] = version
+                    }
                 }
             }
-        let known = Set(["26", "24", "22", "20", "18"] + installed.keys)
+        let known = Set(RuntimeCatalog.macOSNodeMajors + installed.keys)
         return known.sorted { (Int($0) ?? 0) > (Int($1) ?? 0) }.map { cycle in
             RuntimeVersion(
                 cycle: cycle,

@@ -36,7 +36,7 @@ project_build=$(/usr/bin/ruby -ryaml -e '
   document = YAML.load_file(ARGV.fetch(0))
   puts document.fetch("settings").fetch("base").fetch("CURRENT_PROJECT_VERSION")
 ' "$repository_root/project.yml")
-manifest_metadata=$(/usr/bin/ruby -rjson -ruri -e '
+manifest_metadata=$(/usr/bin/ruby -rjson -rset -ruri -e '
   semver = /\A(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+(?:[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?\z/
 
   def https_url(value, label)
@@ -50,6 +50,7 @@ manifest_metadata=$(/usr/bin/ruby -rjson -ruri -e '
   document = JSON.parse(File.binread(ARGV.fetch(0)))
   releases = document["releases"]
   abort "The release manifest must contain at least one release." unless releases.is_a?(Array) && !releases.empty?
+  identities = Set.new
   releases.each_with_index do |release, index|
     label = "releases[#{index}]"
     abort "#{label} is invalid." unless release.is_a?(Hash)
@@ -57,13 +58,22 @@ manifest_metadata=$(/usr/bin/ruby -rjson -ruri -e '
     abort "#{label}.build must be a nonnegative integer." unless release["build"].is_a?(Integer) && release["build"] >= 0
     abort "#{label}.channel must be stable or beta." unless %w[stable beta].include?(release["channel"].to_s.downcase)
     abort "#{label}.notes must be a string." unless release["notes"].is_a?(String)
+    identity = [release["version"], release["build"], release["channel"].to_s.downcase]
+    abort "#{label} duplicates another release identity." unless identities.add?(identity)
     abort "#{label}.downloadURL is obsolete; use downloadURLs." unless release["downloadURL"].nil?
     downloads = release["downloadURLs"]
     abort "#{label}.downloadURLs must contain both platform artifacts." unless downloads.is_a?(Hash)
     macos_url = https_url(downloads["macOS"], "#{label}.downloadURLs.macOS")
     windows_url = https_url(downloads["windowsX64"], "#{label}.downloadURLs.windowsX64")
     abort "#{label} must not use the same artifact for macOS and Windows." if macos_url == windows_url
+    expected_macos = "HerdMe-#{release.fetch("version")}-macOS.zip"
+    expected_windows = "HerdMe-#{release.fetch("version")}-win-x64-setup.exe"
+    abort "#{label}.downloadURLs.macOS must end with #{expected_macos}." unless \
+      File.basename(URI.parse(macos_url).path) == expected_macos
+    abort "#{label}.downloadURLs.windowsX64 must end with #{expected_windows}." unless \
+      File.basename(URI.parse(windows_url).path) == expected_windows
   end
+  abort "releases[0].channel must be stable." unless releases.first["channel"].to_s.downcase == "stable"
   puts releases.first.fetch("version")
   puts releases.first.fetch("build")
 ' "$repository_root/HerdMe/Resources/release-manifest.json")

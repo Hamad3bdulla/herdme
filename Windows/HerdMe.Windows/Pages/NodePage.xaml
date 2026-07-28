@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:HerdMe.Windows.Models"
+    AutomationProperties.AutomationId="NodePageRoot"
     Loaded="Page_Loaded">
     <Grid Padding="32" RowSpacing="16">
         <Grid.RowDefinitions>
@@ -11,13 +12,16 @@
         </Grid.RowDefinitions>
         <Grid>
             <StackPanel>
-                <TextBlock Text="Node.js" Style="{StaticResource TitleTextBlockStyle}" />
-                <TextBlock Text="Official Windows runtimes managed by HerdMe" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBlock x:Uid="NodePageTitle" Text="Node.js" Style="{StaticResource TitleTextBlockStyle}" />
+                <TextBlock x:Uid="NodePageDescription" Text="Official Windows runtimes managed by HerdMe" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
             <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
                 <ProgressRing x:Name="OperationProgress" Width="18" Height="18" />
                 <TextBlock x:Name="OperationStatusText" VerticalAlignment="Center" />
-                <Button Click="Refresh_Click" ToolTipService.ToolTip="Refresh Node.js versions">
+                <Button Click="Refresh_Click">
+                    <ToolTipService.ToolTip>
+                        <ToolTip><TextBlock x:Uid="NodeRefreshTooltip" Text="Refresh Node.js versions" /></ToolTip>
+                    </ToolTipService.ToolTip>
                     <SymbolIcon Symbol="Refresh" />
                 </Button>
             </StackPanel>
@@ -32,8 +36,8 @@
                             <ColumnDefinition Width="180" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Major" FontWeight="SemiBold" />
-                        <TextBlock Grid.Column="1" Text="Status" FontWeight="SemiBold" />
+                        <TextBlock x:Uid="NodeMajorColumn" Text="Major" FontWeight="SemiBold" />
+                        <TextBlock x:Uid="NodeStatusColumn" Grid.Column="1" Text="Status" FontWeight="SemiBold" />
                     </Grid>
                 </ListView.Header>
                 <ListView.ItemTemplate>
@@ -51,13 +55,22 @@
                                     Tag="{x:Bind Major}"
                                     Click="Install_Click"
                                     Visibility="{x:Bind CanInstallOrUpdate}"
-                                    ToolTipService.ToolTip="Install or update">
+                                    >
+                                    <ToolTipService.ToolTip>
+                                        <ToolTip><TextBlock x:Uid="NodeInstallTooltip" Text="Install or update" /></ToolTip>
+                                    </ToolTipService.ToolTip>
                                     <SymbolIcon Symbol="Download" />
                                 </Button>
-                                <Button Tag="{x:Bind Major}" Click="Use_Click" IsEnabled="{x:Bind IsInstalled}" ToolTipService.ToolTip="Use this version">
+                                <Button Tag="{x:Bind Major}" Click="Use_Click" IsEnabled="{x:Bind IsInstalled}">
+                                    <ToolTipService.ToolTip>
+                                        <ToolTip><TextBlock x:Uid="NodeUseTooltip" Text="Use this version" /></ToolTip>
+                                    </ToolTipService.ToolTip>
                                     <SymbolIcon Symbol="Play" />
                                 </Button>
-                                <Button Tag="{x:Bind Major}" Click="Delete_Click" IsEnabled="{x:Bind IsInstalled}" ToolTipService.ToolTip="Delete this version">
+                                <Button Tag="{x:Bind Major}" Click="Delete_Click" IsEnabled="{x:Bind IsInstalled}">
+                                    <ToolTipService.ToolTip>
+                                        <ToolTip><TextBlock x:Uid="NodeDeleteTooltip" Text="Delete this version" /></ToolTip>
+                                    </ToolTipService.ToolTip>
                                     <SymbolIcon Symbol="Delete" />
                                 </Button>
                             </StackPanel>

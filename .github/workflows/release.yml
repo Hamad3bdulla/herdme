@@ -20,12 +20,15 @@ jobs:
 
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Validate release identity
+      - name: Validate signed release identity
         shell: bash
         env:
-          UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.HERDME_UPDATE_SIGNING_PRIVATE_KEY }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           version=$(tr -d '[:space:]' < VERSION)
@@ -33,11 +36,35 @@ jobs:
             echo "Tag $GITHUB_REF_NAME does not match VERSION $version." >&2
             exit 1
           }
+          tag_ref="$RUNNER_TEMP/release-tag-ref.json"
+          tag_object="$RUNNER_TEMP/release-tag-object.json"
+          gh api \
+            "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" \
+            > "$tag_ref"
+          tag_sha=$(ruby -rjson -e \
+            'puts JSON.parse(File.binread(ARGV.fetch(0))).dig("object", "sha")' \
+            "$tag_ref")
+          [[ "$tag_sha" =~ ^[0-9a-fA-F]{40}$ ]] || {
+            echo "GitHub returned an invalid annotated tag identity." >&2
+            exit 1
+          }
+          gh api \
+            "repos/$GITHUB_REPOSITORY/git/tags/$tag_sha" \
+            > "$tag_object"
+          ./scripts/verify-release-tag.sh \
+            "$tag_ref" "$tag_object" "$GITHUB_REF_NAME" "$GITHUB_SHA"
+          ./scripts/check-version.sh
+
+      - name: Sign update feed
+        shell: bash
+        env:
+          UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.HERDME_UPDATE_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
           [[ -n "$UPDATE_SIGNING_PRIVATE_KEY" ]] || {
             echo "HERDME_UPDATE_SIGNING_PRIVATE_KEY is not configured." >&2
             exit 1
           }
-          ./scripts/check-version.sh
           umask 077
           private_key="$RUNNER_TEMP/update-signing-private-key.pem"
           generated_public_key="$RUNNER_TEMP/release-public-key.txt"
@@ -58,7 +85,7 @@ jobs:
             HerdMe/Resources/release-manifest.json
 
       - name: Upload signed feed
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: signed-update-feed
           path: release-assets/release-manifest.signed.json
@@ -73,7 +100,10 @@ jobs:
 
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Select the latest stable Xcode
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
@@ -81,7 +111,7 @@ jobs:
           xcode-version: latest-stable
 
       - name: Install .NET 8 for SBOM generation
-        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: 8.0.x
 
@@ -179,7 +209,7 @@ jobs:
           test -s "$sbom_path"
 
       - name: Upload macOS release artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: public-macos
           path: |
@@ -199,16 +229,23 @@ jobs:
 
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Install .NET 8
-        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: 8.0.x
 
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --version=6.7.1 --no-progress --yes
+
+      - name: Test Windows signing configuration contract
+        shell: pwsh
+        run: ./Windows/test-signing-contract.ps1
 
       - name: Import Windows release certificate
         shell: pwsh
@@ -228,18 +265,37 @@ jobs:
               throw "HERDME_WINDOWS_TIMESTAMP_URL is not configured."
           }
           $certificatePath = Join-Path $env:RUNNER_TEMP "herdme-release.pfx"
-          [IO.File]::WriteAllBytes(
-              $certificatePath,
-              [Convert]::FromBase64String($env:CERTIFICATE_PFX_BASE64)
-          )
-          $password = ConvertTo-SecureString $env:CERTIFICATE_PASSWORD -AsPlainText -Force
-          $certificate = Import-PfxCertificate `
-              -FilePath $certificatePath `
-              -CertStoreLocation Cert:\CurrentUser\My `
-              -Password $password
-          if ($null -eq $certificate -or [string]::IsNullOrWhiteSpace($certificate.Thumbprint)) {
-              throw "The Windows release certificate could not be imported."
+          try {
+              [IO.File]::WriteAllBytes(
+                  $certificatePath,
+                  [Convert]::FromBase64String($env:CERTIFICATE_PFX_BASE64)
+              )
+              $password = ConvertTo-SecureString $env:CERTIFICATE_PASSWORD -AsPlainText -Force
+              $importedCertificates = @(Import-PfxCertificate `
+                  -FilePath $certificatePath `
+                  -CertStoreLocation Cert:\CurrentUser\My `
+                  -Password $password)
           }
+          finally {
+              Remove-Item -LiteralPath $certificatePath -Force -ErrorAction SilentlyContinue
+          }
+          $now = [DateTime]::UtcNow
+          $codeSigningOid = "1.3.6.1.5.5.7.3.3"
+          $signingCertificates = @($importedCertificates | Where-Object {
+              $_.HasPrivateKey `
+                  -and $_.NotBefore.ToUniversalTime() -le $now `
+                  -and $_.NotAfter.ToUniversalTime() -gt $now `
+                  -and $_.EnhancedKeyUsageList.ObjectId.Value -contains $codeSigningOid
+          })
+          if ($signingCertificates.Count -ne 1) {
+              throw "The PFX must contain exactly one current code-signing certificate with a private key."
+          }
+          $certificate = $signingCertificates[0]
+          . ./Windows/sign-windows-artifact.ps1
+          $env:HERDME_WINDOWS_SIGNING_THUMBPRINT = $certificate.Thumbprint
+          $env:HERDME_WINDOWS_TIMESTAMP_URL = $env:TIMESTAMP_URL
+          [void](Get-HerdMeSigningThumbprint)
+          [void](Get-HerdMeTimestampUri)
           "HERDME_WINDOWS_SIGNING_THUMBPRINT=$($certificate.Thumbprint)" | Out-File `
               -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "HERDME_WINDOWS_TIMESTAMP_URL=$env:TIMESTAMP_URL" | Out-File `
@@ -252,7 +308,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           try {
-              & ./Windows/acceptance.ps1 -Configuration Release -SkipLiveReleaseChecks
+              & ./Windows/acceptance.ps1 -Configuration Release
           }
           catch {
               $message = $_.Exception.Message
@@ -296,7 +352,7 @@ jobs:
           }
 
       - name: Upload Windows release artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: public-windows-x64
           path: |
@@ -308,6 +364,17 @@ jobs:
             dist/HerdMe-*-win-x64.spdx.json.sha256
           if-no-files-found: error
           retention-days: 7
+
+      - name: Remove Windows release certificate
+        if: always()
+        shell: pwsh
+        run: |
+          if (-not [string]::IsNullOrWhiteSpace($env:HERDME_WINDOWS_SIGNING_THUMBPRINT)) {
+              Remove-Item `
+                  -LiteralPath "Cert:\CurrentUser\My\$env:HERDME_WINDOWS_SIGNING_THUMBPRINT" `
+                  -Force `
+                  -ErrorAction SilentlyContinue
+          }
 
   publish:
     name: Verify and publish GitHub Release
@@ -321,17 +388,20 @@ jobs:
 
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Download release artifacts
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: "public-*"
           path: release-assets
           merge-multiple: true
 
       - name: Download signed update feed
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: signed-update-feed
           path: release-assets
@@ -341,26 +411,7 @@ jobs:
         run: |
           set -euo pipefail
           version=$(tr -d '[:space:]' < VERSION)
-          expected=(
-            "HerdMe-$version-macOS.zip"
-            "HerdMe-$version-macOS.dmg"
-            "HerdMe-$version-macOS.sha256"
-            "HerdMe-$version-macOS.spdx.json"
-            "HerdMe-$version-macOS.spdx.json.sha256"
-            "HerdMe-$version-win-x64-portable.zip"
-            "HerdMe-$version-win-x64-portable.zip.sha256"
-            "HerdMe-$version-win-x64-setup.exe"
-            "HerdMe-$version-win-x64-setup.exe.sha256"
-            "HerdMe-$version-win-x64.spdx.json"
-            "HerdMe-$version-win-x64.spdx.json.sha256"
-            "release-manifest.signed.json"
-          )
-          for artifact in "${expected[@]}"; do
-            [[ -f "release-assets/$artifact" ]] || {
-              echo "Missing release artifact: $artifact" >&2
-              exit 1
-            }
-          done
+          ./scripts/verify-release-asset-set.sh release-assets "$version"
           (
             cd release-assets
             sha256sum -c "HerdMe-$version-macOS.sha256"
@@ -384,7 +435,7 @@ jobs:
             HerdMe/Resources/release-manifest.json
 
       - name: Attest release build provenance
-        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-path: release-assets/*
 

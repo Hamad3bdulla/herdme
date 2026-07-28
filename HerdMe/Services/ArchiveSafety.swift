@@ -12,19 +12,25 @@ enum ArchiveSafetyError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .empty:
-            "The downloaded archive is empty."
-        case let .tooManyEntries(limit):
-            "The downloaded archive contains more than \(limit) entries."
-        case let .expandedSizeLimit(limit):
-            "The downloaded archive expands beyond the supported \(limit)-byte limit."
+            String(localized: "The downloaded archive is empty.")
+        case .tooManyEntries(let limit):
+            String.localizedStringWithFormat(
+                String(localized: "The downloaded archive contains more than %lld entries."),
+                Int64(limit)
+            )
+        case .expandedSizeLimit(let limit):
+            String.localizedStringWithFormat(
+                String(localized: "The downloaded archive expands beyond the supported %lld-byte limit."),
+                limit
+            )
         case .unsafePath:
-            "The downloaded archive contains an unsafe path."
+            String(localized: "The downloaded archive contains an unsafe path.")
         case .unsupportedEntryType:
-            "The downloaded archive contains a link or special file."
+            String(localized: "The downloaded archive contains a link or special file.")
         case .invalidListing:
-            "The downloaded archive has an invalid entry listing."
+            String(localized: "The downloaded archive has an invalid entry listing.")
         case .extractedTreeChanged:
-            "The extracted archive did not match its validated contents."
+            String(localized: "The extracted archive did not match its validated contents.")
         }
     }
 }
@@ -88,15 +94,17 @@ enum TarArchivePolicy {
         let root = rootURL.resolvingSymlinksInPath().standardizedFileURL
         let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
         var enumerationFailed = false
-        guard let enumerator = fileManager.enumerator(
-            at: root,
-            includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey],
-            options: [],
-            errorHandler: { _, _ in
-                enumerationFailed = true
-                return false
-            }
-        ) else {
+        guard
+            let enumerator = fileManager.enumerator(
+                at: root,
+                includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey],
+                options: [],
+                errorHandler: { _, _ in
+                    enumerationFailed = true
+                    return false
+                }
+            )
+        else {
             throw ArchiveSafetyError.extractedTreeChanged
         }
 
@@ -135,8 +143,9 @@ enum TarArchivePolicy {
 
     private static func normalizedPath(_ value: String) throws -> String {
         guard !value.isEmpty, value.utf8.count <= 1_024,
-              !value.hasPrefix("/"), !value.contains("//"),
-              !value.contains("\\"), !value.contains("\0") else {
+            !value.hasPrefix("/"), !value.contains("//"),
+            !value.contains("\\"), !value.contains("\0")
+        else {
             throw ArchiveSafetyError.unsafePath
         }
         let components = value.split(separator: "/", omittingEmptySubsequences: false)
@@ -148,7 +157,8 @@ enum TarArchivePolicy {
 
     private static func validateSymbolicLink(entryPath: String, target: String) throws {
         guard !target.isEmpty, target.utf8.count <= 1_024,
-              !target.hasPrefix("/"), !target.contains("\\"), !target.contains("\0") else {
+            !target.hasPrefix("/"), !target.contains("\\"), !target.contains("\0")
+        else {
             throw ArchiveSafetyError.unsafePath
         }
         var resolved = try normalizedPath(entryPath).split(separator: "/").map(String.init)

@@ -14,33 +14,35 @@ indirect enum PHPSerializedValue: Sendable {
         guard depth < 16 else { return "..." }
         switch self {
         case .null: return "null"
-        case let .bool(value): return value ? "true" : "false"
-        case let .integer(value): return String(value)
-        case let .double(value): return String(value)
-        case let .string(value): return "\"" + value + "\""
-        case let .reference(identifier): return "reference(" + String(identifier) + ")"
-        case let .array(values):
+        case .bool(let value): return value ? "true" : "false"
+        case .integer(let value): return String(value)
+        case .double(let value): return String(value)
+        case .string(let value): return "\"" + value + "\""
+        case .reference(let identifier): return "reference(" + String(identifier) + ")"
+        case .array(let values):
             guard !values.isEmpty else { return "[]" }
             let indentation = String(repeating: "  ", count: depth + 1)
             let closing = String(repeating: "  ", count: depth)
-            return "[\n" + values.map { key, value in
-                indentation + key.shortKey() + ": " + value.rendered(depth: depth + 1)
-            }.joined(separator: ",\n") + "\n" + closing + "]"
-        case let .object(name, properties):
+            return "[\n"
+                + values.map { key, value in
+                    indentation + key.shortKey() + ": " + value.rendered(depth: depth + 1)
+                }.joined(separator: ",\n") + "\n" + closing + "]"
+        case .object(let name, let properties):
             let indentation = String(repeating: "  ", count: depth + 1)
             let closing = String(repeating: "  ", count: depth)
-            return name + " {\n" + properties.map { key, value in
-                indentation + key.shortKey() + ": " + value.rendered(depth: depth + 1)
-            }.joined(separator: ",\n") + "\n" + closing + "}"
+            return name + " {\n"
+                + properties.map { key, value in
+                    indentation + key.shortKey() + ": " + value.rendered(depth: depth + 1)
+                }.joined(separator: ",\n") + "\n" + closing + "}"
         }
     }
 
     func firstString(forKeysContaining keys: [String]) -> String? {
         switch self {
-        case let .array(values), let .object(_, values):
+        case .array(let values), .object(_, let values):
             for (key, value) in values {
                 let normalized = key.shortKey().lowercased()
-                if keys.contains(where: normalized.contains), case let .string(result) = value {
+                if keys.contains(where: normalized.contains), case .string(let result) = value {
                     return result
                 }
                 if let nested = value.firstString(forKeysContaining: keys) { return nested }
@@ -53,9 +55,9 @@ indirect enum PHPSerializedValue: Sendable {
 
     private func shortKey() -> String {
         switch self {
-        case let .string(value):
+        case .string(let value):
             return value.split(separator: "\0").last.map(String.init) ?? value
-        case let .integer(value):
+        case .integer(let value):
             return String(value)
         default:
             return rendered()
@@ -70,9 +72,13 @@ enum PHPSerializationError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .malformed: "Malformed PHP serialized value."
-        case .resourceLimit: "The PHP serialized value exceeds HerdMe's safety limits."
-        case let .unsupported(type): "Unsupported PHP serialized type: " + String(type)
+        case .malformed: String(localized: "Malformed PHP serialized value.")
+        case .resourceLimit: String(localized: "The PHP serialized value exceeds HerdMe's safety limits.")
+        case .unsupported(let type):
+            String.localizedStringWithFormat(
+                String(localized: "Unsupported PHP serialized type: %@"),
+                String(type)
+            )
         }
     }
 }
@@ -83,16 +89,20 @@ struct PHPSerializationParser {
     private static let maximumCollectionItems = 10_000
 
     private let bytes: [UInt8]
+    private let exceedsInputLimit: Bool
     private var index = 0
     private var remainingCollectionItems = Self.maximumCollectionItems
 
     init(data: Data) {
-        bytes = Array(data)
+        exceedsInputLimit = data.count > Self.maximumInputBytes
+        bytes = exceedsInputLimit ? [] : Array(data)
     }
 
     mutating func parse() throws -> PHPSerializedValue {
-        guard bytes.count <= Self.maximumInputBytes else { throw PHPSerializationError.resourceLimit }
-        return try parseValue(depth: 0)
+        guard !exceedsInputLimit else { throw PHPSerializationError.resourceLimit }
+        let value = try parseValue(depth: 0)
+        guard index == bytes.count else { throw PHPSerializationError.malformed }
+        return value
     }
 
     private mutating func parseValue(depth: Int) throws -> PHPSerializedValue {
@@ -106,8 +116,11 @@ struct PHPSerializationParser {
             return .null
         case "b":
             try expect(":")
-            let value = try readNumber(until: ";")
-            return .bool(value == "1")
+            switch try readNumber(until: ";") {
+            case "0": return .bool(false)
+            case "1": return .bool(true)
+            default: throw PHPSerializationError.malformed
+            }
         case "i":
             try expect(":")
             guard let value = Int64(try readNumber(until: ";")) else { throw PHPSerializationError.malformed }
@@ -178,7 +191,9 @@ struct PHPSerializationParser {
     }
 
     private mutating func readNumber(until delimiter: Character) throws -> String {
-        let delimiterByte = UInt8(String(delimiter).utf8.first!)
+        guard let delimiterByte = String(delimiter).utf8.first else {
+            throw PHPSerializationError.malformed
+        }
         let start = index
         while index < bytes.count, bytes[index] != delimiterByte { index += 1 }
         guard index < bytes.count else { throw PHPSerializationError.malformed }
@@ -189,7 +204,8 @@ struct PHPSerializationParser {
 
     private mutating func expect(_ character: Character) throws {
         guard let expected = String(character).utf8.first,
-              index < bytes.count, bytes[index] == expected else {
+            index < bytes.count, bytes[index] == expected
+        else {
             throw PHPSerializationError.malformed
         }
         index += 1

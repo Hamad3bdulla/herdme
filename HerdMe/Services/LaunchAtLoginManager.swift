@@ -6,7 +6,15 @@ struct LaunchAtLoginStatus: Equatable {
     let requiresApproval: Bool
 }
 
-struct LaunchAtLoginManager {
+@MainActor
+protocol LaunchAtLoginManaging {
+    func status() -> LaunchAtLoginStatus
+    func setEnabled(_ enabled: Bool) throws
+    func openSystemSettings()
+}
+
+@MainActor
+struct LaunchAtLoginManager: LaunchAtLoginManaging {
     func status() -> LaunchAtLoginStatus {
         switch SMAppService.mainApp.status {
         case .enabled:

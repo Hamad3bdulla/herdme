@@ -21,16 +21,19 @@ enum ServiceEnvironmentError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case let .unsupported(service):
-            "HerdMe does not have .env variables for \(service)."
+        case .unsupported(let service):
+            String.localizedStringWithFormat(
+                String(localized: "HerdMe does not have .env variables for %@."),
+                service
+            )
         case .projectMissing:
-            "The selected project directory is no longer available."
+            String(localized: "The selected project directory is no longer available.")
         case .symbolicLink:
-            "HerdMe will not modify a symbolic .env file. Replace it with a project-owned file first."
+            String(localized: "HerdMe will not modify a symbolic .env file. Replace it with a project-owned file first.")
         case .invalidFile:
-            "The project's .env file must be a regular UTF-8 text file."
+            String(localized: "The project's .env file must be a regular UTF-8 text file.")
         case .fileTooLarge:
-            "The project's .env file is larger than the supported 4 MB limit."
+            String(localized: "The project's .env file is larger than the supported 4 MB limit.")
         }
     }
 }
@@ -119,7 +122,8 @@ enum ServiceEnvironmentFile {
     ) throws -> ServiceEnvironmentUpdate {
         var isDirectory: ObjCBool = false
         guard fileManager.fileExists(atPath: projectURL.path, isDirectory: &isDirectory),
-              isDirectory.boolValue else {
+            isDirectory.boolValue
+        else {
             throw ServiceEnvironmentError.projectMissing
         }
 
@@ -166,7 +170,8 @@ enum ServiceEnvironmentFile {
         serviceName: String
     ) -> (contents: String, addedKeys: Int, updatedKeys: Int) {
         let newline = contents.contains("\r\n") ? "\r\n" : "\n"
-        var lines = contents
+        var lines =
+            contents
             .replacingOccurrences(of: "\r\n", with: "\n")
             .components(separatedBy: "\n")
         if lines.last == "" { lines.removeLast() }
@@ -184,7 +189,8 @@ enum ServiceEnvironmentFile {
         let missing = variables.filter { !foundKeys.contains($0.key) }
         if !missing.isEmpty {
             if lines.last?.isEmpty == false { lines.append("") }
-            let safeName = serviceName
+            let safeName =
+                serviceName
                 .replacingOccurrences(of: "\r", with: " ")
                 .replacingOccurrences(of: "\n", with: " ")
                 .prefix(80)
@@ -207,7 +213,8 @@ enum ServiceEnvironmentFile {
 
     private static func readUTF8(_ url: URL) throws -> String {
         guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
-              values.isRegularFile == true else {
+            values.isRegularFile == true
+        else {
             throw ServiceEnvironmentError.invalidFile
         }
         guard (values.fileSize ?? 0) <= maximumEnvironmentFileBytes else {
@@ -226,12 +233,14 @@ enum ServiceEnvironmentFile {
             candidate = candidate.trimmingCharacters(in: .whitespaces)
         }
         guard !candidate.hasPrefix("#"),
-              let separator = candidate.firstIndex(of: "=") else {
+            let separator = candidate.firstIndex(of: "=")
+        else {
             return nil
         }
         let key = String(candidate[..<separator]).trimmingCharacters(in: .whitespaces)
         guard let first = key.first, first == "_" || first.isLetter,
-              key.allSatisfy({ $0 == "_" || $0.isLetter || $0.isNumber }) else {
+            key.allSatisfy({ $0 == "_" || $0.isLetter || $0.isNumber })
+        else {
             return nil
         }
         return key
@@ -241,7 +250,8 @@ enum ServiceEnvironmentFile {
         guard !value.isEmpty else { return "" }
         let safe = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_./:@+-"))
         if value.unicodeScalars.allSatisfy(safe.contains) { return value }
-        return "\"" + value
+        return "\""
+            + value
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
             .replacingOccurrences(of: "\n", with: "\\n") + "\""

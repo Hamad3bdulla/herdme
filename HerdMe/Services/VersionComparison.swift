@@ -7,7 +7,8 @@ enum VersionComparison {
         if normalizedLeft == normalizedRight { return .orderedSame }
 
         if let leftVersion = SemanticVersion(normalizedLeft),
-           let rightVersion = SemanticVersion(normalizedRight) {
+            let rightVersion = SemanticVersion(normalizedRight)
+        {
             return leftVersion.compare(to: rightVersion)
         }
 
@@ -46,7 +47,8 @@ private struct SemanticVersion {
             omittingEmptySubsequences: false
         )
         guard buildParts.count <= 2,
-              buildParts.count == 1 || Self.validIdentifiers(buildParts[1], numericLeadingZeros: true) else {
+            buildParts.count == 1 || Self.validIdentifiers(buildParts[1], numericLeadingZeros: true)
+        else {
             return nil
         }
 
@@ -64,7 +66,8 @@ private struct SemanticVersion {
 
         let core = coreText.split(separator: ".", omittingEmptySubsequences: false)
         guard !core.isEmpty,
-              core.allSatisfy({ Self.validNumericIdentifier($0, allowLeadingZeros: false) }) else {
+            core.allSatisfy({ Self.validNumericIdentifier($0, allowLeadingZeros: false) })
+        else {
             return nil
         }
         self.core = core.map(String.init)
@@ -98,7 +101,7 @@ private struct SemanticVersion {
             return .orderedDescending
         case (_, nil):
             return .orderedAscending
-        case let (left?, right?):
+        case (let left?, let right?):
             for index in 0..<min(left.count, right.count) {
                 let leftIdentifier = left[index]
                 let rightIdentifier = right[index]
@@ -123,18 +126,20 @@ private struct SemanticVersion {
         numericLeadingZeros: Bool
     ) -> Bool {
         let identifiers = value.split(separator: ".", omittingEmptySubsequences: false)
-        return !identifiers.isEmpty && identifiers.allSatisfy { identifier in
-            guard !identifier.isEmpty,
-                  identifier.allSatisfy({ character in
-                      character.isASCII && (character.isLetter || character.isNumber || character == "-")
-                  }) else {
-                return false
+        return !identifiers.isEmpty
+            && identifiers.allSatisfy { identifier in
+                guard !identifier.isEmpty,
+                    identifier.allSatisfy({ character in
+                        character.isASCII && (character.isLetter || character.isNumber || character == "-")
+                    })
+                else {
+                    return false
+                }
+                if identifier.allSatisfy(\.isNumber) {
+                    return validNumericIdentifier(identifier, allowLeadingZeros: numericLeadingZeros)
+                }
+                return true
             }
-            if identifier.allSatisfy(\.isNumber) {
-                return validNumericIdentifier(identifier, allowLeadingZeros: numericLeadingZeros)
-            }
-            return true
-        }
     }
 
     private static func validNumericIdentifier(

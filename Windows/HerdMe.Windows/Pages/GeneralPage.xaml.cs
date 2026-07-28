@@ -9,25 +9,44 @@ namespace HerdMe.Windows.Pages;
 
 public sealed partial class GeneralPage : Page
 {
-    private readonly CoreClient coreClient = new();
+    private readonly CoreClient coreClient;
     private readonly PhpRuntimeInstaller runtimeInstaller;
     private readonly PhpRuntimePolicy runtimePolicy;
-    private readonly WindowsStartupManager startupManager = new();
-    private readonly WindowsHostsManager hostsManager = new();
-    private readonly WindowsCertificateManager certificateManager = new();
-    private readonly SiteConfigurationStore settingsStore = new();
-    private readonly AppUpdateManager updateManager = AppUpdateManager.Configured();
+    private readonly WindowsStartupManager startupManager;
+    private readonly WindowsHostsManager hostsManager;
+    private readonly WindowsCertificateManager certificateManager;
+    private readonly SiteConfigurationStore settingsStore;
+    private readonly AppUpdateManager updateManager;
     private bool loadingStartup;
     private bool loadingUpdateSettings;
 
     public ObservableCollection<RuntimeCheck> Runtimes { get; } = [];
 
-    public GeneralPage()
+    public GeneralPage(
+        CoreClient coreClient,
+        PhpRuntimeInstaller runtimeInstaller,
+        PhpRuntimePolicy runtimePolicy,
+        WindowsStartupManager startupManager,
+        WindowsHostsManager hostsManager,
+        WindowsCertificateManager certificateManager,
+        SiteConfigurationStore settingsStore,
+        AppUpdateManager updateManager
+    )
     {
+        this.coreClient = coreClient;
+        this.runtimeInstaller = runtimeInstaller;
+        this.runtimePolicy = runtimePolicy;
+        this.startupManager = startupManager;
+        this.hostsManager = hostsManager;
+        this.certificateManager = certificateManager;
+        this.settingsStore = settingsStore;
+        this.updateManager = updateManager;
         InitializeComponent();
-        runtimeInstaller = new PhpRuntimeInstaller(coreClient);
-        runtimePolicy = new PhpRuntimePolicy(coreClient);
         CoreExecutableText.Text = coreClient.ExecutablePath;
+        ToolTipService.SetToolTip(
+            OpenDataButton,
+            AppLocalization.Get("GeneralOpenApplicationData")
+        );
         loadingStartup = true;
         StartupToggle.IsOn = startupManager.IsEnabled;
         loadingStartup = false;
@@ -35,7 +54,10 @@ public sealed partial class GeneralPage : Page
         loadingUpdateSettings = true;
         AutomaticUpdatesToggle.IsOn = settings.AutomaticUpdates;
         UpdateChannelBox.SelectedIndex = settings.UpdateChannel == "Beta" ? 1 : 0;
-        UpdateStatusText.Text = $"{settings.UpdateChannel} channel";
+        UpdateStatusText.Text = AppLocalization.Format(
+            "GeneralChannelStatus",
+            UpdateChannelDisplayName(settings.UpdateChannel)
+        );
         loadingUpdateSettings = false;
     }
 
@@ -56,7 +78,7 @@ public sealed partial class GeneralPage : Page
                 XamlRoot = XamlRoot,
                 Title = "HerdMe",
                 Content = error.Message,
-                CloseButtonText = "OK"
+                CloseButtonText = AppLocalization.Get("CommonOk")
             };
             await dialog.ShowAsync();
         }
@@ -79,8 +101,8 @@ public sealed partial class GeneralPage : Page
     private async Task RefreshAsync()
     {
         CoreProgress.IsActive = true;
-        CoreStatusText.Text = "Checking";
-        PhpExtensionStatusText.Text = "Checking";
+        CoreStatusText.Text = AppLocalization.Get("GeneralChecking");
+        PhpExtensionStatusText.Text = AppLocalization.Get("GeneralChecking");
         PhpExtensionDetailText.Text = string.Empty;
         PhpExtensionProgress.IsActive = true;
         OpenDataButton.IsEnabled = false;
@@ -88,7 +110,9 @@ public sealed partial class GeneralPage : Page
         try
         {
             var report = await coreClient.DoctorAsync();
-            CoreStatusText.Text = report.Platform == "windows" ? "Ready" : report.Platform;
+            CoreStatusText.Text = report.Platform == "windows"
+                ? AppLocalization.Get("GeneralReady")
+                : report.Platform;
             SupportPathText.Text = report.SupportPath;
             Directory.CreateDirectory(report.SupportPath);
             OpenDataButton.IsEnabled = true;
@@ -106,28 +130,34 @@ public sealed partial class GeneralPage : Page
                 {
                     var extensions = await coreClient.ValidatePhpAsync(phpPath);
                     PhpExtensionStatusText.Text = extensions.Compatible
-                        ? "Laravel compatible"
-                        : "Missing extensions";
+                        ? AppLocalization.Get("GeneralLaravelCompatible")
+                        : AppLocalization.Get("GeneralMissingExtensions");
                     PhpExtensionDetailText.Text = extensions.Compatible
-                        ? $"{extensions.Required.Count} required extensions loaded"
+                        ? AppLocalization.Format(
+                            "GeneralRequiredExtensionsLoaded",
+                            extensions.Required.Count
+                        )
                         : string.Join(", ", extensions.Missing);
                 }
                 catch (Exception error)
                 {
-                    PhpExtensionStatusText.Text = "Check failed";
+                    PhpExtensionStatusText.Text = AppLocalization.Get("GeneralCheckFailed");
                     PhpExtensionDetailText.Text = error.Message;
                 }
             }
             else
             {
-                PhpExtensionStatusText.Text = "Managed PHP unavailable";
-                PhpExtensionDetailText.Text = $"Install HerdMe PHP {phpSettings.PhpCycle} from the PHP page.";
+                PhpExtensionStatusText.Text = AppLocalization.Get("GeneralManagedPhpUnavailable");
+                PhpExtensionDetailText.Text = AppLocalization.Format(
+                    "GeneralInstallManagedPhp",
+                    phpSettings.PhpCycle
+                );
             }
         }
         catch (Exception error)
         {
             CoreStatusText.Text = error.Message;
-            PhpExtensionStatusText.Text = "Unavailable";
+            PhpExtensionStatusText.Text = AppLocalization.Get("GeneralUnavailable");
             PhpExtensionDetailText.Text = string.Empty;
         }
         finally
@@ -151,7 +181,7 @@ public sealed partial class GeneralPage : Page
             if (sites.Count == 0)
             {
                 throw new InvalidOperationException(
-                    "Add or link at least one site before setting up local domains."
+                    AppLocalization.Get("GeneralAddSiteBeforeDomains")
                 );
             }
             await hostsManager.EnsureMappingsAsync(sites.Select(site => site.Domain));
@@ -195,12 +225,18 @@ public sealed partial class GeneralPage : Page
         try
         {
             var domainsConfigured = await hostsManager.HasManagedMappingsAsync();
-            DomainsStatusText.Text = domainsConfigured ? "Configured" : "Not configured";
+            DomainsStatusText.Text = domainsConfigured
+                ? AppLocalization.Get("GeneralConfigured")
+                : AppLocalization.Get("GeneralNotConfigured");
             RemoveDomainsButton.IsEnabled = domainsConfigured;
-            InstallDomainsButton.Content = domainsConfigured ? "Update" : "Set Up";
+            InstallDomainsButton.Content = domainsConfigured
+                ? AppLocalization.Get("GeneralUpdate")
+                : AppLocalization.Get("GeneralSetUp");
 
             var certificateTrusted = certificateManager.IsAuthorityTrusted();
-            CertificateStatusText.Text = certificateTrusted ? "Trusted" : "Not trusted";
+            CertificateStatusText.Text = certificateTrusted
+                ? AppLocalization.Get("GeneralTrusted")
+                : AppLocalization.Get("GeneralNotTrusted");
             TrustCertificateButton.Visibility = certificateTrusted
                 ? Visibility.Collapsed
                 : Visibility.Visible;
@@ -208,7 +244,7 @@ public sealed partial class GeneralPage : Page
         catch (Exception error)
         {
             DomainsStatusText.Text = error.Message;
-            CertificateStatusText.Text = "Unavailable";
+            CertificateStatusText.Text = AppLocalization.Get("GeneralUnavailable");
         }
     }
 
@@ -268,12 +304,18 @@ public sealed partial class GeneralPage : Page
             settings.AutomaticUpdates = AutomaticUpdatesToggle.IsOn;
             settings.UpdateChannel = SelectedUpdateChannel();
             settingsStore.Save(settings);
-            UpdateStatusText.Text = $"{settings.UpdateChannel} channel";
+            UpdateStatusText.Text = AppLocalization.Format(
+                "GeneralChannelStatus",
+                UpdateChannelDisplayName(settings.UpdateChannel)
+            );
             return true;
         }
         catch (Exception error)
         {
-            _ = ShowMessageAsync("Settings could not be saved", error.Message);
+            _ = ShowMessageAsync(
+                AppLocalization.Get("GeneralSettingsSaveFailed"),
+                error.Message
+            );
             return false;
         }
     }
@@ -290,31 +332,48 @@ public sealed partial class GeneralPage : Page
         try
         {
             var channel = SelectedUpdateChannel();
-            UpdateStatusText.Text = $"Checking {channel.ToLowerInvariant()} releases";
+            var channelName = UpdateChannelDisplayName(channel);
+            UpdateStatusText.Text = AppLocalization.Format(
+                "GeneralCheckingReleases",
+                channelName
+            );
             var result = await updateManager.CheckAsync(channel);
             if (result.AvailableRelease is { } release)
             {
-                UpdateStatusText.Text = $"Version {release.Version} is available";
+                UpdateStatusText.Text = AppLocalization.Format(
+                    "GeneralVersionAvailable",
+                    release.Version
+                );
                 await ShowUpdateAsync(release);
             }
             else
             {
-                UpdateStatusText.Text = $"HerdMe {result.CurrentVersion} is up to date";
+                UpdateStatusText.Text = AppLocalization.Format(
+                    "GeneralUpToDateStatus",
+                    result.CurrentVersion
+                );
                 if (userInitiated)
                 {
                     await ShowMessageAsync(
-                        "HerdMe is up to date",
-                        $"Version {result.CurrentVersion} is the newest {channel.ToLowerInvariant()} release."
+                        AppLocalization.Get("GeneralUpToDateTitle"),
+                        AppLocalization.Format(
+                            "GeneralNewestRelease",
+                            result.CurrentVersion,
+                            channelName
+                        )
                     );
                 }
             }
         }
         catch (Exception error)
         {
-            UpdateStatusText.Text = "Update check failed";
+            UpdateStatusText.Text = AppLocalization.Get("GeneralUpdateCheckFailed");
             if (userInitiated)
             {
-                await ShowMessageAsync("Update check failed", error.Message);
+                await ShowMessageAsync(
+                    AppLocalization.Get("GeneralUpdateCheckFailed"),
+                    error.Message
+                );
             }
         }
         finally
@@ -334,13 +393,15 @@ public sealed partial class GeneralPage : Page
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
-            Title = $"HerdMe {release.Version} is available",
+            Title = AppLocalization.Format("GeneralUpdateDialogTitle", release.Version),
             Content = release.Notes,
-            CloseButtonText = downloadAvailable ? "Later" : "OK"
+            CloseButtonText = downloadAvailable
+                ? AppLocalization.Get("GeneralLater")
+                : AppLocalization.Get("CommonOk")
         };
         if (downloadAvailable)
         {
-            dialog.PrimaryButtonText = "Download";
+            dialog.PrimaryButtonText = AppLocalization.Get("GeneralDownload");
         }
         var choice = await dialog.ShowAsync();
         if (choice == ContentDialogResult.Primary && downloadUri is not null)
@@ -356,8 +417,17 @@ public sealed partial class GeneralPage : Page
             XamlRoot = XamlRoot,
             Title = title,
             Content = message,
-            CloseButtonText = "OK"
+            CloseButtonText = AppLocalization.Get("CommonOk")
         };
         await dialog.ShowAsync();
+    }
+
+    private static string UpdateChannelDisplayName(string channel)
+    {
+        return AppLocalization.Get(
+            channel.Equals("Beta", StringComparison.OrdinalIgnoreCase)
+                ? "GeneralChannelBeta"
+                : "GeneralChannelStable"
+        );
     }
 }

@@ -18,9 +18,9 @@
 namespace herdme {
 namespace {
 
-std::optional<std::string> environment_value(const char* name) {
+std::optional<std::string> environment_value(const char *name) {
 #ifdef _WIN32
-    char* value = nullptr;
+    char *value = nullptr;
     std::size_t length = 0;
     if (_dupenv_s(&value, &length, name) != 0 || value == nullptr) {
         std::free(value);
@@ -30,41 +30,53 @@ std::optional<std::string> environment_value(const char* name) {
     std::free(value);
     return result;
 #else
-    if (const char* value = std::getenv(name)) return std::string(value);
+    if (const char *value = std::getenv(name)) return std::string(value);
     return std::nullopt;
 #endif
 }
 
 char ascii_lower(const unsigned char value) {
-    return value >= 'A' && value <= 'Z'
-        ? static_cast<char>(value + ('a' - 'A'))
-        : static_cast<char>(value);
+    return value >= 'A' && value <= 'Z' ? static_cast<char>(value + ('a' - 'A')) : static_cast<char>(value);
 }
 
-std::string json_escape(const std::string& value) {
+std::string json_escape(const std::string &value) {
     std::ostringstream output;
     for (const unsigned char character : value) {
         switch (character) {
-            case '"': output << "\\\""; break;
-            case '\\': output << "\\\\"; break;
-            case '\b': output << "\\b"; break;
-            case '\f': output << "\\f"; break;
-            case '\n': output << "\\n"; break;
-            case '\r': output << "\\r"; break;
-            case '\t': output << "\\t"; break;
-            default:
-                if (character < 0x20) {
-                    const char* hex = "0123456789abcdef";
-                    output << "\\u00" << hex[(character >> 4) & 0x0f] << hex[character & 0x0f];
-                } else {
-                    output << character;
-                }
+        case '"':
+            output << "\\\"";
+            break;
+        case '\\':
+            output << "\\\\";
+            break;
+        case '\b':
+            output << "\\b";
+            break;
+        case '\f':
+            output << "\\f";
+            break;
+        case '\n':
+            output << "\\n";
+            break;
+        case '\r':
+            output << "\\r";
+            break;
+        case '\t':
+            output << "\\t";
+            break;
+        default:
+            if (character < 0x20) {
+                const char *hex = "0123456789abcdef";
+                output << "\\u00" << hex[(character >> 4) & 0x0f] << hex[character & 0x0f];
+            } else {
+                output << character;
+            }
         }
     }
     return output.str();
 }
 
-std::optional<std::string> read_trimmed(const std::filesystem::path& path) {
+std::optional<std::string> read_trimmed(const std::filesystem::path &path) {
     std::ifstream input(path);
     if (!input) return std::nullopt;
     std::ostringstream contents;
@@ -76,12 +88,12 @@ std::optional<std::string> read_trimmed(const std::filesystem::path& path) {
     return value.substr(first, last - first + 1);
 }
 
-std::optional<std::string> read_node_version(const std::filesystem::path& root) {
+std::optional<std::string> read_node_version(const std::filesystem::path &root) {
     if (const auto managed = read_trimmed(root / ".herdme-node")) return managed;
     return read_trimmed(root / ".nvmrc");
 }
 
-std::string framework_at(const std::filesystem::path& root) {
+std::string framework_at(const std::filesystem::path &root) {
     if (std::filesystem::exists(root / "artisan")) return "Laravel";
     if (std::filesystem::exists(root / "wp-config.php")) return "WordPress";
     if (std::filesystem::exists(root / "public" / "index.php")) return "PHP";
@@ -106,14 +118,14 @@ std::vector<std::filesystem::path> split_path() {
     return values;
 }
 
-std::optional<std::filesystem::path> find_executable(const std::string& name) {
-    for (const auto& directory : split_path()) {
+std::optional<std::filesystem::path> find_executable(const std::string &name) {
+    for (const auto &directory : split_path()) {
 #ifdef _WIN32
         const std::vector<std::string> candidates = {name + ".exe", name + ".cmd", name + ".bat", name};
 #else
         const std::vector<std::string> candidates = {name};
 #endif
-        for (const auto& candidate : candidates) {
+        for (const auto &candidate : candidates) {
             std::error_code error;
             const auto path = directory / candidate;
             if (!std::filesystem::is_regular_file(path, error)) continue;
@@ -127,14 +139,9 @@ std::optional<std::filesystem::path> find_executable(const std::string& name) {
     return std::nullopt;
 }
 
-std::string path_string(const std::filesystem::path& path) {
-    return path.lexically_normal().generic_string();
-}
+std::string path_string(const std::filesystem::path &path) { return path.lexically_normal().generic_string(); }
 
-bool is_same_or_child_path(
-    const std::filesystem::path& candidate,
-    const std::filesystem::path& root
-) {
+bool is_same_or_child_path(const std::filesystem::path &candidate, const std::filesystem::path &root) {
     std::error_code error;
     const auto resolved_candidate = std::filesystem::weakly_canonical(candidate, error);
     if (error) return false;
@@ -152,7 +159,7 @@ bool is_same_or_child_path(
     return candidate_text.rfind(root_text, 0) == 0;
 }
 
-bool belongs_to_other_herd(const std::filesystem::path& path) {
+bool belongs_to_other_herd(const std::filesystem::path &path) {
     std::vector<std::filesystem::path> roots;
 #ifdef _WIN32
     if (const auto user_profile = environment_value("USERPROFILE")) {
@@ -171,9 +178,7 @@ bool belongs_to_other_herd(const std::filesystem::path& path) {
         roots.emplace_back(home_path / "Library" / "Application Support" / "Herd");
     }
 #endif
-    return std::any_of(roots.begin(), roots.end(), [&](const auto& root) {
-        return is_same_or_child_path(path, root);
-    });
+    return std::any_of(roots.begin(), roots.end(), [&](const auto &root) { return is_same_or_child_path(path, root); });
 }
 
 std::string lowercase_trimmed(std::string value) {
@@ -185,7 +190,7 @@ std::string lowercase_trimmed(std::string value) {
     return value;
 }
 
-void append_string_array(std::ostringstream& output, const std::vector<std::string>& values) {
+void append_string_array(std::ostringstream &output, const std::vector<std::string> &values) {
     output << '[';
     for (std::size_t index = 0; index < values.size(); ++index) {
         if (index != 0) output << ',';
@@ -194,7 +199,7 @@ void append_string_array(std::ostringstream& output, const std::vector<std::stri
     output << ']';
 }
 
-RuntimeCheck inspect_runtime(const std::string& name) {
+RuntimeCheck inspect_runtime(const std::string &name) {
     const auto executable = find_executable(name);
     if (!executable) return {name, std::nullopt, "missing", false};
 
@@ -206,18 +211,18 @@ RuntimeCheck inspect_runtime(const std::string& name) {
     if (normalized.rfind(managed_root + "/", 0) == 0) {
         return {name, executable, "managed", true};
     }
-    const bool belongs_to_herd = normalized.find("/application support/herd/") != std::string::npos
-        || normalized.find("/appdata/local/herd/") != std::string::npos
-        || normalized.find("/appdata/roaming/herd/") != std::string::npos;
+    const bool belongs_to_herd = normalized.find("/application support/herd/") != std::string::npos ||
+                                 normalized.find("/appdata/local/herd/") != std::string::npos ||
+                                 normalized.find("/appdata/roaming/herd/") != std::string::npos;
     if (belongs_to_herd) {
         return {name, executable, "other-application", false};
     }
     return {name, executable, "system", true};
 }
 
-}  // namespace
+} // namespace
 
-std::string dns_label(const std::string& name) {
+std::string dns_label(const std::string &name) {
     std::string original;
     original.reserve(name.size());
     for (const unsigned char value : name) {
@@ -227,12 +232,11 @@ std::string dns_label(const std::string& name) {
     const auto is_alphanumeric = [](const unsigned char value) {
         return (value >= 'a' && value <= 'z') || (value >= '0' && value <= '9');
     };
-    const bool is_valid = !original.empty() && original.size() <= 63
-        && is_alphanumeric(static_cast<unsigned char>(original.front()))
-        && is_alphanumeric(static_cast<unsigned char>(original.back()))
-        && std::all_of(original.begin(), original.end(), [&](const unsigned char value) {
-            return is_alphanumeric(value) || value == '-';
-        });
+    const bool is_valid =
+        !original.empty() && original.size() <= 63 && is_alphanumeric(static_cast<unsigned char>(original.front())) &&
+        is_alphanumeric(static_cast<unsigned char>(original.back())) &&
+        std::all_of(original.begin(), original.end(),
+                    [&](const unsigned char value) { return is_alphanumeric(value) || value == '-'; });
     if (is_valid) return original;
 
     std::string normalized;
@@ -271,14 +275,12 @@ std::filesystem::path support_directory() {
 #endif
 }
 
-std::vector<Site> scan_sites(
-    const std::vector<std::filesystem::path>& roots,
-    const std::vector<std::filesystem::path>& linked_sites
-) {
+std::vector<Site> scan_sites(const std::vector<std::filesystem::path> &roots,
+                             const std::vector<std::filesystem::path> &linked_sites) {
     std::vector<Site> sites;
     std::set<std::string> seen;
 
-    const auto append_site = [&](const std::filesystem::path& path, const bool linked) {
+    const auto append_site = [&](const std::filesystem::path &path, const bool linked) {
         std::error_code error;
         if (!std::filesystem::is_directory(path, error)) return;
         const auto resolved = std::filesystem::weakly_canonical(path, error);
@@ -288,23 +290,17 @@ std::vector<Site> scan_sites(
         if (!seen.insert(key).second) return;
         const auto name = resolved.filename().string();
         if (name.empty() || name.front() == '.') return;
-        sites.push_back(Site{
-            name,
-            resolved,
-            framework_at(resolved),
-            linked,
-            read_trimmed(resolved / ".herdme-php"),
-            read_node_version(resolved)
-        });
+        sites.push_back(Site{name, resolved, framework_at(resolved), linked, read_trimmed(resolved / ".herdme-php"),
+                             read_node_version(resolved)});
     };
 
-    for (const auto& linked_site : linked_sites) append_site(linked_site, true);
+    for (const auto &linked_site : linked_sites) append_site(linked_site, true);
 
-    for (const auto& root : roots) {
+    for (const auto &root : roots) {
         std::error_code error;
         if (belongs_to_other_herd(root)) continue;
         if (!std::filesystem::is_directory(root, error)) continue;
-        for (const auto& entry : std::filesystem::directory_iterator(root, error)) {
+        for (const auto &entry : std::filesystem::directory_iterator(root, error)) {
             if (error) break;
             const auto name = entry.path().filename().string();
             if (name.empty() || name.front() == '.') continue;
@@ -314,7 +310,7 @@ std::vector<Site> scan_sites(
         }
     }
 
-    std::sort(sites.begin(), sites.end(), [](const Site& left, const Site& right) {
+    std::sort(sites.begin(), sites.end(), [](const Site &left, const Site &right) {
         std::string left_name = left.name;
         std::string right_name = right.name;
         std::transform(left_name.begin(), left_name.end(), left_name.begin(), ascii_lower);
@@ -325,25 +321,18 @@ std::vector<Site> scan_sites(
 }
 
 std::vector<RuntimeCheck> inspect_runtimes() {
-    return {
-        inspect_runtime("php"),
-        inspect_runtime("composer"),
-        inspect_runtime("node"),
-        inspect_runtime("npm"),
-        inspect_runtime("nginx"),
-        inspect_runtime("dnsmasq")
-    };
+    return {inspect_runtime("php"), inspect_runtime("composer"), inspect_runtime("node"),
+            inspect_runtime("npm"), inspect_runtime("nginx"),    inspect_runtime("dnsmasq")};
 }
 
-const std::vector<std::string>& laravel_required_php_extensions() {
-    static const std::vector<std::string> extensions = {
-        "ctype", "curl", "dom", "fileinfo", "filter", "hash", "mbstring",
-        "openssl", "pcre", "pdo", "session", "tokenizer", "xml"
-    };
+const std::vector<std::string> &laravel_required_php_extensions() {
+    static const std::vector<std::string> extensions = {"ctype",   "curl",      "dom",     "fileinfo", "filter",
+                                                        "hash",    "mbstring",  "openssl", "pcre",     "pdo",
+                                                        "session", "tokenizer", "xml"};
     return extensions;
 }
 
-PhpExtensionReport inspect_php_module_output(const std::string& module_output) {
+PhpExtensionReport inspect_php_module_output(const std::string &module_output) {
     std::set<std::string> loaded;
     std::istringstream lines(module_output);
     std::string line;
@@ -364,48 +353,48 @@ PhpExtensionReport inspect_php_module_output(const std::string& module_output) {
     PhpExtensionReport report;
     report.required = laravel_required_php_extensions();
     report.loaded.assign(loaded.begin(), loaded.end());
-    for (const auto& required : report.required) {
+    for (const auto &required : report.required) {
         if (!loaded.contains(required)) report.missing.push_back(required);
     }
     report.compatible = report.missing.empty();
     return report;
 }
 
-std::string sites_json(const std::vector<Site>& sites, const std::string& tld) {
+std::string sites_json(const std::vector<Site> &sites, const std::string &tld) {
     std::ostringstream output;
     output << "{\"sites\":[";
     for (std::size_t index = 0; index < sites.size(); ++index) {
         if (index != 0) output << ',';
-        const auto& site = sites[index];
-        output << "{\"name\":\"" << json_escape(site.name)
-               << "\",\"path\":\"" << json_escape(path_string(site.path))
-               << "\",\"domain\":\"" << json_escape(dns_label(site.name) + "." + tld)
-               << "\",\"framework\":\"" << json_escape(site.framework)
-               << "\",\"linked\":" << (site.linked ? "true" : "false")
+        const auto &site = sites[index];
+        output << "{\"name\":\"" << json_escape(site.name) << "\",\"path\":\"" << json_escape(path_string(site.path))
+               << "\",\"domain\":\"" << json_escape(dns_label(site.name) + "." + tld) << "\",\"framework\":\""
+               << json_escape(site.framework) << "\",\"linked\":" << (site.linked ? "true" : "false")
                << ",\"phpVersion\":";
-        if (site.php_version) output << '"' << json_escape(*site.php_version) << '"'; else output << "null";
+        if (site.php_version) output << '"' << json_escape(*site.php_version) << '"';
+        else output << "null";
         output << ",\"nodeVersion\":";
-        if (site.node_version) output << '"' << json_escape(*site.node_version) << '"'; else output << "null";
+        if (site.node_version) output << '"' << json_escape(*site.node_version) << '"';
+        else output << "null";
         output << '}';
     }
     output << "]}";
     return output.str();
 }
 
-std::string doctor_json(const std::vector<RuntimeCheck>& checks) {
+std::string doctor_json(const std::vector<RuntimeCheck> &checks) {
     std::ostringstream output;
 #ifdef _WIN32
-    const char* platform = "windows";
+    const char *platform = "windows";
 #else
-    const char* platform = "macos";
+    const char *platform = "macos";
 #endif
-    output << "{\"platform\":\"" << platform << "\",\"supportPath\":\""
-           << json_escape(path_string(support_directory())) << "\",\"runtimes\":[";
+    output << "{\"platform\":\"" << platform << "\",\"supportPath\":\"" << json_escape(path_string(support_directory()))
+           << "\",\"runtimes\":[";
     for (std::size_t index = 0; index < checks.size(); ++index) {
         if (index != 0) output << ',';
-        output << "{\"name\":\"" << json_escape(checks[index].name) << "\",\"available\":"
-               << (checks[index].usable ? "true" : "false") << ",\"detected\":"
-               << (checks[index].executable ? "true" : "false") << ",\"source\":\""
+        output << "{\"name\":\"" << json_escape(checks[index].name)
+               << "\",\"available\":" << (checks[index].usable ? "true" : "false")
+               << ",\"detected\":" << (checks[index].executable ? "true" : "false") << ",\"source\":\""
                << json_escape(checks[index].source) << "\",\"path\":";
         if (checks[index].executable) {
             output << '"' << json_escape(path_string(*checks[index].executable)) << '"';
@@ -418,7 +407,7 @@ std::string doctor_json(const std::vector<RuntimeCheck>& checks) {
     return output.str();
 }
 
-std::string php_extensions_json(const PhpExtensionReport& report) {
+std::string php_extensions_json(const PhpExtensionReport &report) {
     std::ostringstream output;
     output << "{\"required\":";
     append_string_array(output, report.required);
@@ -430,4 +419,4 @@ std::string php_extensions_json(const PhpExtensionReport& report) {
     return output.str();
 }
 
-}  // namespace herdme
+} // namespace herdme

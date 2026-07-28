@@ -1,0 +1,5 @@
+Content-Type: multipart/mixed; boundary="unterminated
+Content-Transfer-Encoding: base64
+
+%%%invalid%%%
+--unterminated

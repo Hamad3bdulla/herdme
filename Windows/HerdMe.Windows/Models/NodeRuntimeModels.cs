@@ -41,7 +41,5 @@ public sealed class NodeRuntimeRow
 
     public bool CanInstallOrUpdate => !IsInstalled || IsUpdateAvailable;
 
-    public string Status => IsActive
-        ? "Active"
-        : InstalledVersion is null ? "Not installed" : InstalledVersion;
+    public string Status { get; init; } = string.Empty;
 }

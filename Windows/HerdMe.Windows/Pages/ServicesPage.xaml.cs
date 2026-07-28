@@ -10,19 +10,39 @@ namespace HerdMe.Windows.Pages;
 
 public sealed partial class ServicesPage : Page
 {
-    private readonly WindowsServiceManager manager = AppServices.Services;
-    private readonly CoreClient coreClient = new();
-    private readonly SiteConfigurationStore siteSettings = AppServices.SiteSettings;
+    private readonly WindowsServiceManager manager;
+    private readonly CoreClient coreClient;
+    private readonly SiteConfigurationStore siteSettings;
     private bool refreshing;
 
     public IReadOnlyList<ManagedServiceDefinition> Definitions { get; } = ManagedServiceCatalog.All;
 
     public ObservableCollection<ManagedServiceRow> Rows { get; } = [];
 
-    public ServicesPage()
+    public ServicesPage(
+        WindowsServiceManager manager,
+        CoreClient coreClient,
+        SiteConfigurationStore siteSettings
+    )
     {
+        this.manager = manager;
+        this.coreClient = coreClient;
+        this.siteSettings = siteSettings;
         InitializeComponent();
-        ServiceTypeBox.SelectedIndex = 0;
+        if (Definitions.Count > 0)
+        {
+            ServiceTypeBox.SelectedIndex = 0;
+        }
+        else
+        {
+            ServiceTypeBox.IsEnabled = false;
+            ServiceNameBox.IsEnabled = false;
+            ServicePortBox.IsEnabled = false;
+            AddServiceButton.IsEnabled = false;
+            ServiceAvailabilityText.Text = RuntimeCatalog.LoadIssue
+                ?? "The bundled service catalog could not be loaded.";
+            ServiceAvailabilityText.Visibility = Visibility.Visible;
+        }
     }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e) => await RefreshRowsAsync();
@@ -38,7 +58,7 @@ public sealed partial class ServicesPage : Page
             manager.LoadInstances().Select(instance => instance.Port)
         ) ?? definition.DefaultPort;
         AddServiceButton.IsEnabled = definition.IsInstallable;
-        ServiceAvailabilityText.Text = definition.UnavailableReason ?? string.Empty;
+        ServiceAvailabilityText.Text = UnavailableReasonFor(definition);
         ServiceAvailabilityText.Visibility = definition.IsInstallable
             ? Visibility.Collapsed
             : Visibility.Visible;
@@ -50,8 +70,7 @@ public sealed partial class ServicesPage : Page
         if (!definition.IsInstallable)
         {
             await ShowErrorAsync(
-                definition.UnavailableReason
-                    ?? $"{definition.Name} is not available for native Windows installation."
+                UnavailableReasonFor(definition)
             );
             return;
         }
@@ -65,11 +84,19 @@ public sealed partial class ServicesPage : Page
                 instances.Select(instance => instance.Port)
             );
             if (suggestion is not null) ServicePortBox.Value = suggestion.Value;
-            var owner = assignedToHerdMe ? "another HerdMe service" : "another application";
-            var nextStep = suggestion is null
-                ? " No alternative loopback port is currently available."
-                : $" Suggested port {suggestion.Value} is now selected; press Add again to use it.";
-            await ShowErrorAsync($"Port {port} is already used by {owner}.{nextStep}");
+            var owner = AppLocalization.Get(
+                assignedToHerdMe ? "ServicesPortOwnerHerdMe" : "ServicesPortOwnerApplication"
+            );
+            await ShowErrorAsync(
+                suggestion is null
+                    ? AppLocalization.Format("ServicesPortConflictNoAlternative", port, owner)
+                    : AppLocalization.Format(
+                        "ServicesPortConflictSuggested",
+                        port,
+                        owner,
+                        suggestion.Value
+                    )
+            );
             return;
         }
         var instance = new ManagedServiceInstance
@@ -83,11 +110,15 @@ public sealed partial class ServicesPage : Page
         await RefreshRowsAsync();
         if (manager.IsInstalled(definition.Id)) return;
 
-        SetWorking(true, $"Installing {instance.Name}");
+        SetWorking(true, AppLocalization.Format("ServicesInstalling", instance.Name));
         try
         {
             var release = await manager.InstallAsync(instance.DefinitionId);
-            OperationStatusText.Text = $"{instance.Name} {release.Version} installed";
+            OperationStatusText.Text = AppLocalization.Format(
+                "ServicesVersionInstalled",
+                instance.Name,
+                release.Version
+            );
         }
         catch (Exception error)
         {
@@ -105,14 +136,18 @@ public sealed partial class ServicesPage : Page
         if (!TryGetInstance(sender, out var instance)) return;
         if (manager.State(instance.Id, instance.DefinitionId) == ManagedServiceState.Running)
         {
-            await ShowErrorAsync("Stop this service before updating its runtime.");
+            await ShowErrorAsync(AppLocalization.Get("ServicesStopBeforeUpdate"));
             return;
         }
-        SetWorking(true, $"Installing {instance.Name}");
+        SetWorking(true, AppLocalization.Format("ServicesInstalling", instance.Name));
         try
         {
             var release = await manager.InstallAsync(instance.DefinitionId);
-            OperationStatusText.Text = $"{instance.Name} {release.Version} installed";
+            OperationStatusText.Text = AppLocalization.Format(
+                "ServicesVersionInstalled",
+                instance.Name,
+                release.Version
+            );
         }
         catch (Exception error)
         {
@@ -129,7 +164,13 @@ public sealed partial class ServicesPage : Page
     {
         if (!TryGetInstance(sender, out var instance)) return;
         var running = manager.State(instance.Id, instance.DefinitionId) == ManagedServiceState.Running;
-        SetWorking(true, running ? $"Stopping {instance.Name}" : $"Starting {instance.Name}");
+        SetWorking(
+            true,
+            AppLocalization.Format(
+                running ? "ServicesStopping" : "ServicesStarting",
+                instance.Name
+            )
+        );
         try
         {
             if (running) await manager.StopAsync(instance.Id);
@@ -179,13 +220,13 @@ public sealed partial class ServicesPage : Page
             );
             if (sites.Count == 0)
             {
-                await ShowErrorAsync("Add or link a site before updating a .env file.");
+                await ShowErrorAsync(AppLocalization.Get("ServicesAddSiteBeforeEnvironment"));
                 return;
             }
 
             var siteBox = new ComboBox
             {
-                Header = "Site",
+                Header = AppLocalization.Get("ServicesSiteField"),
                 ItemsSource = sites,
                 DisplayMemberPath = nameof(SiteRecord.Name),
                 SelectedIndex = 0,
@@ -210,10 +251,10 @@ public sealed partial class ServicesPage : Page
             var dialog = new ContentDialog
             {
                 XamlRoot = XamlRoot,
-                Title = $"Add {instance.Name} to .env",
+                Title = AppLocalization.Format("ServicesEnvironmentDialogTitle", instance.Name),
                 Content = content,
-                PrimaryButtonText = "Add to .env",
-                CloseButtonText = "Cancel",
+                PrimaryButtonText = AppLocalization.Get("ServicesAddToEnvironment"),
+                CloseButtonText = AppLocalization.Get("CommonCancel"),
                 DefaultButton = ContentDialogButton.Primary
             };
             if (await dialog.ShowAsync() != ContentDialogResult.Primary
@@ -224,8 +265,13 @@ public sealed partial class ServicesPage : Page
 
             var update = manager.AddToEnvironment(selectedSite.Path, instance);
             await ShowMessageAsync(
-                "Updated .env",
-                $"Added {update.AddedKeys} and updated {update.UpdatedKeys} variables in {selectedSite.Name}."
+                AppLocalization.Get("ServicesEnvironmentUpdatedTitle"),
+                AppLocalization.Format(
+                    "ServicesEnvironmentUpdatedMessage",
+                    update.AddedKeys,
+                    update.UpdatedKeys,
+                    selectedSite.Name
+                )
             );
         }
         catch (Exception error)
@@ -240,7 +286,7 @@ public sealed partial class ServicesPage : Page
         var uri = manager.ConsoleUri(instance.Id);
         if (uri is null)
         {
-            await ShowErrorAsync("Start this storage service before opening its console.");
+            await ShowErrorAsync(AppLocalization.Get("ServicesStartBeforeConsole"));
             return;
         }
         try
@@ -258,7 +304,7 @@ public sealed partial class ServicesPage : Page
         if (!TryGetInstance(sender, out var instance)) return;
         if (manager.State(instance.Id, instance.DefinitionId) != ManagedServiceState.Running)
         {
-            await ShowErrorAsync("Start this database service before opening it in TablePlus.");
+            await ShowErrorAsync(AppLocalization.Get("ServicesStartBeforeTablePlus"));
             return;
         }
         try
@@ -280,7 +326,7 @@ public sealed partial class ServicesPage : Page
         if (!TryGetInstance(sender, out var instance)) return;
         if (manager.State(instance.Id, instance.DefinitionId) != ManagedServiceState.Running)
         {
-            await ShowErrorAsync("Start this database service before copying its connection URL.");
+            await ShowErrorAsync(AppLocalization.Get("ServicesStartBeforeCopyConnection"));
             return;
         }
         try
@@ -289,7 +335,10 @@ public sealed partial class ServicesPage : Page
             package.SetText(manager.ConnectionUri(instance).AbsoluteUri);
             Clipboard.SetContent(package);
             Clipboard.Flush();
-            OperationStatusText.Text = $"{instance.Name} connection URL copied";
+            OperationStatusText.Text = AppLocalization.Format(
+                "ServicesConnectionCopied",
+                instance.Name
+            );
         }
         catch (Exception error)
         {
@@ -303,10 +352,10 @@ public sealed partial class ServicesPage : Page
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
-            Title = $"Delete {instance.Name}?",
-            Content = "The service will stop and its local data directory will be deleted. The shared runtime stays installed.",
-            PrimaryButtonText = "Delete",
-            CloseButtonText = "Cancel",
+            Title = AppLocalization.Format("ServicesDeleteTitle", instance.Name),
+            Content = AppLocalization.Get("ServicesDeleteMessage"),
+            PrimaryButtonText = AppLocalization.Get("CommonDelete"),
+            CloseButtonText = AppLocalization.Get("CommonCancel"),
             DefaultButton = ContentDialogButton.Close
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
@@ -364,6 +413,13 @@ public sealed partial class ServicesPage : Page
                 Port = instance.Port,
                 Version = installedVersion,
                 State = state,
+                Status = StateLabel(state),
+                InstallLabel = AppLocalization.Get(
+                    state == ManagedServiceState.NotInstalled ? "CommonInstall" : "CommonUpdate"
+                ),
+                ToggleLabel = AppLocalization.Get(
+                    state == ManagedServiceState.Running ? "ServicesStop" : "ServicesStart"
+                ),
                 StartAutomatically = instance.StartAutomatically,
                 IsUpdateAvailable = latestVersion is not null
                     && RuntimeVersionComparison.IsNewer(latestVersion, installedVersion),
@@ -393,6 +449,28 @@ public sealed partial class ServicesPage : Page
         IsEnabled = !working;
     }
 
+    private static string StateLabel(ManagedServiceState state)
+    {
+        return AppLocalization.Get(state switch
+        {
+            ManagedServiceState.NotInstalled => "CommonNotInstalled",
+            ManagedServiceState.Stopped => "ServicesStopped",
+            ManagedServiceState.Running => "ServicesRunning",
+            _ => "ServicesUnknown"
+        });
+    }
+
+    private static string UnavailableReasonFor(ManagedServiceDefinition definition)
+    {
+        return definition.Id switch
+        {
+            "valkey" => AppLocalization.Get("ServicesValkeyUnavailable"),
+            "typesense" => AppLocalization.Get("ServicesTypesenseUnavailable"),
+            _ => definition.UnavailableReason
+                ?? AppLocalization.Format("ServicesUnavailableNative", definition.Name)
+        };
+    }
+
     private async Task ShowErrorAsync(string message)
     {
         await ShowMessageAsync("HerdMe", message);
@@ -405,7 +483,7 @@ public sealed partial class ServicesPage : Page
             XamlRoot = XamlRoot,
             Title = title,
             Content = message,
-            CloseButtonText = "OK"
+            CloseButtonText = AppLocalization.Get("CommonOk")
         };
         await dialog.ShowAsync();
     }

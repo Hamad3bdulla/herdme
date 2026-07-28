@@ -2,32 +2,6 @@ import Darwin
 import Foundation
 import Network
 
-enum LocalFastCGIError: LocalizedError {
-    case malformedRequest
-    case requestTooLarge
-    case invalidPath
-    case scriptMissing
-    case connectionFailed(String)
-    case invalidResponse
-
-    var errorDescription: String? {
-        switch self {
-        case .malformedRequest:
-            "The local HTTP request is malformed."
-        case .requestTooLarge:
-            "The local HTTP request is too large."
-        case .invalidPath:
-            "The requested local path is invalid."
-        case .scriptMissing:
-            "The requested local site has no front controller."
-        case let .connectionFailed(message):
-            "PHP-FPM connection failed: \(message)"
-        case .invalidResponse:
-            "PHP-FPM returned an invalid response."
-        }
-    }
-}
-
 final class LocalFastCGIGateway: @unchecked Sendable {
     private let documentRoot: URL
     private let fpmPort: Int
@@ -52,8 +26,9 @@ final class LocalFastCGIGateway: @unchecked Sendable {
     func start(preferredPort: Int) throws -> Int {
         if let port, listener != nil { return port }
         guard let selectedPort = LocalEnvironmentEngine.availablePort(startingAt: preferredPort),
-              let rawPort = UInt16(exactly: selectedPort),
-              let networkPort = NWEndpoint.Port(rawValue: rawPort) else {
+            let rawPort = UInt16(exactly: selectedPort),
+            let networkPort = NWEndpoint.Port(rawValue: rawPort)
+        else {
             throw LocalEnvironmentError.noAvailablePort
         }
 
@@ -78,7 +53,7 @@ final class LocalFastCGIGateway: @unchecked Sendable {
             session.start()
         }
         listener.stateUpdateHandler = { state in
-            if case let .failed(error) = state {
+            if case .failed(let error) = state {
                 NSLog("HerdMe FastCGI gateway failed: %@", error.localizedDescription)
             }
         }
@@ -95,7 +70,7 @@ final class LocalFastCGIGateway: @unchecked Sendable {
         let activeSessions = Array(sessions.values)
         sessions.removeAll()
         sessionsLock.unlock()
-        activeSessions.forEach { $0.stop() }
+        for session in activeSessions { session.stop() }
         port = nil
     }
 
@@ -108,6 +83,8 @@ final class LocalFastCGIGateway: @unchecked Sendable {
 
 private final class FastCGIHTTPSession: @unchecked Sendable {
     private static let fileChunkSize = 64 * 1_024
+    private static let maximumPersistentRequests = 100
+    private static let persistentIdleTimeout: DispatchTimeInterval = .seconds(5)
     private static let processingQueue = DispatchQueue(
         label: "app.herdme.fastcgi-gateway.processing",
         qos: .userInitiated,
@@ -119,6 +96,9 @@ private final class FastCGIHTTPSession: @unchecked Sendable {
     private let queue = DispatchQueue(label: "app.herdme.fastcgi-gateway.session", qos: .userInitiated)
     private var buffer = Data()
     private var stopped = false
+    private var peerCompleted = false
+    private var receiveGeneration = 0
+    private var requestCount = 0
     private var responseFileDescriptor: Int32?
 
     init(
@@ -161,41 +141,60 @@ private final class FastCGIHTTPSession: @unchecked Sendable {
     }
 
     private func receiveRequest() {
+        guard !stopped else { return }
+        if buffer.count > HTTPWireRequest.maximumSize {
+            send(HTTPWireResponse.error(status: "413 Payload Too Large"))
+            return
+        }
+        do {
+            if let length = try HTTPWireRequest.completeLength(in: buffer), buffer.count >= length {
+                let requestData = Data(buffer.prefix(length))
+                buffer.removeFirst(length)
+                let request = try HTTPWireRequest(data: requestData)
+                requestCount += 1
+                let keepAlive =
+                    !peerCompleted
+                    && request.allowsPersistentConnection
+                    && requestCount < Self.maximumPersistentRequests
+                receiveGeneration &+= 1
+                process(request, keepAlive: keepAlive)
+                return
+            }
+        } catch {
+            NSLog("HerdMe FastCGI request failed: %@", error.localizedDescription)
+            send(HTTPWireResponse.error(status: Self.status(for: error)))
+            return
+        }
+        if peerCompleted {
+            send(HTTPWireResponse.error(status: "400 Bad Request"))
+            return
+        }
+
+        receiveGeneration &+= 1
+        let generation = receiveGeneration
+        queue.asyncAfter(deadline: .now() + Self.persistentIdleTimeout) { [weak self] in
+            guard let self, !self.stopped, self.receiveGeneration == generation else { return }
+            self.stopOnQueue()
+        }
         incoming.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, complete, error in
             guard let self, !self.stopped else { return }
             if let data { self.buffer.append(data) }
-            if self.buffer.count > HTTPWireRequest.maximumSize {
-                self.send(HTTPWireResponse.error(status: "413 Payload Too Large"))
-                return
-            }
-            if let length = try? HTTPWireRequest.completeLength(in: self.buffer),
-               self.buffer.count >= length {
-                do {
-                    let request = try HTTPWireRequest(data: self.buffer.prefix(length))
-                    self.process(request)
-                } catch {
-                    NSLog("HerdMe FastCGI request failed: %@", error.localizedDescription)
-                    self.send(HTTPWireResponse.error(status: Self.status(for: error)))
-                }
-            } else if complete || error != nil {
-                self.send(HTTPWireResponse.error(status: "400 Bad Request"))
-            } else {
-                self.receiveRequest()
-            }
+            if complete || error != nil { self.peerCompleted = true }
+            self.receiveRequest()
         }
     }
 
-    private func process(_ request: HTTPWireRequest) {
+    private func process(_ request: HTTPWireRequest, keepAlive: Bool) {
         Self.processingQueue.async { [weak self] in
             guard let self else { return }
             do {
-                switch try self.handler.responsePlan(to: request) {
-                case let .complete(response):
+                switch try self.handler.responsePlan(to: request, keepAlive: keepAlive) {
+                case .complete(let response):
                     self.queue.async { [weak self] in
                         guard let self, !self.stopped else { return }
                         self.send(response)
                     }
-                case let .fastCGI(fastCGIRequest):
+                case .fastCGI(let fastCGIRequest):
                     try self.streamFastCGI(fastCGIRequest, headOnly: request.method == "HEAD")
                 }
             } catch {
@@ -209,7 +208,10 @@ private final class FastCGIHTTPSession: @unchecked Sendable {
     }
 
     private func streamFastCGI(_ request: FastCGIRequest, headOnly: Bool) throws {
-        var parser = FastCGIHTTPStreamParser(headOnly: headOnly)
+        var parser = FastCGIHTTPStreamParser(
+            headOnly: headOnly,
+            allowKeepAlive: request.keepAlive
+        )
         do {
             let errors = try FastCGIClient(port: handler.fpmPort).performStreaming(
                 parameters: request.parameters,
@@ -226,11 +228,8 @@ private final class FastCGIHTTPSession: @unchecked Sendable {
             if !errors.isEmpty {
                 NSLog("HerdMe PHP-FPM: %@", String(decoding: errors, as: UTF8.self))
             }
-            incoming.send(
-                content: nil,
-                isComplete: true,
-                completion: .contentProcessed { [weak self] _ in self?.stopOnQueue() }
-            )
+            let keepAlive = parser.keepsConnectionAlive
+            queue.async { [weak self] in self?.finishStreamingResponse(keepAlive: keepAlive) }
         } catch {
             guard parser.didStartResponse else { throw error }
             queue.async { [weak self] in self?.stopOnQueue() }
@@ -249,28 +248,44 @@ private final class FastCGIHTTPSession: @unchecked Sendable {
     }
 
     private func send(_ response: HTTPWireResponse) {
+        let keepAlive = response.keepAlive && !peerCompleted
         switch response.body {
-        case let .data(body):
+        case .data(let body):
             var content = response.header
             content.append(body)
-            incoming.send(content: content, isComplete: true, completion: .contentProcessed { [weak self] _ in
-                self?.stopOnQueue()
-            })
-        case let .file(url, offset, length):
+            incoming.send(
+                content: content, isComplete: !keepAlive,
+                completion: .contentProcessed { [weak self] error in
+                    guard let self else { return }
+                    if error == nil {
+                        self.finishResponse(keepAlive: keepAlive)
+                    } else {
+                        self.stopOnQueue()
+                    }
+                })
+        case .file(let url, let offset, let length):
             guard length > 0 else {
                 incoming.send(
                     content: response.header,
-                    isComplete: true,
-                    completion: .contentProcessed { [weak self] _ in self?.stopOnQueue() }
+                    isComplete: !keepAlive,
+                    completion: .contentProcessed { [weak self] error in
+                        guard let self else { return }
+                        if error == nil {
+                            self.finishResponse(keepAlive: keepAlive)
+                        } else {
+                            self.stopOnQueue()
+                        }
+                    }
                 )
                 return
             }
             let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC)
             var metadata = stat()
             guard descriptor >= 0,
-                  fstat(descriptor, &metadata) == 0,
-                  metadata.st_mode & S_IFMT == S_IFREG,
-                  metadata.st_size >= off_t(offset) + off_t(length) else {
+                fstat(descriptor, &metadata) == 0,
+                metadata.st_mode & S_IFMT == S_IFREG,
+                metadata.st_size >= off_t(offset) + off_t(length)
+            else {
                 if descriptor >= 0 { Darwin.close(descriptor) }
                 send(HTTPWireResponse.error(status: "404 Not Found"))
                 return
@@ -285,13 +300,23 @@ private final class FastCGIHTTPSession: @unchecked Sendable {
                         self.stopOnQueue()
                         return
                     }
-                    self.sendFileChunk(descriptor: descriptor, offset: offset, remaining: length)
+                    self.sendFileChunk(
+                        descriptor: descriptor,
+                        offset: offset,
+                        remaining: length,
+                        keepAlive: keepAlive
+                    )
                 }
             )
         }
     }
 
-    private func sendFileChunk(descriptor: Int32, offset: Int64, remaining: Int) {
+    private func sendFileChunk(
+        descriptor: Int32,
+        offset: Int64,
+        remaining: Int,
+        keepAlive: Bool
+    ) {
         guard !stopped, responseFileDescriptor == descriptor, remaining > 0 else {
             stopOnQueue()
             return
@@ -309,7 +334,7 @@ private final class FastCGIHTTPSession: @unchecked Sendable {
         let nextRemaining = remaining - count
         incoming.send(
             content: chunk,
-            isComplete: nextRemaining == 0,
+            isComplete: nextRemaining == 0 && !keepAlive,
             completion: .contentProcessed { [weak self] error in
                 guard let self else { return }
                 guard error == nil else {
@@ -317,21 +342,50 @@ private final class FastCGIHTTPSession: @unchecked Sendable {
                     return
                 }
                 if nextRemaining == 0 {
-                    self.stopOnQueue()
+                    Darwin.close(descriptor)
+                    self.responseFileDescriptor = nil
+                    self.finishResponse(keepAlive: keepAlive)
                 } else {
                     self.sendFileChunk(
                         descriptor: descriptor,
                         offset: offset + Int64(count),
-                        remaining: nextRemaining
+                        remaining: nextRemaining,
+                        keepAlive: keepAlive
                     )
                 }
             }
         )
     }
 
+    private func finishStreamingResponse(keepAlive: Bool) {
+        guard !stopped else { return }
+        let keepAlive = keepAlive && !peerCompleted
+        if keepAlive {
+            finishResponse(keepAlive: true)
+        } else {
+            incoming.send(
+                content: nil,
+                isComplete: true,
+                completion: .contentProcessed { [weak self] _ in self?.stopOnQueue() }
+            )
+        }
+    }
+
+    private func finishResponse(keepAlive: Bool) {
+        guard !stopped else { return }
+        if keepAlive {
+            receiveRequest()
+        } else {
+            stopOnQueue()
+        }
+    }
+
     private static func status(for error: Error) -> String {
         switch error {
+        case LocalFastCGIError.headerTooLarge: "431 Request Header Fields Too Large"
         case LocalFastCGIError.requestTooLarge: "413 Payload Too Large"
+        case LocalFastCGIError.unsupportedHTTPVersion: "505 HTTP Version Not Supported"
+        case LocalFastCGIError.unsupportedTransferCoding: "501 Not Implemented"
         case LocalFastCGIError.invalidPath: "403 Forbidden"
         case LocalFastCGIError.scriptMissing: "404 Not Found"
         case LocalFastCGIError.malformedRequest: "400 Bad Request"
@@ -367,7 +421,22 @@ private final class NetworkSendCompletion: @unchecked Sendable {
 
 private struct HTTPWireRequest: Sendable {
     static let maximumSize = 32 * 1_024 * 1_024
+    private static let maximumHeaderSize = 1 * 1_024 * 1_024
     private static let headerDelimiter = Data("\r\n\r\n".utf8)
+    private static let lineDelimiter = Data("\r\n".utf8)
+
+    private enum BodyFraming {
+        case contentLength(Int)
+        case chunked
+    }
+
+    private struct ParsedHead {
+        let method: String
+        let target: String
+        let protocolVersion: String
+        let headers: [(name: String, value: String)]
+        let framing: BodyFraming
+    }
 
     let method: String
     let target: String
@@ -377,46 +446,34 @@ private struct HTTPWireRequest: Sendable {
 
     init(data: Data) throws {
         guard data.count <= Self.maximumSize,
-              let headerRange = data.range(of: Self.headerDelimiter),
-              let headerText = String(data: data[..<headerRange.lowerBound], encoding: .utf8) else {
+            let headerRange = data.range(of: Self.headerDelimiter)
+        else {
             throw LocalFastCGIError.malformedRequest
         }
-        let lines = headerText.components(separatedBy: "\r\n")
-        guard let requestLine = lines.first else { throw LocalFastCGIError.malformedRequest }
-        let components = requestLine.split(separator: " ", maxSplits: 2).map(String.init)
-        guard components.count == 3, components[2].hasPrefix("HTTP/") else {
-            throw LocalFastCGIError.malformedRequest
+        let headerLength = data.distance(from: data.startIndex, to: headerRange.lowerBound)
+        guard headerLength <= Self.maximumHeaderSize else {
+            throw LocalFastCGIError.headerTooLarge
         }
-
-        method = components[0].uppercased()
-        target = components[1]
-        protocolVersion = components[2]
-        let parsedHeaders: [(name: String, value: String)] = try lines.dropFirst().map { line in
-            guard let separator = line.firstIndex(of: ":") else {
-                throw LocalFastCGIError.malformedRequest
-            }
-            return (
-                String(line[..<separator]).trimmingCharacters(in: .whitespaces),
-                String(line[line.index(after: separator)...]).trimmingCharacters(in: .whitespaces)
-            )
-        }
-        headers = parsedHeaders
+        let parsed = try Self.parseHead(Data(data[..<headerRange.lowerBound]))
+        method = parsed.method.uppercased()
+        target = parsed.target
+        protocolVersion = parsed.protocolVersion
+        headers = parsed.headers
 
         let encodedBody = Data(data[headerRange.upperBound...])
-        let transferEncoding = parsedHeaders.first {
-            $0.name.caseInsensitiveCompare("Transfer-Encoding") == .orderedSame
-        }?.value
-        if transferEncoding?.lowercased().contains("chunked") == true {
-            body = try Self.decodeChunked(encodedBody).body
-        } else {
-            let contentLength = parsedHeaders.first {
-                $0.name.caseInsensitiveCompare("Content-Length") == .orderedSame
-            }?.value
-            let expected = Int(contentLength ?? "0") ?? 0
-            guard expected >= 0, encodedBody.count >= expected else {
+        switch parsed.framing {
+        case .contentLength(let expected):
+            guard encodedBody.count == expected else {
                 throw LocalFastCGIError.malformedRequest
             }
-            body = encodedBody.prefix(expected)
+            body = encodedBody
+        case .chunked:
+            guard let decoded = try Self.decodeChunked(encodedBody),
+                decoded.consumed == encodedBody.count
+            else {
+                throw LocalFastCGIError.malformedRequest
+            }
+            body = decoded.body
         }
     }
 
@@ -424,53 +481,209 @@ private struct HTTPWireRequest: Sendable {
         headers.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame })?.value
     }
 
-    static func completeLength(in data: Data) throws -> Int? {
-        guard let headerRange = data.range(of: headerDelimiter) else { return nil }
-        guard let headerText = String(data: data[..<headerRange.lowerBound], encoding: .utf8) else {
-            throw LocalFastCGIError.malformedRequest
-        }
-        if headerText.range(of: "(?im)^Transfer-Encoding:\\s*.*chunked", options: .regularExpression) != nil {
-            let encodedBody = Data(data[headerRange.upperBound...])
-            guard let decoded = try? decodeChunked(encodedBody) else { return nil }
-            return headerRange.upperBound + decoded.consumed
-        }
-        let contentLength = headerText
-            .components(separatedBy: "\r\n")
-            .first { $0.lowercased().hasPrefix("content-length:") }
-            .flatMap { Int($0.dropFirst("content-length:".count).trimmingCharacters(in: .whitespaces)) } ?? 0
-        guard contentLength >= 0 else { throw LocalFastCGIError.malformedRequest }
-        let expected = headerRange.upperBound + contentLength
-        return data.count >= expected ? expected : nil
+    var allowsPersistentConnection: Bool {
+        let connectionTokens =
+            headers
+            .filter { $0.name.caseInsensitiveCompare("Connection") == .orderedSame }
+            .flatMap { $0.value.split(separator: ",") }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        if connectionTokens.contains("close") { return false }
+        if protocolVersion.caseInsensitiveCompare("HTTP/1.1") == .orderedSame { return true }
+        return protocolVersion.caseInsensitiveCompare("HTTP/1.0") == .orderedSame
+            && connectionTokens.contains("keep-alive")
     }
 
-    private static func decodeChunked(_ data: Data) throws -> (body: Data, consumed: Int) {
-        let delimiter = Data("\r\n".utf8)
+    static func completeLength(in data: Data) throws -> Int? {
+        guard let headerRange = data.range(of: headerDelimiter) else {
+            if data.count > maximumHeaderSize { throw LocalFastCGIError.headerTooLarge }
+            return nil
+        }
+        let headerLength = data.distance(from: data.startIndex, to: headerRange.lowerBound)
+        guard headerLength <= maximumHeaderSize else { throw LocalFastCGIError.headerTooLarge }
+        let parsed = try parseHead(Data(data[..<headerRange.lowerBound]))
+        let bodyOffset = data.distance(from: data.startIndex, to: headerRange.upperBound)
+        switch parsed.framing {
+        case .contentLength(let contentLength):
+            guard contentLength <= maximumSize - bodyOffset else {
+                throw LocalFastCGIError.requestTooLarge
+            }
+            let expected = bodyOffset + contentLength
+            return data.count >= expected ? expected : nil
+        case .chunked:
+            let encodedBody = Data(data[headerRange.upperBound...])
+            guard let decoded = try decodeChunked(encodedBody) else { return nil }
+            let expected = bodyOffset + decoded.consumed
+            guard expected <= maximumSize else { throw LocalFastCGIError.requestTooLarge }
+            return expected
+        }
+    }
+
+    private static func parseHead(_ data: Data) throws -> ParsedHead {
+        guard let headerText = String(data: data, encoding: .utf8) else {
+            throw LocalFastCGIError.malformedRequest
+        }
+        let lines = headerText.components(separatedBy: "\r\n")
+        guard let requestLine = lines.first else { throw LocalFastCGIError.malformedRequest }
+        let components = requestLine.split(separator: " ", maxSplits: 2).map(String.init)
+        guard components.count == 3,
+            isValidToken(components[0]),
+            components[1].utf8.allSatisfy({ $0 > 0x20 && $0 != 0x7f })
+        else {
+            throw LocalFastCGIError.malformedRequest
+        }
+        guard components[2].hasPrefix("HTTP/") else {
+            throw LocalFastCGIError.malformedRequest
+        }
+        guard components[2] == "HTTP/1.0" || components[2] == "HTTP/1.1" else {
+            throw LocalFastCGIError.unsupportedHTTPVersion
+        }
+
+        let headers = try lines.dropFirst().map(parseHeaderLine)
+        let hostHeaders = headers.filter { $0.name.caseInsensitiveCompare("Host") == .orderedSame }
+        guard hostHeaders.count <= 1,
+            components[2] != "HTTP/1.1" || hostHeaders.count == 1,
+            !hostHeaders.contains(where: { $0.value.isEmpty })
+        else {
+            throw LocalFastCGIError.malformedRequest
+        }
+
+        let transferCodings =
+            headers
+            .filter { $0.name.caseInsensitiveCompare("Transfer-Encoding") == .orderedSame }
+            .flatMap {
+                $0.value.split(separator: ",", omittingEmptySubsequences: false)
+                    .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+            }
+        guard !transferCodings.contains(where: { $0.isEmpty }) else {
+            throw LocalFastCGIError.malformedRequest
+        }
+        if transferCodings.contains(where: { $0 != "chunked" }) {
+            throw LocalFastCGIError.unsupportedTransferCoding
+        }
+        guard transferCodings.count <= 1,
+            components[2] != "HTTP/1.0" || transferCodings.isEmpty
+        else {
+            throw LocalFastCGIError.malformedRequest
+        }
+
+        let contentLengthHeaders = headers.filter {
+            $0.name.caseInsensitiveCompare("Content-Length") == .orderedSame
+        }
+        guard contentLengthHeaders.count <= 1,
+            transferCodings.isEmpty || contentLengthHeaders.isEmpty
+        else {
+            throw LocalFastCGIError.malformedRequest
+        }
+        let framing: BodyFraming
+        if !transferCodings.isEmpty {
+            framing = .chunked
+        } else if let contentLength = contentLengthHeaders.first?.value {
+            guard !contentLength.isEmpty,
+                contentLength.utf8.allSatisfy({ (0x30...0x39).contains($0) }),
+                let parsed = Int(contentLength)
+            else {
+                throw LocalFastCGIError.malformedRequest
+            }
+            guard parsed <= maximumSize else { throw LocalFastCGIError.requestTooLarge }
+            framing = .contentLength(parsed)
+        } else {
+            framing = .contentLength(0)
+        }
+        return ParsedHead(
+            method: components[0],
+            target: components[1],
+            protocolVersion: components[2],
+            headers: headers,
+            framing: framing
+        )
+    }
+
+    private static func parseHeaderLine(_ line: String) throws -> (name: String, value: String) {
+        guard let separator = line.firstIndex(of: ":") else {
+            throw LocalFastCGIError.malformedRequest
+        }
+        let name = String(line[..<separator])
+        let value = String(line[line.index(after: separator)...]).trimmingCharacters(in: .whitespaces)
+        guard isValidToken(name), isValidHeaderValue(value) else {
+            throw LocalFastCGIError.malformedRequest
+        }
+        return (name, value)
+    }
+
+    private static func isValidToken(_ value: String) -> Bool {
+        let punctuation = Array("!#$%&'*+-.^_`|~".utf8)
+        return !value.isEmpty
+            && value.utf8.allSatisfy { byte in
+                (0x30...0x39).contains(byte)
+                    || (0x41...0x5a).contains(byte)
+                    || (0x61...0x7a).contains(byte)
+                    || punctuation.contains(byte)
+            }
+    }
+
+    private static func isValidHeaderValue(_ value: String) -> Bool {
+        value.utf8.allSatisfy { $0 == 0x09 || (0x20...0x7e).contains($0) }
+    }
+
+    private static func decodeChunked(_ data: Data) throws -> (body: Data, consumed: Int)? {
         var cursor = data.startIndex
         var body = Data()
         while true {
-            guard let lineRange = data.range(of: delimiter, in: cursor..<data.endIndex),
-                  let sizeLine = String(data: data[cursor..<lineRange.lowerBound], encoding: .utf8),
-                  let size = Int(sizeLine.split(separator: ";", maxSplits: 1)[0], radix: 16),
-                  size >= 0 else {
+            guard let lineRange = data.range(of: lineDelimiter, in: cursor..<data.endIndex) else {
+                if data.distance(from: cursor, to: data.endIndex) > 8_192 {
+                    throw LocalFastCGIError.malformedRequest
+                }
+                return nil
+            }
+            guard let sizeLine = String(data: data[cursor..<lineRange.lowerBound], encoding: .utf8),
+                isValidHeaderValue(sizeLine)
+            else {
+                throw LocalFastCGIError.malformedRequest
+            }
+            let sizeText = sizeLine.split(separator: ";", maxSplits: 1)[0]
+            guard !sizeText.isEmpty,
+                sizeText.utf8.allSatisfy({
+                    (0x30...0x39).contains($0)
+                        || (0x41...0x46).contains($0)
+                        || (0x61...0x66).contains($0)
+                }),
+                let size = Int(sizeText, radix: 16)
+            else {
                 throw LocalFastCGIError.malformedRequest
             }
             cursor = lineRange.upperBound
-            guard data.distance(from: cursor, to: data.endIndex) >= size + 2 else {
-                throw LocalFastCGIError.malformedRequest
-            }
-            if size > 0 {
-                let end = data.index(cursor, offsetBy: size)
-                body.append(data[cursor..<end])
-                cursor = end
-            }
-            guard data[cursor..<data.index(cursor, offsetBy: 2)] == delimiter else {
-                throw LocalFastCGIError.malformedRequest
-            }
-            cursor = data.index(cursor, offsetBy: 2)
             if size == 0 {
-                return (body, data.distance(from: data.startIndex, to: cursor))
+                while true {
+                    guard let trailerRange = data.range(of: lineDelimiter, in: cursor..<data.endIndex) else {
+                        if data.distance(from: cursor, to: data.endIndex) > maximumHeaderSize {
+                            throw LocalFastCGIError.headerTooLarge
+                        }
+                        return nil
+                    }
+                    guard let trailer = String(data: data[cursor..<trailerRange.lowerBound], encoding: .utf8) else {
+                        throw LocalFastCGIError.malformedRequest
+                    }
+                    cursor = trailerRange.upperBound
+                    if trailer.isEmpty {
+                        return (body, data.distance(from: data.startIndex, to: cursor))
+                    }
+                    _ = try parseHeaderLine(trailer)
+                }
             }
-            guard body.count <= maximumSize else { throw LocalFastCGIError.requestTooLarge }
+            guard size <= maximumSize - body.count else {
+                throw LocalFastCGIError.requestTooLarge
+            }
+            guard data.distance(from: cursor, to: data.endIndex) >= size + lineDelimiter.count else {
+                return nil
+            }
+            let end = data.index(cursor, offsetBy: size)
+            body.append(data[cursor..<end])
+            cursor = end
+            let terminatorEnd = data.index(cursor, offsetBy: lineDelimiter.count)
+            guard data[cursor..<terminatorEnd] == lineDelimiter else {
+                throw LocalFastCGIError.malformedRequest
+            }
+            cursor = terminatorEnd
         }
     }
 }
@@ -478,6 +691,7 @@ private struct HTTPWireRequest: Sendable {
 private struct FastCGIRequest: Sendable {
     let parameters: [String: String]
     let body: Data
+    let keepAlive: Bool
 }
 
 private struct FastCGIHTTPHandler: Sendable {
@@ -489,30 +703,34 @@ private struct FastCGIHTTPHandler: Sendable {
         case fastCGI(FastCGIRequest)
     }
 
-    func responsePlan(to request: HTTPWireRequest) throws -> ResponsePlan {
+    func responsePlan(to request: HTTPWireRequest, keepAlive: Bool) throws -> ResponsePlan {
         let target = try RequestTarget(request.target)
         let resource = try resolve(path: target.path)
         switch resource {
-        case let .staticFile(url):
+        case .staticFile(let url):
             guard request.method == "GET" || request.method == "HEAD" else {
                 return .complete(HTTPWireResponse.error(status: "405 Method Not Allowed"))
             }
-            return .complete(try HTTPWireResponse.staticFile(
-                url,
-                headOnly: request.method == "HEAD",
-                rangeHeader: request.header(named: "Range")
-            ))
-        case let .script(scriptURL, scriptName, pathInfo):
-            return .fastCGI(FastCGIRequest(
-                parameters: parameters(
-                    for: request,
-                    target: target,
-                    scriptURL: scriptURL,
-                    scriptName: scriptName,
-                    pathInfo: pathInfo
-                ),
-                body: request.body
-            ))
+            return .complete(
+                try HTTPWireResponse.staticFile(
+                    url,
+                    headOnly: request.method == "HEAD",
+                    rangeHeader: request.header(named: "Range"),
+                    keepAlive: keepAlive
+                ))
+        case .script(let scriptURL, let scriptName, let pathInfo):
+            return .fastCGI(
+                FastCGIRequest(
+                    parameters: parameters(
+                        for: request,
+                        target: target,
+                        scriptURL: scriptURL,
+                        scriptName: scriptName,
+                        pathInfo: pathInfo
+                    ),
+                    body: request.body,
+                    keepAlive: keepAlive
+                ))
         }
     }
 
@@ -567,7 +785,8 @@ private struct FastCGIHTTPHandler: Sendable {
 
     private func resolve(path: String) throws -> Resource {
         let relativePath = path.drop(while: { $0 == "/" })
-        let candidate = documentRoot
+        let candidate =
+            documentRoot
             .appendingPathComponent(String(relativePath))
             .standardizedFileURL
             .resolvingSymlinksInPath()
@@ -642,57 +861,14 @@ private struct HTTPWireResponse: Sendable {
 
     let header: Data
     let body: Body
+    let keepAlive: Bool
 
-    static func fastCGIHeader(_ data: Data) throws -> FastCGIHTTPHeader {
-        guard let headerText = String(data: data, encoding: .utf8) else {
-            throw LocalFastCGIError.invalidResponse
-        }
-        var status = "200 OK"
-        var headers: [(String, String)] = []
-        var contentLength: Int?
-        let hopByHopHeaders: Set<String> = [
-            "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
-            "te", "trailer", "transfer-encoding", "upgrade"
-        ]
-        for line in headerText.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n") {
-            guard !line.isEmpty else { continue }
-            guard let separator = line.firstIndex(of: ":") else {
-                throw LocalFastCGIError.invalidResponse
-            }
-            let name = String(line[..<separator]).trimmingCharacters(in: .whitespaces)
-            let value = String(line[line.index(after: separator)...]).trimmingCharacters(in: .whitespaces)
-            guard isValidHeaderName(name), isValidHeaderValue(value) else {
-                throw LocalFastCGIError.invalidResponse
-            }
-            if name.caseInsensitiveCompare("Status") == .orderedSame {
-                status = value
-            } else if name.caseInsensitiveCompare("Content-Length") == .orderedSame {
-                guard contentLength == nil, let parsed = Int(value), parsed >= 0 else {
-                    throw LocalFastCGIError.invalidResponse
-                }
-                contentLength = parsed
-                headers.append((name, value))
-            } else if !hopByHopHeaders.contains(name.lowercased()) {
-                headers.append((name, value))
-            }
-        }
-        guard isValidStatus(status) else { throw LocalFastCGIError.invalidResponse }
-        if status == "200 OK", headers.contains(where: { $0.0.caseInsensitiveCompare("Location") == .orderedSame }) {
-            status = "302 Found"
-        }
-        if !headers.contains(where: { $0.0.caseInsensitiveCompare("Content-Type") == .orderedSame }) {
-            headers.append(("Content-Type", "text/html; charset=utf-8"))
-        }
-        headers.append(("Connection", "close"))
-        let statusCode = Int(status.prefix(3)) ?? 0
-        return FastCGIHTTPHeader(
-            data: makeHeader(status: status, headers: headers),
-            contentLength: contentLength,
-            bodyForbidden: (100..<200).contains(statusCode) || statusCode == 204 || statusCode == 304
-        )
-    }
-
-    static func staticFile(_ url: URL, headOnly: Bool, rangeHeader: String?) throws -> HTTPWireResponse {
+    static func staticFile(
+        _ url: URL,
+        headOnly: Bool,
+        rangeHeader: String?,
+        keepAlive: Bool
+    ) throws -> HTTPWireResponse {
         let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
         guard values.isRegularFile == true, let fileSize = values.fileSize, fileSize >= 0 else {
             throw LocalFastCGIError.invalidPath
@@ -705,9 +881,10 @@ private struct HTTPWireResponse: Sendable {
                     ("Accept-Ranges", "bytes"),
                     ("Content-Length", "0"),
                     ("Cache-Control", "no-cache"),
-                    ("Connection", "close")
+                    ("Connection", keepAlive ? "keep-alive" : "close")
                 ],
-                body: Data()
+                body: Data(),
+                keepAlive: keepAlive
             )
         }
         var headers = [
@@ -715,7 +892,7 @@ private struct HTTPWireResponse: Sendable {
             ("Content-Length", String(selectedRange.length)),
             ("Accept-Ranges", "bytes"),
             ("Cache-Control", "no-cache"),
-            ("Connection", "close")
+            ("Connection", keepAlive ? "keep-alive" : "close")
         ]
         if selectedRange.isPartial {
             headers.insert(
@@ -726,16 +903,21 @@ private struct HTTPWireResponse: Sendable {
                 at: 2
             )
         }
-        let responseHeader = makeHeader(
+        let responseHeader = HTTPWireHeader.make(
             status: selectedRange.isPartial ? "206 Partial Content" : "200 OK",
             headers: headers
         )
         if headOnly || selectedRange.length == 0 {
-            return HTTPWireResponse(header: responseHeader, body: .data(Data()))
+            return HTTPWireResponse(
+                header: responseHeader,
+                body: .data(Data()),
+                keepAlive: keepAlive
+            )
         }
         return make(
             header: responseHeader,
-            body: .file(url, offset: selectedRange.offset, length: selectedRange.length)
+            body: .file(url, offset: selectedRange.offset, length: selectedRange.length),
+            keepAlive: keepAlive
         )
     }
 
@@ -748,29 +930,26 @@ private struct HTTPWireResponse: Sendable {
                 ("Content-Length", String(body.count)),
                 ("Connection", "close")
             ],
-            body: body
+            body: body,
+            keepAlive: false
         )
     }
 
     private static func make(
         status: String,
         headers: [(String, String)],
-        body: Data
+        body: Data,
+        keepAlive: Bool
     ) -> HTTPWireResponse {
-        HTTPWireResponse(header: makeHeader(status: status, headers: headers), body: .data(body))
+        HTTPWireResponse(
+            header: HTTPWireHeader.make(status: status, headers: headers),
+            body: .data(body),
+            keepAlive: keepAlive
+        )
     }
 
-    private static func make(header: Data, body: Body) -> HTTPWireResponse {
-        HTTPWireResponse(header: header, body: body)
-    }
-
-    fileprivate static func makeHeader(status: String, headers: [(String, String)]) -> Data {
-        var response = Data("HTTP/1.1 \(status)\r\n".utf8)
-        for header in headers {
-            response.append(Data("\(header.0): \(header.1)\r\n".utf8))
-        }
-        response.append(Data("\r\n".utf8))
-        return response
+    private static func make(header: Data, body: Body, keepAlive: Bool) -> HTTPWireResponse {
+        HTTPWireResponse(header: header, body: body, keepAlive: keepAlive)
     }
 
     private static func mimeType(for pathExtension: String) -> String {
@@ -796,105 +975,6 @@ private struct HTTPWireResponse: Sendable {
         }
     }
 
-    private static func isValidStatus(_ status: String) -> Bool {
-        guard status.count >= 3,
-              status.prefix(3).allSatisfy(\.isNumber),
-              let code = Int(status.prefix(3)),
-              (100...599).contains(code) else {
-            return false
-        }
-        if status.count == 3 { return true }
-        return status[status.index(status.startIndex, offsetBy: 3)].isWhitespace
-            && isValidHeaderValue(status)
-    }
-
-    private static func isValidHeaderName(_ name: String) -> Bool {
-        !name.isEmpty && name.utf8.allSatisfy { byte in
-            (48...57).contains(byte)
-                || (65...90).contains(byte)
-                || (97...122).contains(byte)
-                || byte == 45
-        }
-    }
-
-    private static func isValidHeaderValue(_ value: String) -> Bool {
-        value.utf8.allSatisfy { byte in byte == 9 || (32...126).contains(byte) }
-    }
-}
-
-private struct FastCGIHTTPHeader: Sendable {
-    let data: Data
-    let contentLength: Int?
-    let bodyForbidden: Bool
-}
-
-private struct FastCGIHTTPStreamParser {
-    private static let maximumHeaderSize = 1 * 1_024 * 1_024
-    private static let delimiter = Data("\r\n\r\n".utf8)
-    private static let alternateDelimiter = Data("\n\n".utf8)
-
-    let headOnly: Bool
-    private(set) var didStartResponse = false
-    private var headerBuffer = Data()
-    private var declaredContentLength: Int?
-    private var bodyBytes = 0
-    private var bodyForbidden = false
-
-    init(headOnly: Bool) {
-        self.headOnly = headOnly
-    }
-
-    mutating func consume(_ chunk: Data, send: (Data) throws -> Void) throws {
-        guard !chunk.isEmpty else { return }
-        if didStartResponse {
-            try consumeBody(chunk, send: send)
-            return
-        }
-
-        headerBuffer.append(chunk)
-        guard headerBuffer.count <= Self.maximumHeaderSize else {
-            throw LocalFastCGIError.invalidResponse
-        }
-        guard let range = Self.headerRange(in: headerBuffer) else { return }
-        let parsed = try HTTPWireResponse.fastCGIHeader(Data(headerBuffer[..<range.lowerBound]))
-        declaredContentLength = parsed.contentLength
-        bodyForbidden = parsed.bodyForbidden
-        try send(parsed.data)
-        didStartResponse = true
-        let body = Data(headerBuffer[range.upperBound...])
-        headerBuffer.removeAll(keepingCapacity: false)
-        try consumeBody(body, send: send)
-    }
-
-    mutating func finish() throws {
-        guard didStartResponse else { throw LocalFastCGIError.invalidResponse }
-        if !headOnly, !bodyForbidden, let declaredContentLength,
-           bodyBytes != declaredContentLength {
-            throw LocalFastCGIError.invalidResponse
-        }
-    }
-
-    private mutating func consumeBody(_ body: Data, send: (Data) throws -> Void) throws {
-        guard !body.isEmpty else { return }
-        let (updatedBodyBytes, overflow) = bodyBytes.addingReportingOverflow(body.count)
-        guard !overflow else { throw LocalFastCGIError.invalidResponse }
-        bodyBytes = updatedBodyBytes
-        if let declaredContentLength, bodyBytes > declaredContentLength {
-            throw LocalFastCGIError.invalidResponse
-        }
-        if !headOnly, !bodyForbidden { try send(body) }
-    }
-
-    private static func headerRange(in data: Data) -> Range<Data.Index>? {
-        let standard = data.range(of: delimiter)
-        let alternate = data.range(of: alternateDelimiter)
-        return switch (standard, alternate) {
-        case let (left?, right?): left.lowerBound <= right.lowerBound ? left : right
-        case let (left?, nil): left
-        case let (nil, right?): right
-        case (nil, nil): nil
-        }
-    }
 }
 
 private struct HTTPByteRange: Sendable {
@@ -909,8 +989,9 @@ private struct HTTPByteRange: Sendable {
         guard fileSize > 0 else { return nil }
         let components = value.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
         guard components.count == 2,
-              components[0].trimmingCharacters(in: .whitespaces).lowercased() == "bytes",
-              !components[1].contains(",") else {
+            components[0].trimmingCharacters(in: .whitespaces).lowercased() == "bytes",
+            !components[1].contains(",")
+        else {
             return nil
         }
         let bounds = components[1].split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)

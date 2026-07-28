@@ -8,6 +8,7 @@
     <Platforms>x64</Platforms>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <UseWinUI>true</UseWinUI>
+    <DefaultLanguage>en-US</DefaultLanguage>
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <PublishTrimmed>false</PublishTrimmed>
@@ -55,5 +56,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>release-feed-url.txt</TargetPath>
     </Content>
+    <EmbeddedResource Include="..\..\HerdMe\Resources\runtime-catalog.json" LogicalName="HerdMe.runtime-catalog.json" />
   </ItemGroup>
 </Project>

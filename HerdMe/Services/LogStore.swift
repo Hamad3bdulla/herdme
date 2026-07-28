@@ -27,25 +27,29 @@ struct LogStore: Sendable {
 
     func files() -> [LocalLogFile] {
         let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]
-        guard let enumerator = FileManager.default.enumerator(
-            at: rootURL,
-            includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles]
-        ) else {
+        guard
+            let enumerator = FileManager.default.enumerator(
+                at: rootURL,
+                includingPropertiesForKeys: keys,
+                options: [.skipsHiddenFiles]
+            )
+        else {
             return []
         }
 
         var files: [LocalLogFile] = []
         for case let url as URL in enumerator {
             guard let values = try? url.resourceValues(forKeys: Set(keys)),
-                  values.isRegularFile == true else { continue }
+                values.isRegularFile == true
+            else { continue }
             let resolvedURL = url.standardizedFileURL.resolvingSymlinksInPath()
-            files.append(LocalLogFile(
-                url: resolvedURL,
-                relativePath: String(resolvedURL.path.dropFirst(rootURL.path.count + 1)),
-                size: Int64(values.fileSize ?? 0),
-                modifiedAt: values.contentModificationDate ?? .distantPast
-            ))
+            files.append(
+                LocalLogFile(
+                    url: resolvedURL,
+                    relativePath: String(resolvedURL.path.dropFirst(rootURL.path.count + 1)),
+                    size: Int64(values.fileSize ?? 0),
+                    modifiedAt: values.contentModificationDate ?? .distantPast
+                ))
         }
         return files.sorted {
             $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending

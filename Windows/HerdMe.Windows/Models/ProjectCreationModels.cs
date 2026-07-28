@@ -141,6 +141,18 @@ public enum LaravelProjectCreationStage
 
 public static class LaravelProjectCreationStages
 {
+    public static string TitleKey(LaravelProjectCreationStage stage)
+    {
+        if (!Enum.IsDefined(stage)) throw new ArgumentOutOfRangeException(nameof(stage), stage, null);
+        return $"SitesProjectStage{stage}Title";
+    }
+
+    public static string DetailKey(LaravelProjectCreationStage stage)
+    {
+        if (!Enum.IsDefined(stage)) throw new ArgumentOutOfRangeException(nameof(stage), stage, null);
+        return $"SitesProjectStage{stage}Detail";
+    }
+
     public static IReadOnlyList<LaravelProjectCreationStage> For(LaravelProjectRequest request)
     {
         var stages = new List<LaravelProjectCreationStage>

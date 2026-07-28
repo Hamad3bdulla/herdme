@@ -1,0 +1,74 @@
+name: Bug report
+description: Report a reproducible HerdMe failure or regression
+title: "[Bug]: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report security vulnerabilities here. Use the private security advisory link instead. Remove credentials, private keys, tokens, private source, and personal paths from logs before attaching them.
+  - type: input
+    id: version
+    attributes:
+      label: HerdMe version
+      description: Include the version and build from About, or the commit hash.
+      placeholder: "0.1.0 (Build 1) or commit abc1234"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS Apple Silicon
+        - macOS Intel
+        - Windows x64
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system version
+      placeholder: "macOS 26.0 or Windows 11 24H2"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest repeatable sequence, including runtime or service versions when relevant.
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Paste the relevant HerdMe log excerpt or attach a screenshot after removing sensitive data.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: I removed secrets, credentials, private keys, tokens, and private project source.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

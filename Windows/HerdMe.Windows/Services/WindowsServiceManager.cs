@@ -301,6 +301,12 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                     Path.Combine(SupportRoot, "Log", "services", instance.Id.ToString("D") + ".log"),
                     "[HerdMe] Automatic start failed: " + error.Message
                 );
+                await ApplicationDiagnostics.WriteManagedServiceStartupFailureAsync(
+                    instance.Id,
+                    instance.Name,
+                    error,
+                    SupportRoot
+                );
             }
         }
     }

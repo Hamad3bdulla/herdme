@@ -43,7 +43,10 @@ enum IndependentPathError: LocalizedError {
     case otherHerdPath
 
     var errorDescription: String? {
-        "HerdMe does not read or modify another application's project, runtime, or data folders. Choose a HerdMe-owned folder instead."
+        String(
+            localized:
+                "HerdMe does not read or modify another application's project, runtime, or data folders. Choose a HerdMe-owned folder instead."
+        )
     }
 }
 
@@ -53,10 +56,19 @@ enum ConfigurationStoreError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case let .invalidSchemaVersion(version):
-            "The settings schema version \(version) is invalid."
-        case let .unsupportedSchemaVersion(found, supported):
-            "The settings were created by a newer HerdMe release (schema \(found)); this release supports up to schema \(supported)."
+        case .invalidSchemaVersion(let version):
+            String.localizedStringWithFormat(
+                String(localized: "The settings schema version %lld is invalid."),
+                Int64(version)
+            )
+        case .unsupportedSchemaVersion(let found, let supported):
+            String.localizedStringWithFormat(
+                String(
+                    localized:
+                        "The settings were created by a newer HerdMe release (schema %1$lld); this release supports up to schema %2$lld."),
+                Int64(found),
+                Int64(supported)
+            )
         }
     }
 }
@@ -82,7 +94,15 @@ final class ConfigurationStore {
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
-        let applicationSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let applicationSupport =
+            fileManager.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first
+            ?? fileManager.homeDirectoryForCurrentUser.appendingPathComponent(
+                "Library/Application Support",
+                isDirectory: true
+            )
         rootURL = applicationSupport.appendingPathComponent("HerdMe", isDirectory: true)
         configURL = rootURL.appendingPathComponent("config.json")
         projectsURL = fileManager.homeDirectoryForCurrentUser.appendingPathComponent(
@@ -117,10 +137,11 @@ final class ConfigurationStore {
         var value: AppConfiguration
         do {
             data = try Data(contentsOf: configURL)
-            sourceSchemaVersion = try JSONDecoder().decode(
-                SchemaHeader.self,
-                from: data
-            ).configSchemaVersion ?? 0
+            sourceSchemaVersion =
+                try JSONDecoder().decode(
+                    SchemaHeader.self,
+                    from: data
+                ).configSchemaVersion ?? 0
             guard sourceSchemaVersion >= 0 else {
                 throw ConfigurationStoreError.invalidSchemaVersion(sourceSchemaVersion)
             }
@@ -130,7 +151,14 @@ final class ConfigurationStore {
                 )
                 let location = backupURL?.path ?? configURL.path
                 loadIssue = LoadIssue(
-                    message: "HerdMe did not replace settings created by a newer release (schema \(sourceSchemaVersion)). The original file was preserved at \(location). Update HerdMe before restoring it.",
+                    message: String.localizedStringWithFormat(
+                        String(
+                            localized:
+                                "HerdMe did not replace settings created by a newer release (schema %1$lld). The original file was preserved at %2$@. Update HerdMe before restoring it."
+                        ),
+                        Int64(sourceSchemaVersion),
+                        location
+                    ),
                     backupURL: backupURL
                 )
                 return .default
@@ -141,7 +169,13 @@ final class ConfigurationStore {
             let backupURL = preserveConfiguration(prefix: "config.corrupt")
             let location = backupURL?.path ?? configURL.path
             loadIssue = LoadIssue(
-                message: "HerdMe could not read its settings. The original file was preserved at \(location). No replacement settings were saved.",
+                message: String.localizedStringWithFormat(
+                    String(
+                        localized:
+                            "HerdMe could not read its settings. The original file was preserved at %@. No replacement settings were saved."
+                    ),
+                    location
+                ),
                 backupURL: backupURL
             )
             return .default
@@ -152,7 +186,8 @@ final class ConfigurationStore {
         )
         if migrated.parkPaths != value.parkPaths
             || migrated.independenceMigrationVersion != value.independenceMigrationVersion
-            || migrated.configSchemaVersion != sourceSchemaVersion {
+            || migrated.configSchemaVersion != sourceSchemaVersion
+        {
             value = migrated
             try? save(migrated)
         }

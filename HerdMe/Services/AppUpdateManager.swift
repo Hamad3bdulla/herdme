@@ -52,6 +52,10 @@ enum AppUpdateResult: Equatable, Sendable {
     case available(AppUpdateRelease)
 }
 
+protocol AppUpdateChecking: Sendable {
+    func check(channel: String) async throws -> AppUpdateResult
+}
+
 enum AppUpdateError: LocalizedError, Equatable, Sendable {
     case invalidResponse
     case unsignedRemoteManifest
@@ -63,22 +67,25 @@ enum AppUpdateError: LocalizedError, Equatable, Sendable {
     var errorDescription: String? {
         switch self {
         case .invalidResponse:
-            "The update service returned an invalid response."
+            String(localized: "The update service returned an invalid response.")
         case .unsignedRemoteManifest:
-            "The remote update feed is not signed and was rejected."
+            String(localized: "The remote update feed is not signed and was rejected.")
         case .verificationKeyMissing:
-            "This build does not contain the public key required to verify updates."
+            String(localized: "This build does not contain the public key required to verify updates.")
         case .invalidSignature:
-            "The update feed signature is invalid. The update was rejected."
+            String(localized: "The update feed signature is invalid. The update was rejected.")
         case .incompletePlatformDownloads:
-            "The signed update feed must contain HTTPS downloads for macOS and Windows x64."
-        case let .noRelease(channel):
-            "No \(channel.lowercased()) release is available in the update feed."
+            String(localized: "The signed update feed must contain HTTPS downloads for macOS and Windows x64.")
+        case .noRelease(let channel):
+            String.localizedStringWithFormat(
+                String(localized: "No %@ release is available in the update feed."),
+                channel.lowercased()
+            )
         }
     }
 }
 
-struct AppUpdateManager: Sendable {
+struct AppUpdateManager: AppUpdateChecking, Sendable {
     private static let maximumFeedSize = 4 * 1_024 * 1_024
 
     let feedURL: URL
@@ -100,26 +107,29 @@ struct AppUpdateManager: Sendable {
 
     static func configured(bundle: Bundle = .main) -> AppUpdateManager? {
         #if DEBUG
-        let environmentURL = ProcessInfo.processInfo.environment["HERDME_UPDATE_FEED_URL"]
-            .flatMap(URL.init(string:))
-        let environmentKey = ProcessInfo.processInfo.environment["HERDME_UPDATE_PUBLIC_KEY"]
-            .flatMap(Self.decodePublicKey)
+            let environmentURL = ProcessInfo.processInfo.environment["HERDME_UPDATE_FEED_URL"]
+                .flatMap(URL.init(string:))
+            let environmentKey = ProcessInfo.processInfo.environment["HERDME_UPDATE_PUBLIC_KEY"]
+                .flatMap(Self.decodePublicKey)
         #else
-        let environmentURL: URL? = nil
-        let environmentKey: Data? = nil
+            let environmentURL: URL? = nil
+            let environmentKey: Data? = nil
         #endif
         let configuredURL = (bundle.object(forInfoDictionaryKey: "HerdMeUpdateFeedURL") as? String)
             .flatMap(Self.httpsURL)
         let bundledFeedURL = bundle.url(forResource: "release-feed-url", withExtension: "txt")
             .flatMap { try? String(contentsOf: $0, encoding: .utf8) }
             .flatMap(Self.httpsURL)
-        guard let feedURL = environmentURL
+        guard
+            let feedURL = environmentURL
                 ?? configuredURL
                 ?? bundledFeedURL
-                ?? bundle.url(forResource: "release-manifest", withExtension: "json") else {
+                ?? bundle.url(forResource: "release-manifest", withExtension: "json")
+        else {
             return nil
         }
-        let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let version =
+            bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
             ?? "0.0.0"
         let build = Int(bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0") ?? 0
         let configuredKey = (bundle.object(forInfoDictionaryKey: "HerdMeUpdatePublicKey") as? String)
@@ -145,7 +155,8 @@ struct AppUpdateManager: Sendable {
                 session: Self.remoteSession
             )
             guard let httpResponse = response as? HTTPURLResponse,
-                  200..<300 ~= httpResponse.statusCode else {
+                200..<300 ~= httpResponse.statusCode
+            else {
                 throw AppUpdateError.invalidResponse
             }
             data = remoteData
@@ -157,7 +168,8 @@ struct AppUpdateManager: Sendable {
             publicKey: verificationKey
         )
         let selectedChannel = channel.lowercased()
-        let acceptedChannels = selectedChannel == "beta"
+        let acceptedChannels =
+            selectedChannel == "beta"
             ? Set(["stable", "beta"])
             : Set(["stable"])
         let eligibleReleases = manifest.releases
@@ -207,8 +219,9 @@ struct AppUpdateManager: Sendable {
         publicKey: Data?
     ) throws -> AppUpdateManifest {
         guard envelope.algorithm == AppUpdateSignedEnvelope.algorithm,
-              let payload = Data(base64Encoded: envelope.payload),
-              let signatureData = Data(base64Encoded: envelope.signature) else {
+            let payload = Data(base64Encoded: envelope.payload),
+            let signatureData = Data(base64Encoded: envelope.signature)
+        else {
             throw AppUpdateError.invalidSignature
         }
         guard let publicKey else { throw AppUpdateError.verificationKeyMissing }
@@ -243,7 +256,8 @@ struct AppUpdateManager: Sendable {
         }
         guard baseIsValid else { throw AppUpdateError.invalidResponse }
         if requiresPlatformDownloads,
-           !manifest.releases.allSatisfy(hasCompletePlatformDownloads) {
+            !manifest.releases.allSatisfy(hasCompletePlatformDownloads)
+        {
             throw AppUpdateError.incompletePlatformDownloads
         }
         return manifest
@@ -251,7 +265,8 @@ struct AppUpdateManager: Sendable {
 
     private static func hasCompletePlatformDownloads(_ release: AppUpdateRelease) -> Bool {
         guard let downloads = release.downloadURLs,
-              downloads.macOS != downloads.windowsX64 else {
+            downloads.macOS != downloads.windowsX64
+        else {
             return false
         }
         return isValidHTTPSURL(downloads.macOS, required: true)

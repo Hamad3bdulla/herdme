@@ -96,7 +96,10 @@ public sealed partial class LaravelProjectCreator
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 progress?.Report(LaravelProjectCreationStage.PreparingNodeRuntime);
-                var nodeDirectory = await nodeInstaller.EnsureActiveRuntimeAsync("22", cancellationToken);
+                var nodeDirectory = await nodeInstaller.EnsureActiveRuntimeAsync(
+                    RuntimeCatalog.DefaultNodeMajor,
+                    cancellationToken
+                );
                 var npm = Path.Combine(nodeDirectory, "npm.cmd");
                 ValidateFrontendBuild(stagedDestination);
 
@@ -150,11 +153,16 @@ public sealed partial class LaravelProjectCreator
         }
         finally
         {
-            DeleteStagingDirectory(stagingRoot);
+            await DeleteStagingDirectoryAsync(stagingRoot).ConfigureAwait(false);
         }
     }
 
-    internal static void DeleteStagingDirectory(string stagingRoot)
+    internal static Task DeleteStagingDirectoryAsync(string stagingRoot)
+    {
+        return Task.Run(() => DeleteStagingDirectory(stagingRoot));
+    }
+
+    private static void DeleteStagingDirectory(string stagingRoot)
     {
         if (!Directory.Exists(stagingRoot)) return;
         for (var attempt = 1; attempt <= 3; attempt++)

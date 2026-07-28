@@ -7,9 +7,9 @@ enum MailStoreError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .messageNotFound:
-            "This mail message no longer exists."
+            String(localized: "This mail message no longer exists.")
         case .invalidMessage:
-            "HerdMe could not read this mail message because its saved data is invalid."
+            String(localized: "HerdMe could not read this mail message because its saved data is invalid.")
         }
     }
 }
@@ -103,7 +103,7 @@ actor MailStore {
 
     func clear() throws {
         for url in (try? fileManager.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil)) ?? []
-            where url.pathExtension == "json" || url == indexURL {
+        where url.pathExtension == "json" || url == indexURL {
             try fileManager.removeItem(at: url)
         }
         cachedIndex = IndexFile(schemaVersion: 1, entries: [])
@@ -120,12 +120,14 @@ actor MailStore {
         }
         let entries = files.compactMap { file -> IndexEntry? in
             if let entry = existingByID[file.id],
-               entry.fileSize == file.size,
-               entry.modifiedAtMilliseconds == file.modifiedAtMilliseconds {
+                entry.fileSize == file.size,
+                entry.modifiedAtMilliseconds == file.modifiedAtMilliseconds
+            {
                 return entry
             }
             guard let message = knownMessages[file.id] ?? decodeMessage(at: file.url),
-                  message.id == file.id else {
+                message.id == file.id
+            else {
                 return nil
             }
             return IndexEntry(
@@ -152,12 +154,13 @@ actor MailStore {
 
     private func loadIndex() -> IndexFile? {
         guard let values = try? indexURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
-              values.isRegularFile == true,
-              let fileSize = values.fileSize,
-              fileSize <= Self.maximumIndexBytes,
-              let data = try? Data(contentsOf: indexURL),
-              let index = try? decoder().decode(IndexFile.self, from: data),
-              index.schemaVersion == 1 else {
+            values.isRegularFile == true,
+            let fileSize = values.fileSize,
+            fileSize <= Self.maximumIndexBytes,
+            let data = try? Data(contentsOf: indexURL),
+            let index = try? decoder().decode(IndexFile.self, from: data),
+            index.schemaVersion == 1
+        else {
             return nil
         }
         return index
@@ -165,24 +168,26 @@ actor MailStore {
 
     private func messageFiles() -> [MessageFile] {
         let keys: Set<URLResourceKey> = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]
-        return ((try? fileManager.contentsOfDirectory(
-            at: directoryURL,
-            includingPropertiesForKeys: Array(keys),
-            options: [.skipsHiddenFiles]
-        )) ?? []).compactMap { url in
-            guard url.pathExtension == "json",
-                  let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent),
-                  let values = try? url.resourceValues(forKeys: keys),
-                  values.isRegularFile == true else {
-                return nil
+        return
+            ((try? fileManager.contentsOfDirectory(
+                at: directoryURL,
+                includingPropertiesForKeys: Array(keys),
+                options: [.skipsHiddenFiles]
+            )) ?? []).compactMap { url in
+                guard url.pathExtension == "json",
+                    let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent),
+                    let values = try? url.resourceValues(forKeys: keys),
+                    values.isRegularFile == true
+                else {
+                    return nil
+                }
+                return MessageFile(
+                    id: id,
+                    url: url,
+                    size: Int64(values.fileSize ?? 0),
+                    modifiedAtMilliseconds: Self.milliseconds(values.contentModificationDate ?? .distantPast)
+                )
             }
-            return MessageFile(
-                id: id,
-                url: url,
-                size: Int64(values.fileSize ?? 0),
-                modifiedAtMilliseconds: Self.milliseconds(values.contentModificationDate ?? .distantPast)
-            )
-        }
     }
 
     private func messageURL(id: UUID) -> URL {

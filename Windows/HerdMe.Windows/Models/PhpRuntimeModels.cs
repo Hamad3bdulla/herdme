@@ -8,7 +8,7 @@ public sealed class PhpRuntimeSettings
 
     public int MaxUploadMegabytes { get; set; } = 100;
 
-    public string PhpCycle { get; set; } = "8.4";
+    public string PhpCycle { get; set; } = RuntimeCatalog.DefaultPhpCycle;
 
     public DebuggerSettings Debugger { get; set; } = new();
 }

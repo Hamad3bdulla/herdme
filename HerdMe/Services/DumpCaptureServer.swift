@@ -3,25 +3,28 @@ import Network
 
 final class DumpCaptureServer: @unchecked Sendable {
     private let queue = DispatchQueue(label: "app.herdme.dumps", qos: .userInitiated)
+    private let listenerLock = NSLock()
     private let sessionsLock = NSLock()
     private var listener: NWListener?
+    private var listenerToken: UUID?
     private var sessions: [UUID: DumpSession] = [:]
 
-    var isRunning: Bool { listener != nil }
+    var isRunning: Bool { listenerLock.withLock { listener != nil } }
 
     func start(
         port: Int,
         onStateChange: @escaping @Sendable (Bool, String?) -> Void,
         onDump: @escaping @Sendable (CapturedDump) -> Void
     ) throws {
-        guard listener == nil else { return }
         guard let rawPort = UInt16(exactly: port), rawPort > 0,
-              let networkPort = NWEndpoint.Port(rawValue: rawPort) else {
+            let networkPort = NWEndpoint.Port(rawValue: rawPort)
+        else {
             throw LocalListenerError.invalidPort(service: "dump listener")
         }
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: networkPort)
         let listener = try NWListener(using: parameters)
+        let token = UUID()
         listener.newConnectionHandler = { [weak self] connection in
             guard let self else { return }
             let identifier = UUID()
@@ -36,30 +39,59 @@ final class DumpCaptureServer: @unchecked Sendable {
             session.start()
         }
         listener.stateUpdateHandler = { [weak self] state in
+            guard let self else { return }
             switch state {
             case .ready:
-                onStateChange(true, nil)
-            case let .failed(error):
-                self?.listener = nil
-                onStateChange(false, error.localizedDescription)
+                if self.listenerIsCurrent(token) {
+                    onStateChange(true, nil)
+                }
+            case .failed(let error):
+                if self.clearListener(ifMatching: token) {
+                    onStateChange(false, error.localizedDescription)
+                }
             case .cancelled:
-                onStateChange(false, nil)
+                if self.clearListener(ifMatching: token) {
+                    onStateChange(false, nil)
+                }
             default:
                 break
             }
         }
-        listener.start(queue: queue)
-        self.listener = listener
+        listenerLock.withLock {
+            guard self.listener == nil else { return }
+            self.listener = listener
+            listenerToken = token
+            listener.start(queue: queue)
+        }
     }
 
     func stop() {
-        listener?.cancel()
-        listener = nil
+        let activeListener = listenerLock.withLock {
+            let activeListener = listener
+            listener = nil
+            listenerToken = nil
+            return activeListener
+        }
+        activeListener?.cancel()
         sessionsLock.lock()
         let activeSessions = Array(sessions.values)
         sessions.removeAll()
         sessionsLock.unlock()
-        activeSessions.forEach { $0.stop() }
+        for session in activeSessions { session.stop() }
+    }
+
+    private func listenerIsCurrent(_ token: UUID) -> Bool {
+        listenerLock.withLock { listenerToken == token }
+    }
+
+    @discardableResult
+    private func clearListener(ifMatching token: UUID) -> Bool {
+        listenerLock.withLock {
+            guard listenerToken == token else { return false }
+            listener = nil
+            listenerToken = nil
+            return true
+        }
     }
 
     private func removeSession(_ identifier: UUID) {
@@ -76,7 +108,8 @@ struct DumpLineBuffer {
 
     mutating func append(_ chunk: Data) -> Bool {
         guard chunk.count <= Self.maximumBytes,
-              data.count <= Self.maximumBytes - chunk.count else {
+            data.count <= Self.maximumBytes - chunk.count
+        else {
             return false
         }
         data.append(chunk)

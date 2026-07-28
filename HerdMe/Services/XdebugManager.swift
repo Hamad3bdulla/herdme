@@ -12,6 +12,11 @@ struct DebuggerSettings: Equatable, Sendable {
     var port: Int
     var ideKey: String
 
+    var startOnlyOnTrigger: Bool {
+        get { detectBreakpoints }
+        set { detectBreakpoints = newValue }
+    }
+
     static let disabled = DebuggerSettings(
         enabled: false,
         detectBreakpoints: true,
@@ -29,7 +34,7 @@ struct DebuggerSettings: Equatable, Sendable {
                 ? true
                 : defaults.bool(forKey: detectBreakpointsKey),
             port: (1...65_535).contains(storedPort) ? storedPort : 9_003,
-            ideKey: storedIDEKey?.isEmpty == false ? storedIDEKey! : "VSCODE"
+            ideKey: storedIDEKey.flatMap { $0.isEmpty ? nil : $0 } ?? "VSCODE"
         )
     }
 
@@ -112,19 +117,25 @@ enum XdebugInstallationError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidRelease:
-            "The Xdebug release service returned an invalid version."
+            String(localized: "The Xdebug release service returned an invalid version.")
         case .checksumMismatch:
-            "The downloaded Xdebug archive did not match its official SHA-256 checksum."
+            String(localized: "The downloaded Xdebug archive did not match its official SHA-256 checksum.")
         case .unsafeArchive:
-            "The Xdebug archive contains an unsafe path and was rejected."
-        case let .runtimeMissing(cycle):
-            "Install HerdMe PHP \(cycle) before installing Xdebug."
-        case let .buildToolMissing(tool):
-            "Xdebug requires \(tool). Install the Xcode Command Line Tools and try again."
-        case let .commandFailed(output):
-            output.isEmpty ? "Xdebug could not be built." : output
+            String(localized: "The Xdebug archive contains an unsafe path and was rejected.")
+        case .runtimeMissing(let cycle):
+            String.localizedStringWithFormat(
+                String(localized: "Install HerdMe PHP %@ before installing Xdebug."),
+                cycle
+            )
+        case .buildToolMissing(let tool):
+            String.localizedStringWithFormat(
+                String(localized: "Xdebug requires %@. Install the Xcode Command Line Tools and try again."),
+                tool
+            )
+        case .commandFailed(let output):
+            output.isEmpty ? String(localized: "Xdebug could not be built.") : output
         case .extensionInvalid:
-            "The built Xdebug extension could not be loaded by the selected PHP runtime."
+            String(localized: "The built Xdebug extension could not be loaded by the selected PHP runtime.")
         }
     }
 }
@@ -157,7 +168,7 @@ actor XdebugManager {
         options.merge([
             "zend_extension": extensionURL.path,
             "xdebug.mode": "debug,develop",
-            "xdebug.start_with_request": settings.detectBreakpoints ? "trigger" : "yes",
+            "xdebug.start_with_request": settings.startOnlyOnTrigger ? "trigger" : "yes",
             "xdebug.client_host": "127.0.0.1",
             "xdebug.client_port": String(settings.port),
             "xdebug.idekey": settings.ideKey,
@@ -172,14 +183,15 @@ actor XdebugManager {
     func installed(cycle: String, php: URL) -> XdebugInstallation? {
         let extensionURL = Self.extensionURL(rootURL: rootURL, cycle: cycle)
         guard fileManager.isReadableFile(atPath: extensionURL.path),
-              let result = try? run(
-                  php,
-                  arguments: [
-                      "-n", "-d", "zend_extension=\(extensionURL.path)",
-                      "-r", "echo phpversion('xdebug') ?: '';"
-                  ]
-              ),
-              result.status == 0 else {
+            let result = try? run(
+                php,
+                arguments: [
+                    "-n", "-d", "zend_extension=\(extensionURL.path)",
+                    "-r", "echo phpversion('xdebug') ?: '';"
+                ]
+            ),
+            result.status == 0
+        else {
             return nil
         }
         let version = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -187,30 +199,37 @@ actor XdebugManager {
     }
 
     func install(cycle: String) async throws -> XdebugInstallation {
+        try Task.checkCancellation()
         let runtimeURL = rootURL.appendingPathComponent("Runtimes/php/\(cycle)", isDirectory: true)
         let php = runtimeURL.appendingPathComponent("bin/php")
         let phpize = runtimeURL.appendingPathComponent("bin/phpize")
         let phpConfig = runtimeURL.appendingPathComponent("bin/php-config")
         guard fileManager.isExecutableFile(atPath: php.path),
-              fileManager.isExecutableFile(atPath: phpize.path),
-              fileManager.isExecutableFile(atPath: phpConfig.path) else {
+            fileManager.isExecutableFile(atPath: phpize.path),
+            fileManager.isExecutableFile(atPath: phpConfig.path)
+        else {
             throw XdebugInstallationError.runtimeMissing(cycle)
         }
         guard fileManager.isExecutableFile(atPath: "/usr/bin/make") else {
             throw XdebugInstallationError.buildToolMissing("make")
         }
 
-        let releasesURL = URL(string: "https://xdebug.org/download")!
+        guard let releasesURL = URL(string: "https://xdebug.org/download") else {
+            throw XdebugInstallationError.invalidRelease
+        }
         let (releaseData, releaseResponse) = try await ManagedDownloadClient.data(from: releasesURL)
+        try Task.checkCancellation()
         guard (releaseResponse as? HTTPURLResponse)?.statusCode == 200,
-              let releaseHTML = String(data: releaseData, encoding: .utf8),
-              let release = Self.sourceRelease(from: releaseHTML) else {
+            let releaseHTML = String(data: releaseData, encoding: .utf8),
+            let release = Self.sourceRelease(from: releaseHTML)
+        else {
             throw XdebugInstallationError.invalidRelease
         }
 
         let (downloadedArchive, archiveResponse) = try await ManagedDownloadClient.download(
             from: release.archiveURL
         )
+        try Task.checkCancellation()
         guard (archiveResponse as? HTTPURLResponse)?.statusCode == 200 else {
             throw XdebugInstallationError.invalidRelease
         }
@@ -227,6 +246,7 @@ actor XdebugManager {
         try fileManager.createDirectory(at: sourceURL, withIntermediateDirectories: true)
         try fileManager.createSymbolicLink(at: buildRuntimeURL, withDestinationURL: runtimeURL)
         defer { try? fileManager.removeItem(at: stagingRoot) }
+        try Task.checkCancellation()
 
         let archiveListing = try run(
             URL(fileURLWithPath: "/usr/bin/tar"),
@@ -250,15 +270,16 @@ actor XdebugManager {
             throw XdebugInstallationError.unsafeArchive
         }
 
-        try requireSuccess(run(
-            URL(fileURLWithPath: "/usr/bin/tar"),
-            arguments: [
-                "-xzf", downloadedArchive.path,
-                "-C", sourceURL.path,
-                "--strip-components", "1",
-                "--no-same-owner", "--no-same-permissions"
-            ]
-        ))
+        try requireSuccess(
+            run(
+                URL(fileURLWithPath: "/usr/bin/tar"),
+                arguments: [
+                    "-xzf", downloadedArchive.path,
+                    "-C", sourceURL.path,
+                    "--strip-components", "1",
+                    "--no-same-owner", "--no-same-permissions"
+                ]
+            ))
         do {
             try TarArchivePolicy.validateExtractedTree(at: sourceURL)
         } catch {
@@ -266,23 +287,27 @@ actor XdebugManager {
         }
 
         let environment = buildEnvironment(runtimeURL: buildRuntimeURL)
-        try requireSuccess(run(
-            buildRuntimeURL.appendingPathComponent("bin/phpize"),
-            currentDirectory: sourceURL,
-            environment: environment
-        ))
-        try requireSuccess(run(
-            sourceURL.appendingPathComponent("configure"),
-            arguments: ["--with-php-config=\(buildRuntimeURL.appendingPathComponent("bin/php-config").path)"],
-            currentDirectory: sourceURL,
-            environment: environment
-        ))
-        try requireSuccess(run(
-            URL(fileURLWithPath: "/usr/bin/make"),
-            arguments: ["-j\(max(ProcessInfo.processInfo.activeProcessorCount, 2))"],
-            currentDirectory: sourceURL,
-            environment: environment
-        ))
+        try requireSuccess(
+            run(
+                buildRuntimeURL.appendingPathComponent("bin/phpize"),
+                currentDirectory: sourceURL,
+                environment: environment
+            ))
+        try requireSuccess(
+            run(
+                sourceURL.appendingPathComponent("configure"),
+                arguments: ["--with-php-config=\(buildRuntimeURL.appendingPathComponent("bin/php-config").path)"],
+                currentDirectory: sourceURL,
+                environment: environment
+            ))
+        try requireSuccess(
+            run(
+                URL(fileURLWithPath: "/usr/bin/make"),
+                arguments: ["-j\(max(ProcessInfo.processInfo.activeProcessorCount, 2))"],
+                currentDirectory: sourceURL,
+                environment: environment
+            ))
+        try Task.checkCancellation()
 
         let builtExtension = sourceURL.appendingPathComponent("modules/xdebug.so")
         guard fileManager.isReadableFile(atPath: builtExtension.path) else {
@@ -302,7 +327,8 @@ actor XdebugManager {
         try fileManager.moveItem(at: candidate, to: destination)
 
         guard let installation = installed(cycle: cycle, php: php),
-              installation.version == release.version else {
+            installation.version == release.version
+        else {
             throw XdebugInstallationError.extensionInvalid
         }
         try Data((release.version + "\n").utf8).write(
@@ -317,31 +343,35 @@ actor XdebugManager {
     }
 
     nonisolated static func sourceRelease(from html: String) -> XdebugSourceRelease? {
-        guard let anchorPattern = try? NSRegularExpression(
-            pattern: #"<a\b[^>]*>"#,
-            options: [.caseInsensitive]
-        ) else { return nil }
+        guard
+            let anchorPattern = try? NSRegularExpression(
+                pattern: #"<a\b[^>]*>"#,
+                options: [.caseInsensitive]
+            )
+        else { return nil }
         let fullRange = NSRange(html.startIndex..<html.endIndex, in: html)
         for match in anchorPattern.matches(in: html, range: fullRange) {
             guard let range = Range(match.range, in: html) else { continue }
             let anchor = String(html[range])
             guard let href = attribute("href", in: anchor),
-                  let title = attribute("title", in: anchor),
-                  let version = capture(
-                      pattern: #"^/files/xdebug-([0-9]+\.[0-9]+\.[0-9]+)\.tgz$"#,
-                      in: href
-                  ),
-                  isValid(version: version),
-                  let checksum = capture(
-                      pattern: #"^SHA256:\s*([0-9a-fA-F]{64})$"#,
-                      in: title
+                let title = attribute("title", in: anchor),
+                let version = capture(
+                    pattern: #"^/files/xdebug-([0-9]+\.[0-9]+\.[0-9]+)\.tgz$"#,
+                    in: href
+                ),
+                isValid(version: version),
+                let checksum = capture(
+                    pattern: #"^SHA256:\s*([0-9a-fA-F]{64})$"#,
+                    in:
+                        title
                         .replacingOccurrences(of: "&nbsp;", with: " ")
                         .replacingOccurrences(of: "\u{00A0}", with: " ")
-                  )?.lowercased(),
-                  let archiveURL = URL(string: href, relativeTo: URL(string: "https://xdebug.org"))?
+                )?.lowercased(),
+                let archiveURL = URL(string: href, relativeTo: URL(string: "https://xdebug.org"))?
                     .absoluteURL,
-                  archiveURL.scheme == "https",
-                  archiveURL.host == "xdebug.org" else {
+                archiveURL.scheme == "https",
+                archiveURL.host == "xdebug.org"
+            else {
                 continue
             }
             return XdebugSourceRelease(
@@ -370,18 +400,20 @@ actor XdebugManager {
     }
 
     private nonisolated static func attribute(_ name: String, in anchor: String) -> String? {
-        capture(pattern: #"\b"# + NSRegularExpression.escapedPattern(for: name)
-            + #"\s*=\s*[\"']([^\"']+)[\"']"#, in: anchor)
+        capture(
+            pattern: #"\b"# + NSRegularExpression.escapedPattern(for: name)
+                + #"\s*=\s*[\"']([^\"']+)[\"']"#, in: anchor)
     }
 
     private nonisolated static func capture(pattern: String, in value: String) -> String? {
         guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
-              let match = expression.firstMatch(
+            let match = expression.firstMatch(
                 in: value,
                 range: NSRange(value.startIndex..<value.endIndex, in: value)
-              ),
-              match.numberOfRanges > 1,
-              let range = Range(match.range(at: 1), in: value) else {
+            ),
+            match.numberOfRanges > 1,
+            let range = Range(match.range(at: 1), in: value)
+        else {
             return nil
         }
         return String(value[range])
@@ -392,6 +424,7 @@ actor XdebugManager {
         defer { try? handle.close() }
         var hasher = SHA256()
         while let data = try handle.read(upToCount: 1_048_576), !data.isEmpty {
+            if Task<Never, Never>.isCancelled { throw CancellationError() }
             hasher.update(data: data)
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
@@ -424,7 +457,8 @@ actor XdebugManager {
             executable,
             arguments: arguments,
             currentDirectory: currentDirectory,
-            environment: environment
+            environment: environment,
+            cancellationRequested: { Task<Never, Never>.isCancelled }
         )
         return (result.status, result.output)
     }

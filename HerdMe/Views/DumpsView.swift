@@ -2,27 +2,34 @@ import SwiftUI
 
 struct DumpsView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var dumpsCoordinator: DumpsCoordinator
     @AppStorage("dumpShowNewOnTop") private var showNewOnTop = false
     @AppStorage("dumpFontSize") private var fontSize = 14
     @State private var selectedDumpID: CapturedDump.ID?
 
     private var displayedDumps: [CapturedDump] {
-        showNewOnTop ? model.dumps : model.dumps.reversed()
+        showNewOnTop ? dumpsCoordinator.dumps : dumpsCoordinator.dumps.reversed()
     }
 
     private var selectedDump: CapturedDump? {
-        model.dumps.first { $0.id == selectedDumpID }
+        dumpsCoordinator.dumps.first { $0.id == selectedDumpID }
     }
 
     var body: some View {
         PageContainer("Dumps") {
             SettingsPanel {
                 VStack(spacing: 7) {
-                    SettingRow("Intercept dumps", detail: "Listen for Laravel and Symfony VarDumper payloads on port \(model.configuration.dumpPort).") {
-                        Toggle("", isOn: Binding(
-                            get: { model.isDumpServerRunning },
-                            set: { $0 ? model.startDumpServer() : model.stopDumpServer() }
-                        ))
+                    SettingRow(
+                        "Intercept dumps",
+                        detail: "Listen for Laravel and Symfony VarDumper payloads on port \(model.configuration.dumpPort)."
+                    ) {
+                        Toggle(
+                            "",
+                            isOn: Binding(
+                                get: { dumpsCoordinator.isServerRunning },
+                                set: { $0 ? model.startDumpServer() : model.stopDumpServer() }
+                            )
+                        )
                         .labelsHidden()
                         .toggleStyle(.switch)
                     }
@@ -43,7 +50,7 @@ struct DumpsView: View {
                         HStack {
                             Text("Captured").font(.headline)
                             Spacer()
-                            Text("\(model.dumps.count)").font(.caption).foregroundStyle(.secondary)
+                            Text("\(dumpsCoordinator.dumps.count)").font(.caption).foregroundStyle(.secondary)
                             Button {
                                 selectedDumpID = nil
                                 model.clearDumps()
@@ -51,7 +58,7 @@ struct DumpsView: View {
                                 Image(systemName: "trash")
                             }
                             .buttonStyle(.borderless)
-                            .disabled(model.dumps.isEmpty)
+                            .disabled(dumpsCoordinator.dumps.isEmpty)
                             .help("Delete all dumps")
                             .accessibilityLabel("Delete all dumps")
                         }
@@ -63,7 +70,9 @@ struct DumpsView: View {
                             ScrollView {
                                 LazyVStack(spacing: 2) {
                                     ForEach(displayedDumps) { dump in
-                                        Button { selectedDumpID = dump.id } label: {
+                                        Button {
+                                            selectedDumpID = dump.id
+                                        } label: {
                                             VStack(alignment: .leading, spacing: 3) {
                                                 Text(dump.source).font(.caption.weight(.medium)).lineLimit(1)
                                                 Text(dump.summary).font(.caption2.monospaced()).lineLimit(2)

@@ -1,0 +1,562 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="TrayOpenCommand.Label" xml:space="preserve"><value>Open HerdMe</value></data>
+  <data name="TrayQuitCommand.Label" xml:space="preserve"><value>Quit HerdMe</value></data>
+  <data name="TrayStartAllCommand.Label" xml:space="preserve"><value>Start all</value></data>
+  <data name="TrayStopAllCommand.Label" xml:space="preserve"><value>Stop all</value></data>
+  <data name="TrayIcon.ToolTipText" xml:space="preserve"><value>HerdMe</value></data>
+  <data name="TrayOpenMenu.Text" xml:space="preserve"><value>Open HerdMe</value></data>
+  <data name="TrayStartAllMenu.Text" xml:space="preserve"><value>Start all</value></data>
+  <data name="TrayStopAllMenu.Text" xml:space="preserve"><value>Stop all</value></data>
+  <data name="TrayQuitMenu.Text" xml:space="preserve"><value>Quit HerdMe</value></data>
+  <data name="NavGeneral.Content" xml:space="preserve"><value>General</value></data>
+  <data name="NavSites.Content" xml:space="preserve"><value>Sites</value></data>
+  <data name="NavPhp.Content" xml:space="preserve"><value>PHP</value></data>
+  <data name="NavNode.Content" xml:space="preserve"><value>Node.js</value></data>
+  <data name="NavServices.Content" xml:space="preserve"><value>Services</value></data>
+  <data name="NavMail.Content" xml:space="preserve"><value>Mail</value></data>
+  <data name="NavDumps.Content" xml:space="preserve"><value>Dumps</value></data>
+  <data name="NavDebugger.Content" xml:space="preserve"><value>Debugger</value></data>
+  <data name="NavLogs.Content" xml:space="preserve"><value>Logs</value></data>
+  <data name="NavAbout.Content" xml:space="preserve"><value>About</value></data>
+  <data name="OnboardingWelcomeTitle.Text" xml:space="preserve"><value>Welcome to HerdMe</value></data>
+  <data name="OnboardingWelcomeDescription.Text" xml:space="preserve"><value>HerdMe needs to prepare the local development environment. Windows will ask for administrator approval.</value></data>
+  <data name="OnboardingSetupSummary.Text" xml:space="preserve"><value>PHP {0}  |  Composer  |  Laravel Installer  |  Node.js {1}  |  HTTPS</value></data>
+  <data name="OnboardingSetupButton.Text" xml:space="preserve"><value>Set up HerdMe</value></data>
+  <data name="OnboardingFailureTitle.Text" xml:space="preserve"><value>Setup could not finish</value></data>
+  <data name="OnboardingFailureDetails.Header" xml:space="preserve"><value>Technical details</value></data>
+  <data name="OnboardingCopyFailureDetailsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Copy technical details</value></data>
+  <data name="OnboardingCopyFailureDetailsTooltip.Text" xml:space="preserve"><value>Copy technical details</value></data>
+  <data name="OnboardingTryAgainButton.Text" xml:space="preserve"><value>Try again</value></data>
+  <data name="OnboardingCompletedTitle.Text" xml:space="preserve"><value>HerdMe is ready</value></data>
+  <data name="OnboardingCompletedDescription.Text" xml:space="preserve"><value>The default local development environment has been installed successfully.</value></data>
+  <data name="OnboardingOpenButton.Text" xml:space="preserve"><value>Open HerdMe</value></data>
+  <data name="OnboardingStageWelcomeTitle" xml:space="preserve"><value>Welcome to HerdMe</value></data>
+  <data name="OnboardingStageWelcomeDetail" xml:space="preserve"><value>HerdMe needs to prepare the local development environment. Windows will ask for administrator approval.</value></data>
+  <data name="OnboardingStageLocalDomainsTitle" xml:space="preserve"><value>Setting up local .test domains</value></data>
+  <data name="OnboardingStageLocalDomainsDetail" xml:space="preserve"><value>Preparing private routing for projects that use the .test domain.</value></data>
+  <data name="OnboardingStageCertificateTitle" xml:space="preserve"><value>Trusting the local HTTPS certificate</value></data>
+  <data name="OnboardingStageCertificateDetail" xml:space="preserve"><value>Adding the HerdMe local certificate authority to the Windows trust store.</value></data>
+  <data name="OnboardingStagePhpTitle" xml:space="preserve"><value>Installing PHP {0}</value></data>
+  <data name="OnboardingStagePhpDetail" xml:space="preserve"><value>Installing the default runtime and checking every extension required by Laravel.</value></data>
+  <data name="OnboardingStageComposerTitle" xml:space="preserve"><value>Installing Composer and Laravel Installer</value></data>
+  <data name="OnboardingStageComposerDetail" xml:space="preserve"><value>Preparing the managed PHP tools used to create Laravel projects.</value></data>
+  <data name="OnboardingStageNodeTitle" xml:space="preserve"><value>Installing Node.js {0}</value></data>
+  <data name="OnboardingStageNodeDetail" xml:space="preserve"><value>Preparing the default JavaScript runtime and npm.</value></data>
+  <data name="OnboardingStageFinishingTitle" xml:space="preserve"><value>Finishing setup</value></data>
+  <data name="OnboardingStageFinishingDetail" xml:space="preserve"><value>Saving the verified setup and refreshing the local environment.</value></data>
+  <data name="OnboardingStageCompletedTitle" xml:space="preserve"><value>HerdMe is ready</value></data>
+  <data name="OnboardingStageCompletedDetail" xml:space="preserve"><value>The default local development environment has been installed successfully.</value></data>
+  <data name="OnboardingPreparing" xml:space="preserve"><value>Preparing</value></data>
+  <data name="OnboardingStepProgress" xml:space="preserve"><value>Step {0} of {1}</value></data>
+  <data name="GeneralPageTitle.Text" xml:space="preserve"><value>General</value></data>
+  <data name="GeneralRefresh.Text" xml:space="preserve"><value>Refresh</value></data>
+  <data name="GeneralLaunchAtSigninTitle.Text" xml:space="preserve"><value>Launch at sign-in</value></data>
+  <data name="GeneralLaunchAtSigninDescription.Text" xml:space="preserve"><value>Keep local sites available after signing in to Windows.</value></data>
+  <data name="GeneralLocalDomainsTitle.Text" xml:space="preserve"><value>Local domains</value></data>
+  <data name="GeneralDomainsChecking.Text" xml:space="preserve"><value>Checking</value></data>
+  <data name="GeneralRemoveDomains.Content" xml:space="preserve"><value>Remove</value></data>
+  <data name="GeneralSetupDomains.Content" xml:space="preserve"><value>Set up</value></data>
+  <data name="GeneralHttpsCertificateTitle.Text" xml:space="preserve"><value>HTTPS certificate</value></data>
+  <data name="GeneralCertificateChecking.Text" xml:space="preserve"><value>Checking</value></data>
+  <data name="GeneralTrustCertificate.Content" xml:space="preserve"><value>Trust</value></data>
+  <data name="GeneralApplicationUpdatesTitle.Text" xml:space="preserve"><value>Application updates</value></data>
+  <data name="GeneralStableChannel.Text" xml:space="preserve"><value>Stable channel</value></data>
+  <data name="GeneralCheckAutomatically.Text" xml:space="preserve"><value>Check automatically</value></data>
+  <data name="GeneralUpdateChannel.Text" xml:space="preserve"><value>Update channel</value></data>
+  <data name="GeneralStableOption.Content" xml:space="preserve"><value>Stable</value></data>
+  <data name="GeneralBetaOption.Content" xml:space="preserve"><value>Beta</value></data>
+  <data name="GeneralCheckNow.Text" xml:space="preserve"><value>Check now</value></data>
+  <data name="GeneralPortableCoreTitle.Text" xml:space="preserve"><value>Portable core</value></data>
+  <data name="GeneralStatusLabel.Text" xml:space="preserve"><value>Status</value></data>
+  <data name="GeneralCoreChecking.Text" xml:space="preserve"><value>Checking</value></data>
+  <data name="GeneralExecutableLabel.Text" xml:space="preserve"><value>Executable</value></data>
+  <data name="GeneralApplicationDataLabel.Text" xml:space="preserve"><value>Application data</value></data>
+  <data name="GeneralRuntimeCheckTitle.Text" xml:space="preserve"><value>Runtime check</value></data>
+  <data name="GeneralLaravelExtensionsTitle.Text" xml:space="preserve"><value>Laravel PHP extensions</value></data>
+  <data name="GeneralPhpUnavailable.Text" xml:space="preserve"><value>PHP unavailable</value></data>
+  <data name="GeneralOpenApplicationData" xml:space="preserve"><value>Open application data</value></data>
+  <data name="GeneralChannelStatus" xml:space="preserve"><value>{0} channel</value></data>
+  <data name="GeneralChannelStable" xml:space="preserve"><value>Stable</value></data>
+  <data name="GeneralChannelBeta" xml:space="preserve"><value>Beta</value></data>
+  <data name="CommonOk" xml:space="preserve"><value>OK</value></data>
+  <data name="GeneralChecking" xml:space="preserve"><value>Checking</value></data>
+  <data name="GeneralReady" xml:space="preserve"><value>Ready</value></data>
+  <data name="GeneralLaravelCompatible" xml:space="preserve"><value>Laravel compatible</value></data>
+  <data name="GeneralMissingExtensions" xml:space="preserve"><value>Missing extensions</value></data>
+  <data name="GeneralRequiredExtensionsLoaded" xml:space="preserve"><value>{0} required extensions loaded</value></data>
+  <data name="GeneralCheckFailed" xml:space="preserve"><value>Check failed</value></data>
+  <data name="GeneralManagedPhpUnavailable" xml:space="preserve"><value>Managed PHP unavailable</value></data>
+  <data name="GeneralInstallManagedPhp" xml:space="preserve"><value>Install HerdMe PHP {0} from the PHP page.</value></data>
+  <data name="GeneralUnavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="GeneralAddSiteBeforeDomains" xml:space="preserve"><value>Add or link at least one site before setting up local domains.</value></data>
+  <data name="GeneralConfigured" xml:space="preserve"><value>Configured</value></data>
+  <data name="GeneralNotConfigured" xml:space="preserve"><value>Not configured</value></data>
+  <data name="GeneralUpdate" xml:space="preserve"><value>Update</value></data>
+  <data name="GeneralSetUp" xml:space="preserve"><value>Set up</value></data>
+  <data name="GeneralTrusted" xml:space="preserve"><value>Trusted</value></data>
+  <data name="GeneralNotTrusted" xml:space="preserve"><value>Not trusted</value></data>
+  <data name="GeneralSettingsSaveFailed" xml:space="preserve"><value>Settings could not be saved</value></data>
+  <data name="GeneralCheckingReleases" xml:space="preserve"><value>Checking {0} releases</value></data>
+  <data name="GeneralVersionAvailable" xml:space="preserve"><value>Version {0} is available</value></data>
+  <data name="GeneralUpToDateStatus" xml:space="preserve"><value>HerdMe {0} is up to date</value></data>
+  <data name="GeneralUpToDateTitle" xml:space="preserve"><value>HerdMe is up to date</value></data>
+  <data name="GeneralNewestRelease" xml:space="preserve"><value>Version {0} is the newest {1} release.</value></data>
+  <data name="GeneralUpdateCheckFailed" xml:space="preserve"><value>Update check failed</value></data>
+  <data name="GeneralUpdateDialogTitle" xml:space="preserve"><value>HerdMe {0} is available</value></data>
+  <data name="GeneralLater" xml:space="preserve"><value>Later</value></data>
+  <data name="GeneralDownload" xml:space="preserve"><value>Download</value></data>
+  <data name="PhpPageTitle.Text" xml:space="preserve"><value>PHP</value></data>
+  <data name="PhpRefreshTooltip.Text" xml:space="preserve"><value>Refresh PHP status</value></data>
+  <data name="PhpLaravelRuntimeTitle.Text" xml:space="preserve"><value>Laravel runtime</value></data>
+  <data name="PhpInstallButton.Text" xml:space="preserve"><value>Install</value></data>
+  <data name="PhpChecking.Text" xml:space="preserve"><value>Checking</value></data>
+  <data name="PhpToolsTitle.Text" xml:space="preserve"><value>Composer and Laravel Installer</value></data>
+  <data name="PhpComposerNotInstalled.Text" xml:space="preserve"><value>Composer: Not installed</value></data>
+  <data name="PhpLaravelInstallerNotInstalled.Text" xml:space="preserve"><value>Laravel Installer: Not installed</value></data>
+  <data name="PhpInstallToolsButton.Text" xml:space="preserve"><value>Install</value></data>
+  <data name="PhpRequestLimitsTitle.Text" xml:space="preserve"><value>Request limits</value></data>
+  <data name="PhpMemoryLimitLabel.Text" xml:space="preserve"><value>Memory limit (MB)</value></data>
+  <data name="PhpUploadLimitLabel.Text" xml:space="preserve"><value>Maximum upload (MB)</value></data>
+  <data name="PhpSaveButton.Text" xml:space="preserve"><value>Save</value></data>
+  <data name="NodePageTitle.Text" xml:space="preserve"><value>Node.js</value></data>
+  <data name="NodePageDescription.Text" xml:space="preserve"><value>Official Windows runtimes managed by HerdMe</value></data>
+  <data name="NodeRefreshTooltip.Text" xml:space="preserve"><value>Refresh Node.js versions</value></data>
+  <data name="NodeMajorColumn.Text" xml:space="preserve"><value>Major</value></data>
+  <data name="NodeStatusColumn.Text" xml:space="preserve"><value>Status</value></data>
+  <data name="NodeInstallTooltip.Text" xml:space="preserve"><value>Install or update</value></data>
+  <data name="NodeUseTooltip.Text" xml:space="preserve"><value>Use this version</value></data>
+  <data name="NodeDeleteTooltip.Text" xml:space="preserve"><value>Delete this version</value></data>
+  <data name="CommonInstall" xml:space="preserve"><value>Install</value></data>
+  <data name="CommonUpdate" xml:space="preserve"><value>Update</value></data>
+  <data name="CommonNotInstalled" xml:space="preserve"><value>Not installed</value></data>
+  <data name="CommonDelete" xml:space="preserve"><value>Delete</value></data>
+  <data name="CommonCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="PhpCheckingStatus" xml:space="preserve"><value>Checking</value></data>
+  <data name="PhpNoUsableExecutable" xml:space="preserve"><value>No usable PHP executable was found.</value></data>
+  <data name="PhpUnavailable" xml:space="preserve"><value>PHP unavailable</value></data>
+  <data name="PhpComposerVersion" xml:space="preserve"><value>Composer: {0}</value></data>
+  <data name="PhpLaravelInstallerVersion" xml:space="preserve"><value>Laravel Installer: {0}</value></data>
+  <data name="PhpReadyForLaravel" xml:space="preserve"><value>Ready for Laravel projects</value></data>
+  <data name="PhpLegacyRuntime" xml:space="preserve"><value>Legacy PHP runtime</value></data>
+  <data name="PhpBlocked" xml:space="preserve"><value>Blocked</value></data>
+  <data name="PhpRepair" xml:space="preserve"><value>Repair</value></data>
+  <data name="PhpInstallingTools" xml:space="preserve"><value>Installing Composer and Laravel Installer</value></data>
+  <data name="PhpReadyForLaravel13" xml:space="preserve"><value>Ready for Laravel 13</value></data>
+  <data name="PhpToolInstallationFailed" xml:space="preserve"><value>Tool installation failed</value></data>
+  <data name="PhpInstalling" xml:space="preserve"><value>Installing</value></data>
+  <data name="PhpVersionInstalled" xml:space="preserve"><value>PHP {0} installed</value></data>
+  <data name="PhpInstallFailed" xml:space="preserve"><value>Install failed</value></data>
+  <data name="PhpSavedForNextStart" xml:space="preserve"><value>Saved for the next local PHP start.</value></data>
+  <data name="NodeInstallingMajor" xml:space="preserve"><value>Installing Node.js {0}</value></data>
+  <data name="NodeVersionInstalled" xml:space="preserve"><value>Node.js {0} installed</value></data>
+  <data name="NodeMajorNotInstalled" xml:space="preserve"><value>Node.js {0} is not installed.</value></data>
+  <data name="NodeDeleteVersionTitle" xml:space="preserve"><value>Delete Node.js {0}?</value></data>
+  <data name="NodeDeleteVersionMessage" xml:space="preserve"><value>The runtime can be downloaded again later.</value></data>
+  <data name="NodeActive" xml:space="preserve"><value>Active</value></data>
+  <data name="ServicesPageTitle.Text" xml:space="preserve"><value>Services</value></data>
+  <data name="ServicesPageDescription.Text" xml:space="preserve"><value>Checksum-verified open-source Windows service runtimes</value></data>
+  <data name="ServicesRefreshTooltip.Text" xml:space="preserve"><value>Refresh service status</value></data>
+  <data name="ServicesTypeField.Header" xml:space="preserve"><value>Service</value></data>
+  <data name="ServicesNameField.Header" xml:space="preserve"><value>Name</value></data>
+  <data name="ServicesPortField.Header" xml:space="preserve"><value>Port</value></data>
+  <data name="ServicesAddButton.Text" xml:space="preserve"><value>Add</value></data>
+  <data name="ServicesServiceColumn.Text" xml:space="preserve"><value>Service</value></data>
+  <data name="ServicesPortColumn.Text" xml:space="preserve"><value>Port</value></data>
+  <data name="ServicesVersionColumn.Text" xml:space="preserve"><value>Version</value></data>
+  <data name="ServicesStatusColumn.Text" xml:space="preserve"><value>Status</value></data>
+  <data name="ServicesAutomaticStart.OnContent" xml:space="preserve"><value>Auto</value></data>
+  <data name="ServicesAutomaticStart.OffContent" xml:space="preserve"><value>Auto</value></data>
+  <data name="ServicesInstallTooltip.Text" xml:space="preserve"><value>Install or update runtime</value></data>
+  <data name="ServicesOpenDataTooltip.Text" xml:space="preserve"><value>Open data directory</value></data>
+  <data name="ServicesEnvironmentTooltip.Text" xml:space="preserve"><value>Add service connection to a site .env</value></data>
+  <data name="ServicesConsoleTooltip.Text" xml:space="preserve"><value>Open service console</value></data>
+  <data name="ServicesConsoleButton.Text" xml:space="preserve"><value>Console</value></data>
+  <data name="ServicesCopyConnectionTooltip.Text" xml:space="preserve"><value>Copy database connection URL</value></data>
+  <data name="ServicesTablePlusTooltip.Text" xml:space="preserve"><value>Open database in TablePlus</value></data>
+  <data name="ServicesTablePlusButton.Text" xml:space="preserve"><value>TablePlus</value></data>
+  <data name="ServicesDeleteTooltip.Text" xml:space="preserve"><value>Delete service instance</value></data>
+  <data name="ServicesEmptyState.Text" xml:space="preserve"><value>No services added</value></data>
+  <data name="ServicesPortOwnerHerdMe" xml:space="preserve"><value>another HerdMe service</value></data>
+  <data name="ServicesPortOwnerApplication" xml:space="preserve"><value>another application</value></data>
+  <data name="ServicesPortConflictNoAlternative" xml:space="preserve"><value>Port {0} is already used by {1}. No alternative loopback port is currently available.</value></data>
+  <data name="ServicesPortConflictSuggested" xml:space="preserve"><value>Port {0} is already used by {1}. Suggested port {2} is now selected; press Add again to use it.</value></data>
+  <data name="ServicesInstalling" xml:space="preserve"><value>Installing {0}</value></data>
+  <data name="ServicesVersionInstalled" xml:space="preserve"><value>{0} {1} installed</value></data>
+  <data name="ServicesStopBeforeUpdate" xml:space="preserve"><value>Stop this service before updating its runtime.</value></data>
+  <data name="ServicesStopping" xml:space="preserve"><value>Stopping {0}</value></data>
+  <data name="ServicesStarting" xml:space="preserve"><value>Starting {0}</value></data>
+  <data name="ServicesAddSiteBeforeEnvironment" xml:space="preserve"><value>Add or link a site before updating a .env file.</value></data>
+  <data name="ServicesSiteField" xml:space="preserve"><value>Site</value></data>
+  <data name="ServicesEnvironmentDialogTitle" xml:space="preserve"><value>Add {0} to .env</value></data>
+  <data name="ServicesAddToEnvironment" xml:space="preserve"><value>Add to .env</value></data>
+  <data name="ServicesEnvironmentUpdatedTitle" xml:space="preserve"><value>Updated .env</value></data>
+  <data name="ServicesEnvironmentUpdatedMessage" xml:space="preserve"><value>Added {0} and updated {1} variables in {2}.</value></data>
+  <data name="ServicesStartBeforeConsole" xml:space="preserve"><value>Start this storage service before opening its console.</value></data>
+  <data name="ServicesStartBeforeTablePlus" xml:space="preserve"><value>Start this database service before opening it in TablePlus.</value></data>
+  <data name="ServicesStartBeforeCopyConnection" xml:space="preserve"><value>Start this database service before copying its connection URL.</value></data>
+  <data name="ServicesConnectionCopied" xml:space="preserve"><value>{0} connection URL copied</value></data>
+  <data name="ServicesDeleteTitle" xml:space="preserve"><value>Delete {0}?</value></data>
+  <data name="ServicesDeleteMessage" xml:space="preserve"><value>The service will stop and its local data directory will be deleted. The shared runtime stays installed.</value></data>
+  <data name="ServicesStop" xml:space="preserve"><value>Stop</value></data>
+  <data name="ServicesStart" xml:space="preserve"><value>Start</value></data>
+  <data name="ServicesStopped" xml:space="preserve"><value>Stopped</value></data>
+  <data name="ServicesRunning" xml:space="preserve"><value>Running</value></data>
+  <data name="ServicesUnknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="ServicesValkeyUnavailable" xml:space="preserve"><value>Valkey upstream does not currently support or publish an official native Windows x64 package.</value></data>
+  <data name="ServicesTypesenseUnavailable" xml:space="preserve"><value>Typesense upstream does not currently support or publish an official native Windows x64 package.</value></data>
+  <data name="ServicesUnavailableNative" xml:space="preserve"><value>{0} is not available for native Windows installation.</value></data>
+  <data name="SitesPageTitle.Text" xml:space="preserve"><value>Sites</value></data>
+  <data name="SitesEnvironmentStatus.Text" xml:space="preserve"><value>Stopped</value></data>
+  <data name="SitesCreateLaravelButton.Text" xml:space="preserve"><value>Create Laravel</value></data>
+  <data name="SitesEnvironmentButton.Text" xml:space="preserve"><value>Start all</value></data>
+  <data name="SitesDomainField.Header" xml:space="preserve"><value>Domain</value></data>
+  <data name="SitesRefreshTooltip.Text" xml:space="preserve"><value>Refresh sites</value></data>
+  <data name="SitesFoldersExpander.Header" xml:space="preserve"><value>Site folders and linked projects</value></data>
+  <data name="SitesRootPathField.PlaceholderText" xml:space="preserve"><value>Site folder</value></data>
+  <data name="SitesChooseFolderTooltip.Text" xml:space="preserve"><value>Choose folder</value></data>
+  <data name="SitesAddFolderTooltip.Text" xml:space="preserve"><value>Add folder</value></data>
+  <data name="SitesRemoveFolderTooltip.Text" xml:space="preserve"><value>Remove selected folder</value></data>
+  <data name="SitesLinkProjectButton.Text" xml:space="preserve"><value>Link project</value></data>
+  <data name="SitesSearchField.PlaceholderText" xml:space="preserve"><value>Search sites</value></data>
+  <data name="SitesContextCopyLink.Text" xml:space="preserve"><value>Copy link</value></data>
+  <data name="SitesContextCopyPath.Text" xml:space="preserve"><value>Copy path</value></data>
+  <data name="SitesContextRemoveSite.Text" xml:space="preserve"><value>Remove site...</value></data>
+  <data name="SitesCountInitial.Text" xml:space="preserve"><value>0 sites</value></data>
+  <data name="SitesEmptyState.Text" xml:space="preserve"><value>No sites found</value></data>
+  <data name="SitesNoSelection.Text" xml:space="preserve"><value>Select a site</value></data>
+  <data name="SitesOpenBrowserTooltip.Text" xml:space="preserve"><value>Open in browser</value></data>
+  <data name="SitesCopyTooltip.Text" xml:space="preserve"><value>Copy site link or path</value></data>
+  <data name="SitesCopyLinkMenu.Text" xml:space="preserve"><value>Copy link</value></data>
+  <data name="SitesCopyPathMenu.Text" xml:space="preserve"><value>Copy path</value></data>
+  <data name="SitesOpenFolderTooltip.Text" xml:space="preserve"><value>Open project folder</value></data>
+  <data name="SitesEditEnvironmentTooltip.Text" xml:space="preserve"><value>Edit .env</value></data>
+  <data name="SitesOpenTerminalTooltip.Text" xml:space="preserve"><value>Open terminal</value></data>
+  <data name="SitesOpenLogsTooltip.Text" xml:space="preserve"><value>Open site logs</value></data>
+  <data name="SitesArtisanTooltip.Text" xml:space="preserve"><value>Run Artisan command</value></data>
+  <data name="SitesNpmTooltip.Text" xml:space="preserve"><value>Run npm script</value></data>
+  <data name="SitesConfigureRuntimesTooltip.Text" xml:space="preserve"><value>Configure PHP and Node.js</value></data>
+  <data name="SitesUnlinkTooltip.Text" xml:space="preserve"><value>Unlink project</value></data>
+  <data name="SitesMoveToRecycleBinTooltip.Text" xml:space="preserve"><value>Move project to Recycle Bin</value></data>
+  <data name="SitesMoveToRecycleBinTitle" xml:space="preserve"><value>Move {0} to Recycle Bin?</value></data>
+  <data name="SitesMoveToRecycleBinMessage" xml:space="preserve"><value>The project folder will be moved to the Recycle Bin and can be restored from there.</value></data>
+  <data name="SitesMoveToRecycleBin" xml:space="preserve"><value>Move to Recycle Bin</value></data>
+  <data name="SitesRemoveLinkedRejected" xml:space="preserve"><value>Unlink this project instead. HerdMe will not delete the original linked folder.</value></data>
+  <data name="SitesRemoveOutsideRootRejected" xml:space="preserve"><value>HerdMe can only move a direct child of a configured sites folder to the Recycle Bin.</value></data>
+  <data name="SitesRemoveUnavailable" xml:space="preserve"><value>The site folder is missing or is not a removable project folder.</value></data>
+  <data name="SitesLivePreviewLabel.Text" xml:space="preserve"><value>Live preview</value></data>
+  <data name="SitesPreviewUnavailable.Text" xml:space="preserve"><value>Preview unavailable</value></data>
+  <data name="SitesRetryPreviewButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Retry site preview</value></data>
+  <data name="SitesRetryPreviewTooltip.Text" xml:space="preserve"><value>Retry preview</value></data>
+  <data name="SitesFrameworkLabel.Text" xml:space="preserve"><value>Framework</value></data>
+  <data name="SitesRuntimeLabel.Text" xml:space="preserve"><value>Runtime</value></data>
+  <data name="SitesRegistrationLabel.Text" xml:space="preserve"><value>Registration</value></data>
+  <data name="SitesPathLabel.Text" xml:space="preserve"><value>Path</value></data>
+  <data name="SitesUrlLabel.Text" xml:space="preserve"><value>URL</value></data>
+  <data name="SitesEnvironmentStopping" xml:space="preserve"><value>Stopping</value></data>
+  <data name="SitesEnvironmentStarting" xml:space="preserve"><value>Starting</value></data>
+  <data name="SitesEnvironmentRunning" xml:space="preserve"><value>Running</value></data>
+  <data name="SitesEnvironmentRecovering" xml:space="preserve"><value>Recovering</value></data>
+  <data name="SitesEnvironmentStopped" xml:space="preserve"><value>Stopped</value></data>
+  <data name="SitesEnvironmentStopAll" xml:space="preserve"><value>Stop all</value></data>
+  <data name="SitesEnvironmentStartAll" xml:space="preserve"><value>Start all</value></data>
+  <data name="SitesEnvironmentDialogTitle" xml:space="preserve"><value>{0} environment file</value></data>
+  <data name="SitesEnvironmentContentsField" xml:space="preserve"><value>Environment file contents</value></data>
+  <data name="SitesEnvironmentStatusFromExample" xml:space="preserve"><value>Loaded from .env.example. Save to create .env.</value></data>
+  <data name="SitesEnvironmentStatusLoaded" xml:space="preserve"><value>Loaded .env</value></data>
+  <data name="SitesEnvironmentStatusMissing" xml:space="preserve"><value>.env does not exist. Save to create it.</value></data>
+  <data name="SitesEnvironmentStatusUnsaved" xml:space="preserve"><value>Unsaved changes</value></data>
+  <data name="SitesEnvironmentStatusSaved" xml:space="preserve"><value>Saved .env</value></data>
+  <data name="SitesEnvironmentExternalChange" xml:space="preserve"><value>The .env file changed outside HerdMe. Reopen it before saving so those changes are not overwritten.</value></data>
+  <data name="SitesEnvironmentConfirmDiscard" xml:space="preserve"><value>Unsaved changes will be lost. Select Close again to discard them.</value></data>
+  <data name="SitesOk" xml:space="preserve"><value>OK</value></data>
+  <data name="SitesLinkOtherApplicationRejected" xml:space="preserve"><value>HerdMe does not link projects inside another application's folders. Choose a HerdMe-owned folder instead.</value></data>
+  <data name="SitesAddFolderBeforeCreate" xml:space="preserve"><value>Add a site folder before creating a Laravel project.</value></data>
+  <data name="SitesProjectNameField" xml:space="preserve"><value>Project name</value></data>
+  <data name="SitesStarterNone" xml:space="preserve"><value>None</value></data>
+  <data name="SitesStarterCustom" xml:space="preserve"><value>Custom</value></data>
+  <data name="SitesStarterKitField" xml:space="preserve"><value>Starter kit</value></data>
+  <data name="SitesCustomComposerPackageField" xml:space="preserve"><value>Custom Composer package</value></data>
+  <data name="SitesTestingFrameworkField" xml:space="preserve"><value>Testing framework</value></data>
+  <data name="SitesInstallBoostField" xml:space="preserve"><value>Install Laravel Boost</value></data>
+  <data name="SitesInitializeGitField" xml:space="preserve"><value>Initialize Git repository</value></data>
+  <data name="SitesProjectLocation" xml:space="preserve"><value>Location: {0}</value></data>
+  <data name="SitesCreateLaravelDialogTitle" xml:space="preserve"><value>Create Laravel project</value></data>
+  <data name="SitesCreate" xml:space="preserve"><value>Create</value></data>
+  <data name="SitesCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="SitesCreatingLaravelDialogTitle" xml:space="preserve"><value>Creating Laravel project</value></data>
+  <data name="SitesCancellingProjectCreation" xml:space="preserve"><value>Cancelling and removing the incomplete project...</value></data>
+  <data name="SitesLaravelCreatedTitle" xml:space="preserve"><value>Laravel project created</value></data>
+  <data name="SitesDone" xml:space="preserve"><value>Done</value></data>
+  <data name="SitesLaravelCreationCancelledTitle" xml:space="preserve"><value>Laravel project creation cancelled</value></data>
+  <data name="SitesLaravelCreationCancelledMessage" xml:space="preserve"><value>Creation was cancelled and the incomplete project was removed.</value></data>
+  <data name="SitesClose" xml:space="preserve"><value>Close</value></data>
+  <data name="SitesLaravelCreationFailedTitle" xml:space="preserve"><value>Laravel project could not be created</value></data>
+  <data name="SitesLaravelCreationFallback" xml:space="preserve"><value>Laravel Installer could not finish creating the site.</value></data>
+  <data name="SitesTechnicalDetails" xml:space="preserve"><value>Technical details</value></data>
+  <data name="SitesProgressCompleted" xml:space="preserve"><value>Completed</value></data>
+  <data name="SitesProgressInProgress" xml:space="preserve"><value>In progress</value></data>
+  <data name="SitesProgressPending" xml:space="preserve"><value>Pending</value></data>
+  <data name="SitesProgressFailed" xml:space="preserve"><value>Failed</value></data>
+  <data name="SitesProgressRow" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="SitesParkOtherApplicationRejected" xml:space="preserve"><value>HerdMe does not park another application's folders. Choose a HerdMe-owned folder instead.</value></data>
+  <data name="SitesRuntimeDefault" xml:space="preserve"><value>Default</value></data>
+  <data name="SitesSave" xml:space="preserve"><value>Save</value></data>
+  <data name="SitesCount" xml:space="preserve"><value>{0} sites</value></data>
+  <data name="SitesDefaultPhpRuntime" xml:space="preserve"><value>Default PHP</value></data>
+  <data name="SitesProjectNodeRuntime" xml:space="preserve"><value>Project Node.js</value></data>
+  <data name="SitesLinked" xml:space="preserve"><value>Linked</value></data>
+  <data name="SitesParked" xml:space="preserve"><value>Parked</value></data>
+  <data name="SitesArtisanCommandField" xml:space="preserve"><value>Command</value></data>
+  <data name="SitesArtisanCustomCommandField" xml:space="preserve"><value>Custom command</value></data>
+  <data name="SitesArtisanReady" xml:space="preserve"><value>Ready</value></data>
+  <data name="SitesArtisanOutputPlaceholder" xml:space="preserve"><value>Output will appear here.</value></data>
+  <data name="SitesRun" xml:space="preserve"><value>Run</value></data>
+  <data name="SitesArtisanDialogTitle" xml:space="preserve"><value>Artisan - {0}</value></data>
+  <data name="SitesArtisanCancelling" xml:space="preserve"><value>Cancelling</value></data>
+  <data name="SitesArtisanFailed" xml:space="preserve"><value>Failed</value></data>
+  <data name="SitesArtisanValidatingPhp" xml:space="preserve"><value>Validating PHP</value></data>
+  <data name="SitesArtisanRunning" xml:space="preserve"><value>Running</value></data>
+  <data name="SitesArtisanCompleted" xml:space="preserve"><value>Completed</value></data>
+  <data name="SitesArtisanFailedExit" xml:space="preserve"><value>Failed (exit {0})</value></data>
+  <data name="SitesArtisanCancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="SitesArtisanTimedOut" xml:space="preserve"><value>Timed out</value></data>
+  <data name="SitesArtisanPresetRouteList" xml:space="preserve"><value>Route List</value></data>
+  <data name="SitesArtisanPresetMigrationStatus" xml:space="preserve"><value>Migration Status</value></data>
+  <data name="SitesArtisanPresetMigrate" xml:space="preserve"><value>Migrate</value></data>
+  <data name="SitesArtisanPresetQueueWorker" xml:space="preserve"><value>Queue Worker</value></data>
+  <data name="SitesArtisanPresetCustom" xml:space="preserve"><value>Custom</value></data>
+  <data name="SitesNpmScriptField" xml:space="preserve"><value>Script</value></data>
+  <data name="SitesNpmReloadTooltip" xml:space="preserve"><value>Reload npm scripts</value></data>
+  <data name="SitesNpmDialogTitle" xml:space="preserve"><value>npm scripts - {0}</value></data>
+  <data name="SitesNpmReady" xml:space="preserve"><value>Ready</value></data>
+  <data name="SitesNpmLoading" xml:space="preserve"><value>Loading npm scripts</value></data>
+  <data name="SitesNpmUnavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="SitesNpmOutputPlaceholder" xml:space="preserve"><value>Output will appear here.</value></data>
+  <data name="SitesNpmPreparingNode" xml:space="preserve"><value>Preparing Node.js</value></data>
+  <data name="SitesNpmRunning" xml:space="preserve"><value>Running</value></data>
+  <data name="SitesNpmCompleted" xml:space="preserve"><value>Completed</value></data>
+  <data name="SitesNpmFailedExit" xml:space="preserve"><value>Failed (exit {0})</value></data>
+  <data name="SitesNpmCancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="SitesNpmCancelling" xml:space="preserve"><value>Cancelling</value></data>
+  <data name="SitesNpmTimedOut" xml:space="preserve"><value>Timed out</value></data>
+  <data name="SitesNpmFailed" xml:space="preserve"><value>Failed</value></data>
+  <data name="SitesNpmErrorPackageMissing" xml:space="preserve"><value>This project does not contain a package.json file.</value></data>
+  <data name="SitesNpmErrorPackageTooLarge" xml:space="preserve"><value>package.json must be no larger than 1 MB.</value></data>
+  <data name="SitesNpmErrorPackageInvalid" xml:space="preserve"><value>package.json does not contain valid JSON.</value></data>
+  <data name="SitesNpmErrorNoScripts" xml:space="preserve"><value>This project does not define any runnable npm scripts.</value></data>
+  <data name="SitesNpmErrorTooManyScripts" xml:space="preserve"><value>package.json contains more than 256 npm scripts.</value></data>
+  <data name="SitesNpmErrorInvalidName" xml:space="preserve"><value>The npm script name is invalid.</value></data>
+  <data name="SitesNpmErrorScriptUnavailable" xml:space="preserve"><value>The selected npm script is no longer available. Reload the script list.</value></data>
+  <data name="SitesNpmErrorNodeNotInstalled" xml:space="preserve"><value>Install HerdMe Node.js {0} before running npm scripts.</value></data>
+  <data name="SitesNpmErrorNodeUnavailable" xml:space="preserve"><value>The selected managed Node.js executable is unavailable.</value></data>
+  <data name="SitesNpmErrorNpmUnavailable" xml:space="preserve"><value>The selected managed Node.js runtime does not contain npm.</value></data>
+  <data name="SitesNpmErrorInvocationIncomplete" xml:space="preserve"><value>The npm script invocation is incomplete.</value></data>
+  <data name="SitesNpmErrorStartFailed" xml:space="preserve"><value>The selected Node.js runtime could not start npm.</value></data>
+  <data name="SitesNpmErrorTimedOut" xml:space="preserve"><value>The npm script did not finish within {0:0} minutes.</value></data>
+  <data name="SitesNpmErrorInstallNode" xml:space="preserve"><value>Install a HerdMe Node.js runtime before running npm scripts.</value></data>
+  <data name="SitesProjectStageValidatingRequestTitle" xml:space="preserve"><value>Checking project details</value></data>
+  <data name="SitesProjectStageValidatingRequestDetail" xml:space="preserve"><value>Verifying the name, location, and project folder.</value></data>
+  <data name="SitesProjectStagePreparingLaravelInstallerTitle" xml:space="preserve"><value>Preparing Laravel Installer</value></data>
+  <data name="SitesProjectStagePreparingLaravelInstallerDetail" xml:space="preserve"><value>Using the managed Laravel Installer already on this PC, and installing it only if needed.</value></data>
+  <data name="SitesProjectStageCreatingLaravelProjectTitle" xml:space="preserve"><value>Creating Laravel project</value></data>
+  <data name="SitesProjectStageCreatingLaravelProjectDetail" xml:space="preserve"><value>Running the installed Laravel Installer to create and configure the application.</value></data>
+  <data name="SitesProjectStageInstallingLaravelBoostTitle" xml:space="preserve"><value>Installing Laravel Boost</value></data>
+  <data name="SitesProjectStageInstallingLaravelBoostDetail" xml:space="preserve"><value>Adding Laravel Boost as a development dependency.</value></data>
+  <data name="SitesProjectStagePreparingNodeRuntimeTitle" xml:space="preserve"><value>Preparing Node.js</value></data>
+  <data name="SitesProjectStagePreparingNodeRuntimeDetail" xml:space="preserve"><value>Making sure a HerdMe-managed Node.js runtime is ready.</value></data>
+  <data name="SitesProjectStageInstallingFrontendDependenciesTitle" xml:space="preserve"><value>Installing frontend packages</value></data>
+  <data name="SitesProjectStageInstallingFrontendDependenciesDetail" xml:space="preserve"><value>Restoring the starter kit's npm packages.</value></data>
+  <data name="SitesProjectStageBuildingFrontendAssetsTitle" xml:space="preserve"><value>Building frontend assets</value></data>
+  <data name="SitesProjectStageBuildingFrontendAssetsDetail" xml:space="preserve"><value>Compiling the production Vite assets used by the site.</value></data>
+  <data name="SitesProjectStageInitializingGitRepositoryTitle" xml:space="preserve"><value>Initializing Git repository</value></data>
+  <data name="SitesProjectStageInitializingGitRepositoryDetail" xml:space="preserve"><value>Creating the initial local Git repository.</value></data>
+  <data name="SitesProjectStageVerifyingProjectTitle" xml:space="preserve"><value>Verifying Laravel project</value></data>
+  <data name="SitesProjectStageVerifyingProjectDetail" xml:space="preserve"><value>Checking that Laravel finished with its required files.</value></data>
+  <data name="SitesProjectStageRegisteringSiteTitle" xml:space="preserve"><value>Registering local site</value></data>
+  <data name="SitesProjectStageRegisteringSiteDetail" xml:space="preserve"><value>Adding the project to HerdMe's local sites.</value></data>
+  <data name="SitesProjectStageCompletedTitle" xml:space="preserve"><value>Site created</value></data>
+  <data name="SitesProjectStageCompletedDetail" xml:space="preserve"><value>Your project is ready to open.</value></data>
+  <data name="MailPageTitle.Text" xml:space="preserve"><value>Mail</value></data>
+  <data name="MailCopyEnvironmentButton.Text" xml:space="preserve"><value>Copy .env</value></data>
+  <data name="MailCaptureTitle.Text" xml:space="preserve"><value>SMTP capture</value></data>
+  <data name="MailStoppedInitial.Text" xml:space="preserve"><value>Stopped</value></data>
+  <data name="MailServerTooltip.Text" xml:space="preserve"><value>Start or stop SMTP capture</value></data>
+  <data name="MailInboxTitle.Text" xml:space="preserve"><value>Inbox</value></data>
+  <data name="MailClearTooltip.Text" xml:space="preserve"><value>Delete all messages</value></data>
+  <data name="MailSearchField.PlaceholderText" xml:space="preserve"><value>Search messages</value></data>
+  <data name="MailSearchField.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Search messages</value></data>
+  <data name="MailSelectMessageInitial.Text" xml:space="preserve"><value>Select a message</value></data>
+  <data name="MailDeleteTooltip.Text" xml:space="preserve"><value>Delete message</value></data>
+  <data name="MailPreviewTab.Header" xml:space="preserve"><value>Preview</value></data>
+  <data name="MailPreviewUnavailable.Text" xml:space="preserve"><value>Preview unavailable</value></data>
+  <data name="MailRetryPreviewButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Retry message preview</value></data>
+  <data name="MailRetryPreviewTooltip.Text" xml:space="preserve"><value>Retry preview</value></data>
+  <data name="MailTextTab.Header" xml:space="preserve"><value>Text</value></data>
+  <data name="MailRawTab.Header" xml:space="preserve"><value>Raw</value></data>
+  <data name="MailSelectMessage" xml:space="preserve"><value>Select a message</value></data>
+  <data name="MailFrom" xml:space="preserve"><value>From: {0}</value></data>
+  <data name="MailTo" xml:space="preserve"><value>To: {0}</value></data>
+  <data name="MailRunningOn" xml:space="preserve"><value>Running on 127.0.0.1:{0}</value></data>
+  <data name="MailStopped" xml:space="preserve"><value>Stopped</value></data>
+  <data name="DumpsPageTitle.Text" xml:space="preserve"><value>Dumps</value></data>
+  <data name="DumpsCaptureTitle.Text" xml:space="preserve"><value>VarDumper capture</value></data>
+  <data name="DumpsStoppedInitial.Text" xml:space="preserve"><value>Stopped</value></data>
+  <data name="DumpsServerTooltip.Text" xml:space="preserve"><value>Start or stop dump capture</value></data>
+  <data name="DumpsCapturedTitle.Text" xml:space="preserve"><value>Captured</value></data>
+  <data name="DumpsClearTooltip.Text" xml:space="preserve"><value>Delete all dumps</value></data>
+  <data name="DumpsSelectDumpInitial.Text" xml:space="preserve"><value>Select a dump</value></data>
+  <data name="DumpsSelectDump" xml:space="preserve"><value>Select a dump</value></data>
+  <data name="DumpsRunningOn" xml:space="preserve"><value>Running on 127.0.0.1:{0}</value></data>
+  <data name="DumpsStopped" xml:space="preserve"><value>Stopped</value></data>
+  <data name="DebuggerPageTitle.Text" xml:space="preserve"><value>Debugger</value></data>
+  <data name="DebuggerXdebugTitle.Text" xml:space="preserve"><value>Xdebug</value></data>
+  <data name="DebuggerCheckingInitial.Text" xml:space="preserve"><value>Checking</value></data>
+  <data name="DebuggerInstallButton.Text" xml:space="preserve"><value>Install</value></data>
+  <data name="DebuggerSessionSettingsTitle.Text" xml:space="preserve"><value>Session settings</value></data>
+  <data name="DebuggerEnableLabel.Text" xml:space="preserve"><value>Enable Xdebug</value></data>
+  <data name="DebuggerRequireTriggerLabel.Text" xml:space="preserve"><value>Require debug trigger</value></data>
+  <data name="DebuggerTriggerTooltip.Text" xml:space="preserve"><value>Start Xdebug only for requests that include XDEBUG_TRIGGER</value></data>
+  <data name="DebuggerPortLabel.Text" xml:space="preserve"><value>Debug port</value></data>
+  <data name="DebuggerIdeKeyLabel.Text" xml:space="preserve"><value>IDE key</value></data>
+  <data name="DebuggerSaveButton.Text" xml:space="preserve"><value>Save</value></data>
+  <data name="DebuggerSessionTitle.Text" xml:space="preserve"><value>Debug session</value></data>
+  <data name="DebuggerSiteLabel.Text" xml:space="preserve"><value>Site</value></data>
+  <data name="DebuggerStartSessionButton.Text" xml:space="preserve"><value>Start Session</value></data>
+  <data name="DebuggerChecking" xml:space="preserve"><value>Checking</value></data>
+  <data name="DebuggerPhpUnavailable" xml:space="preserve"><value>PHP unavailable</value></data>
+  <data name="DebuggerNotInstalled" xml:space="preserve"><value>Not installed</value></data>
+  <data name="DebuggerVersion" xml:space="preserve"><value>Version {0}</value></data>
+  <data name="DebuggerInstalling" xml:space="preserve"><value>Installing</value></data>
+  <data name="DebuggerSavedForNextStart" xml:space="preserve"><value>Saved for the next local PHP start.</value></data>
+  <data name="DebuggerIdeEndpoint" xml:space="preserve"><value>IDE endpoint: 127.0.0.1:{0}</value></data>
+  <data name="DebuggerScanningSites" xml:space="preserve"><value>Scanning sites</value></data>
+  <data name="DebuggerEnableAndSave" xml:space="preserve"><value>Enable Xdebug and save the session settings first.</value></data>
+  <data name="DebuggerStartEnvironment" xml:space="preserve"><value>Start the local site environment first.</value></data>
+  <data name="DebuggerOpenedSite" xml:space="preserve"><value>Opened {0}</value></data>
+  <data name="DebuggerNoSites" xml:space="preserve"><value>No sites available</value></data>
+  <data name="DebuggerReady" xml:space="preserve"><value>Ready</value></data>
+  <data name="DebuggerEnableToStart" xml:space="preserve"><value>Enable Xdebug to start a session</value></data>
+  <data name="LogsPageTitle.Text" xml:space="preserve"><value>Logs</value></data>
+  <data name="LogsLiveRefreshToggle.OnContent" xml:space="preserve"><value>Live</value></data>
+  <data name="LogsLiveRefreshToggle.OffContent" xml:space="preserve"><value>Paused</value></data>
+  <data name="LogsSearchField.PlaceholderText" xml:space="preserve"><value>Search current log</value></data>
+  <data name="LogsOpenFolderTooltip.Text" xml:space="preserve"><value>Open log folder</value></data>
+  <data name="LogsRefreshTooltip.Text" xml:space="preserve"><value>Refresh logs</value></data>
+  <data name="LogsSourceWarning.Message" xml:space="preserve"><value>Some log sources could not be loaded. HerdMe application logs remain available.</value></data>
+  <data name="LogsSelectLogInitial.Text" xml:space="preserve"><value>Select a log</value></data>
+  <data name="LogsSelectLog" xml:space="preserve"><value>Select a log</value></data>
+  <data name="AboutPageRoot.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>About HerdMe</value></data>
+  <data name="AboutPageDescription.Text" xml:space="preserve"><value>Open-source local development for PHP and Laravel</value></data>
+  <data name="AboutIndependentTitle.Text" xml:space="preserve"><value>Independent implementation</value></data>
+  <data name="AboutIndependentDescription.Text" xml:space="preserve"><value>HerdMe uses its own source, runtimes, certificates, settings, and application data. It does not read another application's private runtime or configuration.</value></data>
+  <data name="AboutLicenseSummary.Text" xml:space="preserve"><value>License: MIT</value></data>
+  <data name="AboutOpenSourcePromise.Text" xml:space="preserve"><value>No activation, subscription, license key, paid tier, or feature gate.</value></data>
+  <data name="AboutRepositoryTooltip.Text" xml:space="preserve"><value>Open the source repository</value></data>
+  <data name="AboutRepositoryButtonText.Text" xml:space="preserve"><value>Repository</value></data>
+  <data name="AboutDocumentationTooltip.Text" xml:space="preserve"><value>Open the documentation</value></data>
+  <data name="AboutDocumentationButtonText.Text" xml:space="preserve"><value>Documentation</value></data>
+  <data name="AboutReleaseNotesTooltip.Text" xml:space="preserve"><value>Open release notes</value></data>
+  <data name="AboutReleaseNotesButtonText.Text" xml:space="preserve"><value>Release Notes</value></data>
+  <data name="AboutCopyVersionTooltip.Text" xml:space="preserve"><value>Copy the HerdMe version and build number</value></data>
+  <data name="AboutCopyVersionButtonText.Text" xml:space="preserve"><value>Copy Version</value></data>
+  <data name="AboutCheckUpdatesButtonText.Text" xml:space="preserve"><value>Check for Updates</value></data>
+  <data name="AboutLicenseButton.Content" xml:space="preserve"><value>MIT License</value></data>
+  <data name="AboutAcknowledgementsButton.Content" xml:space="preserve"><value>Acknowledgements</value></data>
+  <data name="AboutVersionSummary" xml:space="preserve"><value>HerdMe {0} (Build {1})</value></data>
+  <data name="AboutChannelStatus" xml:space="preserve"><value>{0} channel</value></data>
+  <data name="AboutChannelStable" xml:space="preserve"><value>Stable</value></data>
+  <data name="AboutChannelBeta" xml:space="preserve"><value>Beta</value></data>
+  <data name="AboutCopied" xml:space="preserve"><value>Copied</value></data>
+  <data name="AboutCopyFailedTitle" xml:space="preserve"><value>Version could not be copied</value></data>
+  <data name="AboutCheckingReleases" xml:space="preserve"><value>Checking {0} releases</value></data>
+  <data name="AboutVersionAvailable" xml:space="preserve"><value>Version {0} is available</value></data>
+  <data name="AboutUpToDateStatus" xml:space="preserve"><value>HerdMe {0} is up to date</value></data>
+  <data name="AboutUpToDateTitle" xml:space="preserve"><value>HerdMe is up to date</value></data>
+  <data name="AboutUpToDateMessage" xml:space="preserve"><value>Version {0} is the newest {1} release.</value></data>
+  <data name="AboutUpdateCheckFailed" xml:space="preserve"><value>Update check failed</value></data>
+  <data name="AboutLicenseDialogTitle" xml:space="preserve"><value>MIT License</value></data>
+  <data name="AboutAcknowledgementsDialogTitle" xml:space="preserve"><value>Acknowledgements</value></data>
+  <data name="AboutDocumentUnavailable" xml:space="preserve"><value>The bundled document could not be loaded.</value></data>
+  <data name="AboutDone" xml:space="preserve"><value>Done</value></data>
+  <data name="AboutLinkOpenFailed" xml:space="preserve"><value>Link could not be opened</value></data>
+  <data name="AboutOpenInBrowser" xml:space="preserve"><value>Open {0} in a browser.</value></data>
+  <data name="AboutUpdateDialogTitle" xml:space="preserve"><value>HerdMe {0} is available</value></data>
+  <data name="AboutLater" xml:space="preserve"><value>Later</value></data>
+  <data name="AboutDownload" xml:space="preserve"><value>Download</value></data>
+  <data name="AboutDownloadOpenFailed" xml:space="preserve"><value>Download could not be opened</value></data>
+  <data name="NavDashboard.Content" xml:space="preserve"><value>Dashboard</value></data>
+  <data name="DashboardPageTitle.Text" xml:space="preserve"><value>Dashboard</value></data>
+  <data name="DashboardPageSubtitle.Text" xml:space="preserve"><value>Your local development environment at a glance.</value></data>
+  <data name="DashboardRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Refresh dashboard</value></data>
+  <data name="DashboardRefreshTooltip.Text" xml:space="preserve"><value>Refresh dashboard</value></data>
+  <data name="DashboardSitesCard.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open sites</value></data>
+  <data name="DashboardSitesLabel.Text" xml:space="preserve"><value>Sites</value></data>
+  <data name="DashboardServicesCard.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open services</value></data>
+  <data name="DashboardServicesLabel.Text" xml:space="preserve"><value>Services</value></data>
+  <data name="DashboardMailCard.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open mail</value></data>
+  <data name="DashboardMailLabel.Text" xml:space="preserve"><value>Mail</value></data>
+  <data name="DashboardDumpsCard.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open dumps</value></data>
+  <data name="DashboardDumpsLabel.Text" xml:space="preserve"><value>Dumps</value></data>
+  <data name="DashboardEnvironmentSectionTitle.Text" xml:space="preserve"><value>Environment</value></data>
+  <data name="DashboardEnvironmentLabel.Text" xml:space="preserve"><value>Sites environment</value></data>
+  <data name="DashboardDomainsLabel.Text" xml:space="preserve"><value>Local domains</value></data>
+  <data name="DashboardCertificateLabel.Text" xml:space="preserve"><value>HTTPS certificate</value></data>
+  <data name="DashboardRecentActivityTitle.Text" xml:space="preserve"><value>Recent activity</value></data>
+  <data name="DashboardRecentMailTitle.Text" xml:space="preserve"><value>Mail</value></data>
+  <data name="DashboardOpenMailButton.Content" xml:space="preserve"><value>View all</value></data>
+  <data name="DashboardRecentDumpsTitle.Text" xml:space="preserve"><value>Dumps</value></data>
+  <data name="DashboardOpenDumpsButton.Content" xml:space="preserve"><value>View all</value></data>
+  <data name="DashboardRunningCount" xml:space="preserve"><value>{0} of {1} running</value></data>
+  <data name="DashboardCaptureRunning" xml:space="preserve"><value>Capture server running</value></data>
+  <data name="DashboardCaptureStopped" xml:space="preserve"><value>Capture server stopped</value></data>
+  <data name="DashboardRunning" xml:space="preserve"><value>Running</value></data>
+  <data name="DashboardRecovering" xml:space="preserve"><value>Recovering</value></data>
+  <data name="DashboardStopped" xml:space="preserve"><value>Stopped</value></data>
+  <data name="DashboardServingHttps" xml:space="preserve"><value>Local sites are available over HTTPS.</value></data>
+  <data name="DashboardServingHttp" xml:space="preserve"><value>Local sites are available over HTTP.</value></data>
+  <data name="DashboardNotServing" xml:space="preserve"><value>Local sites are not currently being served.</value></data>
+  <data name="DashboardConfigured" xml:space="preserve"><value>Configured</value></data>
+  <data name="DashboardNotConfigured" xml:space="preserve"><value>Not configured</value></data>
+  <data name="DashboardDomainDetail" xml:space="preserve"><value>Projects use the .{0} domain.</value></data>
+  <data name="DashboardTrusted" xml:space="preserve"><value>Trusted</value></data>
+  <data name="DashboardNotTrusted" xml:space="preserve"><value>Not trusted</value></data>
+  <data name="DashboardHttpsActive" xml:space="preserve"><value>HTTPS is active for local sites.</value></data>
+  <data name="DashboardConfigureHttps" xml:space="preserve"><value>Open General to configure HTTPS.</value></data>
+  <data name="DashboardRefreshFailed" xml:space="preserve"><value>Dashboard refresh failed: {0}</value></data>
+  <data name="DashboardEnvironmentRecoveringWarning" xml:space="preserve"><value>The local environment is recovering from an unexpected process exit.</value></data>
+  <data name="DashboardDomainsWarning" xml:space="preserve"><value>Local domains are not configured. Open General to set them up.</value></data>
+  <data name="DashboardCertificateWarning" xml:space="preserve"><value>The HerdMe HTTPS certificate is not trusted. Open General to trust it.</value></data>
+  <data name="DashboardEverythingReady" xml:space="preserve"><value>Everything is ready</value></data>
+  <data name="DashboardNeedsAttention" xml:space="preserve"><value>Needs attention</value></data>
+  <data name="DashboardHealthyDetail" xml:space="preserve"><value>Local domains, certificates, and managed services are ready.</value></data>
+  <data name="DashboardWarningsDetail" xml:space="preserve"><value>Review the items below before relying on the local environment.</value></data>
+  <data name="DashboardNoRecentMail" xml:space="preserve"><value>No captured mail yet</value></data>
+  <data name="DashboardNoSubject" xml:space="preserve"><value>(No subject)</value></data>
+  <data name="DashboardNoRecentDumps" xml:space="preserve"><value>No captured dumps yet</value></data>
+  <data name="DashboardEmptyDump" xml:space="preserve"><value>Empty dump</value></data>
+  <data name="SitesEnvironmentFileLabel.Text" xml:space="preserve"><value>Environment file</value></data>
+  <data name="SitesLogsLabel.Text" xml:space="preserve"><value>Logs</value></data>
+  <data name="SitesRoutesLabel.Text" xml:space="preserve"><value>Laravel routes</value></data>
+  <data name="SitesGitLabel.Text" xml:space="preserve"><value>Git</value></data>
+  <data name="SitesAssociatedServicesLabel.Text" xml:space="preserve"><value>Associated services</value></data>
+  <data name="SitesRuntimeDetails" xml:space="preserve"><value>PHP {0}  Node.js {1}</value></data>
+  <data name="SitesDetailsChecking" xml:space="preserve"><value>Checking...</value></data>
+  <data name="SitesDetailsUnreadable" xml:space="preserve"><value>Unreadable</value></data>
+  <data name="SitesDetailsPresent" xml:space="preserve"><value>Present</value></data>
+  <data name="SitesDetailsMissing" xml:space="preserve"><value>Missing</value></data>
+  <data name="SitesDetailsNoLogs" xml:space="preserve"><value>No log files</value></data>
+  <data name="SitesDetailsLogsLatest" xml:space="preserve"><value>{0} files, latest: {1}</value></data>
+  <data name="SitesDetailsLogsCount" xml:space="preserve"><value>{0} log files</value></data>
+  <data name="SitesDetailsNoRoutes" xml:space="preserve"><value>No route files</value></data>
+  <data name="SitesDetailsNotGit" xml:space="preserve"><value>Not a Git repository</value></data>
+  <data name="SitesDetailsDetached" xml:space="preserve"><value>Detached HEAD</value></data>
+  <data name="SitesDetailsGitClean" xml:space="preserve"><value>{0}, clean</value></data>
+  <data name="SitesDetailsGitChanges" xml:space="preserve"><value>{0}, {1} changes</value></data>
+  <data name="SitesDetailsNoServices" xml:space="preserve"><value>No associated services</value></data>
+  <data name="SitesDetailsUnavailable" xml:space="preserve"><value>Unavailable</value></data>
+</root>

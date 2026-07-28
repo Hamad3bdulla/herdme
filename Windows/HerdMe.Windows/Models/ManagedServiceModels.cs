@@ -13,34 +13,15 @@ public sealed record ManagedServiceDefinition(
 public static class ManagedServiceCatalog
 {
     public static IReadOnlyList<ManagedServiceDefinition> All { get; } =
-    [
-        new("mariadb", "MariaDB", "Database", 3_306, "11.8"),
-        new("mysql", "MySQL", "Database", 3_306, "Innovation"),
-        new("postgresql", "PostgreSQL", "Database", 5_432, "18"),
-        new("mongodb", "MongoDB", "Database", 27_017, "8.0 LTS"),
-        new("redis", "Redis", "Cache", 6_379, "Latest"),
-        new(
-            "valkey",
-            "Valkey",
-            "Cache",
-            6_379,
-            "Latest",
-            false,
-            "Valkey upstream does not currently support or publish an official native Windows x64 package."
-        ),
-        new("meilisearch", "Meilisearch", "Search", 7_700, "Latest"),
-        new(
-            "typesense",
-            "Typesense",
-            "Search",
-            8_108,
-            "Latest",
-            false,
-            "Typesense upstream does not currently support or publish an official native Windows x64 package."
-        ),
-        new("minio", "MinIO", "Storage", 9_000, "Latest"),
-        new("rustfs", "RustFS", "Storage", 9_000, "Beta")
-    ];
+        RuntimeCatalog.Services.Select(service => new ManagedServiceDefinition(
+            service.Id,
+            service.Name,
+            CategoryTitle(service.Category),
+            service.DefaultPort,
+            service.Windows.VersionLabel,
+            service.Windows.Installable,
+            service.Windows.UnavailableReason
+        )).ToList();
 
     public static ManagedServiceDefinition Get(string id)
     {
@@ -48,6 +29,16 @@ public static class ManagedServiceCatalog
             definition.Id.Equals(id, StringComparison.OrdinalIgnoreCase)
         ) ?? throw new ArgumentOutOfRangeException(nameof(id), id, "Unsupported managed service.");
     }
+
+    private static string CategoryTitle(string category) => category switch
+    {
+        "database" => "Database",
+        "cache" => "Cache",
+        "search" => "Search",
+        "storage" => "Storage",
+        "realtime" => "Realtime",
+        _ => category
+    };
 }
 
 public sealed class ManagedServiceInstance
@@ -92,20 +83,14 @@ public sealed class ManagedServiceRow
 
     public string? ConnectionDisplay { get; init; }
 
-    public string Status => State switch
-    {
-        ManagedServiceState.NotInstalled => "Not installed",
-        ManagedServiceState.Stopped => "Stopped",
-        ManagedServiceState.Running => "Running",
-        _ => "Unknown"
-    };
+    public required string Status { get; init; }
 
-    public string InstallLabel => State == ManagedServiceState.NotInstalled ? "Install" : "Update";
+    public required string InstallLabel { get; init; }
 
     public bool CanInstallOrUpdate => State == ManagedServiceState.NotInstalled
         || State == ManagedServiceState.Stopped && IsUpdateAvailable;
 
-    public string ToggleLabel => State == ManagedServiceState.Running ? "Stop" : "Start";
+    public required string ToggleLabel { get; init; }
 
     public bool CanToggle => State != ManagedServiceState.NotInstalled;
 

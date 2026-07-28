@@ -20,10 +20,10 @@ struct SettingsPanel<Content: View>: View {
 }
 
 struct PageContainer<Content: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     @ViewBuilder let content: Content
 
-    init(_ title: String, @ViewBuilder content: () -> Content) {
+    init(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) {
         self.title = title
         self.content = content()
     }
@@ -45,11 +45,15 @@ struct PageContainer<Content: View>: View {
 }
 
 struct SettingRow<Content: View>: View {
-    let title: String
-    var detail: String?
+    let title: LocalizedStringKey
+    var detail: LocalizedStringKey?
     @ViewBuilder let content: Content
 
-    init(_ title: String, detail: String? = nil, @ViewBuilder content: () -> Content) {
+    init(
+        _ title: LocalizedStringKey,
+        detail: LocalizedStringKey? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
         self.title = title
         self.detail = detail
         self.content = content()
@@ -82,9 +86,9 @@ struct PanelDivider: View {
 
 struct EmptyStateView: View {
     let symbol: String
-    let title: String
-    let message: String
-    var actionTitle: String?
+    let title: LocalizedStringKey
+    let message: LocalizedStringKey
+    var actionTitle: LocalizedStringKey?
     var action: (() -> Void)?
 
     var body: some View {
@@ -111,11 +115,20 @@ struct EmptyStateView: View {
 
 extension View {
     @ViewBuilder
-    func herdTheme(_ value: String) -> some View {
+    func herdTheme(_ value: AppTheme) -> some View {
         switch value {
-        case "Light": preferredColorScheme(.light)
-        case "Dark": preferredColorScheme(.dark)
-        default: preferredColorScheme(nil)
+        case .light: preferredColorScheme(.light)
+        case .dark: preferredColorScheme(.dark)
+        case .automatic: preferredColorScheme(nil)
         }
+    }
+}
+
+enum AppLocalization {
+    static func layoutDirection(for locale: Locale) -> LayoutDirection {
+        let language =
+            locale.language.languageCode?.identifier.lowercased()
+            ?? locale.identifier.split(separator: "_").first.map(String.init)?.lowercased()
+        return ["ar", "fa", "he", "ur"].contains(language) ? .rightToLeft : .leftToRight
     }
 }

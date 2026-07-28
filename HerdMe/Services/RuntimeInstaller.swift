@@ -42,7 +42,7 @@ private struct HomebrewFormulaVersions: Decodable {
 }
 
 enum PHPRuntimeSupport {
-    static let installableCycles = ["8.5", "8.4", "8.3", "8.2", "8.1", "8.0"]
+    static let installableCycles = RuntimeCatalog.installablePHPCycles
 
     static func isInstallable(_ cycle: String) -> Bool {
         installableCycles.contains(cycle)
@@ -85,23 +85,6 @@ enum CommandFailureReporter {
     }
 }
 
-enum HomebrewFormulaTrust {
-    static func target(from output: String, expectedFormula: String) -> String? {
-        guard output.localizedCaseInsensitiveContains("untrusted tap"),
-              let match = output.range(
-                of: #"brew trust --formula [`']?([A-Za-z0-9._+/@-]+)"#,
-                options: .regularExpression
-              ) else { return nil }
-        let command = String(output[match])
-        guard let target = command.split(separator: " ").last.map(String.init)?
-            .trimmingCharacters(in: CharacterSet(charactersIn: "`'")),
-              target == expectedFormula || target.hasPrefix(expectedFormula + "@") else {
-            return nil
-        }
-        return target
-    }
-}
-
 enum RuntimeInstallationError: LocalizedError {
     case unsupportedArchitecture
     case unsupportedPHPCycle(String)
@@ -116,28 +99,58 @@ enum RuntimeInstallationError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unsupportedArchitecture:
-            "This Mac architecture is not supported by the selected runtime."
-        case let .unsupportedPHPCycle(cycle):
-            "PHP \(cycle) is not available for new HerdMe installations. Install PHP 8.0 through 8.5 instead."
-        case let .releaseNotFound(cycle):
-            "No compatible Node.js " + cycle + " release was found."
+            String(localized: "This Mac architecture is not supported by the selected runtime.")
+        case .unsupportedPHPCycle(let cycle):
+            String.localizedStringWithFormat(
+                String(localized: "PHP %@ is not available for new HerdMe installations. Install PHP 8.0 through 8.5 instead."),
+                cycle
+            )
+        case .releaseNotFound(let cycle):
+            String.localizedStringWithFormat(
+                String(localized: "No compatible Node.js %@ release was found."),
+                cycle
+            )
         case .invalidResponse:
-            "The runtime server returned an invalid response."
-        case let .archiveFailed(output):
-            output.isEmpty ? "The downloaded runtime could not be unpacked." : output
-        case let .runtimeNotInstalled(name, cycle):
-            name + " " + cycle + " is not installed by HerdMe."
+            String(localized: "The runtime server returned an invalid response.")
+        case .archiveFailed(let output):
+            output.isEmpty ? String(localized: "The downloaded runtime could not be unpacked.") : output
+        case .runtimeNotInstalled(let name, let cycle):
+            String.localizedStringWithFormat(
+                String(localized: "%1$@ %2$@ is not installed by HerdMe."),
+                name,
+                cycle
+            )
         case .packageManagerMissing:
-            "Homebrew is required to install PHP on macOS."
-        case let .integrityCheckFailed(component):
-            component + " did not match its official checksum."
-        case let .commandFailed(output):
-            output.isEmpty ? "The runtime package manager failed." : output
+            String(localized: "Homebrew is required to install PHP on macOS.")
+        case .integrityCheckFailed(let component):
+            String.localizedStringWithFormat(
+                String(localized: "%@ did not match its official checksum."),
+                component
+            )
+        case .commandFailed(let output):
+            output.isEmpty ? String(localized: "The runtime package manager failed.") : output
         }
     }
 }
 
-actor RuntimeInstaller {
+protocol RuntimeInstalling: Sendable {
+    func activatePHP(cycle: String) async throws
+    func installPHP(cycle: String) async throws -> String
+    func installNode(cycle: String) async throws -> String
+    func activateNode(cycle: String) async throws
+    func removeNode(cycle: String) async throws
+    func composerVersion(cycle: String) async -> String?
+    func latestComposerVersion(cycle: String) async throws -> String
+    func updateComposer(cycle: String) async throws -> String
+    func laravelInstallerVersion(cycle: String) async -> String?
+    func latestLaravelInstallerVersion() async throws -> String
+    func updateLaravelInstaller(cycle: String) async throws -> String
+    func prepareLaravelInstallerForProjectCreation(cycle: String) async throws
+    func latestPHPVersions(cycles: [String]) async throws -> [String: String]
+    func latestNodeVersions(cycles: [String]) async throws -> [String: String]
+}
+
+actor RuntimeInstaller: RuntimeInstalling {
     let rootURL: URL
     private let fileManager = FileManager.default
 
@@ -145,9 +158,25 @@ actor RuntimeInstaller {
         self.rootURL = rootURL
     }
 
+    nonisolated static func officialURL(_ value: String, expectedHost: String) throws -> URL {
+        guard let url = URL(string: value),
+            url.scheme == "https",
+            url.host?.lowercased() == expectedHost.lowercased(),
+            url.port == nil || url.port == 443,
+            url.user == nil,
+            url.password == nil
+        else {
+            throw RuntimeInstallationError.invalidResponse
+        }
+        return url
+    }
+
     func installNode(cycle: String) async throws -> String {
         let archiveKey = try nodeArchiveKey()
-        let indexURL = URL(string: "https://nodejs.org/dist/index.json")!
+        let indexURL = try Self.officialURL(
+            "https://nodejs.org/dist/index.json",
+            expectedHost: "nodejs.org"
+        )
         let (indexData, response) = try await ManagedDownloadClient.data(from: indexURL)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             throw RuntimeInstallationError.invalidResponse
@@ -168,8 +197,14 @@ actor RuntimeInstaller {
 
             let platform = archiveKey.hasPrefix("osx-arm64") ? "darwin-arm64" : "darwin-x64"
             let archiveName = "node-\(release.version)-\(platform).tar.gz"
-            let downloadURL = URL(string: "https://nodejs.org/dist/\(release.version)/\(archiveName)")!
-            let checksumsURL = URL(string: "https://nodejs.org/dist/\(release.version)/SHASUMS256.txt")!
+            let downloadURL = try Self.officialURL(
+                "https://nodejs.org/dist/\(release.version)/\(archiveName)",
+                expectedHost: "nodejs.org"
+            )
+            let checksumsURL = try Self.officialURL(
+                "https://nodejs.org/dist/\(release.version)/SHASUMS256.txt",
+                expectedHost: "nodejs.org"
+            )
             async let archiveRequest = ManagedDownloadClient.download(from: downloadURL)
             async let checksumsRequest = ManagedDownloadClient.data(from: checksumsURL)
             let ((temporaryArchive, downloadResponse), (checksumsData, checksumsResponse)) = try await (
@@ -177,12 +212,13 @@ actor RuntimeInstaller {
                 checksumsRequest
             )
             guard (downloadResponse as? HTTPURLResponse)?.statusCode == 200,
-                  (checksumsResponse as? HTTPURLResponse)?.statusCode == 200,
-                  let checksums = String(data: checksumsData, encoding: .utf8),
-                  let expectedChecksum = Self.nodeChecksum(
-                      for: archiveName,
-                      in: checksums
-                  ) else {
+                (checksumsResponse as? HTTPURLResponse)?.statusCode == 200,
+                let checksums = String(data: checksumsData, encoding: .utf8),
+                let expectedChecksum = Self.nodeChecksum(
+                    for: archiveName,
+                    in: checksums
+                )
+            else {
                 throw RuntimeInstallationError.invalidResponse
             }
             guard try Self.sha256(of: temporaryArchive) == expectedChecksum else {
@@ -198,18 +234,22 @@ actor RuntimeInstaller {
 
     func latestNodeVersions(cycles: [String]) async throws -> [String: String] {
         let archiveKey = try nodeArchiveKey()
-        let indexURL = URL(string: "https://nodejs.org/dist/index.json")!
+        let indexURL = try Self.officialURL(
+            "https://nodejs.org/dist/index.json",
+            expectedHost: "nodejs.org"
+        )
         let (indexData, response) = try await ManagedDownloadClient.data(from: indexURL)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             throw RuntimeInstallationError.invalidResponse
         }
         let releases = try JSONDecoder().decode([NodeRelease].self, from: indexData)
-        return Dictionary(uniqueKeysWithValues: Set(cycles).compactMap { cycle in
-            guard let release = Self.release(for: cycle, archiveKey: archiveKey, in: releases) else {
-                return nil
-            }
-            return (cycle, Self.normalizedVersion(release.version))
-        })
+        return Dictionary(
+            uniqueKeysWithValues: Set(cycles).compactMap { cycle in
+                guard let release = Self.release(for: cycle, archiveKey: archiveKey, in: releases) else {
+                    return nil
+                }
+                return (cycle, Self.normalizedVersion(release.version))
+            })
     }
 
     func latestPHPVersions(cycles: [String]) throws -> [String: String] {
@@ -218,19 +258,18 @@ actor RuntimeInstaller {
         if let unsupportedCycle = requestedCycles.first(where: { !PHPRuntimeSupport.isInstallable($0) }) {
             throw RuntimeInstallationError.unsupportedPHPCycle(unsupportedCycle)
         }
-        guard let brew = brewURL() else { throw RuntimeInstallationError.packageManagerMissing }
+        guard let homebrew = HomebrewCLI(fileManager: fileManager) else {
+            throw RuntimeInstallationError.packageManagerMissing
+        }
         let formulae = requestedCycles.sorted().map { "php@\($0)" }
-        let result = try run(
-            brew,
-            arguments: ["info", "--json=v2"] + formulae,
-            environment: homebrewEnvironment
-        )
+        let result = try homebrew.run(arguments: ["info", "--json=v2"] + formulae)
         guard result.status == 0 else {
-            throw RuntimeInstallationError.commandFailed(CommandFailureReporter.recordAndSummarize(
-                result.output,
-                operation: "brew info " + formulae.joined(separator: " "),
-                rootURL: rootURL
-            ))
+            throw RuntimeInstallationError.commandFailed(
+                CommandFailureReporter.recordAndSummarize(
+                    result.output,
+                    operation: "brew info " + formulae.joined(separator: " "),
+                    rootURL: rootURL
+                ))
         }
         return try Self.phpVersions(
             fromHomebrewInfoOutput: result.output,
@@ -249,18 +288,17 @@ actor RuntimeInstaller {
         guard PHPRuntimeSupport.isInstallable(cycle) else {
             throw RuntimeInstallationError.unsupportedPHPCycle(cycle)
         }
-        guard let brew = brewURL() else { throw RuntimeInstallationError.packageManagerMissing }
+        guard let homebrew = HomebrewCLI(fileManager: fileManager) else {
+            throw RuntimeInstallationError.packageManagerMissing
+        }
         let formula = "php@\(cycle)"
         let managedExecutable = rootURL.appendingPathComponent("Runtimes/php/\(cycle)/bin/php")
         let command = fileManager.isExecutableFile(atPath: managedExecutable.path) ? "upgrade" : "install"
-        var install = try run(brew, arguments: [command, formula], environment: homebrewEnvironment)
+        var install = try homebrew.run(arguments: [command, formula])
         if install.status != 0,
-           let trustTarget = Self.phpFormulaTrustTarget(from: install.output, cycle: cycle) {
-            let trust = try run(
-                brew,
-                arguments: ["trust", "--formula", trustTarget],
-                environment: homebrewEnvironment
-            )
+            let trustTarget = Self.phpFormulaTrustTarget(from: install.output, cycle: cycle)
+        {
+            let trust = try homebrew.run(arguments: ["trust", "--formula", trustTarget])
             guard trust.status == 0 else {
                 _ = CommandFailureReporter.recordAndSummarize(
                     trust.output,
@@ -271,11 +309,7 @@ actor RuntimeInstaller {
                     "HerdMe could not approve the verified PHP \(cycle) formula. Full output is available in Logs/homebrew.log."
                 )
             }
-            install = try run(
-                brew,
-                arguments: [command, formula],
-                environment: homebrewEnvironment
-            )
+            install = try homebrew.run(arguments: [command, formula])
         }
         guard install.status == 0 else {
             _ = CommandFailureReporter.recordAndSummarize(
@@ -287,7 +321,7 @@ actor RuntimeInstaller {
                 "PHP \(cycle) could not be installed. Full output is available in Logs/homebrew.log."
             )
         }
-        let prefix = try run(brew, arguments: ["--prefix", formula], environment: homebrewEnvironment)
+        let prefix = try homebrew.run(arguments: ["--prefix", formula])
         guard prefix.status == 0 else {
             _ = CommandFailureReporter.recordAndSummarize(
                 prefix.output,
@@ -301,13 +335,16 @@ actor RuntimeInstaller {
         let source = URL(fileURLWithPath: prefix.output.trimmingCharacters(in: .whitespacesAndNewlines), isDirectory: true)
         var isDirectory: ObjCBool = false
         guard fileManager.fileExists(atPath: source.appendingPathComponent("bin").path, isDirectory: &isDirectory),
-              isDirectory.boolValue else {
+            isDirectory.boolValue
+        else {
             throw RuntimeInstallationError.commandFailed("Homebrew did not return a valid PHP runtime path.")
         }
         let runtimeRoot = rootURL.appendingPathComponent("Runtimes/php", isDirectory: true)
         try fileManager.createDirectory(at: runtimeRoot, withIntermediateDirectories: true)
         let destination = runtimeRoot.appendingPathComponent(cycle, isDirectory: true)
-        if fileManager.fileExists(atPath: destination.path) || (try? destination.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true {
+        if fileManager.fileExists(atPath: destination.path)
+            || (try? destination.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true
+        {
             try? fileManager.removeItem(at: destination)
         }
         try fileManager.createSymbolicLink(at: destination, withDestinationURL: source)
@@ -329,10 +366,12 @@ actor RuntimeInstaller {
             return nil
         }
         let expectedFormula = "shivammathur/php/php@\(cycle)"
-        guard let target = HomebrewFormulaTrust.target(
-            from: output,
-            expectedFormula: expectedFormula
-        ), target == expectedFormula else { return nil }
+        guard
+            let target = HomebrewCLI.formulaTrustTarget(
+                from: output,
+                expectedFormula: expectedFormula
+            ), target == expectedFormula
+        else { return nil }
         return target
     }
 
@@ -349,7 +388,8 @@ actor RuntimeInstaller {
             )
             guard fileManager.fileExists(atPath: candidate.path) else { continue }
             let link = managedBin.appendingPathComponent(name)
-            if fileManager.fileExists(atPath: link.path) || (try? link.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true {
+            if fileManager.fileExists(atPath: link.path) || (try? link.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true
+            {
                 try fileManager.removeItem(at: link)
             }
             try fileManager.createSymbolicLink(at: link, withDestinationURL: candidate)
@@ -361,20 +401,23 @@ actor RuntimeInstaller {
         let php = rootURL.appendingPathComponent("Runtimes/php/\(cycle)/bin/php")
         let installer = laravelInstallerURL
         guard fileManager.isExecutableFile(atPath: php.path),
-              fileManager.isReadableFile(atPath: installer.path),
-              let result = try? run(
-                  php,
-                  arguments: [installer.path, "--version", "--no-ansi"],
-                  environment: composerEnvironment
-              ),
-              result.status == 0 else {
+            fileManager.isReadableFile(atPath: installer.path),
+            let result = try? run(
+                php,
+                arguments: [installer.path, "--version", "--no-ansi"],
+                environment: composerEnvironment
+            ),
+            result.status == 0
+        else {
             return nil
         }
         let output = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let range = output.range(
-            of: "[0-9]+\\.[0-9]+\\.[0-9]+",
-            options: .regularExpression
-        ) else {
+        guard
+            let range = output.range(
+                of: "[0-9]+\\.[0-9]+\\.[0-9]+",
+                options: .regularExpression
+            )
+        else {
             return nil
         }
         return String(output[range])
@@ -384,13 +427,14 @@ actor RuntimeInstaller {
         let php = rootURL.appendingPathComponent("Runtimes/php/\(cycle)/bin/php")
         try? repairManagedToolLaunchers()
         guard fileManager.isExecutableFile(atPath: php.path),
-              fileManager.isReadableFile(atPath: composerPHARURL.path),
-              let result = try? run(
-                  php,
-                  arguments: [composerPHARURL.path, "--version", "--no-ansi"],
-                  environment: composerEnvironment
-              ),
-              result.status == 0 else {
+            fileManager.isReadableFile(atPath: composerPHARURL.path),
+            let result = try? run(
+                php,
+                arguments: [composerPHARURL.path, "--version", "--no-ansi"],
+                environment: composerEnvironment
+            ),
+            result.status == 0
+        else {
             return nil
         }
         return Self.composerVersion(from: result.output)
@@ -407,10 +451,14 @@ actor RuntimeInstaller {
             environment: composerEnvironment
         )
         guard versionID.status == 0,
-              let phpVersionID = Int(versionID.output.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            let phpVersionID = Int(versionID.output.trimmingCharacters(in: .whitespacesAndNewlines))
+        else {
             throw RuntimeInstallationError.invalidResponse
         }
-        let indexURL = URL(string: "https://getcomposer.org/versions")!
+        let indexURL = try Self.officialURL(
+            "https://getcomposer.org/versions",
+            expectedHost: "getcomposer.org"
+        )
         let (data, response) = try await ManagedDownloadClient.data(from: indexURL)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             throw RuntimeInstallationError.invalidResponse
@@ -452,15 +500,20 @@ actor RuntimeInstaller {
     }
 
     func latestLaravelInstallerVersion() async throws -> String {
-        let indexURL = URL(string: "https://repo.packagist.org/p2/laravel/installer.json")!
+        let indexURL = try Self.officialURL(
+            "https://repo.packagist.org/p2/laravel/installer.json",
+            expectedHost: "repo.packagist.org"
+        )
         let (data, response) = try await ManagedDownloadClient.data(from: indexURL)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             throw RuntimeInstallationError.invalidResponse
         }
         let index = try JSONDecoder().decode(PackagistPackageIndex.self, from: data)
-        guard let release = index.packages["laravel/installer"]?.first(where: {
-            Self.isStableVersion($0.version)
-        }) else {
+        guard
+            let release = index.packages["laravel/installer"]?.first(where: {
+                Self.isStableVersion($0.version)
+            })
+        else {
             throw RuntimeInstallationError.invalidResponse
         }
         return Self.normalizedVersion(release.version)
@@ -502,11 +555,12 @@ actor RuntimeInstaller {
             environment: composerEnvironment
         )
         guard result.status == 0 else {
-            throw RuntimeInstallationError.commandFailed(CommandFailureReporter.recordAndSummarize(
-                result.output,
-                operation: "composer update laravel/installer",
-                rootURL: rootURL
-            ))
+            throw RuntimeInstallationError.commandFailed(
+                CommandFailureReporter.recordAndSummarize(
+                    result.output,
+                    operation: "composer update laravel/installer",
+                    rootURL: rootURL
+                ))
         }
         try repairManagedToolLaunchers()
         guard let version = laravelInstallerVersion(cycle: cycle) else {
@@ -534,7 +588,9 @@ actor RuntimeInstaller {
         if activeVersion != nil {
             for name in ["node", "npm", "npx", "corepack"] {
                 let link = rootURL.appendingPathComponent("bin/\(name)")
-                if fileManager.fileExists(atPath: link.path) || (try? link.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true {
+                if fileManager.fileExists(atPath: link.path)
+                    || (try? link.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true
+                {
                     try? fileManager.removeItem(at: link)
                 }
             }
@@ -554,8 +610,9 @@ actor RuntimeInstaller {
             let listedName = fields[1].hasPrefix("*") ? fields[1].dropFirst() : fields[1][...]
             let checksum = String(fields[0]).lowercased()
             guard listedName == archiveName,
-                  checksum.count == 64,
-                  checksum.allSatisfy({ $0.isHexDigit }) else {
+                checksum.count == 64,
+                checksum.allSatisfy({ $0.isHexDigit })
+            else {
                 continue
             }
             return checksum
@@ -572,17 +629,19 @@ actor RuntimeInstaller {
         cycles: Set<String>
     ) throws -> [String: String] {
         guard let start = output.firstIndex(of: "{"),
-              let end = output.lastIndex(of: "}") else {
+            let end = output.lastIndex(of: "}")
+        else {
             throw RuntimeInstallationError.invalidResponse
         }
         let payload = Data(output[start...end].utf8)
         let index = try JSONDecoder().decode(HomebrewFormulaIndex.self, from: payload)
-        return Dictionary(uniqueKeysWithValues: index.formulae.compactMap { formula in
-            guard formula.name.hasPrefix("php@") else { return nil }
-            let cycle = String(formula.name.dropFirst("php@".count))
-            guard cycles.contains(cycle), !formula.versions.stable.isEmpty else { return nil }
-            return (cycle, formula.versions.stable)
-        })
+        return Dictionary(
+            uniqueKeysWithValues: index.formulae.compactMap { formula in
+                guard formula.name.hasPrefix("php@") else { return nil }
+                let cycle = String(formula.name.dropFirst("php@".count))
+                guard cycles.contains(cycle), !formula.versions.stable.isEmpty else { return nil }
+                return (cycle, formula.versions.stable)
+            })
     }
 
     nonisolated static func isNewerVersion(_ candidate: String, than current: String) -> Bool {
@@ -599,10 +658,11 @@ actor RuntimeInstaller {
 
     nonisolated static func composerVersion(from output: String) -> String? {
         guard output.localizedCaseInsensitiveContains("composer"),
-              let range = output.range(
-                  of: #"[0-9]+\.[0-9]+\.[0-9]+"#,
-                  options: .regularExpression
-              ) else { return nil }
+            let range = output.range(
+                of: #"[0-9]+\.[0-9]+\.[0-9]+"#,
+                options: .regularExpression
+            )
+        else { return nil }
         return String(output[range])
     }
 
@@ -611,9 +671,11 @@ actor RuntimeInstaller {
         phpVersionID: Int
     ) throws -> String {
         let index = try JSONDecoder().decode(ComposerReleaseIndex.self, from: data)
-        guard let release = index.stable
-            .filter({ $0.minimumPHP <= phpVersionID && isStableVersion($0.version) })
-            .max(by: { isNewerVersion($1.version, than: $0.version) }) else {
+        guard
+            let release = index.stable
+                .filter({ $0.minimumPHP <= phpVersionID && isStableVersion($0.version) })
+                .max(by: { isNewerVersion($1.version, than: $0.version) })
+        else {
             throw RuntimeInstallationError.invalidResponse
         }
         return normalizedVersion(release.version)
@@ -636,7 +698,8 @@ actor RuntimeInstaller {
             let source = runtimeBin.appendingPathComponent(name)
             guard fileManager.fileExists(atPath: source.path) else { continue }
             let link = managedBin.appendingPathComponent(name)
-            if fileManager.fileExists(atPath: link.path) || (try? link.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true {
+            if fileManager.fileExists(atPath: link.path) || (try? link.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true
+            {
                 try fileManager.removeItem(at: link)
             }
             try fileManager.createSymbolicLink(at: link, withDestinationURL: source)
@@ -683,17 +746,24 @@ actor RuntimeInstaller {
     private func ensureComposer(php: URL) async throws -> URL {
         try repairManagedToolLaunchers()
         if fileManager.isReadableFile(atPath: composerPHARURL.path),
-           let result = try? run(
-               php,
-               arguments: [composerPHARURL.path, "--version", "--no-ansi"],
-               environment: composerEnvironment
-           ),
-           result.status == 0 {
+            let result = try? run(
+                php,
+                arguments: [composerPHARURL.path, "--version", "--no-ansi"],
+                environment: composerEnvironment
+            ),
+            result.status == 0
+        {
             return composerPHARURL
         }
 
-        let installerURL = URL(string: "https://getcomposer.org/installer")!
-        let signatureURL = URL(string: "https://composer.github.io/installer.sig")!
+        let installerURL = try Self.officialURL(
+            "https://getcomposer.org/installer",
+            expectedHost: "getcomposer.org"
+        )
+        let signatureURL = try Self.officialURL(
+            "https://composer.github.io/installer.sig",
+            expectedHost: "composer.github.io"
+        )
         async let installerRequest = ManagedDownloadClient.data(from: installerURL)
         async let signatureRequest = ManagedDownloadClient.data(from: signatureURL)
         let ((installerData, installerResponse), (signatureData, signatureResponse)) = try await (
@@ -701,10 +771,11 @@ actor RuntimeInstaller {
             signatureRequest
         )
         guard (installerResponse as? HTTPURLResponse)?.statusCode == 200,
-              (signatureResponse as? HTTPURLResponse)?.statusCode == 200,
-              let expectedSignature = String(data: signatureData, encoding: .utf8)?
+            (signatureResponse as? HTTPURLResponse)?.statusCode == 200,
+            let expectedSignature = String(data: signatureData, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines),
-              !expectedSignature.isEmpty else {
+            !expectedSignature.isEmpty
+        else {
             throw RuntimeInstallationError.invalidResponse
         }
         let actualSignature = SHA384.hash(data: installerData)
@@ -744,11 +815,12 @@ actor RuntimeInstaller {
         )
         let installedPHAR = installationDirectory.appendingPathComponent("composer.phar")
         guard install.status == 0, fileManager.isReadableFile(atPath: installedPHAR.path) else {
-            throw RuntimeInstallationError.commandFailed(CommandFailureReporter.recordAndSummarize(
-                install.output,
-                operation: "install Composer",
-                rootURL: rootURL
-            ))
+            throw RuntimeInstallationError.commandFailed(
+                CommandFailureReporter.recordAndSummarize(
+                    install.output,
+                    operation: "install Composer",
+                    rootURL: rootURL
+                ))
         }
         let verification = try run(
             php,
@@ -809,8 +881,9 @@ actor RuntimeInstaller {
 
     private func migrateLegacyComposerPHARIfNeeded() throws {
         guard !fileManager.fileExists(atPath: composerPHARURL.path),
-              fileManager.isReadableFile(atPath: composerLauncherURL.path),
-              let handle = try? FileHandle(forReadingFrom: composerLauncherURL) else { return }
+            fileManager.isReadableFile(atPath: composerLauncherURL.path),
+            let handle = try? FileHandle(forReadingFrom: composerLauncherURL)
+        else { return }
         defer { try? handle.close() }
         let prefix = try handle.read(upToCount: 64) ?? Data()
         guard Self.isComposerPHARPrefix(prefix) else { return }
@@ -829,13 +902,13 @@ actor RuntimeInstaller {
     }
 
     private func nodeArchiveKey() throws -> String {
-#if arch(arm64)
-        return "osx-arm64-tar"
-#elseif arch(x86_64)
-        return "osx-x64-tar"
-#else
-        throw RuntimeInstallationError.unsupportedArchitecture
-#endif
+        #if arch(arm64)
+            return "osx-arm64-tar"
+        #elseif arch(x86_64)
+            return "osx-x64-tar"
+        #else
+            throw RuntimeInstallationError.unsupportedArchitecture
+        #endif
     }
 
     private nonisolated static func sha256(of fileURL: URL) throws -> String {
@@ -846,24 +919,6 @@ actor RuntimeInstaller {
             hasher.update(data: chunk)
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
-    }
-
-    private func brewURL() -> URL? {
-        ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
-            .map { URL(fileURLWithPath: $0) }
-            .first { fileManager.isExecutableFile(atPath: $0.path) }
-    }
-
-    private var homebrewEnvironment: [String: String] {
-        var environment = ProcessInfo.processInfo.environment
-        let home = fileManager.homeDirectoryForCurrentUser.path
-        environment["HOME"] = home
-        environment["USER"] = NSUserName()
-        environment["LOGNAME"] = NSUserName()
-        environment["PATH"] = [
-            "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"
-        ].joined(separator: ":")
-        return environment
     }
 
     private func run(

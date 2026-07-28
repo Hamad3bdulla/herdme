@@ -15,7 +15,8 @@ final class LocalDNSServer: @unchecked Sendable {
     ) throws {
         guard listener == nil else { return }
         guard let rawPort = UInt16(exactly: port), rawPort > 0,
-              let networkPort = NWEndpoint.Port(rawValue: rawPort) else {
+            let networkPort = NWEndpoint.Port(rawValue: rawPort)
+        else {
             throw LocalListenerError.invalidPort(service: "DNS")
         }
         let parameters = NWParameters.udp
@@ -37,7 +38,7 @@ final class LocalDNSServer: @unchecked Sendable {
             switch state {
             case .ready:
                 onStateChange(true, nil)
-            case let .failed(error):
+            case .failed(let error):
                 self?.listener = nil
                 onStateChange(false, error.localizedDescription)
             case .cancelled:
@@ -53,7 +54,7 @@ final class LocalDNSServer: @unchecked Sendable {
     func stop() {
         listener?.cancel()
         listener = nil
-        sessions.values.forEach { $0.stop() }
+        for session in sessions.values { session.stop() }
         sessions.removeAll()
     }
 
@@ -99,9 +100,11 @@ private final class DNSSession: @unchecked Sendable {
                 self.connection.cancel()
                 return
             }
-            self.connection.send(content: response, completion: .contentProcessed { [weak self] _ in
-                self?.receive()
-            })
+            self.connection.send(
+                content: response,
+                completion: .contentProcessed { [weak self] _ in
+                    self?.receive()
+                })
         }
     }
 }

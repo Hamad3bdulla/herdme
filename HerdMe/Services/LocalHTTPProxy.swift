@@ -36,8 +36,9 @@ final class LocalHTTPProxy: @unchecked Sendable {
             selectedPort = LocalEnvironmentEngine.availablePort(startingAt: fallbackPort)
         }
         guard let selectedPort,
-              let rawPort = UInt16(exactly: selectedPort),
-              let networkPort = NWEndpoint.Port(rawValue: rawPort) else {
+            let rawPort = UInt16(exactly: selectedPort),
+            let networkPort = NWEndpoint.Port(rawValue: rawPort)
+        else {
             throw LocalEnvironmentError.noAvailablePort
         }
 
@@ -76,7 +77,7 @@ final class LocalHTTPProxy: @unchecked Sendable {
             session.start()
         }
         listener.stateUpdateHandler = { state in
-            if case let .failed(error) = state {
+            if case .failed(let error) = state {
                 NSLog("HerdMe HTTP proxy failed: %@", error.localizedDescription)
             }
         }
@@ -97,7 +98,7 @@ final class LocalHTTPProxy: @unchecked Sendable {
         let activeSessions = Array(sessions.values)
         sessions.removeAll()
         sessionsLock.unlock()
-        activeSessions.forEach { $0.stop() }
+        for session in activeSessions { session.stop() }
         routesLock.lock()
         routes.removeAll()
         routesLock.unlock()
@@ -141,7 +142,8 @@ final class LocalHTTPProxy: @unchecked Sendable {
     nonisolated static func addingForwardedHeaders(to request: Data, secure: Bool) -> Data {
         let delimiter = Data("\r\n\r\n".utf8)
         guard let range = request.range(of: delimiter),
-              let headerText = String(data: request[..<range.lowerBound], encoding: .utf8) else {
+            let headerText = String(data: request[..<range.lowerBound], encoding: .utf8)
+        else {
             return request
         }
         var lines = headerText.components(separatedBy: "\r\n")
@@ -230,8 +232,9 @@ private final class HTTPProxySession: @unchecked Sendable {
 
     private func connectUpstream() {
         guard let host = LocalHTTPProxy.host(in: requestBuffer), let backendPort = route(host),
-              let rawPort = UInt16(exactly: backendPort),
-              let port = NWEndpoint.Port(rawValue: rawPort) else {
+            let rawPort = UInt16(exactly: backendPort),
+            let port = NWEndpoint.Port(rawValue: rawPort)
+        else {
             sendError(status: "404 Not Found")
             return
         }
@@ -247,15 +250,17 @@ private final class HTTPProxySession: @unchecked Sendable {
                     secure: self.secure
                 )
                 self.requestBuffer.removeAll(keepingCapacity: false)
-                upstream.send(content: request, completion: .contentProcessed { [weak self] error in
-                    guard let self else { return }
-                    if error != nil {
-                        self.sendError(status: "502 Bad Gateway")
-                    } else {
-                        self.forward(from: self.incoming, to: upstream)
-                        self.forward(from: upstream, to: self.incoming)
-                    }
-                })
+                upstream.send(
+                    content: request,
+                    completion: .contentProcessed { [weak self] error in
+                        guard let self else { return }
+                        if error != nil {
+                            self.sendError(status: "502 Bad Gateway")
+                        } else {
+                            self.forward(from: self.incoming, to: upstream)
+                            self.forward(from: upstream, to: self.incoming)
+                        }
+                    })
             case .failed:
                 self.sendError(status: "502 Bad Gateway")
             case .cancelled:
@@ -271,14 +276,16 @@ private final class HTTPProxySession: @unchecked Sendable {
         source.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, complete, error in
             guard let self, !self.stopped else { return }
             if let data, !data.isEmpty {
-                destination.send(content: data, isComplete: complete, completion: .contentProcessed { [weak self] sendError in
-                    guard let self else { return }
-                    if complete || error != nil || sendError != nil {
-                        self.stop()
-                    } else {
-                        self.forward(from: source, to: destination)
-                    }
-                })
+                destination.send(
+                    content: data, isComplete: complete,
+                    completion: .contentProcessed { [weak self] sendError in
+                        guard let self else { return }
+                        if complete || error != nil || sendError != nil {
+                            self.stop()
+                        } else {
+                            self.forward(from: source, to: destination)
+                        }
+                    })
             } else if complete || error != nil {
                 self.stop()
             } else {
@@ -289,9 +296,12 @@ private final class HTTPProxySession: @unchecked Sendable {
 
     private func sendError(status: String) {
         let body = "HerdMe could not route this local site.\n"
-        let response = "HTTP/1.1 \(status)\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
-        incoming.send(content: Data(response.utf8), isComplete: true, completion: .contentProcessed { [weak self] _ in
-            self?.stop()
-        })
+        let response =
+            "HTTP/1.1 \(status)\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
+        incoming.send(
+            content: Data(response.utf8), isComplete: true,
+            completion: .contentProcessed { [weak self] _ in
+                self?.stop()
+            })
     }
 }

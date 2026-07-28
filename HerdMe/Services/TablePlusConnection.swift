@@ -9,7 +9,8 @@ enum TablePlusConnection {
 
     static func displayAddress(for instance: ServiceInstance) -> String? {
         guard instance.port > 0, instance.port <= 65_535,
-              let target = target(for: instance.definitionID) else { return nil }
+            let target = target(for: instance.definitionID)
+        else { return nil }
         var components = URLComponents()
         components.scheme = target.scheme
         components.host = "127.0.0.1"
@@ -25,7 +26,8 @@ enum TablePlusConnection {
         guard instance.port > 0, instance.port <= 65_535 else { return nil }
 
         guard let target = target(for: instance.definitionID),
-              !target.requiresCredentials || credentials != nil else { return nil }
+            !target.requiresCredentials || credentials != nil
+        else { return nil }
 
         var components = URLComponents()
         components.scheme = target.scheme
@@ -40,7 +42,8 @@ enum TablePlusConnection {
     }
 
     private static func target(for definitionID: String)
-        -> (scheme: String, database: String, requiresCredentials: Bool)? {
+        -> (scheme: String, database: String, requiresCredentials: Bool)?
+    {
         switch definitionID {
         case "mysql": ("mysql", "mysql", true)
         case "mariadb": ("mariadb", "mysql", true)

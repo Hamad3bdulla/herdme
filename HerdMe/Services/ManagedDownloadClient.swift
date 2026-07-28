@@ -30,8 +30,9 @@ enum ManagedDownloadClient {
             do {
                 let result = try await activeSession.data(from: url)
                 guard attempt < attempts,
-                      let response = result.1 as? HTTPURLResponse,
-                      shouldRetry(statusCode: response.statusCode) else {
+                    let response = result.1 as? HTTPURLResponse,
+                    shouldRetry(statusCode: response.statusCode)
+                else {
                     return result
                 }
                 try await waitBeforeRetry(
@@ -41,8 +42,9 @@ enum ManagedDownloadClient {
                 )
             } catch {
                 guard attempt < attempts,
-                      !Task.isCancelled,
-                      isTransient(error) else {
+                    !Task.isCancelled,
+                    isTransient(error)
+                else {
                     throw error
                 }
                 try await waitBeforeRetry(
@@ -69,8 +71,9 @@ enum ManagedDownloadClient {
             do {
                 let result = try await activeSession.download(from: url)
                 guard attempt < attempts,
-                      let response = result.1 as? HTTPURLResponse,
-                      shouldRetry(statusCode: response.statusCode) else {
+                    let response = result.1 as? HTTPURLResponse,
+                    shouldRetry(statusCode: response.statusCode)
+                else {
                     return result
                 }
                 try? FileManager.default.removeItem(at: result.0)
@@ -81,8 +84,9 @@ enum ManagedDownloadClient {
                 )
             } catch {
                 guard attempt < attempts,
-                      !Task.isCancelled,
-                      isTransient(error) else {
+                    !Task.isCancelled,
+                    isTransient(error)
+                else {
                     throw error
                 }
                 try await waitBeforeRetry(
@@ -108,15 +112,15 @@ enum ManagedDownloadClient {
         guard let error = error as? URLError else { return false }
         switch error.code {
         case .timedOut,
-             .cannotFindHost,
-             .cannotConnectToHost,
-             .networkConnectionLost,
-             .dnsLookupFailed,
-             .notConnectedToInternet,
-             .resourceUnavailable,
-             .internationalRoamingOff,
-             .callIsActive,
-             .dataNotAllowed:
+            .cannotFindHost,
+            .cannotConnectToHost,
+            .networkConnectionLost,
+            .dnsLookupFailed,
+            .notConnectedToInternet,
+            .resourceUnavailable,
+            .internationalRoamingOff,
+            .callIsActive,
+            .dataNotAllowed:
             return true
         default:
             return false
@@ -130,7 +134,8 @@ enum ManagedDownloadClient {
     ) async throws {
         let delay: UInt64
         if let retryAfter = response?.value(forHTTPHeaderField: "Retry-After"),
-           let seconds = UInt64(retryAfter.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            let seconds = UInt64(retryAfter.trimmingCharacters(in: .whitespacesAndNewlines))
+        {
             let (nanoseconds, overflow) = seconds.multipliedReportingOverflow(by: 1_000_000_000)
             delay = min(
                 overflow ? maximumRetryDelayNanoseconds : nanoseconds,

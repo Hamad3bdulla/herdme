@@ -2,10 +2,14 @@ import SwiftUI
 
 struct DebuggerView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var runtimeCoordinator: RuntimeCoordinator
+    @EnvironmentObject private var sitesCoordinator: SitesCoordinator
+    @EnvironmentObject private var environmentCoordinator: EnvironmentCoordinator
     @State private var selectedSiteID: SiteProject.ID?
 
     private var selectedSite: SiteProject? {
-        model.sites.first { $0.id == selectedSiteID } ?? model.selectedSite
+        sitesCoordinator.sites.first { $0.id == selectedSiteID }
+            ?? sitesCoordinator.selectedSite(identifier: model.selectedSiteID)
     }
 
     var body: some View {
@@ -14,10 +18,10 @@ struct DebuggerView: View {
                 VStack(spacing: 10) {
                     SettingRow("Xdebug") {
                         HStack(spacing: 8) {
-                            if let installation = model.xdebugInstallation {
+                            if let installation = runtimeCoordinator.xdebugInstallation {
                                 Text("v\(installation.version)")
                                     .foregroundStyle(.secondary)
-                            } else if model.debuggerOperation != nil {
+                            } else if runtimeCoordinator.debuggerOperation != nil {
                                 ProgressView().controlSize(.small)
                                 Text("Installing")
                                     .foregroundStyle(.secondary)
@@ -34,32 +38,33 @@ struct DebuggerView: View {
                     }
                     PanelDivider()
                     SettingRow("Enable Xdebug") {
-                        Toggle("", isOn: $model.debuggerSettings.enabled)
+                        Toggle("", isOn: $runtimeCoordinator.debuggerSettings.enabled)
                             .labelsHidden()
                             .toggleStyle(.switch)
-                            .disabled(model.xdebugInstallation == nil)
-                            .onChange(of: model.debuggerSettings.enabled) { _ in
+                            .disabled(runtimeCoordinator.xdebugInstallation == nil)
+                            .onChange(of: runtimeCoordinator.debuggerSettings.enabled) { _ in
                                 model.persistDebuggerSettings()
                             }
                     }
                     PanelDivider()
-                    SettingRow("Start On Trigger") {
-                        Toggle("", isOn: $model.debuggerSettings.detectBreakpoints)
+                    SettingRow("Require Debug Trigger") {
+                        Toggle("", isOn: $runtimeCoordinator.debuggerSettings.startOnlyOnTrigger)
                             .labelsHidden()
                             .toggleStyle(.switch)
-                            .onChange(of: model.debuggerSettings.detectBreakpoints) { _ in
+                            .help("Start Xdebug only for requests that include XDEBUG_TRIGGER")
+                            .onChange(of: runtimeCoordinator.debuggerSettings.startOnlyOnTrigger) { _ in
                                 model.persistDebuggerSettings()
                             }
                     }
                     PanelDivider()
                     SettingRow("Debug Port") {
-                        TextField("", value: $model.debuggerSettings.port, format: .number.grouping(.never))
+                        TextField("", value: $runtimeCoordinator.debuggerSettings.port, format: .number.grouping(.never))
                             .frame(width: 90)
                             .onSubmit { model.persistDebuggerSettings() }
                     }
                     PanelDivider()
                     SettingRow("IDE Key") {
-                        TextField("", text: $model.debuggerSettings.ideKey)
+                        TextField("", text: $runtimeCoordinator.debuggerSettings.ideKey)
                             .frame(width: 120)
                             .onSubmit { model.persistDebuggerSettings() }
                     }
@@ -81,7 +86,7 @@ struct DebuggerView: View {
                     PanelDivider()
                     SettingRow("Site") {
                         Picker("", selection: $selectedSiteID) {
-                            ForEach(model.sites) { site in
+                            ForEach(sitesCoordinator.sites) { site in
                                 Text(site.domain(tld: model.configuration.tld))
                                     .tag(Optional(site.id))
                             }
@@ -91,7 +96,7 @@ struct DebuggerView: View {
                     }
                     PanelDivider()
                     SettingRow("IDE Endpoint") {
-                        Text(PortPresentation.endpoint(port: model.debuggerSettings.normalized.port))
+                        Text(PortPresentation.endpoint(port: runtimeCoordinator.debuggerSettings.normalized.port))
                             .foregroundStyle(.secondary)
                     }
                     PanelDivider()
@@ -116,13 +121,15 @@ struct DebuggerView: View {
         }
         .onAppear {
             model.refreshXdebugInstallation()
-            selectedSiteID = selectedSiteID ?? model.selectedSite?.id
+            selectedSiteID =
+                selectedSiteID
+                ?? sitesCoordinator.selectedSite(identifier: model.selectedSiteID)?.id
         }
     }
 
     private var sessionReady: Bool {
-        model.xdebugInstallation != nil
-            && model.debuggerSettings.enabled
-            && model.environmentStatus == .running
+        runtimeCoordinator.xdebugInstallation != nil
+            && runtimeCoordinator.debuggerSettings.enabled
+            && environmentCoordinator.status == .running
     }
 }

@@ -64,7 +64,8 @@ Name: "{group}\HerdMe"; Filename: "{app}\HerdMe.Windows.exe"; WorkingDir: "{app}
 Name: "{autodesktop}\HerdMe"; Filename: "{app}\HerdMe.Windows.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "HerdMe"; Flags: uninsdeletevalue
+; The app owns this opt-in value. Setup only registers uninstall cleanup.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "HerdMe"; Flags: dontcreatekey uninsdeletevalue
 
 [Run]
 Filename: "{app}\HerdMe.Windows.exe"; Description: "Launch HerdMe"; Flags: nowait postinstall skipifsilent

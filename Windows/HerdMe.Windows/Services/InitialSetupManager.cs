@@ -4,23 +4,40 @@ namespace HerdMe.Windows.Services;
 
 public sealed class InitialSetupManager
 {
-    private const string DefaultPhpCycle = "8.4";
-    private const string DefaultNodeCycle = "22";
-    private readonly SiteConfigurationStore settingsStore = AppServices.SiteSettings;
-    private readonly WindowsHostsManager hostsManager = new();
-    private readonly WindowsCertificateManager certificateManager = new();
-    private readonly CoreClient coreClient = new();
+    private static string DefaultPhpCycle => RuntimeCatalog.DefaultPhpCycle;
+    private static string DefaultNodeCycle => RuntimeCatalog.DefaultNodeMajor;
+    private readonly SiteConfigurationStore settingsStore;
+    private readonly WindowsHostsManager hostsManager;
+    private readonly WindowsCertificateManager certificateManager;
+    private readonly CoreClient coreClient;
     private readonly PhpRuntimeInstaller phpInstaller;
     private readonly PhpRuntimePolicy phpPolicy;
     private readonly ComposerToolManager composerTools;
     private readonly NodeRuntimeInstaller nodeInstaller;
 
-    public InitialSetupManager()
+    public InitialSetupManager(
+        SiteConfigurationStore? settingsStore = null,
+        WindowsHostsManager? hostsManager = null,
+        WindowsCertificateManager? certificateManager = null,
+        CoreClient? coreClient = null,
+        PhpRuntimeInstaller? phpInstaller = null,
+        PhpRuntimePolicy? phpPolicy = null,
+        ComposerToolManager? composerTools = null,
+        NodeRuntimeInstaller? nodeInstaller = null
+    )
     {
-        phpInstaller = new PhpRuntimeInstaller(coreClient);
-        phpPolicy = new PhpRuntimePolicy(coreClient);
-        composerTools = new ComposerToolManager(coreClient: coreClient);
-        nodeInstaller = new NodeRuntimeInstaller();
+        this.settingsStore = settingsStore ?? new SiteConfigurationStore();
+        this.hostsManager = hostsManager ?? new WindowsHostsManager();
+        this.certificateManager = certificateManager ?? new WindowsCertificateManager();
+        this.coreClient = coreClient ?? new CoreClient();
+        this.phpInstaller = phpInstaller ?? new PhpRuntimeInstaller(this.coreClient);
+        this.phpPolicy = phpPolicy ?? new PhpRuntimePolicy(this.coreClient);
+        this.composerTools = composerTools ?? new ComposerToolManager(
+            coreClient: this.coreClient,
+            phpInstaller: this.phpInstaller,
+            phpPolicy: this.phpPolicy
+        );
+        this.nodeInstaller = nodeInstaller ?? new NodeRuntimeInstaller(this.composerTools.SupportRoot);
     }
 
     public async Task RunAsync(

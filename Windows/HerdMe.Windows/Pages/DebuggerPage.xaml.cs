@@ -9,21 +9,33 @@ namespace HerdMe.Windows.Pages;
 
 public sealed partial class DebuggerPage : Page
 {
-    private readonly CoreClient coreClient = new();
+    private readonly CoreClient coreClient;
     private readonly PhpRuntimePolicy runtimePolicy;
     private readonly PhpRuntimeInstaller runtimeInstaller;
-    private readonly XdebugManager xdebugManager = new();
-    private readonly SiteConfigurationStore siteSettings = AppServices.SiteSettings;
+    private readonly XdebugManager xdebugManager;
+    private readonly SiteConfigurationStore siteSettings;
+    private readonly WindowsLocalEnvironment environment;
     private PhpRuntimeSettings settings;
     private string? phpExecutable;
 
     public ObservableCollection<SiteRecord> Sites { get; } = [];
 
-    public DebuggerPage()
+    public DebuggerPage(
+        CoreClient coreClient,
+        PhpRuntimePolicy runtimePolicy,
+        PhpRuntimeInstaller runtimeInstaller,
+        XdebugManager xdebugManager,
+        SiteConfigurationStore siteSettings,
+        WindowsLocalEnvironment environment
+    )
     {
+        this.coreClient = coreClient;
+        this.runtimePolicy = runtimePolicy;
+        this.runtimeInstaller = runtimeInstaller;
+        this.xdebugManager = xdebugManager;
+        this.siteSettings = siteSettings;
+        this.environment = environment;
         InitializeComponent();
-        runtimePolicy = new PhpRuntimePolicy(coreClient);
-        runtimeInstaller = new PhpRuntimeInstaller(coreClient);
         settings = runtimePolicy.Load();
         ApplySettings();
     }
@@ -37,7 +49,7 @@ public sealed partial class DebuggerPage : Page
     private async Task RefreshAsync()
     {
         InstallProgress.IsActive = true;
-        InstallStatusText.Text = "Checking";
+        InstallStatusText.Text = AppLocalization.Get("DebuggerChecking");
         InstallButton.IsEnabled = false;
         try
         {
@@ -46,7 +58,7 @@ public sealed partial class DebuggerPage : Page
                 : null;
             if (phpExecutable is null)
             {
-                InstallStatusText.Text = "PHP unavailable";
+                InstallStatusText.Text = AppLocalization.Get("DebuggerPhpUnavailable");
                 EnabledToggle.IsEnabled = false;
                 return;
             }
@@ -58,8 +70,8 @@ public sealed partial class DebuggerPage : Page
             );
             ExtensionPathText.Text = xdebugManager.ExtensionPath(settings.PhpCycle);
             InstallStatusText.Text = installation is null
-                ? "Not installed"
-                : $"Version {installation.Version}";
+                ? AppLocalization.Get("DebuggerNotInstalled")
+                : AppLocalization.Format("DebuggerVersion", installation.Version);
             InstallButton.IsEnabled = installation is null;
             EnabledToggle.IsEnabled = installation is not null;
             if (installation is null)
@@ -84,13 +96,16 @@ public sealed partial class DebuggerPage : Page
         if (phpExecutable is null) return;
         InstallProgress.IsActive = true;
         InstallButton.IsEnabled = false;
-        InstallStatusText.Text = "Installing";
+        InstallStatusText.Text = AppLocalization.Get("DebuggerInstalling");
         try
         {
             var installation = await xdebugManager.InstallAsync(phpExecutable);
             settings.PhpCycle = await xdebugManager.PhpCycleAsync(phpExecutable);
             ExtensionPathText.Text = installation.ExtensionPath;
-            InstallStatusText.Text = $"Version {installation.Version}";
+            InstallStatusText.Text = AppLocalization.Format(
+                "DebuggerVersion",
+                installation.Version
+            );
             EnabledToggle.IsEnabled = true;
         }
         catch (Exception error)
@@ -116,7 +131,7 @@ public sealed partial class DebuggerPage : Page
             _ = PhpRuntimePolicy.BuildPhpOptions(settings);
             runtimePolicy.Save(settings);
             ApplySettings();
-            SaveStatusText.Text = "Saved for the next local PHP start.";
+            SaveStatusText.Text = AppLocalization.Get("DebuggerSavedForNextStart");
             UpdateSessionState();
         }
         catch (Exception error)
@@ -133,13 +148,16 @@ public sealed partial class DebuggerPage : Page
         TriggerToggle.IsOn = settings.Debugger.DetectBreakpoints;
         PortBox.Value = settings.Debugger.Port;
         IdeKeyBox.Text = settings.Debugger.IdeKey;
-        EndpointText.Text = $"IDE endpoint: 127.0.0.1:{settings.Debugger.Port}";
+        EndpointText.Text = AppLocalization.Format(
+            "DebuggerIdeEndpoint",
+            settings.Debugger.Port
+        );
     }
 
     private async Task RefreshSitesAsync()
     {
         SessionProgress.IsActive = true;
-        SessionStatusText.Text = "Scanning sites";
+        SessionStatusText.Text = AppLocalization.Get("DebuggerScanningSites");
         try
         {
             var siteConfiguration = siteSettings.Load();
@@ -174,12 +192,12 @@ public sealed partial class DebuggerPage : Page
         if (SiteBox.SelectedItem is not SiteRecord site) return;
         if (!settings.Debugger.Enabled)
         {
-            SessionStatusText.Text = "Enable Xdebug and save the session settings first.";
+            SessionStatusText.Text = AppLocalization.Get("DebuggerEnableAndSave");
             return;
         }
-        if (!AppServices.Environment.IsRunning)
+        if (!environment.IsRunning)
         {
-            SessionStatusText.Text = "Start the local site environment first.";
+            SessionStatusText.Text = AppLocalization.Get("DebuggerStartEnvironment");
             return;
         }
 
@@ -188,12 +206,12 @@ public sealed partial class DebuggerPage : Page
             var uri = SitePresentation.DebugUri(
                 site,
                 true,
-                AppServices.Environment.HttpPort,
-                AppServices.Environment.HttpsPort,
+                environment.HttpPort,
+                environment.HttpsPort,
                 settings.Debugger.IdeKey
             );
             Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
-            SessionStatusText.Text = $"Opened {site.Domain}";
+            SessionStatusText.Text = AppLocalization.Format("DebuggerOpenedSite", site.Domain);
         }
         catch (Exception error)
         {
@@ -206,9 +224,11 @@ public sealed partial class DebuggerPage : Page
         var hasSite = SiteBox.SelectedItem is SiteRecord;
         StartSessionButton.IsEnabled = hasSite && settings.Debugger.Enabled;
         SessionStatusText.Text = Sites.Count == 0
-            ? "No sites available"
-            : AppServices.Environment.IsRunning
-                ? settings.Debugger.Enabled ? "Ready" : "Enable Xdebug to start a session"
-                : "Start the local site environment first";
+            ? AppLocalization.Get("DebuggerNoSites")
+            : environment.IsRunning
+                ? settings.Debugger.Enabled
+                    ? AppLocalization.Get("DebuggerReady")
+                    : AppLocalization.Get("DebuggerEnableToStart")
+                : AppLocalization.Get("DebuggerStartEnvironment");
     }
 }

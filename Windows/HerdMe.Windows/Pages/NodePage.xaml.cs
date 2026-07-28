@@ -8,13 +8,14 @@ namespace HerdMe.Windows.Pages;
 
 public sealed partial class NodePage : Page
 {
-    private static readonly string[] SupportedMajors = ["26", "24", "22", "20"];
-    private readonly NodeRuntimeInstaller installer = new();
+    private static IReadOnlyList<string> SupportedMajors => RuntimeCatalog.WindowsNodeMajors;
+    private readonly NodeRuntimeInstaller installer;
 
     public ObservableCollection<NodeRuntimeRow> Rows { get; } = [];
 
-    public NodePage()
+    public NodePage(NodeRuntimeInstaller installer)
     {
+        this.installer = installer;
         InitializeComponent();
     }
 
@@ -31,11 +32,14 @@ public sealed partial class NodePage : Page
     private async void Install_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as Button)?.Tag is not string major) return;
-        SetWorking(true, $"Installing Node.js {major}");
+        SetWorking(true, AppLocalization.Format("NodeInstallingMajor", major));
         try
         {
             var release = await installer.InstallAsync(major);
-            OperationStatusText.Text = $"Node.js {release.Version} installed";
+            OperationStatusText.Text = AppLocalization.Format(
+                "NodeVersionInstalled",
+                release.Version
+            );
         }
         catch (Exception error)
         {
@@ -54,7 +58,9 @@ public sealed partial class NodePage : Page
         try
         {
             var version = installer.InstalledVersion(major)
-                ?? throw new InvalidOperationException($"Node.js {major} is not installed.");
+                ?? throw new InvalidOperationException(
+                    AppLocalization.Format("NodeMajorNotInstalled", major)
+                );
             installer.SetActive(version);
             await RefreshRowsAsync();
         }
@@ -72,10 +78,10 @@ public sealed partial class NodePage : Page
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
-            Title = $"Delete Node.js {version}?",
-            Content = "The runtime can be downloaded again later.",
-            PrimaryButtonText = "Delete",
-            CloseButtonText = "Cancel",
+            Title = AppLocalization.Format("NodeDeleteVersionTitle", version),
+            Content = AppLocalization.Get("NodeDeleteVersionMessage"),
+            PrimaryButtonText = AppLocalization.Get("CommonDelete"),
+            CloseButtonText = AppLocalization.Get("CommonCancel"),
             DefaultButton = ContentDialogButton.Close
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
@@ -113,7 +119,12 @@ public sealed partial class NodePage : Page
                 InstalledVersion = installed,
                 IsActive = installed is not null && installed == active,
                 IsUpdateAvailable = installed is not null && latest is not null
-                    && RuntimeVersionComparison.IsNewer(latest, installed)
+                    && RuntimeVersionComparison.IsNewer(latest, installed),
+                Status = installed is null
+                    ? AppLocalization.Get("CommonNotInstalled")
+                    : installed == active
+                        ? AppLocalization.Get("NodeActive")
+                        : installed
             });
         }
     }
@@ -132,7 +143,7 @@ public sealed partial class NodePage : Page
             XamlRoot = XamlRoot,
             Title = "HerdMe",
             Content = message,
-            CloseButtonText = "OK"
+            CloseButtonText = AppLocalization.Get("CommonOk")
         };
         await dialog.ShowAsync();
     }

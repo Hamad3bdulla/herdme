@@ -15,6 +15,14 @@ enum ServiceRuntimeState: String, Sendable {
     case running = "Running"
 
     var isRunning: Bool { self == .running }
+
+    var localizedTitle: String {
+        switch self {
+        case .notInstalled: String(localized: "Not Installed")
+        case .stopped: String(localized: "Stopped")
+        case .running: String(localized: "Running")
+        }
+    }
 }
 
 enum ServiceRuntimeError: LocalizedError {
@@ -28,20 +36,36 @@ enum ServiceRuntimeError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case let .unsupported(name):
-            "Automatic runtime management is not available for \(name) yet."
+        case .unsupported(let name):
+            String.localizedStringWithFormat(
+                String(localized: "Automatic runtime management is not available for %@ yet."),
+                name
+            )
         case .packageManagerMissing:
-            "Homebrew is required to install local service runtimes on macOS."
-        case let .notInstalled(name):
-            "Install the \(name) runtime before starting this service."
-        case let .portUnavailable(port):
-            "Port \(port) is already in use. Choose another port for this service."
-        case let .commandFailed(output):
-            output.isEmpty ? "The service package command failed." : output
-        case let .processFailed(name):
-            "The \(name) service exited before it became ready. Check its log for details."
-        case let .readinessTimedOut(name, port):
-            "The \(name) service did not become ready on port \(port). Check its log for details."
+            String(localized: "Homebrew is required to install local service runtimes on macOS.")
+        case .notInstalled(let name):
+            String.localizedStringWithFormat(
+                String(localized: "Install the %@ runtime before starting this service."),
+                name
+            )
+        case .portUnavailable(let port):
+            String.localizedStringWithFormat(
+                String(localized: "Port %lld is already in use. Choose another port for this service."),
+                Int64(port)
+            )
+        case .commandFailed(let output):
+            output.isEmpty ? String(localized: "The service package command failed.") : output
+        case .processFailed(let name):
+            String.localizedStringWithFormat(
+                String(localized: "The %@ service exited before it became ready. Check its log for details."),
+                name
+            )
+        case .readinessTimedOut(let name, let port):
+            String.localizedStringWithFormat(
+                String(localized: "The %1$@ service did not become ready on port %2$lld. Check its log for details."),
+                name,
+                Int64(port)
+            )
         }
     }
 }
@@ -131,7 +155,8 @@ final class ServiceProcessManager: @unchecked Sendable {
         }
 
         if let persistedPID = persistedProcessID(for: instance),
-           isManagedProcess(persistedPID, for: instance) {
+            isManagedProcess(persistedPID, for: instance)
+        {
             lock.lock()
             adoptedProcessIDs[instance.id] = persistedPID
             lock.unlock()
@@ -142,15 +167,17 @@ final class ServiceProcessManager: @unchecked Sendable {
     }
 
     func install(definitionID: String) async throws -> String {
-        try await Task.detached(priority: .userInitiated) { [self] in
-            try installSynchronously(definitionID: definitionID)
-        }.value
+        try await AsyncProcessLifecycle.runDetached(priority: .userInitiated) { [self] in
+            try Task.checkCancellation()
+            return try installSynchronously(definitionID: definitionID)
+        }
     }
 
     func outdatedDefinitionIDs() async throws -> Set<String> {
-        try await Task.detached(priority: .utility) {
-            try Self.outdatedDefinitionIDsSynchronously()
-        }.value
+        try await AsyncProcessLifecycle.runDetached(priority: .utility) {
+            try Task.checkCancellation()
+            return try Self.outdatedDefinitionIDsSynchronously()
+        }
     }
 
     func start(
@@ -160,10 +187,18 @@ final class ServiceProcessManager: @unchecked Sendable {
         await operationGate.acquire()
         do {
             try Task.checkCancellation()
-            try await startManaged(
-                instance,
-                allowCredentialInteraction: allowCredentialInteraction
-            )
+            let startTask = Task.detached(priority: .userInitiated) { [self] in
+                try Task.checkCancellation()
+                try await startManaged(
+                    instance,
+                    allowCredentialInteraction: allowCredentialInteraction
+                )
+            }
+            try await withTaskCancellationHandler {
+                try await startTask.value
+            } onCancel: {
+                startTask.cancel()
+            }
             await operationGate.release()
         } catch {
             await operationGate.release()
@@ -198,15 +233,15 @@ final class ServiceProcessManager: @unchecked Sendable {
         consolePorts.removeAll()
         lock.unlock()
 
-        activeProcesses.forEach { identifier, process in
+        for (identifier, process) in activeProcesses {
             AsyncProcessLifecycle.terminateImmediately(process)
             removeRuntimeArtifacts(id: identifier)
         }
-        adopted.forEach { identifier, pid in
+        for (identifier, pid) in adopted {
             AsyncProcessLifecycle.terminateImmediately(pid: pid)
             removeRuntimeArtifacts(id: identifier)
         }
-        handles.values.forEach { try? $0.close() }
+        for handle in handles.values { try? handle.close() }
     }
 
     func dataDirectory(for instance: ServiceInstance) -> URL {
@@ -223,7 +258,8 @@ final class ServiceProcessManager: @unchecked Sendable {
         let knownPort = consolePorts[instance.id]
         let managedProcess = processes[instance.id]
         let adoptedProcessID = adoptedProcessIDs[instance.id]
-        let processID = managedProcess?.isRunning == true
+        let processID =
+            managedProcess?.isRunning == true
             ? managedProcess?.processIdentifier
             : adoptedProcessID
         if processID == nil {
@@ -235,8 +271,9 @@ final class ServiceProcessManager: @unchecked Sendable {
             return URL(string: "http://127.0.0.1:\(knownPort)")
         }
         guard let processID,
-              let arguments = Self.processArguments(pid: processID),
-              let port = Self.consolePort(from: arguments) else {
+            let arguments = Self.processArguments(pid: processID),
+            let port = Self.consolePort(from: arguments)
+        else {
             return nil
         }
         lock.lock()
@@ -249,59 +286,54 @@ final class ServiceProcessManager: @unchecked Sendable {
         guard let descriptor = Self.descriptor(for: definitionID), let formula = descriptor.formula else {
             throw ServiceRuntimeError.unsupported(Self.displayName(for: definitionID))
         }
-        guard let brew = Self.brewURL() else { throw ServiceRuntimeError.packageManagerMissing }
+        guard let homebrew = HomebrewCLI(fileManager: fileManager) else {
+            throw ServiceRuntimeError.packageManagerMissing
+        }
         let packageCommand = executableURL(for: definitionID) == nil ? "install" : "upgrade"
-        var install = try Self.run(
-            brew,
-            arguments: [packageCommand, formula],
-            environment: Self.homebrewEnvironment
-        )
+        var install = try homebrew.run(arguments: [packageCommand, formula])
         if install.status != 0,
-           let trustTarget = Self.formulaTrustTarget(from: install.output, expectedFormula: formula) {
-            let trust = try Self.run(
-                brew,
-                arguments: ["trust", "--formula", trustTarget],
-                environment: Self.homebrewEnvironment
-            )
+            let trustTarget = Self.formulaTrustTarget(from: install.output, expectedFormula: formula)
+        {
+            let trust = try homebrew.run(arguments: ["trust", "--formula", trustTarget])
             guard trust.status == 0 else {
-                throw ServiceRuntimeError.commandFailed(CommandFailureReporter.recordAndSummarize(
-                    trust.output,
-                    operation: "brew trust --formula \(trustTarget)",
-                    rootURL: rootURL
-                ))
+                throw ServiceRuntimeError.commandFailed(
+                    CommandFailureReporter.recordAndSummarize(
+                        trust.output,
+                        operation: "brew trust --formula \(trustTarget)",
+                        rootURL: rootURL
+                    ))
             }
-            install = try Self.run(
-                brew,
-                arguments: [packageCommand, formula],
-                environment: Self.homebrewEnvironment
-            )
+            install = try homebrew.run(arguments: [packageCommand, formula])
         }
         if install.status != 0,
-           let recovery = Self.databaseConflictRecoveryPlan(
-               from: install.output,
-               installing: formula,
-               packageCommand: packageCommand
-           ) {
+            let recovery = Self.databaseConflictRecoveryPlan(
+                from: install.output,
+                installing: formula,
+                packageCommand: packageCommand
+            )
+        {
             install = try installResolvingDatabaseConflict(
                 recovery,
                 initialOutput: install.output,
-                brew: brew
+                homebrew: homebrew
             )
         }
         guard install.status == 0 else {
-            throw ServiceRuntimeError.commandFailed(CommandFailureReporter.recordAndSummarize(
-                install.output,
-                operation: "brew \(packageCommand) \(formula)",
-                rootURL: rootURL
-            ))
+            throw ServiceRuntimeError.commandFailed(
+                CommandFailureReporter.recordAndSummarize(
+                    install.output,
+                    operation: "brew \(packageCommand) \(formula)",
+                    rootURL: rootURL
+                ))
         }
-        let prefix = try Self.run(brew, arguments: ["--prefix", formula], environment: Self.homebrewEnvironment)
+        let prefix = try homebrew.run(arguments: ["--prefix", formula])
         guard prefix.status == 0 else {
-            throw ServiceRuntimeError.commandFailed(CommandFailureReporter.recordAndSummarize(
-                prefix.output,
-                operation: "brew --prefix \(formula)",
-                rootURL: rootURL
-            ))
+            throw ServiceRuntimeError.commandFailed(
+                CommandFailureReporter.recordAndSummarize(
+                    prefix.output,
+                    operation: "brew --prefix \(formula)",
+                    rootURL: rootURL
+                ))
         }
 
         let source = URL(
@@ -316,17 +348,15 @@ final class ServiceProcessManager: @unchecked Sendable {
         try fileManager.createDirectory(at: runtimeRoot, withIntermediateDirectories: true)
         let destination = runtimeRoot.appendingPathComponent(definitionID, isDirectory: true)
         if fileManager.fileExists(atPath: destination.path)
-            || (try? destination.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true {
+            || (try? destination.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true
+        {
             try fileManager.removeItem(at: destination)
         }
         try fileManager.createSymbolicLink(at: destination, withDestinationURL: source)
-        let version = try Self.run(
-            brew,
-            arguments: ["list", "--versions", formula],
-            environment: Self.homebrewEnvironment
-        )
+        let version = try homebrew.run(arguments: ["list", "--versions", formula])
         guard version.status == 0,
-              let installedVersion = version.output.split(whereSeparator: \.isWhitespace).last.map(String.init) else {
+            let installedVersion = version.output.split(whereSeparator: \.isWhitespace).last.map(String.init)
+        else {
             throw ServiceRuntimeError.commandFailed("Homebrew did not report the installed service version.")
         }
         return installedVersion
@@ -335,22 +365,17 @@ final class ServiceProcessManager: @unchecked Sendable {
     private func installResolvingDatabaseConflict(
         _ plan: DatabaseConflictRecoveryPlan,
         initialOutput: String,
-        brew: URL
-    ) throws -> (status: Int32, output: String) {
-        let environment = Self.homebrewEnvironment
+        homebrew: HomebrewCLI
+    ) throws -> ProcessResult {
         _ = CommandFailureReporter.recordAndSummarize(
             initialOutput,
             operation: "brew \(plan.packageCommand) \(plan.installingFormula)",
             rootURL: rootURL
         )
 
-        let unlink = try Self.run(brew, arguments: plan.unlinkConflictArguments, environment: environment)
+        let unlink = try homebrew.run(arguments: plan.unlinkConflictArguments)
         guard unlink.status == 0 else {
-            let relink = try? Self.run(
-                brew,
-                arguments: plan.restoreArguments[1],
-                environment: environment
-            )
+            let relink = try? homebrew.run(arguments: plan.restoreArguments[1])
             throw conciseCommandFailure(
                 output: [unlink.output, relink?.output]
                     .compactMap { $0 }
@@ -361,27 +386,19 @@ final class ServiceProcessManager: @unchecked Sendable {
             )
         }
 
-        var retry: (status: Int32, output: String)?
+        var retry: ProcessResult?
         var retryError: Error?
         do {
-            retry = try Self.run(brew, arguments: plan.retryInstallArguments, environment: environment)
+            retry = try homebrew.run(arguments: plan.retryInstallArguments)
         } catch {
             retryError = error
         }
 
-        let unlinkInstalled = try? Self.run(
-            brew,
-            arguments: plan.restoreArguments[0],
-            environment: environment
-        )
-        let relinkOriginal: (status: Int32, output: String)?
+        let unlinkInstalled = try? homebrew.run(arguments: plan.restoreArguments[0])
+        let relinkOriginal: ProcessResult?
         var relinkError: Error?
         do {
-            relinkOriginal = try Self.run(
-                brew,
-                arguments: plan.restoreArguments[1],
-                environment: environment
-            )
+            relinkOriginal = try homebrew.run(arguments: plan.restoreArguments[1])
         } catch {
             relinkOriginal = nil
             relinkError = error
@@ -398,7 +415,8 @@ final class ServiceProcessManager: @unchecked Sendable {
             throw conciseCommandFailure(
                 output: restorationOutput,
                 operation: "restore Homebrew link for \(plan.conflictingFormula)",
-                message: "HerdMe could not restore \(plan.conflictingFormula)'s Homebrew links. Run brew unlink \(plan.installingFormula), then brew link \(plan.conflictingFormula)."
+                message:
+                    "HerdMe could not restore \(plan.conflictingFormula)'s Homebrew links. Run brew unlink \(plan.installingFormula), then brew link \(plan.conflictingFormula)."
             )
         }
 
@@ -406,14 +424,16 @@ final class ServiceProcessManager: @unchecked Sendable {
             throw conciseCommandFailure(
                 output: retryError.localizedDescription,
                 operation: "brew \(plan.packageCommand) \(plan.installingFormula)",
-                message: "\(Self.displayName(for: plan.installingFormula)) could not be installed. \(Self.displayName(for: plan.conflictingFormula)) was linked again."
+                message:
+                    "\(Self.displayName(for: plan.installingFormula)) could not be installed. \(Self.displayName(for: plan.conflictingFormula)) was linked again."
             )
         }
         guard let retry, retry.status == 0 else {
             throw conciseCommandFailure(
                 output: retry?.output ?? "",
                 operation: "brew \(plan.packageCommand) \(plan.installingFormula)",
-                message: "\(Self.displayName(for: plan.installingFormula)) could not be installed. \(Self.displayName(for: plan.conflictingFormula)) was linked again."
+                message:
+                    "\(Self.displayName(for: plan.installingFormula)) could not be installed. \(Self.displayName(for: plan.conflictingFormula)) was linked again."
             )
         }
         return retry
@@ -430,7 +450,8 @@ final class ServiceProcessManager: @unchecked Sendable {
     ) async throws {
         if state(for: instance) == .running { return }
         guard instance.port > 0, instance.port <= 65_535,
-              LocalEnvironmentEngine.canBind(port: instance.port) else {
+            LocalEnvironmentEngine.canBind(port: instance.port)
+        else {
             throw ServiceRuntimeError.portUnavailable(instance.port)
         }
         guard let executable = executableURL(for: instance.definitionID) else {
@@ -470,7 +491,8 @@ final class ServiceProcessManager: @unchecked Sendable {
         let peeringPort: Int?
         if instance.definitionID == "typesense" {
             guard let preferredPort = Self.typesensePeeringPort(apiPort: instance.port),
-                  LocalEnvironmentEngine.canBind(port: preferredPort) else {
+                LocalEnvironmentEngine.canBind(port: preferredPort)
+            else {
                 try? outputHandle.close()
                 throw ServiceRuntimeError.portUnavailable(
                     Self.typesensePeeringPort(apiPort: instance.port) ?? instance.port
@@ -500,7 +522,8 @@ final class ServiceProcessManager: @unchecked Sendable {
         )
         var environment = ProcessInfo.processInfo.environment
         let runtimeBin = executable.deletingLastPathComponent().path
-        environment["PATH"] = runtimeBin + ":" + rootURL.appendingPathComponent("bin").path
+        environment["PATH"] =
+            runtimeBin + ":" + rootURL.appendingPathComponent("bin").path
             + ":" + (environment["PATH"] ?? "")
         if instance.definitionID == "minio" {
             environment["MINIO_ROOT_USER"] = credentials?.username
@@ -610,26 +633,30 @@ final class ServiceProcessManager: @unchecked Sendable {
         case "mariadb":
             guard !fileManager.fileExists(atPath: dataURL.appendingPathComponent("mysql").path) else { return }
             let installer = executable.deletingLastPathComponent().appendingPathComponent("mariadb-install-db")
-            command = fileManager.isExecutableFile(atPath: installer.path)
+            command =
+                fileManager.isExecutableFile(atPath: installer.path)
                 ? (installer, ["--no-defaults", "--auth-root-authentication-method=normal", "--datadir=\(dataURL.path)"])
                 : nil
         case "postgresql":
             guard !fileManager.fileExists(atPath: dataURL.appendingPathComponent("PG_VERSION").path),
-                  let credentials else { return }
+                let credentials
+            else { return }
             let initdb = executable.deletingLastPathComponent().appendingPathComponent("initdb")
             let passwordURL = dataURL.deletingLastPathComponent()
                 .appendingPathComponent(".herdme-initdb-\(UUID().uuidString).password")
             try Data((credentials.secret + "\n").utf8).write(to: passwordURL, options: [.atomic])
             try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: passwordURL.path)
             defer { try? fileManager.removeItem(at: passwordURL) }
-            let result = try Self.run(initdb, arguments: [
-                "-D", dataURL.path,
-                "--username=\(credentials.username)",
-                "--pwfile=\(passwordURL.path)",
-                "--auth-local=scram-sha-256",
-                "--auth-host=scram-sha-256",
-                "--encoding=UTF8"
-            ])
+            let result = try Self.run(
+                initdb,
+                arguments: [
+                    "-D", dataURL.path,
+                    "--username=\(credentials.username)",
+                    "--pwfile=\(passwordURL.path)",
+                    "--auth-local=scram-sha-256",
+                    "--auth-host=scram-sha-256",
+                    "--encoding=UTF8"
+                ])
             guard result.status == 0 else { throw ServiceRuntimeError.commandFailed(result.output) }
             return
         default:
@@ -778,8 +805,9 @@ final class ServiceProcessManager: @unchecked Sendable {
 
     private func persistedProcessID(for instance: ServiceInstance) -> pid_t? {
         guard let value = try? String(contentsOf: pidFileURL(for: instance), encoding: .utf8),
-              let pid = pid_t(value.trimmingCharacters(in: .whitespacesAndNewlines)),
-              pid > 1 else {
+            let pid = pid_t(value.trimmingCharacters(in: .whitespacesAndNewlines)),
+            pid > 1
+        else {
             return nil
         }
         return pid
@@ -796,9 +824,10 @@ final class ServiceProcessManager: @unchecked Sendable {
 
     private func isManagedProcess(_ pid: pid_t, for instance: ServiceInstance) -> Bool {
         guard Darwin.kill(pid, 0) == 0,
-              let executable = executableURL(for: instance.definitionID),
-              let actualExecutable = Self.processExecutablePath(pid: pid),
-              let currentDirectory = Self.processCurrentDirectory(pid: pid) else {
+            let executable = executableURL(for: instance.definitionID),
+            let actualExecutable = Self.processExecutablePath(pid: pid),
+            let currentDirectory = Self.processCurrentDirectory(pid: pid)
+        else {
             return false
         }
 
@@ -806,7 +835,8 @@ final class ServiceProcessManager: @unchecked Sendable {
         let normalizedActualExecutable = URL(fileURLWithPath: actualExecutable)
             .resolvingSymlinksInPath().standardizedFileURL.path
         let scriptArguments = Self.processArguments(pid: pid) ?? []
-        let executableMatches = normalizedActualExecutable == expectedExecutable
+        let executableMatches =
+            normalizedActualExecutable == expectedExecutable
             || scriptArguments.prefix(2).contains { argument in
                 URL(fileURLWithPath: argument).resolvingSymlinksInPath().standardizedFileURL.path
                     == expectedExecutable
@@ -825,7 +855,8 @@ final class ServiceProcessManager: @unchecked Sendable {
         var mib = [CTL_KERN, KERN_PROCARGS2, pid]
         var size = 0
         guard sysctl(&mib, u_int(mib.count), nil, &size, nil, 0) == 0,
-              size > MemoryLayout<Int32>.size else {
+            size > MemoryLayout<Int32>.size
+        else {
             return nil
         }
 
@@ -895,13 +926,15 @@ final class ServiceProcessManager: @unchecked Sendable {
 
     static func consolePort(from arguments: [String]) -> Int? {
         guard let index = arguments.firstIndex(of: "--console-address"),
-              arguments.indices.contains(index + 1) else { return nil }
+            arguments.indices.contains(index + 1)
+        else { return nil }
         let endpoint = arguments[index + 1].split(separator: ":", omittingEmptySubsequences: false)
         guard endpoint.count == 2,
-              endpoint[0] == "127.0.0.1",
-              let port = Int(endpoint[1]),
-              port > 0,
-              port <= 65_535 else { return nil }
+            endpoint[0] == "127.0.0.1",
+            let port = Int(endpoint[1]),
+            port > 0,
+            port <= 65_535
+        else { return nil }
         return port
     }
 
@@ -930,7 +963,7 @@ final class ServiceProcessManager: @unchecked Sendable {
     }
 
     static func formulaTrustTarget(from output: String, expectedFormula: String) -> String? {
-        HomebrewFormulaTrust.target(from: output, expectedFormula: expectedFormula)
+        HomebrewCLI.formulaTrustTarget(from: output, expectedFormula: expectedFormula)
     }
 
     static func databaseConflictRecoveryPlan(
@@ -944,7 +977,8 @@ final class ServiceProcessManager: @unchecked Sendable {
         case "mariadb": conflicting = "mysql"
         default: return nil
         }
-        let normalized = output
+        let normalized =
+            output
             .replacingOccurrences(
                 of: #"\x{1B}\[[0-?]*[ -/]*[@-~]"#,
                 with: "",
@@ -952,8 +986,9 @@ final class ServiceProcessManager: @unchecked Sendable {
             )
             .lowercased()
         guard normalized.contains("cannot install \(formula)"),
-              normalized.contains("conflicting formula"),
-              normalized.contains("brew unlink \(conflicting)") else {
+            normalized.contains("conflicting formula"),
+            normalized.contains("brew unlink \(conflicting)")
+        else {
             return nil
         }
         return DatabaseConflictRecoveryPlan(
@@ -965,7 +1000,8 @@ final class ServiceProcessManager: @unchecked Sendable {
 
     static func outdatedFormulaNames(from output: String) throws -> Set<String> {
         guard let start = output.firstIndex(of: "{"),
-              let end = output.lastIndex(of: "}") else {
+            let end = output.lastIndex(of: "}")
+        else {
             throw ServiceRuntimeError.commandFailed("Homebrew returned an invalid update response.")
         }
         let payload = Data(output[start...end].utf8)
@@ -974,38 +1010,18 @@ final class ServiceProcessManager: @unchecked Sendable {
     }
 
     private static func outdatedDefinitionIDsSynchronously() throws -> Set<String> {
-        guard let brew = brewURL() else { throw ServiceRuntimeError.packageManagerMissing }
-        let result = try run(
-            brew,
-            arguments: ["outdated", "--json=v2"],
-            environment: homebrewEnvironment
-        )
+        guard let homebrew = HomebrewCLI() else { throw ServiceRuntimeError.packageManagerMissing }
+        let result = try homebrew.run(arguments: ["outdated", "--json=v2"])
         guard result.status == 0 else {
             throw ServiceRuntimeError.commandFailed(result.output)
         }
         let names = try outdatedFormulaNames(from: result.output)
-        return Set(ServiceCatalog.all.compactMap { definition in
-            guard let formula = descriptor(for: definition.id)?.formula else { return nil }
-            let shortName = formula.split(separator: "/").last.map(String.init) ?? formula
-            return names.contains(formula) || names.contains(shortName) ? definition.id : nil
-        })
-    }
-
-    private static func brewURL() -> URL? {
-        ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
-            .map { URL(fileURLWithPath: $0) }
-            .first { FileManager.default.isExecutableFile(atPath: $0.path) }
-    }
-
-    private static var homebrewEnvironment: [String: String] {
-        var environment = ProcessInfo.processInfo.environment
-        environment["HOME"] = FileManager.default.homeDirectoryForCurrentUser.path
-        environment["USER"] = NSUserName()
-        environment["LOGNAME"] = NSUserName()
-        environment["PATH"] = [
-            "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"
-        ].joined(separator: ":")
-        return environment
+        return Set(
+            ServiceCatalog.all.compactMap { definition in
+                guard let formula = descriptor(for: definition.id)?.formula else { return nil }
+                let shortName = formula.split(separator: "/").last.map(String.init) ?? formula
+                return names.contains(formula) || names.contains(shortName) ? definition.id : nil
+            })
     }
 
     private static func run(
@@ -1016,7 +1032,8 @@ final class ServiceProcessManager: @unchecked Sendable {
         let result = try ProcessRunner.run(
             executable,
             arguments: arguments,
-            environment: environment
+            environment: environment,
+            cancellationRequested: { Task.isCancelled }
         )
         return (
             result.status,

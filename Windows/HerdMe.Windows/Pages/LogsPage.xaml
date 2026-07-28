@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:HerdMe.Windows.Models"
+    AutomationProperties.AutomationId="LogsPageRoot"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
     <Grid Padding="32" RowSpacing="16">
@@ -12,7 +13,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid>
-            <TextBlock Text="Logs" Style="{StaticResource TitleTextBlockStyle}" />
+            <TextBlock x:Uid="LogsPageTitle" Text="Logs" Style="{StaticResource TitleTextBlockStyle}" />
             <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
                 <ComboBox
                     x:Name="SourceBox"
@@ -22,24 +23,33 @@
                     SelectionChanged="SourceBox_SelectionChanged" />
                 <ToggleSwitch
                     x:Name="LiveRefreshToggle"
+                    x:Uid="LogsLiveRefreshToggle"
                     IsOn="True"
                     OnContent="Live"
                     OffContent="Paused" />
                 <TextBox
                     x:Name="SearchBox"
+                    x:Uid="LogsSearchField"
                     Width="220"
                     PlaceholderText="Search current log"
                     TextChanged="SearchBox_TextChanged" />
-                <Button Click="OpenFolder_Click" ToolTipService.ToolTip="Open log folder">
+                <Button Click="OpenFolder_Click">
+                    <ToolTipService.ToolTip>
+                        <ToolTip><TextBlock x:Uid="LogsOpenFolderTooltip" Text="Open log folder" /></ToolTip>
+                    </ToolTipService.ToolTip>
                     <SymbolIcon Symbol="Folder" />
                 </Button>
-                <Button Click="Refresh_Click" ToolTipService.ToolTip="Refresh logs">
+                <Button Click="Refresh_Click">
+                    <ToolTipService.ToolTip>
+                        <ToolTip><TextBlock x:Uid="LogsRefreshTooltip" Text="Refresh logs" /></ToolTip>
+                    </ToolTipService.ToolTip>
                     <SymbolIcon Symbol="Refresh" />
                 </Button>
             </StackPanel>
         </Grid>
         <InfoBar
             x:Name="SourceWarning"
+            x:Uid="LogsSourceWarning"
             Grid.Row="1"
             IsOpen="False"
             IsClosable="True"
@@ -72,7 +82,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <TextBlock x:Name="LogTitleText" Text="Select a log" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <TextBlock x:Name="LogTitleText" x:Uid="LogsSelectLogInitial" Text="Select a log" Style="{StaticResource SubtitleTextBlockStyle}" />
                     <ScrollViewer Grid.Row="1">
                         <TextBlock x:Name="LogContentText" FontFamily="Consolas" FontSize="13" TextWrapping="NoWrap" IsTextSelectionEnabled="True" />
                     </ScrollViewer>

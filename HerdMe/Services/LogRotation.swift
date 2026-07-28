@@ -11,9 +11,10 @@ enum LogRotation {
         fileManager: FileManager = .default
     ) throws {
         guard maximumBytes > 0, archiveCount >= 0,
-              let attributes = try? fileManager.attributesOfItem(atPath: logURL.path),
-              let size = attributes[.size] as? NSNumber,
-              size.uint64Value >= maximumBytes else {
+            let attributes = try? fileManager.attributesOfItem(atPath: logURL.path),
+            let size = attributes[.size] as? NSNumber,
+            size.uint64Value >= maximumBytes
+        else {
             return
         }
 

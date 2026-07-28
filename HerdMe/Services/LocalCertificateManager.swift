@@ -14,7 +14,8 @@ struct UserCertificateTrustBackend: CertificateTrustBacking {
         let policy = SecPolicyCreateBasicX509()
         var trust: SecTrust?
         guard SecTrustCreateWithCertificates(certificate, policy, &trust) == errSecSuccess,
-              let trust else {
+            let trust
+        else {
             return .untrusted
         }
         return SecTrustEvaluateWithError(trust, nil) ? .trusted : .untrusted
@@ -43,10 +44,11 @@ struct UserCertificateTrustBackend: CertificateTrustBacking {
         )
         guard trustStatus == errSecSuccess else {
             if addStatus == errSecSuccess, let persistentReference {
-                _ = SecItemDelete([
-                    kSecClass: kSecClassCertificate,
-                    kSecValuePersistentRef: persistentReference
-                ] as CFDictionary)
+                _ = SecItemDelete(
+                    [
+                        kSecClass: kSecClassCertificate,
+                        kSecValuePersistentRef: persistentReference
+                    ] as CFDictionary)
             }
             throw LocalCertificateError.authorizationFailed(securityMessage(for: trustStatus))
         }
@@ -57,15 +59,16 @@ struct UserCertificateTrustBackend: CertificateTrustBacking {
             return certificate
         }
         guard let pem = String(data: data, encoding: .utf8),
-              let begin = pem.range(of: "-----BEGIN CERTIFICATE-----"),
-              let end = pem.range(
-                  of: "-----END CERTIFICATE-----",
-                  range: begin.upperBound..<pem.endIndex
-              ),
-              let decoded = Data(
-                  base64Encoded: String(pem[begin.upperBound..<end.lowerBound]),
-                  options: .ignoreUnknownCharacters
-              ) else {
+            let begin = pem.range(of: "-----BEGIN CERTIFICATE-----"),
+            let end = pem.range(
+                of: "-----END CERTIFICATE-----",
+                range: begin.upperBound..<pem.endIndex
+            ),
+            let decoded = Data(
+                base64Encoded: String(pem[begin.upperBound..<end.lowerBound]),
+                options: .ignoreUnknownCharacters
+            )
+        else {
             return nil
         }
         return SecCertificateCreateWithData(nil, decoded as CFData)
@@ -84,9 +87,9 @@ enum CertificateTrustState: Equatable, Sendable {
 
     var title: String {
         switch self {
-        case .missing: "Not created"
-        case .untrusted: "Not trusted"
-        case .trusted: "Trusted"
+        case .missing: String(localized: "Not created")
+        case .untrusted: String(localized: "Not trusted")
+        case .trusted: String(localized: "Trusted")
         }
     }
 }
@@ -101,15 +104,18 @@ enum LocalCertificateError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidTLD:
-            "The top-level domain may only contain letters, numbers, and hyphens."
-        case let .toolFailed(message):
-            message.isEmpty ? "HerdMe could not create its local certificate." : message
-        case let .identityImportFailed(status):
-            "HerdMe could not load its HTTPS identity (Security status \(status))."
+            String(localized: "The top-level domain may only contain letters, numbers, and hyphens.")
+        case .toolFailed(let message):
+            message.isEmpty ? String(localized: "HerdMe could not create its local certificate.") : message
+        case .identityImportFailed(let status):
+            String.localizedStringWithFormat(
+                String(localized: "HerdMe could not load its HTTPS identity (Security status %d)."),
+                status
+            )
         case .identityMissing:
-            "HerdMe created a certificate bundle, but it did not contain a usable identity."
-        case let .authorizationFailed(message):
-            message.isEmpty ? "The HerdMe local certificate authority was not trusted." : message
+            String(localized: "HerdMe created a certificate bundle, but it did not contain a usable identity.")
+        case .authorizationFailed(let message):
+            message.isEmpty ? String(localized: "The HerdMe local certificate authority was not trusted.") : message
         }
     }
 }
@@ -161,10 +167,11 @@ final class LocalCertificateManager: @unchecked Sendable {
         identityLock.lock()
         defer { identityLock.unlock() }
         if let cachedIdentity,
-           cachedIdentity.marker == marker,
-           (try? String(contentsOf: tldMarkerURL, encoding: .utf8)) == marker,
-           fileManager.fileExists(atPath: leafCertificateURL.path),
-           fileManager.fileExists(atPath: identityURL.path) {
+            cachedIdentity.marker == marker,
+            (try? String(contentsOf: tldMarkerURL, encoding: .utf8)) == marker,
+            fileManager.fileExists(atPath: leafCertificateURL.path),
+            fileManager.fileExists(atPath: identityURL.path)
+        {
             return cachedIdentity.identity
         }
         try fileManager.createDirectory(at: certificatesURL, withIntermediateDirectories: true)
@@ -195,7 +202,8 @@ final class LocalCertificateManager: @unchecked Sendable {
         )
         guard status == errSecSuccess else { throw LocalCertificateError.identityImportFailed(status) }
         guard let items = importedItems as? [[CFString: Any]],
-              let identity = items.compactMap(Self.identity(from:)).first else {
+            let identity = items.compactMap(Self.identity(from:)).first
+        else {
             throw LocalCertificateError.identityMissing
         }
         cachedIdentity = (marker, identity)
@@ -210,8 +218,8 @@ final class LocalCertificateManager: @unchecked Sendable {
     }
 
     @discardableResult
-    func installAuthority(tld: String) throws -> Bool {
-        _ = try prepareIdentity(tld: tld)
+    func installAuthority(tld: String, domains: [String] = []) throws -> Bool {
+        _ = try prepareIdentity(tld: tld, domains: domains)
         if trustState() == .trusted { return false }
         try trustBackend.install(Data(contentsOf: authorityCertificateURL))
         guard trustState() == .trusted else {
@@ -224,16 +232,21 @@ final class LocalCertificateManager: @unchecked Sendable {
 
     private func ensureAuthority(allowKeychainInteraction: Bool) throws {
         let certificateExists = fileManager.fileExists(atPath: authorityCertificateURL.path)
-        let certificateIsCurrent = certificateExists
-            && run(opensslURL, arguments: [
-                "x509", "-checkend", "2592000", "-noout", "-in", authorityCertificateURL.path
-            ]).status == 0
+        let certificateIsCurrent =
+            certificateExists
+            && run(
+                opensslURL,
+                arguments: [
+                    "x509", "-checkend", "2592000", "-noout", "-in", authorityCertificateURL.path
+                ]
+            ).status == 0
         if certificateIsCurrent {
             if let storedKey = try secretStore.data(
                 for: .authorityPrivateKey,
                 allowInteraction: allowKeychainInteraction
             ),
-               authorityKeyMatchesCertificate(storedKey, certificateURL: authorityCertificateURL) {
+                authorityKeyMatchesCertificate(storedKey, certificateURL: authorityCertificateURL)
+            {
                 try removeLegacyAuthorityKey()
                 return
             }
@@ -253,27 +266,29 @@ final class LocalCertificateManager: @unchecked Sendable {
         let keyURL = staging.appendingPathComponent("herdme-ca.key")
         let certificateURL = staging.appendingPathComponent("herdme-ca.pem")
         let configuration = """
-        [req]
-        distinguished_name = distinguished_name
-        x509_extensions = authority_extensions
-        prompt = no
+            [req]
+            distinguished_name = distinguished_name
+            x509_extensions = authority_extensions
+            prompt = no
 
-        [distinguished_name]
-        CN = HerdMe Local CA
-        O = HerdMe
+            [distinguished_name]
+            CN = HerdMe Local CA
+            O = HerdMe
 
-        [authority_extensions]
-        basicConstraints = critical,CA:TRUE
-        keyUsage = critical,keyCertSign,cRLSign
-        subjectKeyIdentifier = hash
-        authorityKeyIdentifier = keyid:always
-        """
+            [authority_extensions]
+            basicConstraints = critical,CA:TRUE
+            keyUsage = critical,keyCertSign,cRLSign
+            subjectKeyIdentifier = hash
+            authorityKeyIdentifier = keyid:always
+            """
         try configuration.write(to: configurationURL, atomically: true, encoding: .utf8)
-        let result = run(opensslURL, arguments: [
-            "req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "3650",
-            "-set_serial", "0x\(try randomHex(byteCount: 16))", "-keyout", keyURL.path,
-            "-out", certificateURL.path, "-config", configurationURL.path
-        ])
+        let result = run(
+            opensslURL,
+            arguments: [
+                "req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "3650",
+                "-set_serial", "0x\(try randomHex(byteCount: 16))", "-keyout", keyURL.path,
+                "-out", certificateURL.path, "-config", configurationURL.path
+            ])
         guard result.status == 0 else { throw LocalCertificateError.toolFailed(result.output) }
         try setPrivatePermissions(on: keyURL)
         let keyData = try Data(contentsOf: keyURL)
@@ -297,22 +312,31 @@ final class LocalCertificateManager: @unchecked Sendable {
         let requiredFiles = [leafCertificateURL, identityURL]
         let filesExist = requiredFiles.allSatisfy { fileManager.fileExists(atPath: $0.path) }
         if storedMarker == marker, filesExist,
-           run(opensslURL, arguments: [
-               "x509", "-checkend", "2592000", "-noout", "-in", leafCertificateURL.path
-           ]).status == 0,
-           run(opensslURL, arguments: [
-               "verify", "-CAfile", authorityCertificateURL.path, leafCertificateURL.path
-           ]).status == 0,
-           identityBundleIsValid(passphrase: passphrase) {
+            run(
+                opensslURL,
+                arguments: [
+                    "x509", "-checkend", "2592000", "-noout", "-in", leafCertificateURL.path
+                ]
+            ).status == 0,
+            run(
+                opensslURL,
+                arguments: [
+                    "verify", "-CAfile", authorityCertificateURL.path, leafCertificateURL.path
+                ]
+            ).status == 0,
+            identityBundleIsValid(passphrase: passphrase)
+        {
             try removeLegacyLeafPrivateFiles()
             return
         }
 
-        guard let authorityKey = try secretStore.data(
-            for: .authorityPrivateKey,
-            allowInteraction: allowKeychainInteraction
-        ),
-              authorityKeyMatchesCertificate(authorityKey, certificateURL: authorityCertificateURL) else {
+        guard
+            let authorityKey = try secretStore.data(
+                for: .authorityPrivateKey,
+                allowInteraction: allowKeychainInteraction
+            ),
+            authorityKeyMatchesCertificate(authorityKey, certificateURL: authorityCertificateURL)
+        else {
             throw CertificateSecretError.invalidStoredValue
         }
         let staging = try makeStagingDirectory()
@@ -326,46 +350,52 @@ final class LocalCertificateManager: @unchecked Sendable {
             .map { "DNS.\($0.offset + 1) = \($0.element)" }
             .joined(separator: "\n")
         let configuration = """
-        [req]
-        distinguished_name = distinguished_name
-        req_extensions = leaf_extensions
-        prompt = no
+            [req]
+            distinguished_name = distinguished_name
+            req_extensions = leaf_extensions
+            prompt = no
 
-        [distinguished_name]
-        CN = *.\(tld)
-        O = HerdMe
+            [distinguished_name]
+            CN = *.\(tld)
+            O = HerdMe
 
-        [leaf_extensions]
-        basicConstraints = critical,CA:FALSE
-        keyUsage = critical,digitalSignature,keyEncipherment
-        extendedKeyUsage = serverAuth
-        subjectAltName = @alternate_names
+            [leaf_extensions]
+            basicConstraints = critical,CA:FALSE
+            keyUsage = critical,digitalSignature,keyEncipherment
+            extendedKeyUsage = serverAuth
+            subjectAltName = @alternate_names
 
-        [alternate_names]
-        \(alternateNames)
-        """
+            [alternate_names]
+            \(alternateNames)
+            """
         try configuration.write(to: configurationURL, atomically: true, encoding: .utf8)
 
-        var result = run(opensslURL, arguments: [
-            "req", "-new", "-newkey", "rsa:2048", "-nodes", "-keyout", keyURL.path,
-            "-out", requestURL.path, "-config", configurationURL.path
-        ])
+        var result = run(
+            opensslURL,
+            arguments: [
+                "req", "-new", "-newkey", "rsa:2048", "-nodes", "-keyout", keyURL.path,
+                "-out", requestURL.path, "-config", configurationURL.path
+            ])
         guard result.status == 0 else { throw LocalCertificateError.toolFailed(result.output) }
         try setPrivatePermissions(on: keyURL)
 
-        result = run(opensslURL, arguments: [
-            "x509", "-req", "-in", requestURL.path, "-CA", authorityCertificateURL.path,
-            "-CAkey", "/dev/stdin", "-set_serial", "0x\(try randomHex(byteCount: 16))",
-            "-out", certificateURL.path, "-days", "825", "-extfile", configurationURL.path,
-            "-extensions", "leaf_extensions"
-        ], standardInput: authorityKey)
+        result = run(
+            opensslURL,
+            arguments: [
+                "x509", "-req", "-in", requestURL.path, "-CA", authorityCertificateURL.path,
+                "-CAkey", "/dev/stdin", "-set_serial", "0x\(try randomHex(byteCount: 16))",
+                "-out", certificateURL.path, "-days", "825", "-extfile", configurationURL.path,
+                "-extensions", "leaf_extensions"
+            ], standardInput: authorityKey)
         guard result.status == 0 else { throw LocalCertificateError.toolFailed(result.output) }
 
-        result = run(opensslURL, arguments: [
-            "pkcs12", "-export", "-out", identityStagingURL.path, "-inkey", keyURL.path,
-            "-in", certificateURL.path, "-certfile", authorityCertificateURL.path,
-            "-name", "HerdMe Local Sites", "-passout", "stdin"
-        ], standardInput: secretStandardInput(passphrase))
+        result = run(
+            opensslURL,
+            arguments: [
+                "pkcs12", "-export", "-out", identityStagingURL.path, "-inkey", keyURL.path,
+                "-in", certificateURL.path, "-certfile", authorityCertificateURL.path,
+                "-name", "HerdMe Local Sites", "-passout", "stdin"
+            ], standardInput: secretStandardInput(passphrase))
         guard result.status == 0 else { throw LocalCertificateError.toolFailed(result.output) }
         try writeAtomically(contentsOf: certificateURL, to: leafCertificateURL)
         try writeAtomically(contentsOf: identityStagingURL, to: identityURL)
@@ -377,8 +407,11 @@ final class LocalCertificateManager: @unchecked Sendable {
     private static func normalizedDomains(_ domains: [String], tld: String) -> [String] {
         let normalizedTLD = tld.lowercased()
         let suffix = "." + normalizedTLD
-        return Array(Set(domains.map { $0.lowercased() }
-            .filter { $0.hasSuffix(suffix) && $0.count > suffix.count && isValidDNSName($0) })).sorted()
+        return Array(
+            Set(
+                domains.map { $0.lowercased() }
+                    .filter { $0.hasSuffix(suffix) && $0.count > suffix.count && isValidDNSName($0) })
+        ).sorted()
     }
 
     private static func leafMarker(tld: String, domains: [String]) -> String {
@@ -467,8 +500,11 @@ final class LocalCertificateManager: @unchecked Sendable {
                 standardInput: standardInput,
                 timeout: 30
             )
-            return (result.status, result.output
-                .trimmingCharacters(in: .whitespacesAndNewlines))
+            return (
+                result.status,
+                result.output
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            )
         } catch {
             return (-1, error.localizedDescription)
         }
@@ -478,8 +514,9 @@ final class LocalCertificateManager: @unchecked Sendable {
         guard !value.isEmpty, value.utf8.count <= 253 else { return false }
         return value.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { label in
             guard !label.isEmpty, label.utf8.count <= 63,
-                  let first = label.utf8.first, let last = label.utf8.last,
-                  isASCIIAlphanumeric(first), isASCIIAlphanumeric(last) else { return false }
+                let first = label.utf8.first, let last = label.utf8.last,
+                isASCIIAlphanumeric(first), isASCIIAlphanumeric(last)
+            else { return false }
             return label.utf8.allSatisfy { isASCIIAlphanumeric($0) || $0 == 45 }
         }
     }

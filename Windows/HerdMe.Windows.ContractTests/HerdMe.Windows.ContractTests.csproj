@@ -10,6 +10,13 @@
 
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="DownloadAndStorageContractChecks.cs" />
+    <Compile Include="SiteContractChecks.cs" />
+    <Compile Include="ServiceContractChecks.cs" />
+    <Compile Include="ToolAndUpdateContractChecks.cs" />
+    <Compile Include="RepositoryContractChecks.cs" />
+    <Compile Include="RuntimeContractChecks.cs" />
+    <Compile Include="ContractTestSupport.cs" />
     <Compile Include="../HerdMe.Windows/Models/CoreModels.cs" Link="Models/CoreModels.cs" />
     <Compile Include="../HerdMe.Windows/Models/DumpModels.cs" Link="Models/DumpModels.cs" />
     <Compile Include="../HerdMe.Windows/Models/InitialSetupModels.cs" Link="Models/InitialSetupModels.cs" />
@@ -19,8 +26,12 @@
     <Compile Include="../HerdMe.Windows/Models/NodeRuntimeModels.cs" Link="Models/NodeRuntimeModels.cs" />
     <Compile Include="../HerdMe.Windows/Models/PhpRuntimeModels.cs" Link="Models/PhpRuntimeModels.cs" />
     <Compile Include="../HerdMe.Windows/Models/ProjectCreationModels.cs" Link="Models/ProjectCreationModels.cs" />
+    <Compile Include="../HerdMe.Windows/Models/ProductLinks.cs" Link="Models/ProductLinks.cs" />
+    <Compile Include="../HerdMe.Windows/Models/RuntimeCatalog.cs" Link="Models/RuntimeCatalog.cs" />
     <Compile Include="../HerdMe.Windows/Models/SiteSettingsModels.cs" Link="Models/SiteSettingsModels.cs" />
     <Compile Include="../HerdMe.Windows/Services/AppServices.cs" Link="Services/AppServices.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ArtisanCommandRunner.cs" Link="Services/ArtisanCommandRunner.cs" />
+    <Compile Include="../HerdMe.Windows/Services/NpmScriptRunner.cs" Link="Services/NpmScriptRunner.cs" />
     <Compile Include="../HerdMe.Windows/Services/ComposerToolManager.cs" Link="Services/ComposerToolManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/InitialSetupManager.cs" Link="Services/InitialSetupManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/MailMimeParser.cs" Link="Services/MailMimeParser.cs" />
@@ -28,6 +39,7 @@
     <Compile Include="../HerdMe.Windows/Services/ManagedDownloadClient.cs" Link="Services/ManagedDownloadClient.cs" />
     <Compile Include="../HerdMe.Windows/Services/ServicePackageInstaller.cs" Link="Services/ServicePackageInstaller.cs" />
     <Compile Include="../HerdMe.Windows/Services/ServiceEnvironmentFile.cs" Link="Services/ServiceEnvironmentFile.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ProjectEnvironmentFile.cs" Link="Services/ProjectEnvironmentFile.cs" />
     <Compile Include="../HerdMe.Windows/Services/DatabaseServiceAuthenticator.cs" Link="Services/DatabaseServiceAuthenticator.cs" />
     <Compile Include="../HerdMe.Windows/Services/SafeZipExtractor.cs" Link="Services/SafeZipExtractor.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsJobObject.cs" Link="Services/WindowsJobObject.cs" />
@@ -35,6 +47,7 @@
     <Compile Include="../HerdMe.Windows/Services/WindowsCredentialStore.cs" Link="Services/WindowsCredentialStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsServiceCredentialStore.cs" Link="Services/WindowsServiceCredentialStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/DumpCaptureService.cs" Link="Services/DumpCaptureService.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ApplicationDiagnostics.cs" Link="Services/ApplicationDiagnostics.cs" />
     <Compile Include="../HerdMe.Windows/Services/DiagnosticLog.cs" Link="Services/DiagnosticLog.cs" />
     <Compile Include="../HerdMe.Windows/Services/FastCgiClient.cs" Link="Services/FastCgiClient.cs" />
     <Compile Include="../HerdMe.Windows/Services/LaravelProjectCreator.cs" Link="Services/LaravelProjectCreator.cs" />
@@ -43,11 +56,13 @@
     <Compile Include="../HerdMe.Windows/Services/PhpFastCgiProcess.cs" Link="Services/PhpFastCgiProcess.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteConfigurationStore.cs" Link="Services/SiteConfigurationStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/SitePresentation.cs" Link="Services/SitePresentation.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SiteRemovalService.cs" Link="Services/SiteRemovalService.cs" />
     <Compile Include="../HerdMe.Windows/Services/LogPresentation.cs" Link="Services/LogPresentation.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteRuntimeStore.cs" Link="Services/SiteRuntimeStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/StorageMaintenance.cs" Link="Services/StorageMaintenance.cs" />
     <Compile Include="../HerdMe.Windows/Services/TablePlusConnection.cs" Link="Services/TablePlusConnection.cs" />
     <Compile Include="../HerdMe.Windows/Services/UnhandledExceptionPolicy.cs" Link="Services/UnhandledExceptionPolicy.cs" />
+    <Compile Include="../HerdMe.Windows/Services/UiLanguagePolicy.cs" Link="Services/UiLanguagePolicy.cs" />
     <Compile Include="../HerdMe.Windows/Services/SingleInstanceCoordinator.cs" Link="Services/SingleInstanceCoordinator.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsHostsManager.cs" Link="Services/WindowsHostsManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/AppUpdateManager.cs" Link="Services/AppUpdateManager.cs" />
@@ -59,6 +74,10 @@
     <Compile Include="../HerdMe.Windows/Services/WindowsLocalEnvironment.cs" Link="Services/WindowsLocalEnvironment.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsStartupManager.cs" Link="Services/WindowsStartupManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/XdebugManager.cs" Link="Services/XdebugManager.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="../../HerdMe/Resources/runtime-catalog.json" LogicalName="HerdMe.runtime-catalog.json" />
   </ItemGroup>
 
 </Project>

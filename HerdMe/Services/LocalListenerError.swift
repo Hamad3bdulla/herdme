@@ -5,8 +5,11 @@ enum LocalListenerError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case let .invalidPort(service):
-            "The configured \(service) port is invalid."
+        case .invalidPort(let service):
+            String.localizedStringWithFormat(
+                String(localized: "The configured %@ port is invalid."),
+                service
+            )
         }
     }
 }

@@ -43,7 +43,8 @@ actor DumpStore {
     }
 
     func clear() throws {
-        for url in (try? fileManager.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil)) ?? [] where url.pathExtension == "json" {
+        for url in (try? fileManager.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil)) ?? []
+        where url.pathExtension == "json" {
             try fileManager.removeItem(at: url)
         }
     }

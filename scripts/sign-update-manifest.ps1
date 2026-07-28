@@ -43,6 +43,7 @@ $releases = @($manifest.releases)
 if ($null -eq $manifest.releases -or $releases.Count -eq 0) {
     throw "The release manifest must contain at least one release."
 }
+$identities = @{}
 for ($index = 0; $index -lt $releases.Count; $index++) {
     $release = $releases[$index]
     $label = "releases[$index]"
@@ -65,10 +66,26 @@ for ($index = 0; $index -lt $releases.Count; $index++) {
     if ($null -eq $release.downloadURLs) {
         throw "$label.downloadURLs must contain both platform artifacts."
     }
+    $artifactVersion = ([string]$release.version) -replace '^v', ''
+    $identity = "$artifactVersion|$build|$(([string]$release.channel).ToLowerInvariant())"
+    if ($identities.ContainsKey($identity)) {
+        throw "$label duplicates another release identity."
+    }
+    $identities[$identity] = $true
     $macOSUrl = Assert-HttpsUrl $release.downloadURLs.macOS "$label.downloadURLs.macOS"
     $windowsUrl = Assert-HttpsUrl $release.downloadURLs.windowsX64 "$label.downloadURLs.windowsX64"
     if ($macOSUrl -eq $windowsUrl) {
         throw "$label must not use the same artifact for macOS and Windows."
+    }
+    $macOSUri = [Uri]$macOSUrl
+    $windowsUri = [Uri]$windowsUrl
+    $expectedMacOS = "HerdMe-$artifactVersion-macOS.zip"
+    $expectedWindows = "HerdMe-$artifactVersion-win-x64-setup.exe"
+    if ([Uri]::UnescapeDataString($macOSUri.Segments[-1]) -ne $expectedMacOS) {
+        throw "$label.downloadURLs.macOS must end with $expectedMacOS."
+    }
+    if ([Uri]::UnescapeDataString($windowsUri.Segments[-1]) -ne $expectedWindows) {
+        throw "$label.downloadURLs.windowsX64 must end with $expectedWindows."
     }
 }
 

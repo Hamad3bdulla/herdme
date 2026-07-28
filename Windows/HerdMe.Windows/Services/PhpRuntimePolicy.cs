@@ -104,11 +104,14 @@ public sealed class PhpRuntimePolicy
         settings.MemoryLimitMegabytes = Math.Clamp(settings.MemoryLimitMegabytes, 16, 100_000);
         settings.MaxUploadMegabytes = Math.Clamp(settings.MaxUploadMegabytes, 1, 100_000);
         settings.PhpCycle = string.IsNullOrWhiteSpace(settings.PhpCycle)
-            ? "8.4"
+            ? RuntimeCatalog.DefaultPhpCycle
             : new string(settings.PhpCycle.Trim().Where(character =>
                 char.IsAsciiDigit(character) || character == '.'
             ).ToArray());
-        if (string.IsNullOrEmpty(settings.PhpCycle)) settings.PhpCycle = "8.4";
+        if (string.IsNullOrEmpty(settings.PhpCycle))
+        {
+            settings.PhpCycle = RuntimeCatalog.DefaultPhpCycle;
+        }
 
         settings.Debugger ??= new DebuggerSettings();
         settings.Debugger.Port = Math.Clamp(settings.Debugger.Port, 1, 65_535);

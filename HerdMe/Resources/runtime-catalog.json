@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "defaults": {
+    "phpCycle": "8.4",
+    "nodeMajor": "22"
+  },
+  "php": {
+    "installableCycles": [
+      "8.5",
+      "8.4",
+      "8.3",
+      "8.2",
+      "8.1",
+      "8.0"
+    ]
+  },
+  "node": {
+    "macOSMajors": [
+      "26",
+      "24",
+      "22",
+      "20",
+      "18"
+    ],
+    "windowsMajors": [
+      "26",
+      "24",
+      "22",
+      "20"
+    ]
+  },
+  "services": [
+    {
+      "id": "mariadb",
+      "name": "MariaDB",
+      "category": "database",
+      "defaultPort": 3306,
+      "macOS": {
+        "versionLabel": "12.3",
+        "symbol": "cylinder.split.1x2",
+        "architectures": ["arm64", "x86_64"]
+      },
+      "windows": {
+        "versionLabel": "11.8",
+        "installable": true
+      }
+    },
+    {
+      "id": "mysql",
+      "name": "MySQL",
+      "category": "database",
+      "defaultPort": 3306,
+      "macOS": {
+        "versionLabel": "9.7",
+        "symbol": "cylinder",
+        "architectures": ["arm64", "x86_64"]
+      },
+      "windows": {
+        "versionLabel": "Innovation",
+        "installable": true
+      }
+    },
+    {
+      "id": "postgresql",
+      "name": "PostgreSQL",
+      "category": "database",
+      "defaultPort": 5432,
+      "macOS": {
+        "versionLabel": "18",
+        "symbol": "server.rack",
+        "architectures": ["arm64", "x86_64"]
+      },
+      "windows": {
+        "versionLabel": "18",
+        "installable": true
+      }
+    },
+    {
+      "id": "mongodb",
+      "name": "MongoDB",
+      "category": "database",
+      "defaultPort": 27017,
+      "macOS": {
+        "versionLabel": "7.0",
+        "symbol": "leaf",
+        "architectures": ["arm64", "x86_64"]
+      },
+      "windows": {
+        "versionLabel": "8.0 LTS",
+        "installable": true
+      }
+    },
+    {
+      "id": "redis",
+      "name": "Redis",
+      "category": "cache",
+      "defaultPort": 6379,
+      "macOS": {
+        "versionLabel": "8.8",
+        "symbol": "square.stack.3d.up",
+        "architectures": ["arm64", "x86_64"]
+      },
+      "windows": {
+        "versionLabel": "Latest",
+        "installable": true
+      }
+    },
+    {
+      "id": "valkey",
+      "name": "Valkey",
+      "category": "cache",
+      "defaultPort": 6379,
+      "macOS": {
+        "versionLabel": "9.1",
+        "symbol": "square.stack.3d.down.right",
+        "architectures": ["arm64", "x86_64"]
+      },
+      "windows": {
+        "versionLabel": "Latest",
+        "installable": false,
+        "unavailableReason": "Valkey upstream does not currently support or publish an official native Windows x64 package."
+      }
+    },
+    {
+      "id": "meilisearch",
+      "name": "Meilisearch",
+      "category": "search",
+      "defaultPort": 7700,
+      "macOS": {
+        "versionLabel": "1.50",
+        "symbol": "magnifyingglass",
+        "architectures": ["arm64", "x86_64"]
+      },
+      "windows": {
+        "versionLabel": "Latest",
+        "installable": true
+      }
+    },
+    {
+      "id": "typesense",
+      "name": "Typesense",
+      "category": "search",
+      "defaultPort": 8108,
+      "macOS": {
+        "versionLabel": "30.2",
+        "symbol": "text.magnifyingglass",
+        "architectures": ["arm64", "x86_64"]
+      },
+      "windows": {
+        "versionLabel": "Latest",
+        "installable": false,
+        "unavailableReason": "Typesense upstream does not currently support or publish an official native Windows x64 package."
+      }
+    },
+    {
+      "id": "minio",
+      "name": "MinIO",
+      "category": "storage",
+      "defaultPort": 9000,
+      "macOS": {
+        "versionLabel": "Latest",
+        "symbol": "shippingbox",
+        "architectures": ["arm64", "x86_64"]
+      },
+      "windows": {
+        "versionLabel": "Latest",
+        "installable": true
+      }
+    },
+    {
+      "id": "rustfs",
+      "name": "RustFS",
+      "category": "storage",
+      "defaultPort": 9000,
+      "macOS": {
+        "versionLabel": "1.0 Beta",
+        "symbol": "archivebox",
+        "architectures": ["arm64"]
+      },
+      "windows": {
+        "versionLabel": "Beta",
+        "installable": true
+      }
+    }
+  ]
+}

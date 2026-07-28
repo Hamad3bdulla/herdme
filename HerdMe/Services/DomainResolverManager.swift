@@ -1,3 +1,4 @@
+import CryptoKit
 import Darwin
 import Foundation
 import ServiceManagement
@@ -34,7 +35,23 @@ struct SMNetworkServiceController: NetworkServiceControlling {
     }
 
     func unregister() throws {
-        try service.unregister()
+        let completion = NetworkServiceUnregistrationCompletion()
+        let semaphore = DispatchSemaphore(value: 0)
+
+        // The synchronous API returns before launchd has reaped the daemon. The
+        // completion API is the point at which SMAppService permits re-registering it.
+        service.unregister { error in
+            completion.store(error)
+            semaphore.signal()
+        }
+        guard semaphore.wait(timeout: .now() + 30) == .success else {
+            throw NSError(
+                domain: "app.herdme.network-service",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Timed out while stopping the local domain service."]
+            )
+        }
+        if let error = completion.error() { throw error }
     }
 
     func openApprovalSettings() {
@@ -43,6 +60,19 @@ struct SMNetworkServiceController: NetworkServiceControlling {
 
     private var service: SMAppService {
         SMAppService.daemon(plistName: plistName)
+    }
+}
+
+private final class NetworkServiceUnregistrationCompletion: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedError: Error?
+
+    func store(_ error: Error?) {
+        lock.withLock { storedError = error }
+    }
+
+    func error() -> Error? {
+        lock.withLock { storedError }
     }
 }
 
@@ -62,6 +92,7 @@ enum DomainResolverState: Equatable, Sendable {
 
 enum DomainResolverError: LocalizedError {
     case invalidTLD
+    case applicationMustBeInstalled
     case ownedByAnotherApplication
     case helperMissing
     case serviceManifestMissing
@@ -73,21 +104,23 @@ enum DomainResolverError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidTLD:
-            "The top-level domain may only contain letters, numbers, and hyphens."
+            String(localized: "The top-level domain may only contain letters, numbers, and hyphens.")
+        case .applicationMustBeInstalled:
+            String(localized: "Move HerdMe to the Applications folder and reopen it before setting up local domains.")
         case .ownedByAnotherApplication:
-            "The resolver for this top-level domain is managed outside HerdMe and was not changed."
+            String(localized: "The resolver for this top-level domain is managed outside HerdMe and was not changed.")
         case .helperMissing:
-            "This HerdMe build does not contain its local network helper."
+            String(localized: "This HerdMe build does not contain its local network helper.")
         case .serviceManifestMissing:
-            "This HerdMe build does not contain its signed network service manifest."
+            String(localized: "This HerdMe build does not contain its signed network service manifest.")
         case .serviceRequiresApproval:
-            "Approve HerdMe in System Settings > General > Login Items, then try local domains again."
+            String(localized: "Approve HerdMe in System Settings > General > Login Items, then try local domains again.")
         case .invalidRoutingPorts:
-            "HerdMe could not prepare valid internal ports for local domains."
+            String(localized: "HerdMe could not prepare valid internal ports for local domains.")
         case .installationVerificationFailed:
-            "The local domain command completed, but its resolver or helper files could not be verified."
-        case let .authorizationFailed(message):
-            message.isEmpty ? "The local domain resolver could not be installed." : message
+            String(localized: "The local domain command completed, but its resolver or helper files could not be verified.")
+        case .authorizationFailed(let message):
+            message.isEmpty ? String(localized: "The local domain resolver could not be installed.") : message
         }
     }
 }
@@ -119,6 +152,10 @@ struct DomainResolverManager: Sendable {
         rootURL.appendingPathComponent("Runtime/network-helper.conf")
     }
 
+    private var networkHelperIdentityURL: URL {
+        rootURL.appendingPathComponent("Runtime/network-helper.identity")
+    }
+
     func state(tld: String) -> DomainResolverState {
         guard Self.isValid(tld: tld) else { return .missing }
         let resolver = URL(fileURLWithPath: "/etc/resolver", isDirectory: true).appendingPathComponent(tld)
@@ -127,8 +164,15 @@ struct DomainResolverManager: Sendable {
     }
 
     @discardableResult
-    func install(tld: String, replacingExternal: Bool = false) throws -> Bool {
+    func install(
+        tld: String,
+        replacingExternal: Bool = false,
+        openApprovalSettingsOnFailure: Bool = true
+    ) throws -> Bool {
         guard Self.isValid(tld: tld) else { throw DomainResolverError.invalidTLD }
+        guard Self.applicationIsInstalled(at: bundleURL) else {
+            throw DomainResolverError.applicationMustBeInstalled
+        }
         let currentState = state(tld: tld)
         if currentState == .managed, isModernNetworkHelperRunning(), isNetworkHelperCurrent() {
             return false
@@ -137,12 +181,14 @@ struct DomainResolverManager: Sendable {
             throw DomainResolverError.ownedByAnotherApplication
         }
 
-        let bundledHelper = bundleURL
+        let bundledHelper =
+            bundleURL
             .appendingPathComponent("Contents/Helpers/herdme-network-helper")
         guard FileManager.default.isExecutableFile(atPath: bundledHelper.path) else {
             throw DomainResolverError.helperMissing
         }
-        let bundledManifest = bundleURL
+        let bundledManifest =
+            bundleURL
             .appendingPathComponent("Contents/Library/LaunchDaemons/")
             .appendingPathComponent(Self.modernPlistName)
         guard Self.modernServiceManifestIsValid(at: bundledManifest) else {
@@ -158,17 +204,26 @@ struct DomainResolverManager: Sendable {
         do {
             try registerModernService(restart: networkService.status() == .enabled)
         } catch DomainResolverError.serviceRequiresApproval {
-            networkService.openApprovalSettings()
+            if openApprovalSettingsOnFailure {
+                networkService.openApprovalSettings()
+            }
             throw DomainResolverError.serviceRequiresApproval
         } catch {
             throw DomainResolverError.authorizationFailed(error.localizedDescription)
         }
 
+        var recordedIdentity = false
         for _ in 0..<50 {
-            if state(tld: tld) == .managed,
-               isNetworkHelperCurrent(),
-               isModernNetworkHelperRunning() {
-                return true
+            if state(tld: tld) == .managed, isModernNetworkHelperRunning() {
+                if !recordedIdentity {
+                    do {
+                        try recordCurrentNetworkHelperIdentity()
+                        recordedIdentity = true
+                    } catch {
+                        throw DomainResolverError.installationVerificationFailed
+                    }
+                }
+                if isNetworkHelperCurrent() { return true }
             }
             Thread.sleep(forTimeInterval: 0.1)
         }
@@ -180,8 +235,9 @@ struct DomainResolverManager: Sendable {
 
     func updateNetworkRouting(httpPort: Int, httpsPort: Int?, tld: String) throws {
         guard Self.isValid(tld: tld),
-              (1_024...65_535).contains(httpPort),
-              httpsPort.map({ (1_024...65_535).contains($0) }) ?? true else {
+            (1_024...65_535).contains(httpPort),
+            httpsPort.map({ (1_024...65_535).contains($0) }) ?? true
+        else {
             throw DomainResolverError.invalidRoutingPorts
         }
         let directory = routingConfigurationURL.deletingLastPathComponent()
@@ -219,57 +275,147 @@ struct DomainResolverManager: Sendable {
     func isNetworkHelperCurrent(
         bundledHelperURL: URL? = nil,
         installedHelperURL: URL = URL(fileURLWithPath: Self.helperDestination),
-        installedDaemonURL: URL = URL(fileURLWithPath: Self.launchDaemonDestination)
+        installedDaemonURL: URL = URL(fileURLWithPath: Self.launchDaemonDestination),
+        bundledManifestURL: URL? = nil,
+        modernServiceRunning: Bool? = nil
     ) -> Bool {
         if networkService.status() == .enabled {
-            return Self.modernServiceManifestIsValid(
-                at: bundleURL
-                    .appendingPathComponent("Contents/Library/LaunchDaemons/")
-                    .appendingPathComponent(Self.modernPlistName)
-            ) && isModernNetworkHelperRunning()
+            let bundledHelperURL = bundledHelperURL ?? bundledNetworkHelperURL
+            let bundledManifestURL = bundledManifestURL ?? bundledNetworkManifestURL
+            guard Self.modernServiceManifestIsValid(at: bundledManifestURL),
+                modernServiceRunning ?? isModernNetworkHelperRunning(),
+                let bundledIdentity = Self.networkHelperIdentity(
+                    helperURL: bundledHelperURL,
+                    manifestURL: bundledManifestURL,
+                    bundleURL: bundleURL
+                )
+            else {
+                return false
+            }
+            return storedNetworkHelperIdentity() == bundledIdentity
         }
-        let bundledHelperURL = bundledHelperURL ?? bundleURL
+        let bundledHelperURL =
+            bundledHelperURL
+            ?? bundleURL
             .appendingPathComponent("Contents/Helpers/herdme-network-helper")
         guard let bundledHelper = try? Data(contentsOf: bundledHelperURL),
-              let installedHelper = try? Data(contentsOf: installedHelperURL),
-              bundledHelper == installedHelper,
-              let installedDaemon = try? Data(contentsOf: installedDaemonURL) else {
+            let installedHelper = try? Data(contentsOf: installedHelperURL),
+            bundledHelper == installedHelper,
+            let installedDaemon = try? Data(contentsOf: installedDaemonURL)
+        else {
             return false
         }
 
-        let expectedDaemon = Data(Self.launchDaemonPlist(
-            configurationPath: routingConfigurationURL.path,
-            uid: getuid(),
-            gid: getgid()
-        ).utf8)
-        guard let expectedPropertyList = try? PropertyListSerialization.propertyList(
-            from: expectedDaemon,
-            format: nil
-        ) as? NSDictionary,
-              let installedPropertyList = try? PropertyListSerialization.propertyList(
+        let expectedDaemon = Data(
+            Self.launchDaemonPlist(
+                configurationPath: routingConfigurationURL.path,
+                uid: getuid(),
+                gid: getgid()
+            ).utf8)
+        guard
+            let expectedPropertyList = try? PropertyListSerialization.propertyList(
+                from: expectedDaemon,
+                format: nil
+            ) as? NSDictionary,
+            let installedPropertyList = try? PropertyListSerialization.propertyList(
                 from: installedDaemon,
                 format: nil
-              ) as? NSDictionary else {
+            ) as? NSDictionary
+        else {
             return false
         }
         return expectedPropertyList.isEqual(installedPropertyList)
     }
 
+    func recordCurrentNetworkHelperIdentity(
+        bundledHelperURL: URL? = nil,
+        bundledManifestURL: URL? = nil
+    ) throws {
+        guard
+            let identity = Self.networkHelperIdentity(
+                helperURL: bundledHelperURL ?? bundledNetworkHelperURL,
+                manifestURL: bundledManifestURL ?? bundledNetworkManifestURL,
+                bundleURL: bundleURL
+            )
+        else {
+            throw DomainResolverError.installationVerificationFailed
+        }
+        let directory = networkHelperIdentityURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try (identity + "\n").write(
+            to: networkHelperIdentityURL,
+            atomically: true,
+            encoding: .utf8
+        )
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o644],
+            ofItemAtPath: networkHelperIdentityURL.path
+        )
+    }
+
+    static func networkHelperIdentity(
+        helperURL: URL,
+        manifestURL: URL,
+        bundleURL: URL
+    ) -> String? {
+        guard let helper = try? Data(contentsOf: helperURL),
+            let manifest = try? Data(contentsOf: manifestURL)
+        else {
+            return nil
+        }
+        let canonicalBundlePath = bundleURL
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+            .path
+        var hasher = SHA256()
+        hasher.update(data: helper)
+        hasher.update(data: Data([0]))
+        hasher.update(data: manifest)
+        hasher.update(data: Data([0]))
+        hasher.update(data: Data(canonicalBundlePath.utf8))
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    private var bundledNetworkHelperURL: URL {
+        bundleURL.appendingPathComponent("Contents/Helpers/herdme-network-helper")
+    }
+
+    private var bundledNetworkManifestURL: URL {
+        bundleURL
+            .appendingPathComponent("Contents/Library/LaunchDaemons/")
+            .appendingPathComponent(Self.modernPlistName)
+    }
+
+    private func storedNetworkHelperIdentity() -> String? {
+        guard
+            let identity = try? String(
+                contentsOf: networkHelperIdentityURL,
+                encoding: .utf8
+            ).trimmingCharacters(in: .whitespacesAndNewlines),
+            identity.count == 64,
+            identity.allSatisfy(\.isHexDigit)
+        else {
+            return nil
+        }
+        return identity.lowercased()
+    }
+
     static func modernServiceManifestIsValid(at url: URL) -> Bool {
         guard let data = try? Data(contentsOf: url),
-              let manifest = try? PropertyListSerialization.propertyList(
+            let manifest = try? PropertyListSerialization.propertyList(
                 from: data,
                 format: nil
-              ) as? [String: Any],
-              manifest["Label"] as? String == modernHelperLabel,
-              manifest["BundleProgram"] as? String == "Contents/Helpers/herdme-network-helper",
-              manifest["AssociatedBundleIdentifiers"] as? [String] == ["app.herdme.desktop"],
-              manifest["ProgramArguments"] as? [String] == [
+            ) as? [String: Any],
+            manifest["Label"] as? String == modernHelperLabel,
+            manifest["BundleProgram"] as? String == "Contents/Helpers/herdme-network-helper",
+            manifest["AssociatedBundleIdentifiers"] as? [String] == ["app.herdme.desktop"],
+            manifest["ProgramArguments"] as? [String] == [
                 "herdme-network-helper", "--managed"
-              ],
-              manifest["RunAtLoad"] as? Bool == true,
-              let keepAlive = manifest["KeepAlive"] as? [String: Any],
-              keepAlive["SuccessfulExit"] as? Bool == false else {
+            ],
+            manifest["RunAtLoad"] as? Bool == true,
+            let keepAlive = manifest["KeepAlive"] as? [String: Any],
+            keepAlive["SuccessfulExit"] as? Bool == false
+        else {
             return false
         }
         return true
@@ -295,10 +441,23 @@ struct DomainResolverManager: Sendable {
 
     static func isValid(tld: String) -> Bool {
         guard !tld.isEmpty, tld.count <= 63,
-              tld.first != "-", tld.last != "-" else { return false }
+            tld.first != "-", tld.last != "-"
+        else { return false }
         return tld.unicodeScalars.allSatisfy {
             CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-")).contains($0)
         }
+    }
+
+    static func applicationIsInstalled(at bundleURL: URL) -> Bool {
+        guard bundleURL.isFileURL, bundleURL.pathExtension.caseInsensitiveCompare("app") == .orderedSame
+        else {
+            return false
+        }
+        let applicationsURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        let resolvedBundleURL = bundleURL.standardizedFileURL.resolvingSymlinksInPath()
+        return resolvedBundleURL.path.hasPrefix(applicationsURL.path + "/")
     }
 
     static func launchDaemonPlist(configurationPath: String, uid: uid_t, gid: gid_t) -> String {
@@ -366,13 +525,31 @@ struct DomainResolverManager: Sendable {
 
         currentStatus = networkService.status()
         if currentStatus != .enabled {
-            do {
-                try networkService.register()
-            } catch {
+            let maximumAttempts = restart ? 61 : 1
+            var registrationError: Error?
+            for attempt in 0..<maximumAttempts {
+                if attempt > 0 { Thread.sleep(forTimeInterval: 0.5) }
+                do {
+                    try networkService.register()
+                    registrationError = nil
+                    break
+                } catch {
+                    registrationError = error
+                    currentStatus = networkService.status()
+                    if currentStatus == .enabled {
+                        registrationError = nil
+                        break
+                    }
+                    if currentStatus == .requiresApproval {
+                        throw DomainResolverError.serviceRequiresApproval
+                    }
+                }
+            }
+            if let registrationError {
                 if networkService.status() == .requiresApproval {
                     throw DomainResolverError.serviceRequiresApproval
                 }
-                throw error
+                throw registrationError
             }
         }
 
@@ -396,9 +573,10 @@ struct DomainResolverManager: Sendable {
             values[String(parts[0])] = String(parts[1])
         }
         guard let httpValue = values["http"], let http = Int(httpValue),
-              (1_024...65_535).contains(http),
-              let httpsValue = values["https"], let rawHTTPS = Int(httpsValue),
-              rawHTTPS == 0 || (1_024...65_535).contains(rawHTTPS) else {
+            (1_024...65_535).contains(http),
+            let httpsValue = values["https"], let rawHTTPS = Int(httpsValue),
+            rawHTTPS == 0 || (1_024...65_535).contains(rawHTTPS)
+        else {
             return nil
         }
         return (http, rawHTTPS == 0 ? nil : rawHTTPS)

@@ -6,7 +6,10 @@ script_directory="${0:A:h}"
 test_directory=$(mktemp -d "${TMPDIR:-/tmp}/herdme-network-helper-test.XXXXXX")
 helper_pid=""
 legacy_pid_file="$test_directory/legacy.pid"
+legacy_orphan_pid_file="$test_directory/legacy-orphan.pid"
 blocker_pid_file="$test_directory/blocker.pid"
+relay_client_pid_file="$test_directory/relay-client.pid"
+relay_server_pid_file="$test_directory/relay-server.pid"
 migration_mode="$test_directory/migration-mode"
 migration_log="$test_directory/launchctl.log"
 legacy_helper="$test_directory/app.herdme.network-helper"
@@ -18,7 +21,12 @@ cleanup() {
         kill "$helper_pid" 2>/dev/null || true
         wait "$helper_pid" 2>/dev/null || true
     fi
-    for pid_file in "$legacy_pid_file" "$blocker_pid_file"; do
+    for pid_file in \
+        "$legacy_pid_file" \
+        "$legacy_orphan_pid_file" \
+        "$blocker_pid_file" \
+        "$relay_client_pid_file" \
+        "$relay_server_pid_file"; do
         if [[ -f "$pid_file" ]]; then
             local process_id
             process_id=$(<"$pid_file")
@@ -92,6 +100,7 @@ xcrun --sdk macosx clang \
     -DHERDME_LAUNCHCTL_PATH="\"$launchctl_mock\"" \
     -DHERDME_BIND_RETRY_COUNT=10 \
     -DHERDME_BIND_RETRY_NANOSECONDS=50000000L \
+    -DHERDME_RELAY_IDLE_TIMEOUT_MILLISECONDS=1000 \
     -mmacosx-version-min=13.0 \
     "$script_directory/main.c" \
     -o "$executable"
@@ -179,6 +188,10 @@ stop_legacy_listener
 
 : > "$migration_log"
 printf 'success\n' > "$migration_mode"
+cp /bin/sleep "$legacy_helper"
+chmod 755 "$legacy_helper"
+"$legacy_helper" 60 &
+print -r -- "$!" > "$legacy_orphan_pid_file"
 start_legacy_listener
 "$executable" \
     --managed-test "$configuration" \
@@ -194,6 +207,17 @@ wait_for_state "$front_https_port" open
 [[ "$(cat "$resolver_directory/external")" == 'nameserver 192.0.2.1' ]]
 [[ ! -e "$legacy_helper" ]]
 [[ ! -e "$legacy_plist" ]]
+legacy_orphan_pid=$(<"$legacy_orphan_pid_file")
+for _ in {1..50}; do
+    if ! kill -0 "$legacy_orphan_pid" 2>/dev/null; then break; fi
+    sleep 0.02
+done
+if kill -0 "$legacy_orphan_pid" 2>/dev/null; then
+    echo "Legacy relay process survived service migration." >&2
+    exit 1
+fi
+wait "$legacy_orphan_pid" 2>/dev/null || true
+rm -f "$legacy_orphan_pid_file"
 grep -q '^bootout system/app.herdme.network-helper$' "$migration_log"
 grep -q '^disable system/app.herdme.network-helper$' "$migration_log"
 grep -q "port $front_dns_port" "$resolver_directory/test"
@@ -203,6 +227,56 @@ wait_for_state "$front_https_port" open
 
 write_configuration 0
 wait_for_state "$front_https_port" open
+
+worker_pid="$(pgrep -P "$helper_pid")"
+[[ -n "$worker_pid" ]]
+/usr/bin/perl -MIO::Socket::INET -e '
+    my $server = IO::Socket::INET->new(
+        LocalAddr => "127.0.0.1",
+        LocalPort => 19080,
+        Listen => 1,
+        ReuseAddr => 1,
+        Proto => "tcp"
+    ) or die $!;
+    my $client = $server->accept() or die $!;
+    select undef, undef, undef, 0.2;
+    close $client;
+' &
+relay_server_pid="$!"
+print -r -- "$relay_server_pid" > "$relay_server_pid_file"
+wait_for_state 19080 open
+/usr/bin/perl -MIO::Socket::INET -e '
+    my $socket = IO::Socket::INET->new(
+        PeerAddr => "127.0.0.1",
+        PeerPort => 18080,
+        Proto => "tcp"
+    ) or die $!;
+    sleep 5;
+' &
+relay_client_pid="$!"
+print -r -- "$relay_client_pid" > "$relay_client_pid_file"
+
+relay_pid=""
+for _ in {1..50}; do
+    relay_pid="$(pgrep -P "$worker_pid" || true)"
+    if [[ -n "$relay_pid" ]]; then break; fi
+    sleep 0.02
+done
+[[ -n "$relay_pid" ]]
+wait "$relay_server_pid"
+rm -f "$relay_server_pid_file"
+for _ in {1..50}; do
+    if ! kill -0 "$relay_pid" 2>/dev/null; then break; fi
+    sleep 0.02
+done
+if kill -0 "$relay_pid" 2>/dev/null; then
+    echo "Relay worker remained alive after the upstream server closed." >&2
+    exit 1
+fi
+kill -0 "$relay_client_pid"
+kill "$relay_client_pid"
+wait "$relay_client_pid" 2>/dev/null || true
+rm -f "$relay_client_pid_file"
 
 printf 'http=invalid\nhttps=0\ntld=test\n' > "$configuration.next"
 mv "$configuration.next" "$configuration"

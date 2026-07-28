@@ -17,15 +17,15 @@ enum CertificateSecretError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .randomGenerationFailed:
-            "HerdMe could not generate secure certificate credentials."
+            String(localized: "HerdMe could not generate secure certificate credentials.")
         case .keychainReadFailed:
-            "HerdMe could not read its certificate credentials from Keychain."
+            String(localized: "HerdMe could not read its certificate credentials from Keychain.")
         case .keychainWriteFailed:
-            "HerdMe could not save its certificate credentials in Keychain."
+            String(localized: "HerdMe could not save its certificate credentials in Keychain.")
         case .interactionRequired:
-            "HerdMe needs explicit Keychain approval before HTTPS can start."
+            String(localized: "HerdMe needs explicit Keychain approval before HTTPS can start.")
         case .invalidStoredValue:
-            "HerdMe's saved certificate credentials are invalid."
+            String(localized: "HerdMe's saved certificate credentials are invalid.")
         }
     }
 }
@@ -89,14 +89,15 @@ final class CertificateSecretStore: @unchecked Sendable {
     }
 
     private static func isValidPassphrase(_ value: String) -> Bool {
-        value.count >= 32 && value.unicodeScalars.allSatisfy { scalar in
-            switch scalar.value {
-            case 45, 48...57, 65...90, 95, 97...122:
-                true
-            default:
-                false
+        value.count >= 32
+            && value.unicodeScalars.allSatisfy { scalar in
+                switch scalar.value {
+                case 45, 48...57, 65...90, 95, 97...122:
+                    true
+                default:
+                    false
+                }
             }
-        }
     }
 }
 
@@ -113,16 +114,16 @@ protocol CertificateKeychainAccess: AnyObject {
 
 enum KeychainQueryInteraction {
     // LAContext alone does not suppress legacy macOS Keychain ACL prompts.
-    // This is the stable CFString value of kSecUseAuthenticationUIFail, whose
-    // Swift symbol is deprecated even though the SDK still requires both keys.
-    static var failAuthenticationUI: CFString { "u_AuthUIF" as CFString }
+    // Skip is the only query policy that guarantees protected matches are
+    // ignored without presenting UI during automatic startup.
+    static var skipAuthenticationUI: CFString { "u_AuthUIS" as CFString }
 
     static func apply(allowInteraction: Bool, to query: inout [CFString: Any]) {
         guard !allowInteraction else { return }
         let context = LAContext()
         context.interactionNotAllowed = true
         query[kSecUseAuthenticationContext] = context
-        query[kSecUseAuthenticationUI] = failAuthenticationUI
+        query[kSecUseAuthenticationUI] = skipAuthenticationUI
     }
 }
 
@@ -141,6 +142,11 @@ final class KeychainCertificateSecretBackend: CertificateSecretBacking {
             dataProtection: true,
             allowInteraction: allowInteraction
         )
+        if !allowInteraction,
+            protected.0 == errSecInteractionNotAllowed || protected.0 == errSecAuthFailed
+        {
+            throw CertificateSecretError.interactionRequired
+        }
         switch protected.0 {
         case errSecSuccess:
             guard let data = protected.1 else {
@@ -156,9 +162,6 @@ final class KeychainCertificateSecretBackend: CertificateSecretBacking {
                 migrate: allowInteraction,
                 allowInteraction: allowInteraction
             )
-            if legacy == nil, !allowInteraction {
-                throw CertificateSecretError.interactionRequired
-            }
             return legacy
         case errSecMissingEntitlement:
             let legacy = try readLegacy(
@@ -166,9 +169,6 @@ final class KeychainCertificateSecretBackend: CertificateSecretBacking {
                 migrate: false,
                 allowInteraction: allowInteraction
             )
-            if legacy == nil, !allowInteraction {
-                throw CertificateSecretError.interactionRequired
-            }
             return legacy
         default:
             throw CertificateSecretError.keychainReadFailed(protected.0)
@@ -211,9 +211,13 @@ final class KeychainCertificateSecretBackend: CertificateSecretBacking {
             dataProtection: false,
             allowInteraction: allowInteraction
         )
-        if legacy.0 == errSecItemNotFound { return nil }
+        if legacy.0 == errSecItemNotFound {
+            if !allowInteraction { throw CertificateSecretError.interactionRequired }
+            return nil
+        }
         if !allowInteraction,
-           (legacy.0 == errSecInteractionNotAllowed || legacy.0 == errSecAuthFailed) {
+            legacy.0 == errSecInteractionNotAllowed || legacy.0 == errSecAuthFailed
+        {
             throw CertificateSecretError.interactionRequired
         }
         guard legacy.0 == errSecSuccess, let data = legacy.1 else {

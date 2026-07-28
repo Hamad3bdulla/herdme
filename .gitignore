@@ -2,6 +2,7 @@
 build/
 Core/build/
 DerivedData/
+DerivedData-*/
 dist/
 *.xcuserstate
 xcuserdata/

@@ -10,6 +10,17 @@ enum StarterKit: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var localizedTitle: String {
+        switch self {
+        case .none: String(localized: "No Starter Kit")
+        case .react: "React"
+        case .vue: "Vue"
+        case .svelte: "Svelte"
+        case .livewire: "Livewire"
+        case .custom: String(localized: "Custom Starter Kit")
+        }
+    }
+
     var symbol: String {
         switch self {
         case .none: "l.square.fill"
@@ -84,35 +95,35 @@ enum ProjectCreationStage: String, CaseIterable, Sendable, Equatable, Identifiab
 
     var title: String {
         switch self {
-        case .validatingRequest: "Checking project details"
-        case .preparingLaravelInstaller: "Preparing Laravel Installer"
-        case .creatingLaravelProject: "Creating Laravel project"
-        case .installingLaravelBoost: "Installing Laravel Boost"
-        case .preparingNodeRuntime: "Preparing Node.js"
-        case .installingFrontendDependencies: "Installing frontend packages"
-        case .buildingFrontendAssets: "Building frontend assets"
-        case .initializingGitRepository: "Initializing Git repository"
-        case .verifyingProject: "Verifying Laravel project"
-        case .registeringSite: "Registering local site"
-        case .completed: "Site created"
+        case .validatingRequest: String(localized: "Checking project details")
+        case .preparingLaravelInstaller: String(localized: "Preparing Laravel Installer")
+        case .creatingLaravelProject: String(localized: "Creating Laravel project")
+        case .installingLaravelBoost: String(localized: "Installing Laravel Boost")
+        case .preparingNodeRuntime: String(localized: "Preparing Node.js")
+        case .installingFrontendDependencies: String(localized: "Installing frontend packages")
+        case .buildingFrontendAssets: String(localized: "Building frontend assets")
+        case .initializingGitRepository: String(localized: "Initializing Git repository")
+        case .verifyingProject: String(localized: "Verifying Laravel project")
+        case .registeringSite: String(localized: "Registering local site")
+        case .completed: String(localized: "Site created")
         }
     }
 
     var detail: String {
         switch self {
-        case .validatingRequest: "Verifying the name, location, and project folder."
+        case .validatingRequest: String(localized: "Verifying the name, location, and project folder.")
         case .preparingLaravelInstaller:
-            "Using the managed Laravel Installer already on this Mac, and installing it only if needed."
+            String(localized: "Using the managed Laravel Installer already on this Mac, and installing it only if needed.")
         case .creatingLaravelProject:
-            "Running the installed Laravel Installer to create and configure the application."
-        case .installingLaravelBoost: "Adding Laravel Boost as a development dependency."
-        case .preparingNodeRuntime: "Making sure a HerdMe-managed Node.js runtime is ready."
-        case .installingFrontendDependencies: "Restoring the starter kit's npm packages."
-        case .buildingFrontendAssets: "Compiling the production Vite assets used by the site."
-        case .initializingGitRepository: "Creating the initial local Git repository."
-        case .verifyingProject: "Checking that Laravel finished with its required files."
-        case .registeringSite: "Adding the project to HerdMe's local sites."
-        case .completed: "Your project is ready to open."
+            String(localized: "Running the installed Laravel Installer to create and configure the application.")
+        case .installingLaravelBoost: String(localized: "Adding Laravel Boost as a development dependency.")
+        case .preparingNodeRuntime: String(localized: "Making sure a HerdMe-managed Node.js runtime is ready.")
+        case .installingFrontendDependencies: String(localized: "Restoring the starter kit's npm packages.")
+        case .buildingFrontendAssets: String(localized: "Compiling the production Vite assets used by the site.")
+        case .initializingGitRepository: String(localized: "Creating the initial local Git repository.")
+        case .verifyingProject: String(localized: "Checking that Laravel finished with its required files.")
+        case .registeringSite: String(localized: "Adding the project to HerdMe's local sites.")
+        case .completed: String(localized: "Your project is ready to open.")
         }
     }
 
@@ -151,25 +162,32 @@ enum ProjectCreationError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidName: "Enter a valid project name."
+        case .invalidName: String(localized: "Enter a valid project name.")
         case .invalidCustomStarterKit:
-            "Enter the custom starter kit as a Composer package such as vendor/package."
-        case .destinationExists: "A folder with this project name already exists."
+            String(localized: "Enter the custom starter kit as a Composer package such as vendor/package.")
+        case .destinationExists: String(localized: "A folder with this project name already exists.")
         case .externalApplicationPath:
-            "HerdMe does not create projects inside another application's folders. Choose a HerdMe-owned folder instead."
-        case let .incompleteProject(missingFiles):
-            "Laravel Installer finished without creating a complete Laravel project. Missing: \(missingFiles.joined(separator: ", "))."
-        case let .commandFailed(output):
-            ErrorPresentation(output, fallback: "Laravel Installer could not finish creating the site.").message
-        case .cancelled: "Site creation was cancelled. The incomplete project was removed."
+            String(localized: "HerdMe does not create projects inside another application's folders. Choose a HerdMe-owned folder instead.")
+        case .incompleteProject(let missingFiles):
+            String.localizedStringWithFormat(
+                String(localized: "Laravel Installer finished without creating a complete Laravel project. Missing: %@."),
+                missingFiles.joined(separator: ", ")
+            )
+        case .commandFailed(let output):
+            ErrorPresentation(
+                output,
+                fallback: String(localized: "Laravel Installer could not finish creating the site.")
+            ).message
+        case .cancelled:
+            String(localized: "Site creation was cancelled. The incomplete project was removed.")
         }
     }
 
     var technicalDetails: String? {
-        guard case let .commandFailed(output) = self else { return nil }
+        guard case .commandFailed(let output) = self else { return nil }
         return ErrorPresentation(
             output,
-            fallback: "Laravel Installer could not finish creating the site."
+            fallback: String(localized: "Laravel Installer could not finish creating the site.")
         ).technicalDetails
     }
 }
@@ -189,7 +207,8 @@ actor ProjectCreator {
     nonisolated static func validate(_ request: NewProjectRequest) throws {
         let trimmedName = request.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty,
-              trimmedName.range(of: "^[A-Za-z0-9._-]+$", options: .regularExpression) != nil else {
+            trimmedName.range(of: "^[A-Za-z0-9._-]+$", options: .regularExpression) != nil
+        else {
             throw ProjectCreationError.invalidName
         }
         guard !IndependentPathPolicy.belongsToOtherHerd(request.parentDirectory) else {
@@ -197,10 +216,12 @@ actor ProjectCreator {
         }
         if request.starterKit == .custom {
             let package = request.customStarterKit?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            guard package.range(
-                of: "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?::\\S+)?$",
-                options: .regularExpression
-            ) != nil else {
+            guard
+                package.range(
+                    of: "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?::\\S+)?$",
+                    options: .regularExpression
+                ) != nil
+            else {
                 throw ProjectCreationError.invalidCustomStarterKit
             }
         }
@@ -235,7 +256,8 @@ actor ProjectCreator {
         let php = rootURL.appendingPathComponent("bin/php")
         let laravel = rootURL.appendingPathComponent("Composer/vendor/bin/laravel")
         guard FileManager.default.isExecutableFile(atPath: php.path),
-              FileManager.default.isReadableFile(atPath: laravel.path) else {
+            FileManager.default.isReadableFile(atPath: laravel.path)
+        else {
             throw ProjectCreationError.commandFailed("Install Laravel Installer from the PHP page first.")
         }
 
@@ -315,8 +337,9 @@ actor ProjectCreator {
         if let flag = request.starterKit.commandFlag {
             arguments += [flag, "--no-node"]
         } else if request.starterKit == .custom,
-                  let package = request.customStarterKit?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !package.isEmpty {
+            let package = request.customStarterKit?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !package.isEmpty
+        {
             arguments += ["--using=\(package)", "--npm"]
         }
         return arguments
@@ -344,7 +367,9 @@ actor ProjectCreator {
         let npm = rootURL.appendingPathComponent("bin/npm")
         if FileManager.default.isExecutableFile(atPath: npm.path) { return npm }
 
-        _ = try await RuntimeInstaller(rootURL: rootURL).installNode(cycle: "22")
+        _ = try await RuntimeInstaller(rootURL: rootURL).installNode(
+            cycle: RuntimeCatalog.defaultNodeMajor
+        )
         guard FileManager.default.isExecutableFile(atPath: npm.path) else {
             throw ProjectCreationError.commandFailed(
                 "HerdMe could not prepare Node.js for the selected starter kit."
@@ -356,10 +381,11 @@ actor ProjectCreator {
     private func validateFrontendBuild(at destination: URL) throws {
         let packageURL = destination.appendingPathComponent("package.json")
         guard let data = try? Data(contentsOf: packageURL),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let scripts = object["scripts"] as? [String: Any],
-              let build = scripts["build"] as? String,
-              !build.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let scripts = object["scripts"] as? [String: Any],
+            let build = scripts["build"] as? String,
+            !build.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
             throw ProjectCreationError.commandFailed(
                 "The selected starter kit did not provide a valid npm build script."
             )
@@ -388,7 +414,8 @@ actor ProjectCreator {
         let php = rootURL.appendingPathComponent("bin/php")
         let composer = rootURL.appendingPathComponent("bin/composer")
         guard FileManager.default.isExecutableFile(atPath: php.path),
-              FileManager.default.isReadableFile(atPath: composer.path) else {
+            FileManager.default.isReadableFile(atPath: composer.path)
+        else {
             throw ProjectCreationError.commandFailed("HerdMe Composer is not installed.")
         }
         let result = try ProcessRunner.run(

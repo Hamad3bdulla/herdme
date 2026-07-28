@@ -13,11 +13,13 @@ enum PHPRuntimeValidationError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case let .inspectionFailed(output):
-            output.isEmpty ? "HerdMe could not inspect the selected PHP runtime." : output
-        case let .missingExtensions(extensions):
-            "The selected PHP runtime is missing Laravel extensions: "
-                + extensions.joined(separator: ", ") + "."
+        case .inspectionFailed(let output):
+            output.isEmpty ? String(localized: "HerdMe could not inspect the selected PHP runtime.") : output
+        case .missingExtensions(let extensions):
+            String.localizedStringWithFormat(
+                String(localized: "The selected PHP runtime is missing Laravel extensions: %@."),
+                extensions.joined(separator: ", ")
+            )
         }
     }
 }
@@ -39,6 +41,12 @@ struct PHPRuntimeValidator: Sendable {
         "xml"
     ]
 
+    private let coreClient: PortableCoreClient
+
+    init(coreClient: PortableCoreClient = PortableCoreClient()) {
+        self.coreClient = coreClient
+    }
+
     func report(executable: URL) throws -> PHPExtensionReport {
         let result = try ProcessRunner.run(executable, arguments: ["-m"], timeout: 30)
         let text = result.output
@@ -46,8 +54,16 @@ struct PHPRuntimeValidator: Sendable {
         guard result.status == 0 else {
             throw PHPRuntimeValidationError.inspectionFailed(text)
         }
-
-        return Self.report(moduleOutput: text)
+        do {
+            return try coreClient.phpExtensionReport(
+                moduleOutput: text,
+                requiredExtensions: Self.laravelRequiredExtensions
+            )
+        } catch let error as PortableCoreClientError {
+            throw PHPRuntimeValidationError.inspectionFailed(error.diagnostic)
+        } catch {
+            throw PHPRuntimeValidationError.inspectionFailed(error.localizedDescription)
+        }
     }
 
     func validate(executable: URL) throws {
