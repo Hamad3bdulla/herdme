@@ -596,6 +596,20 @@ internal static partial class ContractChecks
                 ),
             "the managed XAML compiler compatibility dependency is restored"
         );
+        Check(
+            projectDocument.Descendants()
+                .Any(element =>
+                    element.Name.LocalName == "Target"
+                    && element.Attribute("Name")?.Value == "CopyProjectPriToPublishDirectory"
+                    && element.Attribute("AfterTargets")?.Value == "Publish"
+                    && element.Descendants().Any(child =>
+                        child.Name.LocalName == "Copy"
+                        && child.Attribute("SourceFiles")?.Value == "$(ProjectPriFullPath)"
+                        && child.Attribute("DestinationFolder")?.Value == "$(PublishDir)"
+                    )
+                ),
+            "the unpackaged Windows publish copies the generated project resource index"
+        );
 
         var windowsDirectory = Path.Combine(repositoryRoot, "Windows");
         Check(

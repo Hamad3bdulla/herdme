@@ -60,4 +60,14 @@
     </Content>
     <EmbeddedResource Include="..\..\HerdMe\Resources\runtime-catalog.json" LogicalName="HerdMe.runtime-catalog.json" />
   </ItemGroup>
+
+  <Target
+    Name="CopyProjectPriToPublishDirectory"
+    AfterTargets="Publish"
+    Condition="'$(PublishDir)' != '' and Exists('$(ProjectPriFullPath)')">
+    <Copy
+      SourceFiles="$(ProjectPriFullPath)"
+      DestinationFolder="$(PublishDir)"
+      SkipUnchangedFiles="true" />
+  </Target>
 </Project>
