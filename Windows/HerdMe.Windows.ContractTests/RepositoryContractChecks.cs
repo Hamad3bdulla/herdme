@@ -501,6 +501,18 @@ internal static partial class ContractChecks
             }
         }
 
+        var appDocument = XDocument.Load(Path.Combine(projectRoot, "App.xaml"));
+        var taskbarIcon = appDocument.Descendants()
+            .Single(element => element.Name.LocalName == "TaskbarIcon");
+        var generatedIconSource = taskbarIcon.Elements()
+            .SingleOrDefault(element => element.Name.LocalName == "TaskbarIcon.IconSource")?
+            .Elements()
+            .SingleOrDefault();
+        Check(
+            generatedIconSource?.Name.LocalName == "GeneratedIconSource",
+            "the Windows tray icon uses the H.NotifyIcon generated icon source API"
+        );
+
         var navigationContract = new[]
         {
             (Tag: "dashboard", NavigationId: "NavDashboard", Page: "DashboardPage.xaml", PageId: "DashboardPageRoot"),

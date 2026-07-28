@@ -37,9 +37,9 @@
                 ContextMenuMode="SecondWindow"
                 LeftClickCommand="{StaticResource OpenHerdMeCommand}"
                 NoLeftClickDelay="True">
-                <tb:TaskbarIcon.GeneratedIcon>
-                    <tb:GeneratedIcon Text="H" Foreground="#E31B23" />
-                </tb:TaskbarIcon.GeneratedIcon>
+                <tb:TaskbarIcon.IconSource>
+                    <tb:GeneratedIconSource Text="H" Foreground="#E31B23" />
+                </tb:TaskbarIcon.IconSource>
                 <tb:TaskbarIcon.ContextFlyout>
                     <MenuFlyout AreOpenCloseAnimationsEnabled="False">
                         <MenuFlyoutItem x:Uid="TrayOpenMenu" Command="{StaticResource OpenHerdMeCommand}" Text="Open HerdMe" />
