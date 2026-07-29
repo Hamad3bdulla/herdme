@@ -9,6 +9,8 @@ public sealed class ServicePackageInstaller
 {
     private static readonly HttpClient HttpClient = ManagedDownloadClient.Create();
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static readonly TimeSpan DownloadAttemptTimeout = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan DownloadIdleTimeout = TimeSpan.FromSeconds(30);
 
     public ServicePackageInstaller(string? supportRoot = null)
     {
@@ -558,21 +560,28 @@ public sealed class ServicePackageInstaller
             if (File.Exists(destination)) File.Delete(destination);
             try
             {
+                using var attemptCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken
+                );
+                attemptCancellation.CancelAfter(DownloadAttemptTimeout);
+                var attemptToken = attemptCancellation.Token;
                 using var response = await downloadClient.GetAsync(
                     release.DownloadUri,
                     HttpCompletionOption.ResponseHeadersRead,
-                    cancellationToken
+                    attemptToken
                 );
                 response.EnsureSuccessStatusCode();
-                await using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
+                await using var source = await response.Content.ReadAsStreamAsync(attemptToken);
                 await using var output = File.Create(destination);
                 using var hash = IncrementalHash.CreateHash(algorithm);
                 var buffer = new byte[128 * 1_024];
                 while (true)
                 {
-                    var count = await source.ReadAsync(buffer, cancellationToken);
+                    var count = await source.ReadAsync(buffer, attemptToken)
+                        .AsTask()
+                        .WaitAsync(DownloadIdleTimeout, attemptToken);
                     if (count == 0) break;
-                    await output.WriteAsync(buffer.AsMemory(0, count), cancellationToken);
+                    await output.WriteAsync(buffer.AsMemory(0, count), attemptToken);
                     hash.AppendData(buffer, 0, count);
                 }
                 var actual = Convert.ToHexString(hash.GetHashAndReset());
@@ -607,7 +616,7 @@ public sealed class ServicePackageInstaller
 
     private static bool IsRetryableDownloadFailure(Exception error)
     {
-        if (error is IOException) return true;
+        if (error is IOException or TimeoutException or OperationCanceledException) return true;
         if (error is not HttpRequestException requestError) return false;
         if (requestError.StatusCode is null) return true;
         var code = (int)requestError.StatusCode.Value;
