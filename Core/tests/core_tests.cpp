@@ -124,8 +124,8 @@ int main() {
     expect(long_label.size() <= 63, "normalized DNS labels must fit the 63-byte limit");
     expect(long_label == herdme::dns_label(long_name), "DNS normalization must be deterministic");
 
-    const std::vector<std::string> expected = {"ctype", "curl",    "dom",     "fileinfo", "filter", "hash", "mbstring",
-                                               "openssl", "pcre", "pdo",     "session",  "tokenizer", "xml", "zip"};
+    const std::vector<std::string> expected = {"ctype",   "curl", "dom", "fileinfo", "filter",    "hash", "mbstring",
+                                               "openssl", "pcre", "pdo", "session",  "tokenizer", "xml",  "zip"};
     expect(herdme::laravel_required_php_extensions() == expected,
            "Laravel and Composer require the exact 14-module runtime contract");
 
@@ -250,8 +250,7 @@ int main() {
 
     const auto system_runtime_bin = runtime_fixture / "System" / "bin";
     write_file(system_runtime_bin / "php.bat");
-    path_guard.set(private_config_bin.string() + ";" + private_local_bin.string() + ";" +
-                   system_runtime_bin.string());
+    path_guard.set(private_config_bin.string() + ";" + private_local_bin.string() + ";" + system_runtime_bin.string());
     const auto fallback_runtimes = herdme::inspect_runtimes();
     const auto *fallback_php = runtime_named(fallback_runtimes, "php");
     expect(fallback_php != nullptr && fallback_php->usable && fallback_php->source == "system" &&
