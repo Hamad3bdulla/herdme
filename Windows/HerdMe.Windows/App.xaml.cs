@@ -180,18 +180,14 @@ public partial class App : Application
 
     private async void StartCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)
     {
-        var settings = services.SiteSettings.Load();
-        settings.StartAutomatically = true;
-        services.SiteSettings.Save(settings);
+        services.SiteSettings.UpdateStartAutomatically(true);
         await StartConfiguredEnvironmentAsync();
         await services.Services.StartEnabledAsync();
     }
 
     private async void StopCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)
     {
-        var settings = services.SiteSettings.Load();
-        settings.StartAutomatically = false;
-        services.SiteSettings.Save(settings);
+        services.SiteSettings.UpdateStartAutomatically(false);
         await services.Environment.StopAsync();
         await services.Services.StopAllAsync();
     }

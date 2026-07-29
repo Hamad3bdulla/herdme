@@ -53,9 +53,8 @@ public sealed class InitialSetupManager
     )
     {
         var settings = settingsStore.Load();
-        settings.OnboardingCompleted = false;
+        settingsStore.UpdateOnboardingCompleted(false);
         foreach (var root in settings.Roots) Directory.CreateDirectory(root);
-        settingsStore.Save(settings);
 
         progress.Report(InitialSetupStage.LocalDomains);
         await hostsManager.EnsureMappingsAsync(
@@ -69,9 +68,7 @@ public sealed class InitialSetupManager
         await EnsureCommandLineToolsAsync(progress, cancellationToken);
 
         progress.Report(InitialSetupStage.Finishing);
-        settings = settingsStore.Load();
-        settings.OnboardingCompleted = true;
-        settingsStore.Save(settings);
+        settingsStore.UpdateOnboardingCompleted(true);
         progress.Report(InitialSetupStage.Completed);
     }
 

@@ -236,13 +236,7 @@ public sealed partial class GeneralPage : Page
 
     private void TldTextBox_LostFocus(object sender, RoutedEventArgs e)
     {
-        var settings = settingsStore.Load();
-        settingsStore.UpdateSites(
-            settings.Roots,
-            TldTextBox.Text,
-            startAutomatically: true,
-            showPreviews: settings.ShowPreviews
-        );
+        settingsStore.UpdateTld(TldTextBox.Text);
         TldTextBox.Text = settingsStore.Load().Tld;
     }
 
@@ -378,13 +372,11 @@ public sealed partial class GeneralPage : Page
     {
         try
         {
-            var settings = settingsStore.Load();
-            settings.AutomaticUpdates = AutomaticUpdatesToggle.IsOn;
-            settings.UpdateChannel = SelectedUpdateChannel();
-            settingsStore.Save(settings);
+            var updateChannel = SelectedUpdateChannel();
+            settingsStore.UpdateUpdatePreferences(AutomaticUpdatesToggle.IsOn, updateChannel);
             UpdateStatusText.Text = AppLocalization.Format(
                 "GeneralChannelStatus",
-                UpdateChannelDisplayName(settings.UpdateChannel)
+                UpdateChannelDisplayName(updateChannel)
             );
             return true;
         }

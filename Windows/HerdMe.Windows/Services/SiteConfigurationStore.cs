@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using HerdMe.Windows.Models;
 
@@ -8,6 +9,9 @@ public sealed class SiteConfigurationStore
     public const int CurrentSchemaVersion = 1;
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static readonly ConcurrentDictionary<string, object> SettingsLocks = new(
+        StringComparer.OrdinalIgnoreCase
+    );
 
     public SiteConfigurationStore(string? supportRoot = null)
     {
@@ -26,6 +30,11 @@ public sealed class SiteConfigurationStore
     public string? LastBackupPath { get; private set; }
 
     public WindowsSiteSettings Load()
+    {
+        lock (SettingsLock()) return LoadUnlocked();
+    }
+
+    private WindowsSiteSettings LoadUnlocked()
     {
         if (!File.Exists(SettingsPath)) return DefaultSettings();
         LastLoadWarning = null;
@@ -63,7 +72,7 @@ public sealed class SiteConfigurationStore
                 settings.OnboardingCompleted = true;
             }
             var normalized = Normalize(settings);
-            if (sourceSchemaVersion < CurrentSchemaVersion) Save(normalized);
+            if (sourceSchemaVersion < CurrentSchemaVersion) SaveUnlocked(normalized);
             return normalized;
         }
         catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException)
@@ -113,6 +122,11 @@ public sealed class SiteConfigurationStore
 
     public void Save(WindowsSiteSettings settings)
     {
+        lock (SettingsLock()) SaveUnlocked(settings);
+    }
+
+    private void SaveUnlocked(WindowsSiteSettings settings)
+    {
         if (settings.SchemaVersion is < 0 or > CurrentSchemaVersion)
         {
             throw new InvalidOperationException(
@@ -126,19 +140,74 @@ public sealed class SiteConfigurationStore
         File.Move(temporary, SettingsPath, true);
     }
 
-    public void UpdateSites(
-        IEnumerable<string> roots,
-        string tld,
-        bool? startAutomatically = null,
-        bool? showPreviews = null
-    )
+    public void UpdateRoots(IEnumerable<string> roots)
     {
-        var current = Load();
-        current.Roots = roots.ToList();
-        current.Tld = tld;
-        if (startAutomatically is not null) current.StartAutomatically = startAutomatically.Value;
-        if (showPreviews is not null) current.ShowPreviews = showPreviews.Value;
-        Save(current);
+        var rootsSnapshot = roots.ToList();
+        Update(current => current.Roots = rootsSnapshot);
+    }
+
+    public void UpdateShowPreviews(bool showPreviews)
+    {
+        Update(settings => settings.ShowPreviews = showPreviews);
+    }
+
+    public void UpdateTld(string tld)
+    {
+        Update(settings => settings.Tld = tld);
+    }
+
+    public void UpdateStartAutomatically(bool startAutomatically)
+    {
+        Update(settings => settings.StartAutomatically = startAutomatically);
+    }
+
+    public void UpdateUpdatePreferences(bool automaticUpdates, string updateChannel)
+    {
+        Update(settings =>
+        {
+            settings.AutomaticUpdates = automaticUpdates;
+            settings.UpdateChannel = updateChannel;
+        });
+    }
+
+    public void UpdateOnboardingCompleted(bool completed)
+    {
+        Update(settings => settings.OnboardingCompleted = completed);
+    }
+
+    public bool AddLinkedSite(string path)
+    {
+        var added = false;
+        Update(settings =>
+        {
+            if (settings.LinkedSites.Contains(path, StringComparer.OrdinalIgnoreCase)) return;
+            settings.LinkedSites.Add(path);
+            added = true;
+        });
+        return added;
+    }
+
+    public void RemoveLinkedSite(string path)
+    {
+        Update(settings => settings.LinkedSites.RemoveAll(candidate => candidate.Equals(
+            path,
+            StringComparison.OrdinalIgnoreCase
+        )));
+    }
+
+    private void Update(Action<WindowsSiteSettings> update)
+    {
+        lock (SettingsLock())
+        {
+            var current = LoadUnlocked();
+            update(current);
+            SaveUnlocked(current);
+        }
+    }
+
+    private object SettingsLock()
+    {
+        return SettingsLocks.GetOrAdd(Path.GetFullPath(SettingsPath), static _ => new object());
     }
 
     public static WindowsSiteSettings Normalize(

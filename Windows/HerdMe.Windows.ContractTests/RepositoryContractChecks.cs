@@ -315,6 +315,31 @@ internal static partial class ContractChecks
             () => WindowsStartupCommand.Create("C:\\Invalid\"Path\\HerdMe.Windows.exe"),
             "Windows launch-at-login rejects unsafe executable paths"
         );
+        if (OperatingSystem.IsWindows())
+        {
+            var contractExecutable = Environment.ProcessPath
+                ?? throw new InvalidOperationException("The contract executable path is unavailable.");
+            var shortcutRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"herdme-startup-contract-{Guid.NewGuid():N}"
+            );
+            var shortcutPath = Path.Combine(shortcutRoot, "HerdMe.lnk");
+            WindowsStartupShortcut.Create(shortcutPath, contractExecutable);
+            Check(
+                WindowsStartupShortcut.Matches(shortcutPath, contractExecutable),
+                "Windows launch-at-login creates a valid background startup shortcut"
+            );
+            WindowsStartupShortcut.Delete(shortcutPath);
+            Check(!File.Exists(shortcutPath), "Windows launch-at-login removes its startup shortcut");
+            Directory.Delete(shortcutRoot);
+        }
+        Check(
+            installerText.Contains(
+                "Type: files; Name: \"{userstartup}\\HerdMe.lnk\"",
+                StringComparison.Ordinal
+            ),
+            "the Windows uninstaller removes the launch-at-login shortcut"
+        );
         var icon = setup.GetValueOrDefault("SetupIconFile");
         Check(
             !string.IsNullOrWhiteSpace(icon)
@@ -1232,6 +1257,37 @@ internal static partial class ContractChecks
             sitesResourceKeys.Length > 0
                 && sitesResourceKeys.All(english.ContainsKey),
             "Windows Sites dynamic display strings use localized resources"
+        );
+        var siteScanStart = sitesPageSource.IndexOf(
+            "private async Task ScanAsync",
+            StringComparison.Ordinal
+        );
+        var siteScanEnd = siteScanStart < 0
+            ? -1
+            : sitesPageSource.IndexOf(
+                "private void StartGitInspection",
+                siteScanStart,
+                StringComparison.Ordinal
+            );
+        Check(
+            siteScanStart >= 0
+                && siteScanEnd > siteScanStart
+                && !sitesPageSource[siteScanStart..siteScanEnd].Contains(
+                    "SaveRoots(",
+                    StringComparison.Ordinal
+                ),
+            "automatic site scans never overwrite the persisted park roots"
+        );
+        Check(
+            sitesPageSource.Contains(
+                "private bool suppressPreviewToggle = true;",
+                StringComparison.Ordinal
+            )
+                && sitesPageSource.Contains(
+                    "settingsStore.UpdateShowPreviews(PreviewToggle.IsOn);",
+                    StringComparison.Ordinal
+                ),
+            "Windows Sites initialization and preview changes never overwrite park roots"
         );
         Check(
             sitesPageSource.Contains("DisplayOption", StringComparison.Ordinal)

@@ -197,13 +197,31 @@ internal static partial class ContractChecks
             independentSettings.LinkedSites.SequenceEqual([Path.GetFullPath(independentProjects)]),
             "stored linked projects exclude other Herd folders"
         );
-        store.UpdateSites([Path.Combine(supportRoot, "Other Sites")], "dev-test", showPreviews: true);
+        store.UpdateRoots([Path.Combine(supportRoot, "Other Sites")]);
+        store.UpdateTld("dev-test");
+        store.UpdateShowPreviews(true);
         var siteUpdatedSettings = store.Load();
         Check(!siteUpdatedSettings.AutomaticUpdates, "site edits preserve automatic update preferences");
         Check(siteUpdatedSettings.UpdateChannel == "Beta", "site edits preserve the update channel");
         Check(siteUpdatedSettings.StartAutomatically, "site edits preserve automatic environment startup");
         Check(siteUpdatedSettings.ShowPreviews, "site edits apply preview preferences");
         Check(siteUpdatedSettings.Tld == "dev-test", "site edits apply the local TLD");
+
+        var parkedRoot = Path.Combine(supportRoot, "Parked Sites");
+        store.UpdateRoots([siteUpdatedSettings.Roots[0], parkedRoot]);
+        store.UpdateUpdatePreferences(automaticUpdates: true, updateChannel: "Stable");
+        store.UpdateTld("persist-test");
+        var reopenedStore = new SiteConfigurationStore(supportRoot);
+        var reopenedSettings = reopenedStore.Load();
+        Check(
+            reopenedSettings.Roots.Contains(
+                Path.GetFullPath(parkedRoot),
+                StringComparer.OrdinalIgnoreCase
+            ),
+            "parked roots survive unrelated settings changes and page recreation"
+        );
+        Check(reopenedSettings.Tld == "persist-test", "focused TLD updates are persisted");
+        Check(reopenedSettings.AutomaticUpdates, "focused update preferences are persisted");
 
         var site = new SiteRecord
         {

@@ -62,8 +62,8 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         var settings = store.Load();
         if (!settings.StartAutomatically)
         {
+            store.UpdateStartAutomatically(true);
             settings.StartAutomatically = true;
-            store.Save(settings);
         }
         var sites = await coreClient.ScanAsync(
             settings.Roots,

@@ -34,7 +34,7 @@ public sealed partial class SitesPage : Page
     private readonly WindowsServiceManager serviceManager;
     private readonly SiteScanGeneration siteScanGeneration = new();
     private bool loaded;
-    private bool suppressPreviewToggle;
+    private bool suppressPreviewToggle = true;
     private SiteRecord? selectedSite;
     private CancellationTokenSource? artisanCancellation;
     private CancellationTokenSource? npmCancellation;
@@ -151,12 +151,7 @@ public sealed partial class SitesPage : Page
             );
             return;
         }
-        var settings = settingsStore.Load();
-        if (!settings.LinkedSites.Contains(folder.Path, StringComparer.OrdinalIgnoreCase))
-        {
-            settings.LinkedSites.Add(folder.Path);
-            settingsStore.Save(settings);
-        }
+        settingsStore.AddLinkedSite(folder.Path);
         await ScanAsync();
     }
 
@@ -168,9 +163,7 @@ public sealed partial class SitesPage : Page
 
     private async Task UnlinkSiteAsync(SiteRecord site)
     {
-        var settings = settingsStore.Load();
-        settings.LinkedSites.RemoveAll(path => path.Equals(site.Path, StringComparison.OrdinalIgnoreCase));
-        settingsStore.Save(settings);
+        settingsStore.RemoveLinkedSite(site.Path);
         await ScanAsync();
     }
 
@@ -531,7 +524,7 @@ public sealed partial class SitesPage : Page
         if (!Roots.Contains(normalized, StringComparer.OrdinalIgnoreCase))
         {
             Roots.Add(normalized);
-            SaveSettings();
+            SaveRoots();
             await ScanAsync();
         }
     }
@@ -610,7 +603,7 @@ public sealed partial class SitesPage : Page
         if (RootList.SelectedItem is string path)
         {
             Roots.Remove(path);
-            SaveSettings();
+            SaveRoots();
             if (Roots.Count == 0)
             {
                 var fallback = settingsStore.Load().Roots[0];
@@ -647,7 +640,6 @@ public sealed partial class SitesPage : Page
         ShowSite(null);
         try
         {
-            SaveSettings();
             var normalizedSettings = settingsStore.Load();
             var scanned = await coreClient.ScanAsync(
                 Roots,
@@ -1116,7 +1108,7 @@ public sealed partial class SitesPage : Page
     {
         if (!suppressPreviewToggle)
         {
-            SaveSettings(showPreviews: PreviewToggle.IsOn);
+            settingsStore.UpdateShowPreviews(PreviewToggle.IsOn);
         }
         _ = RefreshPreviewAsync();
     }
@@ -1809,15 +1801,9 @@ public sealed partial class SitesPage : Page
         outputBox.Select(outputBox.Text.Length, 0);
     }
 
-    private void SaveSettings(bool? showPreviews = null)
+    private void SaveRoots()
     {
-        var settings = settingsStore.Load();
-        settingsStore.UpdateSites(
-            Roots,
-            settings.Tld,
-            startAutomatically: true,
-            showPreviews
-        );
+        settingsStore.UpdateRoots(Roots);
     }
 
     private async Task ShowErrorAsync(string message)
