@@ -38,7 +38,8 @@ struct PHPRuntimeValidator: Sendable {
         "pdo",
         "session",
         "tokenizer",
-        "xml"
+        "xml",
+        "zip"
     ]
 
     private let coreClient: PortableCoreClient
