@@ -19,7 +19,10 @@ $runtimeIdentifier = "win-x64"
 $nativeBuildLog = Join-Path $repoRoot "build\windows-native-build.log"
 $nativeBuildBinaryLog = Join-Path $repoRoot "build\windows-native-build.binlog"
 $nativeBuildLogDirectory = Split-Path -Parent $nativeBuildLog
+$vcRuntimeDirectory = Join-Path $repoRoot "build\windows-vc143-runtime"
 . (Join-Path $PSScriptRoot "windows-build-tools.ps1")
+
+Copy-HerdMeVCRuntime -DestinationDirectory $vcRuntimeDirectory
 
 cmake -S (Join-Path $repoRoot "Core") -B $coreBuild -A $Architecture -DBUILD_TESTING=ON
 if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed." }
@@ -80,7 +83,7 @@ if (-not $SkipTests) {
     $xamlProjectRoot = Join-Path $PSScriptRoot "HerdMe.Windows"
     $xamlFiles = @(Get-ChildItem $xamlProjectRoot -Recurse -Filter "*.xaml" -File |
         Where-Object {
-            $relativePath = [IO.Path]::GetRelativePath($xamlProjectRoot, $_.FullName)
+            $relativePath = $_.FullName.Substring($xamlProjectRoot.Length)
             $pathSegments = @($relativePath -split "[\/\\]")
             @($pathSegments | Where-Object { $_ -in @("bin", "obj") }).Count -eq 0
         })
@@ -175,6 +178,17 @@ $buildOutput = $builtExecutable.DirectoryName
 foreach ($relativePath in @(
     "HerdMe.Windows.exe",
     "HerdMe.Windows.pri",
+    "Assets\HerdMe.ico",
+    "Prerequisites\VC143\concrt140.dll",
+    "Prerequisites\VC143\msvcp140.dll",
+    "Prerequisites\VC143\msvcp140_1.dll",
+    "Prerequisites\VC143\msvcp140_2.dll",
+    "Prerequisites\VC143\msvcp140_atomic_wait.dll",
+    "Prerequisites\VC143\msvcp140_codecvt_ids.dll",
+    "Prerequisites\VC143\vccorlib140.dll",
+    "Prerequisites\VC143\vcruntime140.dll",
+    "Prerequisites\VC143\vcruntime140_1.dll",
+    "Prerequisites\VC143\vcruntime140_threads.dll",
     "Runtime\herdme-core.exe",
     "Microsoft.Windows.ApplicationModel.Resources.dll",
     "Microsoft.WindowsAppRuntime.dll",

@@ -139,8 +139,13 @@ public sealed class CoreClient
             var error = await errorTask;
             if (process.ExitCode != 0)
             {
+                var summary = $"{Path.GetFileName(executable)} failed with exit code "
+                    + $"{process.ExitCode} (0x{unchecked((uint)process.ExitCode):X8}).";
+                var detail = string.IsNullOrWhiteSpace(error) ? output.Trim() : error.Trim();
                 throw new InvalidOperationException(
-                    string.IsNullOrWhiteSpace(error) ? "HerdMe Core failed." : error.Trim()
+                    string.IsNullOrWhiteSpace(detail)
+                        ? summary
+                        : summary + Environment.NewLine + detail
                 );
             }
             return output;

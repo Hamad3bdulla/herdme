@@ -11,6 +11,8 @@ public sealed class AppServices
         RuntimePolicy = new PhpRuntimePolicy(Core);
         PhpInstaller = new PhpRuntimeInstaller(Core);
         NodeInstaller = new NodeRuntimeInstaller();
+        GitInstaller = new GitRuntimeInstaller();
+        UserPath = new WindowsUserPathManager();
         ComposerTools = new ComposerToolManager(
             coreClient: Core,
             phpInstaller: PhpInstaller,
@@ -21,7 +23,9 @@ public sealed class AppServices
             ComposerTools,
             PhpInstaller,
             RuntimePolicy,
-            NodeInstaller
+            NodeInstaller,
+            GitInstaller,
+            UserPath
         );
         Environment = new WindowsLocalEnvironment(
             Core,
@@ -45,7 +49,9 @@ public sealed class AppServices
             PhpInstaller,
             RuntimePolicy,
             ComposerTools,
-            NodeInstaller
+            NodeInstaller,
+            GitInstaller,
+            UserPath
         );
     }
 
@@ -62,6 +68,10 @@ public sealed class AppServices
     public PhpRuntimeInstaller PhpInstaller { get; }
 
     public NodeRuntimeInstaller NodeInstaller { get; }
+
+    public GitRuntimeInstaller GitInstaller { get; }
+
+    public WindowsUserPathManager UserPath { get; }
 
     public ComposerToolManager ComposerTools { get; }
 

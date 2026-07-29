@@ -118,8 +118,13 @@ std::vector<std::filesystem::path> split_path() {
     return values;
 }
 
+bool belongs_to_private_application_lexically(const std::filesystem::path &path);
+
 std::optional<std::filesystem::path> find_executable(const std::string &name) {
     for (const auto &directory : split_path()) {
+        // PATH may include another application's private bin directory. Reject
+        // that directory before probing any executable within it.
+        if (belongs_to_private_application_lexically(directory)) continue;
 #ifdef _WIN32
         const std::vector<std::string> candidates = {name + ".exe", name + ".cmd", name + ".bat", name};
 #else
@@ -159,14 +164,17 @@ bool is_same_or_child_path(const std::filesystem::path &candidate, const std::fi
     return candidate_text.rfind(root_text, 0) == 0;
 }
 
-bool belongs_to_other_herd(const std::filesystem::path &path) {
+std::vector<std::filesystem::path> private_application_roots() {
     std::vector<std::filesystem::path> roots;
 #ifdef _WIN32
     if (const auto user_profile = environment_value("USERPROFILE")) {
         roots.emplace_back(std::filesystem::path(*user_profile) / "Herd");
+        roots.emplace_back(std::filesystem::path(*user_profile) / ".config");
     }
     if (const auto local_app_data = environment_value("LOCALAPPDATA")) {
         roots.emplace_back(std::filesystem::path(*local_app_data) / "Herd");
+        roots.emplace_back(std::filesystem::path(*local_app_data) / "app.laraboxs.local");
+        roots.emplace_back(std::filesystem::path(*local_app_data) / "DevHerd Local");
     }
     if (const auto app_data = environment_value("APPDATA")) {
         roots.emplace_back(std::filesystem::path(*app_data) / "Herd");
@@ -175,9 +183,36 @@ bool belongs_to_other_herd(const std::filesystem::path &path) {
     if (const auto home = environment_value("HOME")) {
         const auto home_path = std::filesystem::path(*home);
         roots.emplace_back(home_path / "Herd");
+        roots.emplace_back(home_path / ".config" / "herd");
         roots.emplace_back(home_path / "Library" / "Application Support" / "Herd");
     }
 #endif
+    return roots;
+}
+
+bool is_same_or_child_path_lexically(const std::filesystem::path &candidate, const std::filesystem::path &root) {
+    std::error_code error;
+    auto candidate_text = path_string(std::filesystem::absolute(candidate, error).lexically_normal());
+    if (error) return false;
+    auto root_text = path_string(std::filesystem::absolute(root, error).lexically_normal());
+    if (error) return false;
+#ifdef _WIN32
+    std::transform(candidate_text.begin(), candidate_text.end(), candidate_text.begin(), ascii_lower);
+    std::transform(root_text.begin(), root_text.end(), root_text.begin(), ascii_lower);
+#endif
+    if (candidate_text == root_text) return true;
+    if (root_text.empty() || root_text.back() != '/') root_text += '/';
+    return candidate_text.rfind(root_text, 0) == 0;
+}
+
+bool belongs_to_private_application_lexically(const std::filesystem::path &path) {
+    const auto roots = private_application_roots();
+    return std::any_of(roots.begin(), roots.end(),
+                       [&](const auto &root) { return is_same_or_child_path_lexically(path, root); });
+}
+
+bool belongs_to_private_application(const std::filesystem::path &path) {
+    const auto roots = private_application_roots();
     return std::any_of(roots.begin(), roots.end(), [&](const auto &root) { return is_same_or_child_path(path, root); });
 }
 
@@ -211,11 +246,8 @@ RuntimeCheck inspect_runtime(const std::string &name) {
     if (normalized.rfind(managed_root + "/", 0) == 0) {
         return {name, executable, "managed", true};
     }
-    const bool belongs_to_herd = normalized.find("/application support/herd/") != std::string::npos ||
-                                 normalized.find("/appdata/local/herd/") != std::string::npos ||
-                                 normalized.find("/appdata/roaming/herd/") != std::string::npos;
-    if (belongs_to_herd) {
-        return {name, executable, "other-application", false};
+    if (belongs_to_private_application(*executable)) {
+        return {name, std::nullopt, "other-application", false};
     }
     return {name, executable, "system", true};
 }
@@ -285,7 +317,7 @@ std::vector<Site> scan_sites(const std::vector<std::filesystem::path> &roots,
         if (!std::filesystem::is_directory(path, error)) return;
         const auto resolved = std::filesystem::weakly_canonical(path, error);
         if (error) return;
-        if (belongs_to_other_herd(resolved)) return;
+        if (belongs_to_private_application(resolved)) return;
         const auto key = path_string(resolved);
         if (!seen.insert(key).second) return;
         const auto name = resolved.filename().string();
@@ -298,7 +330,7 @@ std::vector<Site> scan_sites(const std::vector<std::filesystem::path> &roots,
 
     for (const auto &root : roots) {
         std::error_code error;
-        if (belongs_to_other_herd(root)) continue;
+        if (belongs_to_private_application(root)) continue;
         if (!std::filesystem::is_directory(root, error)) continue;
         for (const auto &entry : std::filesystem::directory_iterator(root, error)) {
             if (error) break;
@@ -328,7 +360,7 @@ std::vector<RuntimeCheck> inspect_runtimes() {
 const std::vector<std::string> &laravel_required_php_extensions() {
     static const std::vector<std::string> extensions = {"ctype",   "curl",      "dom",     "fileinfo", "filter",
                                                         "hash",    "mbstring",  "openssl", "pcre",     "pdo",
-                                                        "session", "tokenizer", "xml"};
+                                                        "session", "tokenizer", "xml",     "zip"};
     return extensions;
 }
 

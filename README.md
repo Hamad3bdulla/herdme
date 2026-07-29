@@ -42,7 +42,7 @@ C++20 core for shared contracts.
 - Safely remove projects created by HerdMe while protecting linked projects and
   projects outside the managed sites directory from accidental deletion.
 
-### PHP, Composer, and Node
+### PHP, Composer, Git, and Node
 
 - Manage supported PHP versions from `8.0` through `8.5` inside HerdMe-owned
   storage.
@@ -50,6 +50,8 @@ C++20 core for shared contracts.
   `ctype`, `curl`, `dom`, `fileinfo`, `filter`, `hash`, `mbstring`, `openssl`,
   `pcre`, `pdo`, `session`, `tokenizer`, and `xml`.
 - Install and update Composer and Laravel Installer from the application.
+- On Windows, install verified MinGit and expose the managed PHP, Composer,
+  Laravel Installer, Node.js, npm, and Git commands to new terminal sessions.
 - Manage Node.js versions `20`, `22`, `24`, and `26`.
 - Install and manage Xdebug inside HerdMe-owned storage without modifying
   another package manager's configuration.

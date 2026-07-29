@@ -261,7 +261,8 @@ public sealed class SiteConfigurationStore
         return new WindowsSiteSettings
         {
             SchemaVersion = CurrentSchemaVersion,
-            Roots = [DefaultRoot()]
+            Roots = [DefaultRoot()],
+            StartAutomatically = true
         };
     }
 

@@ -9,18 +9,24 @@ public sealed partial class LaravelProjectCreator
     private readonly PhpRuntimeInstaller phpInstaller;
     private readonly PhpRuntimePolicy phpPolicy;
     private readonly NodeRuntimeInstaller nodeInstaller;
+    private readonly GitRuntimeInstaller gitInstaller;
+    private readonly WindowsUserPathManager userPathManager;
 
     public LaravelProjectCreator(
         ComposerToolManager? tools = null,
         PhpRuntimeInstaller? phpInstaller = null,
         PhpRuntimePolicy? phpPolicy = null,
-        NodeRuntimeInstaller? nodeInstaller = null
+        NodeRuntimeInstaller? nodeInstaller = null,
+        GitRuntimeInstaller? gitInstaller = null,
+        WindowsUserPathManager? userPathManager = null
     )
     {
         this.tools = tools ?? new ComposerToolManager();
         this.phpInstaller = phpInstaller ?? new PhpRuntimeInstaller();
         this.phpPolicy = phpPolicy ?? new PhpRuntimePolicy();
         this.nodeInstaller = nodeInstaller ?? new NodeRuntimeInstaller(this.tools.SupportRoot);
+        this.gitInstaller = gitInstaller ?? new GitRuntimeInstaller(this.tools.SupportRoot);
+        this.userPathManager = userPathManager ?? new WindowsUserPathManager(this.tools.SupportRoot);
     }
 
     public async Task<string> CreateAsync(
@@ -126,8 +132,10 @@ public sealed partial class LaravelProjectCreator
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 progress?.Report(LaravelProjectCreationStage.InitializingGitRepository);
+                var git = await gitInstaller.EnsureInstalledAsync(cancellationToken);
+                userPathManager.Synchronize(tools.CommandLineDirectories(settings.PhpCycle));
                 await ComposerToolManager.RunAsync(
-                    "git.exe",
+                    git,
                     ["init"],
                     stagedDestination,
                     tools.ManagedEnvironment(settings.PhpCycle),

@@ -55,6 +55,16 @@ function Get-HerdMeStartupValue {
     return [string]$properties.$startupValueName
 }
 
+$preExistingProcesses = @(Get-Process -Name "HerdMe.Windows" -ErrorAction SilentlyContinue)
+if ($preExistingProcesses.Count -gt 0) {
+    $preExistingProcesses | Stop-Process -Force
+    foreach ($process in $preExistingProcesses) {
+        if (-not $process.WaitForExit(5000)) {
+            throw "HerdMe process $($process.Id) did not exit before the Windows build."
+        }
+    }
+}
+
 & (Join-Path $PSScriptRoot "package-portable.ps1") `
     -Architecture x64 `
     -Configuration $Configuration
@@ -133,7 +143,20 @@ if ($null -ne (Get-HerdMeStartupValue)) {
 }
 $installedExecutable = Join-Path $installerTestDirectory "HerdMe.Windows.exe"
 $installedCore = Join-Path $installerTestDirectory "Runtime\herdme-core.exe"
-foreach ($installedFile in @($installedExecutable, $installedCore)) {
+$installedTrayIcon = Join-Path $installerTestDirectory "Assets\HerdMe.ico"
+$installedVcRuntimeFiles = @(
+    "concrt140.dll",
+    "msvcp140.dll",
+    "msvcp140_1.dll",
+    "msvcp140_2.dll",
+    "msvcp140_atomic_wait.dll",
+    "msvcp140_codecvt_ids.dll",
+    "vccorlib140.dll",
+    "vcruntime140.dll",
+    "vcruntime140_1.dll",
+    "vcruntime140_threads.dll"
+) | ForEach-Object { Join-Path $installerTestDirectory "Prerequisites\VC143\$_" }
+foreach ($installedFile in @($installedExecutable, $installedCore, $installedTrayIcon) + $installedVcRuntimeFiles) {
     if (-not (Test-Path -LiteralPath $installedFile -PathType Leaf)) {
         throw "The Windows installer did not install $installedFile."
     }
@@ -232,6 +255,67 @@ function Select-AutomationElement(
     }
 
     throw "The WinUI navigation element '$AutomationId' is not selectable."
+}
+
+function Assert-FixedMainWindow(
+    [System.Diagnostics.Process]$Process
+) {
+    $window = [System.Windows.Automation.AutomationElement]::FromHandle(
+        [IntPtr]$Process.MainWindowHandle
+    )
+    if ($null -eq $window) {
+        throw "The native HerdMe window is unavailable to UI Automation."
+    }
+
+    $windowPatternObject = $null
+    if (-not $window.TryGetCurrentPattern(
+        [System.Windows.Automation.WindowPattern]::Pattern,
+        [ref]$windowPatternObject
+    )) {
+        throw "The native HerdMe window does not expose its window controls."
+    }
+    $transformPatternObject = $null
+    if (-not $window.TryGetCurrentPattern(
+        [System.Windows.Automation.TransformPattern]::Pattern,
+        [ref]$transformPatternObject
+    )) {
+        throw "The native HerdMe window does not expose its resize state."
+    }
+
+    $windowPattern = [System.Windows.Automation.WindowPattern]$windowPatternObject
+    $transformPattern = [System.Windows.Automation.TransformPattern]$transformPatternObject
+    if (
+        $windowPattern.Current.CanMaximize -or
+        $windowPattern.Current.CanMinimize -or
+        $transformPattern.Current.CanResize
+    ) {
+        throw "The native HerdMe window can still be minimized, maximized, or resized."
+    }
+}
+
+function Assert-OnboardingLayout(
+    [System.Diagnostics.Process]$Process
+) {
+    $window = [System.Windows.Automation.AutomationElement]::FromHandle(
+        [IntPtr]$Process.MainWindowHandle
+    )
+    if ($null -eq $window) {
+        throw "The onboarding window is unavailable to UI Automation."
+    }
+    $startButton = Wait-AutomationElementById $window "OnboardingStartButton"
+    $windowBounds = $window.Current.BoundingRectangle
+    $buttonBounds = $startButton.Current.BoundingRectangle
+    if (
+        $startButton.Current.IsOffscreen -or
+        $buttonBounds.Width -le 0 -or
+        $buttonBounds.Height -le 0 -or
+        $buttonBounds.Left -lt $windowBounds.Left -or
+        $buttonBounds.Right -gt $windowBounds.Right -or
+        $buttonBounds.Top -lt $windowBounds.Top -or
+        $buttonBounds.Bottom -gt $windowBounds.Bottom
+    ) {
+        throw "The onboarding start button is clipped or outside the fixed window."
+    }
 }
 
 function Assert-WinUiNavigation(
@@ -433,6 +517,29 @@ function Assert-DumpCapture {
     }
 }
 
+$onboarding = Start-Process `
+    -FilePath $executable `
+    -ArgumentList "--acceptance-onboarding" `
+    -PassThru
+try {
+    $deadline = [DateTime]::UtcNow.AddSeconds(20)
+    while ($onboarding.MainWindowHandle -eq 0 -and [DateTime]::UtcNow -lt $deadline) {
+        Start-Sleep -Milliseconds 250
+        $onboarding.Refresh()
+    }
+    if ($onboarding.MainWindowHandle -eq 0) {
+        throw "The onboarding acceptance window did not become available."
+    }
+    Assert-FixedMainWindow $onboarding
+    Assert-OnboardingLayout $onboarding
+}
+finally {
+    if (-not $onboarding.HasExited) {
+        Stop-Process -Id $onboarding.Id -Force
+        $onboarding.WaitForExit(5000)
+    }
+}
+
 $startedBySuite = $false
 $processes = @(Get-HerdMeProcesses)
 if ($processes.Count -eq 0) {
@@ -459,6 +566,7 @@ try {
     if ($primary.MainWindowHandle -eq 0) {
         throw "The native HerdMe window did not become available."
     }
+    Assert-FixedMainWindow $primary
 
     Start-Process -FilePath $executable | Out-Null
     Start-Sleep -Seconds 2

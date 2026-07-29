@@ -107,13 +107,6 @@
                                 <TextBlock Grid.Column="2" Text="{x:Bind Version}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                 <TextBlock Grid.Column="3" Text="{x:Bind Status}" VerticalAlignment="Center" />
                                 <StackPanel Grid.Column="4" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="6">
-                                    <ToggleSwitch
-                                        x:Uid="ServicesAutomaticStart"
-                                        Tag="{x:Bind Id}"
-                                        IsOn="{x:Bind StartAutomatically, Mode=OneWay}"
-                                        Toggled="AutomaticStart_Toggled"
-                                        OnContent="Auto"
-                                        OffContent="Auto" />
                                     <Button
                                         Tag="{x:Bind Id}"
                                         Click="Install_Click"
@@ -129,52 +122,64 @@
                                     <Button Tag="{x:Bind Id}" Click="Toggle_Click" IsEnabled="{x:Bind CanToggle}">
                                         <TextBlock Text="{x:Bind ToggleLabel}" />
                                     </Button>
-                                    <Button Tag="{x:Bind Id}" Click="OpenData_Click">
+                                    <Button>
                                         <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="ServicesOpenDataTooltip" Text="Open data directory" /></ToolTip>
+                                            <ToolTip><TextBlock x:Uid="ServicesMoreTooltip" Text="More service actions" /></ToolTip>
                                         </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="Folder" />
-                                    </Button>
-                                    <Button
-                                        Tag="{x:Bind Id}"
-                                        Click="AddToEnvironment_Click">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="ServicesEnvironmentTooltip" Text="Add service connection to a site .env" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <TextBlock Text=".env" />
-                                    </Button>
-                                    <Button
-                                        Tag="{x:Bind Id}"
-                                        Click="OpenConsole_Click"
-                                        Visibility="{x:Bind CanOpenConsole}">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="ServicesConsoleTooltip" Text="Open service console" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <TextBlock x:Uid="ServicesConsoleButton" Text="Console" />
-                                    </Button>
-                                    <Button
-                                        Tag="{x:Bind Id}"
-                                        Click="CopyConnection_Click"
-                                        Visibility="{x:Bind CanOpenInTablePlus}">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="ServicesCopyConnectionTooltip" Text="Copy database connection URL" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="Copy" />
-                                    </Button>
-                                    <Button
-                                        Tag="{x:Bind Id}"
-                                        Click="OpenTablePlus_Click"
-                                        Visibility="{x:Bind CanOpenInTablePlus}">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="ServicesTablePlusTooltip" Text="Open database in TablePlus" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <TextBlock x:Uid="ServicesTablePlusButton" Text="TablePlus" />
-                                    </Button>
-                                    <Button Tag="{x:Bind Id}" Click="Delete_Click">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="ServicesDeleteTooltip" Text="Delete service instance" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="Delete" />
+                                        <SymbolIcon Symbol="More" />
+                                        <Button.Flyout>
+                                            <MenuFlyout>
+                                                <ToggleMenuFlyoutItem
+                                                    x:Uid="ServicesAutomaticStartMenu"
+                                                    Text="Start automatically"
+                                                    Tag="{x:Bind Id}"
+                                                    IsChecked="{x:Bind StartAutomatically, Mode=OneTime}"
+                                                    Click="AutomaticStart_Toggled" />
+                                                <MenuFlyoutSeparator />
+                                                <MenuFlyoutItem
+                                                    x:Uid="ServicesOpenDataTooltip"
+                                                    Text="Open data directory"
+                                                    Tag="{x:Bind Id}"
+                                                    Click="OpenData_Click">
+                                                    <MenuFlyoutItem.Icon><SymbolIcon Symbol="Folder" /></MenuFlyoutItem.Icon>
+                                                </MenuFlyoutItem>
+                                                <MenuFlyoutItem
+                                                    x:Uid="ServicesEnvironmentTooltip"
+                                                    Text="Add service connection to a site .env"
+                                                    Tag="{x:Bind Id}"
+                                                    Click="AddToEnvironment_Click">
+                                                    <MenuFlyoutItem.Icon><SymbolIcon Symbol="Edit" /></MenuFlyoutItem.Icon>
+                                                </MenuFlyoutItem>
+                                                <MenuFlyoutItem
+                                                    x:Uid="ServicesConsoleTooltip"
+                                                    Text="Open service console"
+                                                    Tag="{x:Bind Id}"
+                                                    Click="OpenConsole_Click"
+                                                    Visibility="{x:Bind CanOpenConsole}" />
+                                                <MenuFlyoutItem
+                                                    x:Uid="ServicesCopyConnectionTooltip"
+                                                    Text="Copy database connection URL"
+                                                    Tag="{x:Bind Id}"
+                                                    Click="CopyConnection_Click"
+                                                    Visibility="{x:Bind CanOpenInTablePlus}">
+                                                    <MenuFlyoutItem.Icon><SymbolIcon Symbol="Copy" /></MenuFlyoutItem.Icon>
+                                                </MenuFlyoutItem>
+                                                <MenuFlyoutItem
+                                                    x:Uid="ServicesTablePlusTooltip"
+                                                    Text="Open database in TablePlus"
+                                                    Tag="{x:Bind Id}"
+                                                    Click="OpenTablePlus_Click"
+                                                    Visibility="{x:Bind CanOpenInTablePlus}" />
+                                                <MenuFlyoutSeparator />
+                                                <MenuFlyoutItem
+                                                    x:Uid="ServicesDeleteTooltip"
+                                                    Text="Delete service instance"
+                                                    Tag="{x:Bind Id}"
+                                                    Click="Delete_Click">
+                                                    <MenuFlyoutItem.Icon><SymbolIcon Symbol="Delete" /></MenuFlyoutItem.Icon>
+                                                </MenuFlyoutItem>
+                                            </MenuFlyout>
+                                        </Button.Flyout>
                                     </Button>
                                 </StackPanel>
                             </Grid>

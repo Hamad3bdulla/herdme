@@ -60,7 +60,11 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
     )
     {
         var settings = store.Load();
-        if (!settings.StartAutomatically) return;
+        if (!settings.StartAutomatically)
+        {
+            settings.StartAutomatically = true;
+            store.Save(settings);
+        }
         var sites = await coreClient.ScanAsync(
             settings.Roots,
             settings.Tld,
@@ -116,27 +120,27 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        if (Volatile.Read(ref recoveryEnabled) == 0) return;
         var siteList = sites.ToArray();
         await operationLock.WaitAsync(cancellationToken);
         try
         {
-            if (Volatile.Read(ref recoveryEnabled) == 0) return;
             if (siteList.Length == 0)
             {
+                Volatile.Write(ref recoveryEnabled, 0);
                 configuredSites = [];
                 await StopCoreAsync();
                 return;
             }
+            configuredSites = siteList;
+            Volatile.Write(ref recoveryEnabled, 1);
+            EnsureHealthMonitorStarted();
             var settings = runtimePolicy.Load();
             var configurationKey = ConfigurationKey(siteList, settings.PhpCycle);
             if (IsRunning && activeConfigurationKey == configurationKey)
             {
-                configuredSites = siteList;
                 return;
             }
             var launches = await PreparePhpLaunchesAsync(siteList, settings, cancellationToken);
-            configuredSites = siteList;
             await StopCoreAsync();
             await StartCoreAsync(siteList, settings, launches, cancellationToken);
         }
@@ -218,6 +222,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
             var httpPort = await httpServer.StartAsync(
                 definitions,
                 phpFastCgiPort: ports.Values.First(),
+                fallbackPort: null,
                 cancellationToken: cancellationToken
             );
             var certificate = certificateManager.PrepareServerCertificate(
@@ -227,7 +232,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
                 definitions,
                 phpFastCgiPort: ports.Values.First(),
                 preferredPort: 443,
-                fallbackPort: 8_443,
+                fallbackPort: null,
                 serverCertificate: certificate,
                 cancellationToken: cancellationToken
             );
@@ -262,6 +267,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         var launches = new Dictionary<string, PreparedPhpLaunch>(StringComparer.Ordinal);
         foreach (var cycle in cycles)
         {
+            runtimeInstaller.EnsureManagedConfiguration(cycle);
             var php = runtimeInstaller.PhpExecutable(cycle);
             var contract = await runtimePolicy.PrepareLaunchAsync(php, cycle, cancellationToken);
             launches[cycle] = new PreparedPhpLaunch(

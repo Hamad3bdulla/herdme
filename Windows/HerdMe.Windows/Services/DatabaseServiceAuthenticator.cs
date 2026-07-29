@@ -94,25 +94,34 @@ public static class DatabaseServiceAuthenticator
                 $"The {instance.Name} runtime is missing its command-line client."
             );
 
-        var available = false;
-        for (var attempt = 0; attempt < 30 && !available; attempt++)
+        var managedLoginWorks = false;
+        var rootPasswordLoginWorks = false;
+        var rootPasswordlessLoginWorks = false;
+        for (var attempt = 0; attempt < 100; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            available = await MySqlLoginAsync(
+            managedLoginWorks = await MySqlLoginAsync(
                 client, instance, credentials.Username, credentials.Secret, cancellationToken
-            ) || await MySqlLoginAsync(client, instance, "root", null, cancellationToken);
-            if (!available) await Task.Delay(100, cancellationToken);
+            );
+            rootPasswordLoginWorks = await MySqlLoginAsync(
+                client, instance, "root", credentials.Secret, cancellationToken
+            );
+            rootPasswordlessLoginWorks = await MySqlLoginAsync(
+                client, instance, "root", null, cancellationToken
+            );
+            if (managedLoginWorks || rootPasswordLoginWorks || rootPasswordlessLoginWorks) break;
+            await Task.Delay(100, cancellationToken);
         }
-        if (!available)
+        if (!managedLoginWorks && !rootPasswordLoginWorks && !rootPasswordlessLoginWorks)
         {
             throw new InvalidOperationException(
                 $"HerdMe could not reach {instance.Name}'s SQL authentication endpoint. The data was preserved."
             );
         }
 
-        if (await MySqlLoginAsync(client, instance, credentials.Username, credentials.Secret, cancellationToken)
+        if (managedLoginWorks
             && !await MySqlLoginAsync(client, instance, credentials.Username, null, cancellationToken)
-            && !await MySqlLoginAsync(client, instance, "root", null, cancellationToken))
+            && !rootPasswordlessLoginWorks)
         {
             await WriteMarkerAsync(markerPath, cancellationToken);
             return;
@@ -124,13 +133,18 @@ public static class DatabaseServiceAuthenticator
             );
         }
 
+        var bootstrapUser = managedLoginWorks ? credentials.Username : "root";
+        var bootstrapPassword = managedLoginWorks || rootPasswordLoginWorks
+            ? credentials.Secret
+            : null;
         var bootstrap = await RunAsync(
             client,
             [
-                "--no-defaults", "--protocol=TCP", "--host=127.0.0.1", $"--port={instance.Port}", "--user=root",
+                "--no-defaults", "--protocol=TCP", "--host=127.0.0.1", $"--port={instance.Port}",
+                $"--user={bootstrapUser}",
                 "--connect-timeout=1", "--batch"
             ],
-            new Dictionary<string, string?> { ["MYSQL_PWD"] = null },
+            new Dictionary<string, string?> { ["MYSQL_PWD"] = bootstrapPassword },
             cancellationToken,
             MySqlProvisioningSql(credentials)
         );

@@ -15,6 +15,49 @@ internal static partial class ContractChecks
 {
     internal static async Task VerifyToolAndUpdateContractsAsync(string supportRoot)
     {
+        var gitDigest = new string('a', 64);
+        var gitRelease = GitRuntimeInstaller.SelectRelease($$"""
+            {
+              "assets": [
+                {
+                  "name": "MinGit-2.55.0.3-busybox-64-bit.zip",
+                  "size": 100,
+                  "digest": "sha256:{{new string('b', 64)}}",
+                  "browser_download_url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.3/MinGit-2.55.0.3-busybox-64-bit.zip"
+                },
+                {
+                  "name": "MinGit-2.55.0.3-64-bit.zip",
+                  "size": 38791206,
+                  "digest": "sha256:{{gitDigest}}",
+                  "browser_download_url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.3/MinGit-2.55.0.3-64-bit.zip"
+                }
+              ]
+            }
+            """);
+        Check(
+            gitRelease.Version == "2.55.0.3"
+                && gitRelease.FileName == "MinGit-2.55.0.3-64-bit.zip"
+                && gitRelease.Size == 38_791_206
+                && gitRelease.Sha256 == gitDigest,
+            "Git provisioning selects the official non-BusyBox MinGit x64 asset and SHA-256"
+        );
+        Throws<InvalidDataException>(
+            () => GitRuntimeInstaller.SelectRelease(
+                """{"assets":[{"name":"MinGit-2.55.0.3-64-bit.zip","size":1,"digest":null,"browser_download_url":"https://github.com/example.zip"}]}"""
+            ),
+            "Git provisioning rejects release assets without an official SHA-256 digest"
+        );
+
+        var installedGit = new GitRuntimeInstaller(supportRoot);
+        var gitExecutable = installedGit.GitExecutable("2.55.0.3");
+        Directory.CreateDirectory(Path.GetDirectoryName(gitExecutable)!);
+        await File.WriteAllTextAsync(gitExecutable, "managed git");
+        Check(
+            installedGit.InstalledVersion() == "2.55.0.3"
+                && await installedGit.EnsureInstalledAsync() == gitExecutable,
+            "Git provisioning reuses an installed managed runtime without network access"
+        );
+
         var laravelArguments = LaravelProjectCreator.BuildLaravelArguments(
             new LaravelProjectRequest(
                 " demo-app ",
@@ -77,6 +120,16 @@ internal static partial class ContractChecks
         Directory.CreateDirectory(Path.GetDirectoryName(installedTools.LaravelExecutable)!);
         File.WriteAllText(installedPhp.PhpExecutable("8.4"), "managed php");
         File.WriteAllText(installedPhp.PhpCgiExecutable("8.4"), "managed php-cgi");
+        foreach (var runtimeFile in PhpRuntimeInstaller.RequiredVcRuntimeFiles)
+        {
+            File.WriteAllText(
+                Path.Combine(
+                    Path.GetDirectoryName(installedPhp.PhpExecutable("8.4"))!,
+                    runtimeFile
+                ),
+                "Microsoft VC143 fixture"
+            );
+        }
         File.WriteAllText(installedTools.ComposerPath, "managed composer");
         File.WriteAllText(installedTools.LaravelExecutable, "managed laravel installer");
         Check(
@@ -84,6 +137,62 @@ internal static partial class ContractChecks
             "Project creation detects the installed Laravel Installer without launching it"
         );
         await installedTools.EnsureLaravelInstallerAsync("8.4");
+        Check(
+            File.Exists(installedTools.ComposerCommandPath),
+            "Project creation repairs the managed Composer command without downloading tools again"
+        );
+        var composerCommand = File.ReadAllText(installedTools.ComposerCommandPath);
+        Check(
+            composerCommand.Contains(
+                @"%~dp0..\Runtimes\php\8.4\php.exe",
+                StringComparison.Ordinal
+            )
+                && composerCommand.Contains(
+                    @"%~dp0composer.phar",
+                    StringComparison.Ordinal
+                )
+                && composerCommand.EndsWith("%*\r\n", StringComparison.Ordinal),
+            "The managed Composer command uses HerdMe PHP and forwards Laravel Installer arguments"
+        );
+        var managedPath = installedTools.ManagedEnvironment("8.4")["PATH"]
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+        Check(
+            managedPath.Contains(
+                Path.GetDirectoryName(installedTools.ComposerCommandPath)!,
+                StringComparer.OrdinalIgnoreCase
+            ),
+            "Laravel Installer receives the managed Composer command directory on PATH"
+        );
+        Check(
+            managedPath.Contains(
+                Path.GetDirectoryName(gitExecutable)!,
+                StringComparer.OrdinalIgnoreCase
+            ),
+            "Composer and Laravel child commands receive managed Git on PATH"
+        );
+
+        var managedBin = Path.GetDirectoryName(installedTools.ComposerCommandPath)!;
+        var managedPhp = Path.GetDirectoryName(installedPhp.PhpExecutable("8.4"))!;
+        var managedNode = Path.Combine(supportRoot, "Runtimes", "node", "22.99.0");
+        var managedComposerBin = Path.Combine(installedTools.ComposerHome, "vendor", "bin");
+        var systemTools = Path.GetFullPath(Path.Combine(supportRoot, "..", "system-tools"));
+        var stalePhp = Path.Combine(supportRoot, "Runtimes", "php", "8.3");
+        var mergedUserPath = WindowsUserPathManager.MergeManagedPath(
+            string.Join(Path.PathSeparator, [systemTools, stalePhp, managedBin]),
+            supportRoot,
+            [managedBin, managedPhp, managedComposerBin, managedNode, Path.GetDirectoryName(gitExecutable)!]
+        ).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+        Check(
+            mergedUserPath.Take(5).SequenceEqual(
+                [managedBin, managedPhp, managedComposerBin, managedNode, Path.GetDirectoryName(gitExecutable)!],
+                StringComparer.OrdinalIgnoreCase
+            )
+                && mergedUserPath.Contains(systemTools, StringComparer.OrdinalIgnoreCase)
+                && !mergedUserPath.Contains(stalePhp, StringComparer.OrdinalIgnoreCase)
+                && mergedUserPath.Distinct(StringComparer.OrdinalIgnoreCase).Count()
+                    == mergedUserPath.Length,
+            "User PATH puts active HerdMe tools first, preserves system entries, and removes stale HerdMe runtimes"
+        );
         Check(
             LaravelProjectCreationStages.For(new LaravelProjectRequest(
                 "demo-app", supportRoot, "React", "Pest", InstallBoost: true, InitializeGit: true
@@ -242,6 +351,24 @@ internal static partial class ContractChecks
         );
         var currentManager = new AppUpdateManager(updateFeed, "1.0.1", 1);
         Check(!(await currentManager.CheckAsync("Beta")).IsAvailable, "current beta release is up to date");
+        var unpublishedReleaseHandler = new SequenceHttpMessageHandler(
+            _ => new HttpResponseMessage(HttpStatusCode.NotFound)
+        );
+        using (var unpublishedReleaseClient = new HttpClient(unpublishedReleaseHandler))
+        {
+            var unpublishedReleaseManager = new AppUpdateManager(
+                "https://github.com/example/herdme/releases/latest/download/release-manifest.signed.json",
+                "1.0.1",
+                1,
+                fallbackFeedLocation: updateFeed,
+                httpClient: unpublishedReleaseClient
+            );
+            Check(
+                !(await unpublishedReleaseManager.CheckAsync("Stable")).IsAvailable
+                    && unpublishedReleaseHandler.CallCount == 1,
+                "unpublished GitHub releases fall back to the bundled manifest without a 404 error"
+            );
+        }
 
         var semanticUpdateFeed = Path.Combine(supportRoot, "semantic-release-manifest.json");
         await File.WriteAllTextAsync(
@@ -412,7 +539,16 @@ internal static partial class ContractChecks
 
         var phpSupportRoot = Path.Combine(supportRoot, "php-installer");
         var phpRuntime = Path.Combine(phpSupportRoot, "Runtimes", "php", "8.4");
+        var vcRuntimeSource = Path.Combine(phpSupportRoot, "vc143-source");
         Directory.CreateDirectory(phpRuntime);
+        Directory.CreateDirectory(vcRuntimeSource);
+        foreach (var runtimeFile in PhpRuntimeInstaller.RequiredVcRuntimeFiles)
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(vcRuntimeSource, runtimeFile),
+                "Microsoft VC143 fixture: " + runtimeFile
+            );
+        }
         await File.WriteAllBytesAsync(Path.Combine(phpRuntime, "php.exe"), []);
         await File.WriteAllBytesAsync(Path.Combine(phpRuntime, "php-cgi.exe"), []);
         await File.WriteAllTextAsync(
@@ -421,7 +557,10 @@ internal static partial class ContractChecks
             { "runtime": "php", "cycle": "8.4", "version": "8.4.14" }
             """
         );
-        var phpInspector = new PhpRuntimeInstaller(supportRoot: phpSupportRoot);
+        var phpInspector = new PhpRuntimeInstaller(
+            supportRoot: phpSupportRoot,
+            vcRuntimeRoot: vcRuntimeSource
+        );
         Check(
             PhpRuntimeInstaller.SupportedCycles.SequenceEqual(
                 new[] { "8.5", "8.4", "8.3", "8.2", "8.1", "8.0" }
@@ -433,16 +572,82 @@ internal static partial class ContractChecks
             async () => { _ = await phpInspector.ResolveReleaseAsync("7.4"); },
             "unsupported PHP release checks fail before network access"
         );
-        Check(phpInspector.IsInstalled("8.4"), "managed PHP requires both CLI and CGI executables");
+        Check(
+            !phpInspector.IsInstalled("8.4"),
+            "managed PHP is incomplete without the app-local Visual C++ runtime"
+        );
+        PhpRuntimeInstaller.CopyVcRuntimeFiles(vcRuntimeSource, phpRuntime);
+        Check(
+            PhpRuntimeInstaller.RequiredVcRuntimeFiles.All(file =>
+                File.ReadAllText(Path.Combine(phpRuntime, file))
+                    == "Microsoft VC143 fixture: " + file
+            ),
+            "managed PHP receives every app-local Visual C++ runtime file"
+        );
+        Throws<InvalidDataException>(
+            () => PhpRuntimeInstaller.CopyVcRuntimeFiles(
+                Path.Combine(phpSupportRoot, "missing-vc143"),
+                Path.Combine(phpSupportRoot, "invalid-runtime")
+            ),
+            "managed PHP rejects an incomplete app-local Visual C++ runtime"
+        );
+        var phpExtensionDirectory = Path.Combine(phpRuntime, "ext");
+        Directory.CreateDirectory(phpExtensionDirectory);
+        foreach (var extension in PhpRuntimeInstaller.RequiredManagedExtensions)
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(phpExtensionDirectory, $"php_{extension}.dll"),
+                "managed PHP extension fixture"
+            );
+        }
+        Check(
+            PhpRuntimeInstaller.RequiredManagedExtensions.Contains(
+                "pdo_mysql",
+                StringComparer.OrdinalIgnoreCase
+            ) && PhpRuntimeInstaller.ManagedPhpIni.Contains(
+                "extension = pdo_mysql",
+                StringComparison.Ordinal
+            ),
+            "managed PHP enables Laravel's MySQL PDO driver"
+        );
+        var phpConfiguration = Path.Combine(phpRuntime, "php.ini");
+        await File.WriteAllTextAsync(
+            phpConfiguration,
+            PhpRuntimeInstaller.ManagedPhpIni.Replace(
+                "extension = zip",
+                "; extension = zip",
+                StringComparison.Ordinal
+            )
+        );
+        Check(
+            !PhpRuntimeInstaller.HasRequiredConfiguration(phpConfiguration),
+            "managed PHP detects when Composer's ZIP extension is disabled"
+        );
+        phpInspector.EnsureManagedConfiguration("8.4");
+        Check(
+            PhpRuntimeInstaller.HasRequiredConfiguration(phpConfiguration),
+            "managed PHP repairs every required Laravel and Composer extension"
+        );
+        var zipExtension = Path.Combine(phpExtensionDirectory, "php_zip.dll");
+        File.Delete(zipExtension);
+        Throws<InvalidDataException>(
+            () => phpInspector.EnsureManagedConfiguration("8.4"),
+            "managed PHP rejects a missing ZIP extension before Composer starts"
+        );
+        await File.WriteAllTextAsync(zipExtension, "managed PHP extension fixture");
+        Check(
+            phpInspector.IsInstalled("8.4"),
+            "managed PHP requires CLI, CGI, and app-local VC++ executables"
+        );
         Check(phpInspector.InstalledVersion("8.4") == "8.4.14", "managed PHP reads its release manifest");
         var legacyPhpRuntime = Path.Combine(phpSupportRoot, "Runtimes", "php", "7.4");
         Directory.CreateDirectory(legacyPhpRuntime);
         await File.WriteAllBytesAsync(Path.Combine(legacyPhpRuntime, "php.exe"), []);
         await File.WriteAllBytesAsync(Path.Combine(legacyPhpRuntime, "php-cgi.exe"), []);
+        PhpRuntimeInstaller.CopyVcRuntimeFiles(vcRuntimeSource, legacyPhpRuntime);
         Check(
             phpInspector.InstalledCycles().Contains("7.4", StringComparer.Ordinal),
             "installed legacy PHP remains visible and selectable"
         );
     }
 }
-

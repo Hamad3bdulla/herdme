@@ -73,7 +73,6 @@ public sealed partial class SitesPage : Page
         foreach (var root in settings.Roots) Roots.Add(root);
         Directory.CreateDirectory(Roots[0]);
         RootPathTextBox.Text = Roots[0];
-        TldTextBox.Text = settings.Tld;
         suppressPreviewToggle = true;
         PreviewToggle.IsOn = settings.ShowPreviews;
         suppressPreviewToggle = false;
@@ -98,44 +97,6 @@ public sealed partial class SitesPage : Page
         siteDetailsCancellation?.Cancel();
     }
 
-    private async void Environment_Click(object sender, RoutedEventArgs e)
-    {
-        EnvironmentButton.IsEnabled = false;
-        try
-        {
-            if (environment.IsRunning)
-            {
-                EnvironmentStatusText.Text = AppLocalization.Get("SitesEnvironmentStopping");
-                await environment.StopAsync();
-                SaveSettings(startAutomatically: false);
-            }
-            else
-            {
-                if (Sites.Count == 0) await ScanAsync();
-                EnvironmentStatusText.Text = AppLocalization.Get("SitesEnvironmentStarting");
-                await environment.StartAsync(Sites);
-                SaveSettings(startAutomatically: true);
-            }
-        }
-        catch (Exception error)
-        {
-            var dialog = new ContentDialog
-            {
-                XamlRoot = XamlRoot,
-                Title = "HerdMe",
-                Content = error.Message,
-                CloseButtonText = AppLocalization.Get("SitesOk")
-            };
-            await dialog.ShowAsync();
-        }
-        finally
-        {
-            EnvironmentButton.IsEnabled = true;
-            UpdateEnvironmentState();
-            _ = RefreshPreviewAsync();
-        }
-    }
-
     private void UpdateEnvironmentState()
     {
         var running = environment.IsRunning;
@@ -144,16 +105,24 @@ public sealed partial class SitesPage : Page
             : environment.IsDegraded
                 ? AppLocalization.Get("SitesEnvironmentRecovering")
                 : AppLocalization.Get("SitesEnvironmentStopped");
-        EnvironmentButtonText.Text = AppLocalization.Get(
-            running ? "SitesEnvironmentStopAll" : "SitesEnvironmentStartAll"
-        );
-        EnvironmentButtonIcon.Symbol = running ? Symbol.Stop : Symbol.Play;
         EnvironmentEndpointText.Text = running
             ? environment.HttpsPort is not null ? "HTTPS" : "HTTP"
             : string.Empty;
     }
 
     private async void Browse_Click(object sender, RoutedEventArgs e)
+    {
+        var path = await PickFolderPathAsync();
+        if (path is not null) RootPathTextBox.Text = path;
+    }
+
+    private async void ParkFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var path = await PickFolderPathAsync();
+        if (path is not null) await AddRootAsync(path);
+    }
+
+    private static async Task<string?> PickFolderPathAsync()
     {
         var picker = new FolderPicker
         {
@@ -162,10 +131,7 @@ public sealed partial class SitesPage : Page
         picker.FileTypeFilter.Add("*");
         InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
         var folder = await picker.PickSingleFolderAsync();
-        if (folder is not null)
-        {
-            RootPathTextBox.Text = folder.Path;
-        }
+        return folder?.Path;
     }
 
     private async void LinkSite_Click(object sender, RoutedEventArgs e)
@@ -532,17 +498,39 @@ public sealed partial class SitesPage : Page
 
     private async void AddRoot_Click(object sender, RoutedEventArgs e)
     {
-        var path = RootPathTextBox.Text.Trim();
-        if (path.Length > 0 && SiteConfigurationStore.BelongsToOtherHerd(path))
+        await AddRootAsync(RootPathTextBox.Text);
+    }
+
+    private async Task AddRootAsync(string value)
+    {
+        var path = value.Trim();
+        if (path.Length == 0) return;
+        string normalized;
+        try
+        {
+            normalized = Path.GetFullPath(path);
+        }
+        catch (Exception error) when (error is ArgumentException or NotSupportedException)
+        {
+            await ShowErrorAsync(error.Message);
+            return;
+        }
+        if (SiteConfigurationStore.BelongsToOtherHerd(normalized))
         {
             await ShowErrorAsync(
                 AppLocalization.Get("SitesParkOtherApplicationRejected")
             );
             return;
         }
-        if (path.Length > 0 && !Roots.Contains(path, StringComparer.OrdinalIgnoreCase))
+        if (!Directory.Exists(normalized))
         {
-            Roots.Add(Path.GetFullPath(path));
+            await ShowErrorAsync(AppLocalization.Format("SitesParkFolderMissing", normalized));
+            return;
+        }
+        RootPathTextBox.Text = normalized;
+        if (!Roots.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+        {
+            Roots.Add(normalized);
             SaveSettings();
             await ScanAsync();
         }
@@ -659,19 +647,11 @@ public sealed partial class SitesPage : Page
         ShowSite(null);
         try
         {
-            var tld = TldTextBox.Text.Trim();
-            if (tld.Length == 0)
-            {
-                tld = "test";
-                TldTextBox.Text = tld;
-            }
             SaveSettings();
             var normalizedSettings = settingsStore.Load();
-            tld = normalizedSettings.Tld;
-            TldTextBox.Text = tld;
             var scanned = await coreClient.ScanAsync(
                 Roots,
-                tld,
+                normalizedSettings.Tld,
                 normalizedSettings.LinkedSites
             );
             if (!siteScanGeneration.IsCurrent(generation)) return;
@@ -681,8 +661,14 @@ public sealed partial class SitesPage : Page
             }
             ApplyFilter(selectedPath);
             SiteCountText.Text = AppLocalization.Format("SitesCount", Sites.Count);
+            if (scanned.Count > 0 && !environment.IsRunning)
+            {
+                EnvironmentStatusText.Text = AppLocalization.Get("SitesEnvironmentStarting");
+            }
             await environment.SynchronizeSitesAsync(scanned);
             if (!siteScanGeneration.IsCurrent(generation)) return;
+            UpdateEnvironmentState();
+            await RefreshPreviewAsync();
             StartGitInspection(scanned, generation);
         }
         catch (Exception error)
@@ -697,6 +683,7 @@ public sealed partial class SitesPage : Page
             {
                 ScanProgress.IsActive = false;
                 SiteCountText.Text = AppLocalization.Format("SitesCount", Sites.Count);
+                UpdateEnvironmentState();
             }
         }
     }
@@ -1822,12 +1809,13 @@ public sealed partial class SitesPage : Page
         outputBox.Select(outputBox.Text.Length, 0);
     }
 
-    private void SaveSettings(bool? startAutomatically = null, bool? showPreviews = null)
+    private void SaveSettings(bool? showPreviews = null)
     {
+        var settings = settingsStore.Load();
         settingsStore.UpdateSites(
             Roots,
-            TldTextBox.Text,
-            startAutomatically,
+            settings.Tld,
+            startAutomatically: true,
             showPreviews
         );
     }

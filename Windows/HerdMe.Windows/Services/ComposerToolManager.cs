@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using HerdMe.Windows.Models;
@@ -35,6 +36,8 @@ public sealed partial class ComposerToolManager
     public string SupportRoot { get; }
 
     public string ComposerPath => Path.Combine(SupportRoot, "bin", "composer.phar");
+
+    public string ComposerCommandPath => Path.Combine(SupportRoot, "bin", "composer.cmd");
 
     public string ComposerHome => Path.Combine(SupportRoot, "Composer");
 
@@ -108,6 +111,7 @@ public sealed partial class ComposerToolManager
             var composerVersion = ExtractVersion(versionOutput)
                 ?? throw new InvalidDataException("The verified Composer PHAR did not report a version.");
             File.Move(temporary, ComposerPath, true);
+            EnsureComposerCommand(phpCycle);
 
             await RunAsync(
                 php,
@@ -208,8 +212,45 @@ public sealed partial class ComposerToolManager
         CancellationToken cancellationToken = default
     )
     {
-        if (IsLaravelInstallerReady(phpCycle)) return;
+        if (IsLaravelInstallerReady(phpCycle))
+        {
+            EnsureComposerCommand(phpCycle);
+            return;
+        }
         await InstallOrUpdateAsync(phpCycle, cancellationToken);
+    }
+
+    internal void EnsureComposerCommand(string phpCycle)
+    {
+        if (!PhpRuntimeInstaller.IsSupportedCycle(phpCycle))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(phpCycle),
+                phpCycle,
+                "The Composer command requires a supported HerdMe PHP cycle."
+            );
+        }
+        if (!File.Exists(ComposerPath))
+        {
+            throw new FileNotFoundException("The managed Composer PHAR is missing.", ComposerPath);
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(ComposerCommandPath)!);
+        var content = string.Join("\r\n", [
+            "@echo off",
+            $"\"%~dp0..\\Runtimes\\php\\{phpCycle}\\php.exe\" \"%~dp0composer.phar\" %*",
+            string.Empty
+        ]);
+        if (File.Exists(ComposerCommandPath)
+            && File.ReadAllText(ComposerCommandPath).Equals(content, StringComparison.Ordinal))
+        {
+            return;
+        }
+        File.WriteAllText(
+            ComposerCommandPath,
+            content,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)
+        );
     }
 
     public bool IsLaravelInstallerReady(string phpCycle)
@@ -221,17 +262,7 @@ public sealed partial class ComposerToolManager
 
     public IReadOnlyDictionary<string, string> ManagedEnvironment(string phpCycle)
     {
-        var paths = new List<string>
-        {
-            Path.GetDirectoryName(phpInstaller.PhpExecutable(phpCycle))!,
-            Path.Combine(SupportRoot, "bin"),
-            Path.Combine(ComposerHome, "vendor", "bin")
-        };
-        var activeNode = nodeInstaller.LoadSettings().ActiveVersion;
-        if (!string.IsNullOrWhiteSpace(activeNode))
-        {
-            paths.Add(Path.Combine(nodeInstaller.RuntimeRoot, activeNode));
-        }
+        var paths = CommandLineDirectories(phpCycle).ToList();
         paths.Add(Environment.GetEnvironmentVariable("PATH") ?? string.Empty);
         return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -240,6 +271,28 @@ public sealed partial class ComposerToolManager
             ["COMPOSER_NO_INTERACTION"] = "1",
             ["PATH"] = string.Join(Path.PathSeparator, paths.Where(path => !string.IsNullOrWhiteSpace(path)))
         };
+    }
+
+    public IReadOnlyList<string> CommandLineDirectories(string phpCycle)
+    {
+        var paths = new List<string>();
+        var phpDirectory = Path.GetDirectoryName(phpInstaller.PhpExecutable(phpCycle))!;
+        if (File.Exists(phpInstaller.PhpExecutable(phpCycle))) paths.Add(phpDirectory);
+        var binDirectory = Path.Combine(SupportRoot, "bin");
+        if (Directory.Exists(binDirectory)) paths.Add(binDirectory);
+        var composerBin = Path.Combine(ComposerHome, "vendor", "bin");
+        if (Directory.Exists(composerBin)) paths.Add(composerBin);
+        var activeNode = nodeInstaller.LoadSettings().ActiveVersion;
+        if (!string.IsNullOrWhiteSpace(activeNode))
+        {
+            var nodeDirectory = Path.Combine(nodeInstaller.RuntimeRoot, activeNode);
+            if (File.Exists(Path.Combine(nodeDirectory, "node.exe"))) paths.Add(nodeDirectory);
+        }
+        var git = new GitRuntimeInstaller(SupportRoot).InstalledExecutable();
+        if (git is not null) paths.Add(Path.GetDirectoryName(git)!);
+        return paths
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     public static async Task<string> RunAsync(
@@ -299,6 +352,7 @@ public sealed partial class ComposerToolManager
         {
             throw new InvalidOperationException($"Install HerdMe PHP {cycle} before installing Composer.");
         }
+        phpInstaller.EnsureManagedConfiguration(cycle);
         var php = phpInstaller.PhpExecutable(cycle);
         await phpPolicy.PrepareLaunchAsync(php, cancellationToken);
         return php;

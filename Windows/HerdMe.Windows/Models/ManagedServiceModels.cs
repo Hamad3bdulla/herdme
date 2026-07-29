@@ -51,7 +51,7 @@ public sealed class ManagedServiceInstance
 
     public int Port { get; set; } = 3_306;
 
-    public bool StartAutomatically { get; set; }
+    public bool StartAutomatically { get; set; } = true;
 }
 
 public enum ManagedServiceState

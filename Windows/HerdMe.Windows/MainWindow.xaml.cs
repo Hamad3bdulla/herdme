@@ -4,6 +4,7 @@ using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using System.Runtime.InteropServices;
 using Windows.Graphics;
 using WinRT.Interop;
 
@@ -11,11 +12,18 @@ namespace HerdMe.Windows;
 
 public sealed partial class MainWindow : Window
 {
+    private const int LogicalWindowWidth = 1_080;
+    private const int LogicalWindowHeight = 720;
+    private const int LogicalWindowMargin = 16;
     private readonly AppServices services;
     private string? pendingLogSitePath;
     private string? configurationLoadWarning;
 
-    public MainWindow(AppServices services, bool skipOnboarding = false)
+    public MainWindow(
+        AppServices services,
+        bool skipOnboarding = false,
+        bool forceOnboarding = false
+    )
     {
         this.services = services;
         InitializeComponent();
@@ -35,8 +43,8 @@ public sealed partial class MainWindow : Window
         );
         if (string.IsNullOrWhiteSpace(configurationLoadWarning)) configurationLoadWarning = null;
         if (configurationLoadWarning is not null) Activated += ShowConfigurationLoadWarning;
-        RequiresOnboarding = !skipOnboarding
-            && !siteSettings.OnboardingCompleted;
+        RequiresOnboarding = forceOnboarding
+            || (!skipOnboarding && !siteSettings.OnboardingCompleted);
         Navigation.Visibility = RequiresOnboarding ? Visibility.Collapsed : Visibility.Visible;
         Onboarding.Visibility = RequiresOnboarding ? Visibility.Visible : Visibility.Collapsed;
         Navigation.SelectedItem = Navigation.MenuItems[0];
@@ -71,8 +79,36 @@ public sealed partial class MainWindow : Window
     {
         var windowHandle = WindowNative.GetWindowHandle(this);
         var windowId = Win32Interop.GetWindowIdFromWindow(windowHandle);
-        AppWindow.GetFromWindowId(windowId).Resize(new SizeInt32(1_080, 720));
+        var appWindow = AppWindow.GetFromWindowId(windowId);
+        var displayArea = DisplayArea.GetFromWindowId(windowId, DisplayAreaFallback.Primary);
+        var workArea = displayArea.WorkArea;
+        var dpi = GetDpiForWindow(windowHandle);
+        var scale = dpi == 0 ? 1d : dpi / 96d;
+        var margin = (int)Math.Round(LogicalWindowMargin * scale);
+        var width = Math.Min(
+            (int)Math.Round(LogicalWindowWidth * scale),
+            Math.Max(1, workArea.Width - (margin * 2))
+        );
+        var height = Math.Min(
+            (int)Math.Round(LogicalWindowHeight * scale),
+            Math.Max(1, workArea.Height - (margin * 2))
+        );
+        appWindow.MoveAndResize(new RectInt32(
+            workArea.X + ((workArea.Width - width) / 2),
+            workArea.Y + ((workArea.Height - height) / 2),
+            width,
+            height
+        ));
+        if (appWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.IsResizable = false;
+            presenter.IsMaximizable = false;
+            presenter.IsMinimizable = false;
+        }
     }
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr windowHandle);
 
     private void Navigation_SelectionChanged(
         NavigationView sender,
@@ -108,6 +144,9 @@ public sealed partial class MainWindow : Window
                     services.Core,
                     services.PhpInstaller,
                     services.RuntimePolicy,
+                    services.NodeInstaller,
+                    services.ComposerTools,
+                    services.GitInstaller,
                     services.Startup,
                     services.Hosts,
                     services.Certificates,
@@ -134,11 +173,17 @@ public sealed partial class MainWindow : Window
                     services.Core,
                     services.RuntimePolicy,
                     services.PhpInstaller,
-                    services.ComposerTools
+                    services.ComposerTools,
+                    services.UserPath
                 );
                 break;
             case "node":
-                ContentFrame.Content = new NodePage(services.NodeInstaller);
+                ContentFrame.Content = new NodePage(
+                    services.NodeInstaller,
+                    services.ComposerTools,
+                    services.RuntimePolicy,
+                    services.UserPath
+                );
                 break;
             case "services":
                 ContentFrame.Content = new ServicesPage(
@@ -179,6 +224,9 @@ public sealed partial class MainWindow : Window
                     services.Core,
                     services.PhpInstaller,
                     services.RuntimePolicy,
+                    services.NodeInstaller,
+                    services.ComposerTools,
+                    services.GitInstaller,
                     services.Startup,
                     services.Hosts,
                     services.Certificates,

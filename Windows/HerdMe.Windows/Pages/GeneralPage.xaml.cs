@@ -12,6 +12,9 @@ public sealed partial class GeneralPage : Page
     private readonly CoreClient coreClient;
     private readonly PhpRuntimeInstaller runtimeInstaller;
     private readonly PhpRuntimePolicy runtimePolicy;
+    private readonly NodeRuntimeInstaller nodeInstaller;
+    private readonly ComposerToolManager composerTools;
+    private readonly GitRuntimeInstaller gitInstaller;
     private readonly WindowsStartupManager startupManager;
     private readonly WindowsHostsManager hostsManager;
     private readonly WindowsCertificateManager certificateManager;
@@ -26,6 +29,9 @@ public sealed partial class GeneralPage : Page
         CoreClient coreClient,
         PhpRuntimeInstaller runtimeInstaller,
         PhpRuntimePolicy runtimePolicy,
+        NodeRuntimeInstaller nodeInstaller,
+        ComposerToolManager composerTools,
+        GitRuntimeInstaller gitInstaller,
         WindowsStartupManager startupManager,
         WindowsHostsManager hostsManager,
         WindowsCertificateManager certificateManager,
@@ -36,6 +42,9 @@ public sealed partial class GeneralPage : Page
         this.coreClient = coreClient;
         this.runtimeInstaller = runtimeInstaller;
         this.runtimePolicy = runtimePolicy;
+        this.nodeInstaller = nodeInstaller;
+        this.composerTools = composerTools;
+        this.gitInstaller = gitInstaller;
         this.startupManager = startupManager;
         this.hostsManager = hostsManager;
         this.certificateManager = certificateManager;
@@ -51,6 +60,7 @@ public sealed partial class GeneralPage : Page
         StartupToggle.IsOn = startupManager.IsEnabled;
         loadingStartup = false;
         var settings = settingsStore.Load();
+        TldTextBox.Text = settings.Tld;
         loadingUpdateSettings = true;
         AutomaticUpdatesToggle.IsOn = settings.AutomaticUpdates;
         UpdateChannelBox.SelectedIndex = settings.UpdateChannel == "Beta" ? 1 : 0;
@@ -116,7 +126,7 @@ public sealed partial class GeneralPage : Page
             SupportPathText.Text = report.SupportPath;
             Directory.CreateDirectory(report.SupportPath);
             OpenDataButton.IsEnabled = true;
-            foreach (var runtime in report.Runtimes)
+            foreach (var runtime in ManagedRuntimeChecks())
             {
                 Runtimes.Add(runtime);
             }
@@ -128,6 +138,7 @@ public sealed partial class GeneralPage : Page
             {
                 try
                 {
+                    runtimeInstaller.EnsureManagedConfiguration(phpSettings.PhpCycle);
                     var extensions = await coreClient.ValidatePhpAsync(phpPath);
                     PhpExtensionStatusText.Text = extensions.Compatible
                         ? AppLocalization.Get("GeneralLaravelCompatible")
@@ -166,6 +177,73 @@ public sealed partial class GeneralPage : Page
             PhpExtensionProgress.IsActive = false;
         }
         await RefreshLocalSetupAsync();
+    }
+
+    private IReadOnlyList<RuntimeCheck> ManagedRuntimeChecks()
+    {
+        var phpCycle = runtimePolicy.Load().PhpCycle;
+        var phpPath = runtimeInstaller.PhpExecutable(phpCycle);
+        var nodeVersion = nodeInstaller.LoadSettings().ActiveVersion;
+        if (string.IsNullOrWhiteSpace(nodeVersion)
+            || !File.Exists(Path.Combine(nodeInstaller.RuntimeRoot, nodeVersion, "node.exe")))
+        {
+            nodeVersion = nodeInstaller.InstalledVersions().FirstOrDefault() ?? string.Empty;
+        }
+        var nodeDirectory = string.IsNullOrWhiteSpace(nodeVersion)
+            ? null
+            : Path.Combine(nodeInstaller.RuntimeRoot, nodeVersion);
+        var gitPath = gitInstaller.InstalledExecutable();
+
+        return
+        [
+            ManagedRuntime("php", phpPath, runtimeInstaller.IsInstalled(phpCycle)),
+            ManagedRuntime(
+                "composer",
+                composerTools.ComposerCommandPath,
+                File.Exists(composerTools.ComposerPath)
+                    && File.Exists(composerTools.ComposerCommandPath)
+            ),
+            ManagedRuntime(
+                "laravel",
+                composerTools.LaravelExecutable,
+                composerTools.IsLaravelInstallerReady(phpCycle)
+            ),
+            ManagedRuntime(
+                "node",
+                nodeDirectory is null ? null : Path.Combine(nodeDirectory, "node.exe"),
+                nodeDirectory is not null && File.Exists(Path.Combine(nodeDirectory, "node.exe"))
+            ),
+            ManagedRuntime(
+                "npm",
+                nodeDirectory is null ? null : Path.Combine(nodeDirectory, "npm.cmd"),
+                nodeDirectory is not null && File.Exists(Path.Combine(nodeDirectory, "npm.cmd"))
+            ),
+            ManagedRuntime("git", gitPath, gitPath is not null && File.Exists(gitPath))
+        ];
+    }
+
+    private static RuntimeCheck ManagedRuntime(string name, string? path, bool available)
+    {
+        return new RuntimeCheck
+        {
+            Name = name,
+            Available = available,
+            Detected = available,
+            Source = "managed",
+            Path = available ? path : null
+        };
+    }
+
+    private void TldTextBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        var settings = settingsStore.Load();
+        settingsStore.UpdateSites(
+            settings.Roots,
+            TldTextBox.Text,
+            startAutomatically: true,
+            showPreviews: settings.ShowPreviews
+        );
+        TldTextBox.Text = settingsStore.Load().Tld;
     }
 
     private async void InstallDomains_Click(object sender, RoutedEventArgs e)

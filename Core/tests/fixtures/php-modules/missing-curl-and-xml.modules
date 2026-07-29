@@ -10,6 +10,7 @@ pcre
 pdo
 session
 tokenizer
+zip
 [Zend Modules]
 curl
 xml

@@ -4,8 +4,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     AutomationProperties.AutomationId="DashboardPageRoot"
     Loaded="Page_Loaded"
+    SizeChanged="Page_SizeChanged"
     Unloaded="Page_Unloaded">
-    <Grid Padding="28,22,28,24" RowSpacing="18">
+    <Grid x:Name="DashboardLayout" Padding="28,22,28,24" RowSpacing="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -21,7 +22,8 @@
                 <TextBlock
                     x:Uid="DashboardPageSubtitle"
                     Text="Your local development environment at a glance."
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    TextWrapping="Wrap" />
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <ProgressRing x:Name="RefreshProgress" Width="18" Height="18" />
@@ -43,15 +45,20 @@
                 <InfoBar x:Name="HealthBanner" IsOpen="True" IsClosable="False" />
                 <StackPanel x:Name="WarningList" Spacing="8" Visibility="Collapsed" />
 
-                <Grid ColumnSpacing="12">
+                <Grid x:Name="SummaryCardsGrid" ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition x:Name="SummaryColumn0" Width="*" />
+                        <ColumnDefinition x:Name="SummaryColumn1" Width="*" />
+                        <ColumnDefinition x:Name="SummaryColumn2" Width="*" />
+                        <ColumnDefinition x:Name="SummaryColumn3" Width="*" />
                     </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <Button
                         x:Uid="DashboardSitesCard"
+                        x:Name="SitesCard"
                         Click="OpenSites_Click"
                         Padding="14"
                         HorizontalContentAlignment="Stretch"
@@ -68,6 +75,7 @@
                     </Button>
                     <Button
                         x:Uid="DashboardServicesCard"
+                        x:Name="ServicesCard"
                         Grid.Column="1"
                         Click="OpenServices_Click"
                         Padding="14"
@@ -85,6 +93,7 @@
                     </Button>
                     <Button
                         x:Uid="DashboardMailCard"
+                        x:Name="MailCard"
                         Grid.Column="2"
                         Click="OpenMail_Click"
                         Padding="14"
@@ -102,6 +111,7 @@
                     </Button>
                     <Button
                         x:Uid="DashboardDumpsCard"
+                        x:Name="DumpsCard"
                         Grid.Column="3"
                         Click="OpenDumps_Click"
                         Padding="14"
@@ -127,24 +137,27 @@
                     CornerRadius="6">
                     <StackPanel Spacing="10">
                         <TextBlock x:Uid="DashboardEnvironmentSectionTitle" Text="Environment" Style="{StaticResource SubtitleTextBlockStyle}" />
-                        <Grid ColumnSpacing="14">
+                        <Grid x:Name="EnvironmentGrid" ColumnSpacing="14">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="170" />
-                                <ColumnDefinition Width="140" />
-                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition x:Name="EnvironmentLabelColumn" Width="170" />
+                                <ColumnDefinition x:Name="EnvironmentStatusColumn" Width="140" />
+                                <ColumnDefinition x:Name="EnvironmentDetailColumn" Width="*" />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <TextBlock x:Uid="DashboardEnvironmentLabel" Text="Sites environment" Padding="0,8" FontWeight="SemiBold" />
+                            <TextBlock x:Uid="DashboardEnvironmentLabel" x:Name="EnvironmentLabelText" Text="Sites environment" Padding="0,8" FontWeight="SemiBold" />
                             <TextBlock x:Name="EnvironmentStatusText" Grid.Column="1" Padding="0,8" />
                             <TextBlock x:Name="EnvironmentDetailText" Grid.Column="2" Padding="0,8" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Uid="DashboardDomainsLabel" Grid.Row="1" Text="Local domains" Padding="0,8" FontWeight="SemiBold" />
+                            <TextBlock x:Uid="DashboardDomainsLabel" x:Name="DomainsLabelText" Grid.Row="1" Text="Local domains" Padding="0,8" FontWeight="SemiBold" />
                             <TextBlock x:Name="DomainsStatusText" Grid.Row="1" Grid.Column="1" Padding="0,8" />
                             <TextBlock x:Name="DomainsDetailText" Grid.Row="1" Grid.Column="2" Padding="0,8" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Uid="DashboardCertificateLabel" Grid.Row="2" Text="HTTPS certificate" Padding="0,8" FontWeight="SemiBold" />
+                            <TextBlock x:Uid="DashboardCertificateLabel" x:Name="CertificateLabelText" Grid.Row="2" Text="HTTPS certificate" Padding="0,8" FontWeight="SemiBold" />
                             <TextBlock x:Name="CertificateStatusText" Grid.Row="2" Grid.Column="1" Padding="0,8" />
                             <TextBlock x:Name="CertificateDetailText" Grid.Row="2" Grid.Column="2" Padding="0,8" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                         </Grid>
@@ -159,11 +172,15 @@
                     CornerRadius="6">
                     <StackPanel Spacing="12">
                         <TextBlock x:Uid="DashboardRecentActivityTitle" Text="Recent activity" Style="{StaticResource SubtitleTextBlockStyle}" />
-                        <Grid ColumnSpacing="24">
+                        <Grid x:Name="RecentActivityGrid" ColumnSpacing="24">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
                             <StackPanel Spacing="10">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -175,7 +192,7 @@
                                 </Grid>
                                 <StackPanel x:Name="RecentMailItems" Spacing="9" />
                             </StackPanel>
-                            <StackPanel Grid.Column="1" Spacing="10">
+                            <StackPanel x:Name="RecentDumpsPanel" Grid.Column="1" Spacing="10">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />

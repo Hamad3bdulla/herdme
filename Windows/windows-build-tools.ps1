@@ -1,35 +1,90 @@
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-function Find-HerdMeMSBuild {
-    $command = Get-Command "MSBuild.exe" -ErrorAction SilentlyContinue
-    if ($null -ne $command) { return $command.Source }
-
+function Find-HerdMeVisualStudioInstallation {
     $installerRoot = ${env:ProgramFiles(x86)}
     if ([string]::IsNullOrWhiteSpace($installerRoot)) {
-        throw "MSBuild.exe was not found and ProgramFiles(x86) is unavailable."
+        throw "Visual Studio was not found and ProgramFiles(x86) is unavailable."
     }
     $vswhere = Join-Path $installerRoot "Microsoft Visual Studio\Installer\vswhere.exe"
     if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
-        throw "MSBuild.exe was not found. Install Visual Studio 2022 with C++ build tools."
+        throw "Visual Studio was not found. Install Visual Studio 2022 with C++ build tools."
     }
 
     $installationPath = [string](& $vswhere `
         -latest `
         -products * `
-        -requires Microsoft.Component.MSBuild `
+        -requires Microsoft.Component.MSBuild Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
         -property installationPath |
         Select-Object -First 1)
     $installationPath = $installationPath.Trim()
     if ([string]::IsNullOrWhiteSpace($installationPath)) {
-        throw "Visual Studio with the MSBuild component was not found."
+        throw "Visual Studio with MSBuild and the x64 C++ tools was not found."
     }
 
+    $msvcDirectory = Join-Path $installationPath "VC\Tools\MSVC"
+    if (-not (Test-Path -LiteralPath $msvcDirectory -PathType Container)) {
+        throw "The selected Visual Studio installation is missing MSVC tools at $msvcDirectory."
+    }
+    return $installationPath
+}
+
+function Find-HerdMeMSBuild {
+    $installationPath = Find-HerdMeVisualStudioInstallation
     $candidate = Join-Path $installationPath "MSBuild\Current\Bin\MSBuild.exe"
     if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
         throw "MSBuild.exe was not found at $candidate."
     }
     return $candidate
+}
+
+function Copy-HerdMeVCRuntime {
+    param([Parameter(Mandatory = $true)][string]$DestinationDirectory)
+
+    $installationPath = Find-HerdMeVisualStudioInstallation
+    $redistRoot = Join-Path $installationPath "VC\Redist\MSVC"
+    if (-not (Test-Path -LiteralPath $redistRoot -PathType Container)) {
+        throw "The selected Visual Studio installation is missing VC redistributables at $redistRoot."
+    }
+
+    $runtimeDirectory = Get-ChildItem -LiteralPath $redistRoot -Directory |
+        Where-Object { $_.Name -match '^\d+(?:\.\d+){2,3}$' } |
+        Sort-Object { [Version]$_.Name } -Descending |
+        ForEach-Object { Join-Path $_.FullName "x64\Microsoft.VC143.CRT" } |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Container } |
+        Select-Object -First 1
+    if ([string]::IsNullOrWhiteSpace($runtimeDirectory)) {
+        throw "The x64 Microsoft.VC143.CRT app-local runtime was not found under $redistRoot."
+    }
+
+    $runtimeFiles = @(
+        "concrt140.dll",
+        "msvcp140.dll",
+        "msvcp140_1.dll",
+        "msvcp140_2.dll",
+        "msvcp140_atomic_wait.dll",
+        "msvcp140_codecvt_ids.dll",
+        "vccorlib140.dll",
+        "vcruntime140.dll",
+        "vcruntime140_1.dll",
+        "vcruntime140_threads.dll"
+    )
+    New-Item -ItemType Directory -Force -Path $DestinationDirectory | Out-Null
+    foreach ($runtimeFile in $runtimeFiles) {
+        $source = Join-Path $runtimeDirectory $runtimeFile
+        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+            throw "The Visual C++ runtime is missing $source."
+        }
+        $signature = Get-AuthenticodeSignature -LiteralPath $source
+        if (
+            $signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
+            $null -eq $signature.SignerCertificate -or
+            $signature.SignerCertificate.Subject -notmatch "(^|,\s*)O=Microsoft Corporation(,|$)"
+        ) {
+            throw "The Visual C++ runtime file is not validly signed by Microsoft: $source"
+        }
+        Copy-Item -LiteralPath $source -Destination (Join-Path $DestinationDirectory $runtimeFile) -Force
+    }
 }
 
 function Install-HerdMeXamlCompilerDependency {

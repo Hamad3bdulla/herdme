@@ -44,6 +44,10 @@ OutputBaseFilename={#OutputBaseFilename}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
+#if Ver < EncodeVer(6, 6, 0)
+WizardResizable=no
+#endif
+WizardSizePercent=100
 CloseApplications=yes
 CloseApplicationsFilter=HerdMe.Windows.exe
 RestartApplications=no

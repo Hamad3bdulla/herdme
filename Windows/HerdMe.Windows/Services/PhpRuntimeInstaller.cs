@@ -14,16 +14,48 @@ public sealed record PhpWindowsRelease(
 
 public sealed class PhpRuntimeInstaller
 {
+    private static readonly string[] ManagedExtensions =
+    [
+        "curl",
+        "fileinfo",
+        "mbstring",
+        "openssl",
+        "pdo_mysql",
+        "zip"
+    ];
+    private static readonly string[] VcRuntimeFiles =
+    [
+        "concrt140.dll",
+        "msvcp140.dll",
+        "msvcp140_1.dll",
+        "msvcp140_2.dll",
+        "msvcp140_atomic_wait.dll",
+        "msvcp140_codecvt_ids.dll",
+        "vccorlib140.dll",
+        "vcruntime140.dll",
+        "vcruntime140_1.dll",
+        "vcruntime140_threads.dll"
+    ];
     private static readonly HttpClient HttpClient = ManagedDownloadClient.Create();
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly CoreClient coreClient;
+    private readonly string vcRuntimeRoot;
 
     public static IReadOnlyList<string> SupportedCycles { get; } =
         RuntimeCatalog.InstallablePhpCycles;
 
-    public PhpRuntimeInstaller(CoreClient? coreClient = null, string? supportRoot = null)
+    public PhpRuntimeInstaller(
+        CoreClient? coreClient = null,
+        string? supportRoot = null,
+        string? vcRuntimeRoot = null
+    )
     {
         this.coreClient = coreClient ?? new CoreClient();
+        this.vcRuntimeRoot = vcRuntimeRoot ?? Path.Combine(
+            AppContext.BaseDirectory,
+            "Prerequisites",
+            "VC143"
+        );
         RuntimeRoot = Path.Combine(
             supportRoot ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -36,6 +68,10 @@ public sealed class PhpRuntimeInstaller
 
     public string RuntimeRoot { get; }
 
+    internal static IReadOnlyList<string> RequiredVcRuntimeFiles => VcRuntimeFiles;
+    internal static IReadOnlyList<string> RequiredManagedExtensions => ManagedExtensions;
+    internal static string ManagedPhpIni => PhpIni;
+
     public static bool IsSupportedCycle(string cycle)
     {
         return SupportedCycles.Contains(cycle, StringComparer.Ordinal);
@@ -47,7 +83,73 @@ public sealed class PhpRuntimeInstaller
 
     public bool IsInstalled(string cycle)
     {
-        return File.Exists(PhpExecutable(cycle)) && File.Exists(PhpCgiExecutable(cycle));
+        var runtimeDirectory = Path.Combine(RuntimeRoot, cycle);
+        return File.Exists(PhpExecutable(cycle))
+            && File.Exists(PhpCgiExecutable(cycle))
+            && VcRuntimeFiles.All(file => File.Exists(Path.Combine(runtimeDirectory, file)));
+    }
+
+    public void EnsureManagedConfiguration(string cycle)
+    {
+        var runtimeDirectory = Path.Combine(RuntimeRoot, cycle);
+        if (!IsInstalled(cycle))
+        {
+            throw new InvalidOperationException(
+                $"Install HerdMe PHP {cycle} before preparing its configuration."
+            );
+        }
+        var missingExtensions = ManagedExtensions.Where(extension => !File.Exists(Path.Combine(
+            runtimeDirectory,
+            "ext",
+            $"php_{extension}.dll"
+        ))).ToArray();
+        if (missingExtensions.Length > 0)
+        {
+            throw new InvalidDataException(
+                $"HerdMe PHP {cycle} is missing managed extensions: "
+                + string.Join(", ", missingExtensions)
+                + ". Reinstall this PHP runtime."
+            );
+        }
+
+        var configurationPath = Path.Combine(runtimeDirectory, "php.ini");
+        if (!HasRequiredConfiguration(configurationPath))
+        {
+            File.WriteAllText(configurationPath, PhpIni);
+        }
+    }
+
+    internal static bool HasRequiredConfiguration(string configurationPath)
+    {
+        if (!File.Exists(configurationPath)) return false;
+        try
+        {
+            var enabled = File.ReadLines(configurationPath)
+                .Select(line => line.Trim())
+                .Where(line => line.Length > 0 && !line.StartsWith(';'))
+                .Select(line => line.Split(';', 2)[0].Trim())
+                .Select(line =>
+                {
+                    var separator = line.IndexOf('=');
+                    if (separator < 0
+                        || !line[..separator].Trim().Equals(
+                            "extension",
+                            StringComparison.OrdinalIgnoreCase
+                        )) return null;
+                    var value = line[(separator + 1)..].Trim().Trim('"', '\'');
+                    var extension = Path.GetFileNameWithoutExtension(value);
+                    return extension.StartsWith("php_", StringComparison.OrdinalIgnoreCase)
+                        ? extension[4..]
+                        : extension;
+                })
+                .Where(extension => !string.IsNullOrWhiteSpace(extension))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return ManagedExtensions.All(extension => enabled.Contains(extension));
+        }
+        catch (IOException)
+        {
+            return false;
+        }
     }
 
     public string? InstalledVersion(string cycle)
@@ -171,6 +273,7 @@ public sealed class PhpRuntimeInstaller
                 throw new InvalidDataException("The official PHP package did not contain php.exe and php-cgi.exe.");
             }
 
+            CopyVcRuntimeFiles(vcRuntimeRoot, stagingPath);
             var extensions = await coreClient.ValidatePhpAsync(php, cancellationToken);
             if (!extensions.Compatible)
             {
@@ -187,7 +290,8 @@ public sealed class PhpRuntimeInstaller
                     cycle = release.Cycle,
                     version = release.Version,
                     source = release.DownloadUri.ToString(),
-                    sha256 = release.Sha256
+                    sha256 = release.Sha256,
+                    vcRuntime = "Microsoft.VC143.CRT"
                 }, JsonOptions),
                 cancellationToken
             );
@@ -214,6 +318,31 @@ public sealed class PhpRuntimeInstaller
             if (Directory.Exists(backupPath)) Directory.Delete(backupPath, true);
         }
         return release;
+    }
+
+    internal static void CopyVcRuntimeFiles(string sourceDirectory, string destinationDirectory)
+    {
+        var missing = VcRuntimeFiles
+            .Where(file => !File.Exists(Path.Combine(sourceDirectory, file)))
+            .ToArray();
+        if (missing.Length > 0)
+        {
+            throw new InvalidDataException(
+                "The HerdMe package is missing Microsoft Visual C++ runtime files: "
+                + string.Join(", ", missing)
+                + ". Reinstall HerdMe before installing PHP."
+            );
+        }
+
+        Directory.CreateDirectory(destinationDirectory);
+        foreach (var file in VcRuntimeFiles)
+        {
+            File.Copy(
+                Path.Combine(sourceDirectory, file),
+                Path.Combine(destinationDirectory, file),
+                overwrite: true
+            );
+        }
     }
 
     private static void EnsureSupportedCycle(string cycle)
@@ -259,6 +388,8 @@ public sealed class PhpRuntimeInstaller
         extension = fileinfo
         extension = mbstring
         extension = openssl
+        extension = pdo_mysql
+        extension = zip
         date.timezone = UTC
         cgi.fix_pathinfo = 1
         expose_php = Off

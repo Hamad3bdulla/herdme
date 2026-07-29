@@ -534,36 +534,84 @@ public sealed class ServicePackageInstaller
         );
     }
 
-    private static async Task DownloadAndVerifyAsync(
+    internal static async Task DownloadAndVerifyAsync(
         ServicePackageRelease release,
         string destination,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        HttpClient? downloadClient = null,
+        int maximumAttempts = 4,
+        Func<int, TimeSpan>? delayFactory = null
     )
     {
-        await using var source = await HttpClient.GetStreamAsync(release.DownloadUri, cancellationToken);
-        await using var output = File.Create(destination);
+        if (maximumAttempts < 1) throw new ArgumentOutOfRangeException(nameof(maximumAttempts));
+        downloadClient ??= HttpClient;
         var algorithm = release.ChecksumAlgorithm switch
         {
             ServicePackageChecksumAlgorithm.Sha256 => HashAlgorithmName.SHA256,
             ServicePackageChecksumAlgorithm.Md5 => HashAlgorithmName.MD5,
             _ => throw new InvalidDataException("The service package uses an unsupported checksum algorithm.")
         };
-        using var hash = IncrementalHash.CreateHash(algorithm);
-        var buffer = new byte[128 * 1_024];
-        while (true)
+        Exception? lastFailure = null;
+        for (var attempt = 1; attempt <= maximumAttempts; attempt++)
         {
-            var count = await source.ReadAsync(buffer, cancellationToken);
-            if (count == 0) break;
-            await output.WriteAsync(buffer.AsMemory(0, count), cancellationToken);
-            hash.AppendData(buffer, 0, count);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (File.Exists(destination)) File.Delete(destination);
+            try
+            {
+                using var response = await downloadClient.GetAsync(
+                    release.DownloadUri,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken
+                );
+                response.EnsureSuccessStatusCode();
+                await using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
+                await using var output = File.Create(destination);
+                using var hash = IncrementalHash.CreateHash(algorithm);
+                var buffer = new byte[128 * 1_024];
+                while (true)
+                {
+                    var count = await source.ReadAsync(buffer, cancellationToken);
+                    if (count == 0) break;
+                    await output.WriteAsync(buffer.AsMemory(0, count), cancellationToken);
+                    hash.AppendData(buffer, 0, count);
+                }
+                var actual = Convert.ToHexString(hash.GetHashAndReset());
+                if (!actual.Equals(release.Checksum, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new IOException(
+                        $"The {release.DefinitionId} download was incomplete or failed "
+                        + $"{release.ChecksumAlgorithm} verification."
+                    );
+                }
+                return;
+            }
+            catch (Exception error) when (
+                IsRetryableDownloadFailure(error)
+                && !cancellationToken.IsCancellationRequested
+            )
+            {
+                lastFailure = error;
+                if (attempt == maximumAttempts) break;
+                var delay = delayFactory?.Invoke(attempt)
+                    ?? TimeSpan.FromMilliseconds(Math.Min(8_000, 500 * Math.Pow(2, attempt - 1)));
+                if (delay > TimeSpan.Zero) await Task.Delay(delay, cancellationToken);
+            }
         }
-        var actual = Convert.ToHexString(hash.GetHashAndReset());
-        if (!actual.Equals(release.Checksum, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidDataException(
-                $"The {release.DefinitionId} package failed {release.ChecksumAlgorithm} verification."
-            );
-        }
+        if (File.Exists(destination)) File.Delete(destination);
+        throw new InvalidDataException(
+            $"The {release.DefinitionId} download was interrupted or incomplete after "
+            + $"{maximumAttempts} attempts. Check the internet connection and try again.",
+            lastFailure
+        );
+    }
+
+    private static bool IsRetryableDownloadFailure(Exception error)
+    {
+        if (error is IOException) return true;
+        if (error is not HttpRequestException requestError) return false;
+        if (requestError.StatusCode is null) return true;
+        var code = (int)requestError.StatusCode.Value;
+        return code is 408 or 425 or 429 || code is >= 500 and <= 599;
     }
 
     internal static string NormalizeExtractedRuntime(string stagingContainer, string definitionId)

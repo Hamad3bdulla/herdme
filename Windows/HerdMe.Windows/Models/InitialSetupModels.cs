@@ -6,6 +6,7 @@ public enum InitialSetupStage
     LocalDomains,
     Certificate,
     Php,
+    Git,
     Composer,
     Node,
     Finishing,
@@ -19,6 +20,7 @@ public static class InitialSetupStages
         InitialSetupStage.LocalDomains,
         InitialSetupStage.Certificate,
         InitialSetupStage.Php,
+        InitialSetupStage.Git,
         InitialSetupStage.Composer,
         InitialSetupStage.Node,
         InitialSetupStage.Finishing

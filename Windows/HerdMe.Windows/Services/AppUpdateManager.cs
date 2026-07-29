@@ -1,3 +1,4 @@
+using System.Net;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -36,7 +37,7 @@ public sealed class AppUpdateManager
 {
     private const string SignatureAlgorithm = "ECDSA_P256_SHA256";
     private const int MaximumFeedSize = 4 * 1024 * 1024;
-    private static readonly HttpClient HttpClient = new()
+    private static readonly HttpClient DefaultHttpClient = new()
     {
         Timeout = TimeSpan.FromSeconds(60)
     };
@@ -49,17 +50,23 @@ public sealed class AppUpdateManager
     private readonly string currentVersion;
     private readonly int currentBuild;
     private readonly byte[]? verificationKey;
+    private readonly string? fallbackFeedLocation;
+    private readonly HttpClient httpClient;
 
     public AppUpdateManager(
         string feedLocation,
         string currentVersion,
         int currentBuild,
-        string? publicKey = null
+        string? publicKey = null,
+        string? fallbackFeedLocation = null,
+        HttpClient? httpClient = null
     )
     {
         this.feedLocation = feedLocation;
         this.currentVersion = currentVersion;
         this.currentBuild = currentBuild;
+        this.fallbackFeedLocation = fallbackFeedLocation;
+        this.httpClient = httpClient ?? DefaultHttpClient;
         verificationKey = DecodePublicKey(publicKey);
     }
 
@@ -100,7 +107,13 @@ public sealed class AppUpdateManager
                 publicKey = File.ReadAllText(publicKeyPath);
             }
         }
-        return new AppUpdateManager(feed, version, build, publicKey);
+        return new AppUpdateManager(
+            feed,
+            version,
+            build,
+            publicKey,
+            Path.Combine(AppContext.BaseDirectory, "release-manifest.json")
+        );
     }
 
     public async Task<AppUpdateCheck> CheckAsync(
@@ -108,8 +121,8 @@ public sealed class AppUpdateManager
         CancellationToken cancellationToken = default
     )
     {
-        var data = await ReadFeedAsync(cancellationToken);
-        var manifest = DecodeManifest(data, IsRemoteFeed(feedLocation));
+        var feed = await ReadFeedAsync(cancellationToken);
+        var manifest = DecodeManifest(feed.Data, feed.RequireSignature);
         var normalizedChannel = channel.Equals("Beta", StringComparison.OrdinalIgnoreCase)
             ? "beta"
             : "stable";
@@ -127,31 +140,49 @@ public sealed class AppUpdateManager
         return new AppUpdateCheck(currentVersion, currentBuild, available);
     }
 
-    private async Task<byte[]> ReadFeedAsync(CancellationToken cancellationToken)
+    private async Task<FeedPayload> ReadFeedAsync(CancellationToken cancellationToken)
     {
         if (Uri.TryCreate(feedLocation, UriKind.Absolute, out var uri))
         {
             if (uri.Scheme is "http" or "https")
             {
-                using var response = await HttpClient.GetAsync(
+                using var response = await httpClient.GetAsync(
                     uri,
                     HttpCompletionOption.ResponseHeadersRead,
                     cancellationToken
                 );
+                if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone
+                    && fallbackFeedLocation is { } fallback
+                    && File.Exists(fallback))
+                {
+                    return new FeedPayload(
+                        await ReadFileAsync(fallback, cancellationToken),
+                        RequireSignature: false
+                    );
+                }
                 response.EnsureSuccessStatusCode();
                 if (response.Content.Headers.ContentLength is > MaximumFeedSize)
                 {
                     throw new InvalidDataException("The update feed is too large.");
                 }
                 await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
-                return await ReadBoundedAsync(input, cancellationToken);
+                return new FeedPayload(
+                    await ReadBoundedAsync(input, cancellationToken),
+                    RequireSignature: true
+                );
             }
             if (uri.IsFile)
             {
-                return await ReadFileAsync(uri.LocalPath, cancellationToken);
+                return new FeedPayload(
+                    await ReadFileAsync(uri.LocalPath, cancellationToken),
+                    RequireSignature: false
+                );
             }
         }
-        return await ReadFileAsync(feedLocation, cancellationToken);
+        return new FeedPayload(
+            await ReadFileAsync(feedLocation, cancellationToken),
+            RequireSignature: false
+        );
     }
 
     private AppUpdateManifest DecodeManifest(byte[] data, bool requireSignature)
@@ -358,6 +389,8 @@ public sealed class AppUpdateManager
         return Uri.TryCreate(location, UriKind.Absolute, out var uri)
             && uri.Scheme is "http" or "https";
     }
+
+    private sealed record FeedPayload(byte[] Data, bool RequireSignature);
 
     private bool IsNewer(AppUpdateRelease release)
     {

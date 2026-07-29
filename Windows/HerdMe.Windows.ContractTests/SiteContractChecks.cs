@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -18,6 +19,7 @@ internal static partial class ContractChecks
         var freshStore = new SiteConfigurationStore(Path.Combine(supportRoot, "fresh"));
         var freshSettings = freshStore.Load();
         Check(!freshSettings.OnboardingCompleted, "new installations require initial setup");
+        Check(freshSettings.StartAutomatically, "new installations start local sites automatically");
         Check(
             freshSettings.SchemaVersion == SiteConfigurationStore.CurrentSchemaVersion,
             "new Windows site settings use the current schema"
@@ -34,6 +36,10 @@ internal static partial class ContractChecks
             "settings created before onboarding remain completed"
         );
         Check(
+            migratedLegacySettings.StartAutomatically,
+            "legacy settings without an automatic-start field adopt automatic site startup"
+        );
+        Check(
             migratedLegacySettings.SchemaVersion == SiteConfigurationStore.CurrentSchemaVersion
                 && File.ReadAllText(legacyStore.SettingsPath).Contains(
                     $"\"SchemaVersion\": {SiteConfigurationStore.CurrentSchemaVersion}",
@@ -46,6 +52,7 @@ internal static partial class ContractChecks
                 InitialSetupStage.LocalDomains,
                 InitialSetupStage.Certificate,
                 InitialSetupStage.Php,
+                InitialSetupStage.Git,
                 InitialSetupStage.Composer,
                 InitialSetupStage.Node,
                 InitialSetupStage.Finishing
@@ -315,6 +322,15 @@ internal static partial class ContractChecks
             WindowsCertificateManager.ServerCertificateCacheKey(["a.test"])
                 != WindowsCertificateManager.ServerCertificateCacheKey(["a.test", "b.test"]),
             "Windows server certificates are renewed when the domain set changes"
+        );
+        Check(
+            WindowsCertificateManager.Pkcs12KeyStorageFlags.HasFlag(
+                X509KeyStorageFlags.UserKeySet
+            )
+                && !WindowsCertificateManager.Pkcs12KeyStorageFlags.HasFlag(
+                    X509KeyStorageFlags.EphemeralKeySet
+                ),
+            "Windows TLS certificates use an SChannel-compatible private key"
         );
         Check(
             WindowsCredentialStore.BuildTarget(

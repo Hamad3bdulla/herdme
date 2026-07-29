@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace HerdMe.Windows;
 
@@ -42,11 +43,20 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         InitializeTrayIcon();
-        var acceptanceRun = Environment.GetCommandLineArgs().Contains(
+        var commandLine = Environment.GetCommandLineArgs();
+        var acceptanceRun = commandLine.Contains(
             "--acceptance",
             StringComparer.OrdinalIgnoreCase
         );
-        MainWindow = new MainWindow(services, skipOnboarding: acceptanceRun);
+        var onboardingAcceptance = commandLine.Contains(
+            "--acceptance-onboarding",
+            StringComparer.OrdinalIgnoreCase
+        );
+        MainWindow = new MainWindow(
+            services,
+            skipOnboarding: acceptanceRun,
+            forceOnboarding: onboardingAcceptance
+        );
         MainWindow.InitialSetupCompleted += (_, _) => _ = StartBackgroundServicesOnceAsync();
         MainWindow.Closed += MainWindow_Closed;
         if (!MainWindow.RequiresOnboarding
@@ -83,7 +93,7 @@ public partial class App : Application
     {
         var openCommand = new XamlUICommand
         {
-            Label = AppLocalization.Get("TrayOpenCommand.Label"),
+            Label = AppLocalization.Get("TrayOpenCommandLabel"),
             IconSource = new SymbolIconSource { Symbol = Symbol.OpenPane }
         };
         openCommand.ExecuteRequested += (_, _) =>
@@ -93,19 +103,19 @@ public partial class App : Application
         };
         var quitCommand = new XamlUICommand
         {
-            Label = AppLocalization.Get("TrayQuitCommand.Label"),
+            Label = AppLocalization.Get("TrayQuitCommandLabel"),
             IconSource = new SymbolIconSource { Symbol = Symbol.ClosePane }
         };
         quitCommand.ExecuteRequested += QuitCommand_ExecuteRequested;
         var startCommand = new XamlUICommand
         {
-            Label = AppLocalization.Get("TrayStartAllCommand.Label"),
+            Label = AppLocalization.Get("TrayStartAllCommandLabel"),
             IconSource = new SymbolIconSource { Symbol = Symbol.Play }
         };
         startCommand.ExecuteRequested += StartCommand_ExecuteRequested;
         var stopCommand = new XamlUICommand
         {
-            Label = AppLocalization.Get("TrayStopAllCommand.Label"),
+            Label = AppLocalization.Get("TrayStopAllCommandLabel"),
             IconSource = new SymbolIconSource { Symbol = Symbol.Stop }
         };
         stopCommand.ExecuteRequested += StopCommand_ExecuteRequested;
@@ -138,16 +148,10 @@ public partial class App : Application
         {
             Visibility = Visibility.Visible,
             ToolTipText = "HerdMe",
-            ContextMenuMode = ContextMenuMode.SecondWindow,
+            ContextMenuMode = ContextMenuMode.PopupMenu,
             LeftClickCommand = openCommand,
             NoLeftClickDelay = true,
-            IconSource = new GeneratedIconSource
-            {
-                Text = "H",
-                Foreground = new SolidColorBrush(
-                    global::Windows.UI.Color.FromArgb(255, 227, 27, 35)
-                )
-            },
+            IconSource = new BitmapImage(new Uri("ms-appx:///Assets/HerdMe.ico")),
             ContextFlyout = contextMenu
         };
         trayIcon.ForceCreate();
@@ -210,6 +214,10 @@ public partial class App : Application
         await StartAndLogAsync("dump capture", () => services.Dumps.StartAsync());
         await StartAndLogAsync("managed services", () => services.Services.StartEnabledAsync());
         await StartConfiguredEnvironmentAsync();
+        await StartAndLogAsync(
+            "command-line tools",
+            () => services.InitialSetup.EnsureCommandLineToolsAsync()
+        );
     }
 
     private Task StartBackgroundServicesOnceAsync()

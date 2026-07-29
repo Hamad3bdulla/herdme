@@ -15,6 +15,10 @@ internal static partial class ContractChecks
 {
     internal static async Task VerifyServiceContractsAsync(string supportRoot)
     {
+        Check(
+            new ManagedServiceInstance().StartAutomatically,
+            "new managed service instances start automatically"
+        );
         Check(ManagedServiceCatalog.Get("mongodb").DefaultPort == 27_017, "Windows service catalog includes MongoDB");
         Check(ManagedServiceCatalog.Get("mysql").DefaultPort == 3_306, "Windows service catalog includes MySQL");
         Check(ManagedServiceCatalog.Get("postgresql").DefaultPort == 5_432, "Windows service catalog includes PostgreSQL");
@@ -410,9 +414,41 @@ internal static partial class ContractChecks
             "--port=3307",
             "--bind-address=127.0.0.1",
             "--mysqlx=0",
-            "--skip-name-resolve",
             "--pid-file=" + Path.Combine(mysqlData, "mysql.pid")
         ]), "MySQL launch disables its extra listener and binds its SQL port to loopback");
+        var mariaDbInstance = new ManagedServiceInstance
+        {
+            DefinitionId = "mariadb",
+            Name = "MariaDB",
+            Port = 3_306
+        };
+        var mariaDbExecutable = Path.Combine("C:\\HerdMe", "mariadb", "bin", "mariadbd.exe");
+        var mariaDbData = Path.Combine("C:\\HerdMe", "Services", "mariadb", "data");
+        var mariaDbRuntime = Directory.GetParent(Path.GetDirectoryName(mariaDbExecutable)!)!.FullName;
+        var mariaDbLaunch = WindowsServiceManager.BuildLaunchSpec(
+            mariaDbInstance,
+            mariaDbExecutable,
+            mariaDbData
+        );
+        Check(mariaDbLaunch.Arguments.SequenceEqual([
+            "--no-defaults",
+            "--console",
+            "--basedir=" + mariaDbRuntime,
+            "--datadir=" + mariaDbData,
+            "--port=3306",
+            "--bind-address=127.0.0.1",
+            "--pid-file=" + Path.Combine(mariaDbData, "mariadb.pid")
+        ]), "MariaDB launch binds its SQL port to loopback without disabling local account matching");
+        var mariaDbInitialization = WindowsServiceManager.BuildMariaDbInitializationArguments(
+            mariaDbData,
+            mariaDbInstance.Port,
+            environmentCredentials
+        );
+        Check(mariaDbInitialization.SequenceEqual([
+            "--datadir=" + mariaDbData,
+            "--password=" + environmentCredentials.Secret,
+            "--port=3306"
+        ]), "MariaDB initialization uses only options supported by its Windows initializer");
         var postgreSqlInstance = new ManagedServiceInstance
         {
             DefinitionId = "postgresql",

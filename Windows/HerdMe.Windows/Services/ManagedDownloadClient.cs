@@ -5,7 +5,7 @@ namespace HerdMe.Windows.Services;
 public static class ManagedDownloadClient
 {
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromMinutes(10);
-    public const int DefaultMaximumAttempts = 3;
+    public const int DefaultMaximumAttempts = 5;
 
     public static HttpClient Create(TimeSpan? timeout = null)
     {

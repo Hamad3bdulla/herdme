@@ -37,7 +37,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         IEnumerable<LocalSiteDefinition> sites,
         int phpFastCgiPort,
         int preferredPort = 80,
-        int fallbackPort = 8_080,
+        int? fallbackPort = 8_080,
         X509Certificate2? serverCertificate = null,
         CancellationToken cancellationToken = default
     )
@@ -198,7 +198,22 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             }
             finally
             {
-                secureStream?.Dispose();
+                if (secureStream is not null)
+                {
+                    try
+                    {
+                        await secureStream.ShutdownAsync();
+                    }
+                    catch (Exception error) when (
+                        error is AuthenticationException
+                            or IOException
+                            or InvalidOperationException
+                            or SocketException
+                    )
+                    {
+                    }
+                    secureStream.Dispose();
+                }
             }
         }
     }
@@ -738,10 +753,16 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         return host.Trim().TrimEnd('.').ToLowerInvariant();
     }
 
-    private static int AvailablePort(int preferredPort, int fallbackPort)
+    private static int AvailablePort(int preferredPort, int? fallbackPort)
     {
         if (CanListen(preferredPort)) return preferredPort;
-        for (var port = fallbackPort; port < fallbackPort + 100; port++)
+        if (fallbackPort is null)
+        {
+            throw new InvalidOperationException(
+                $"Local site port {preferredPort} is unavailable. Stop the application using this port, then retry."
+            );
+        }
+        for (var port = fallbackPort.Value; port < fallbackPort.Value + 100; port++)
         {
             if (port != preferredPort && CanListen(port)) return port;
         }

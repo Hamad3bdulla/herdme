@@ -10,12 +10,23 @@ public sealed partial class NodePage : Page
 {
     private static IReadOnlyList<string> SupportedMajors => RuntimeCatalog.WindowsNodeMajors;
     private readonly NodeRuntimeInstaller installer;
+    private readonly ComposerToolManager toolManager;
+    private readonly PhpRuntimePolicy runtimePolicy;
+    private readonly WindowsUserPathManager userPathManager;
 
     public ObservableCollection<NodeRuntimeRow> Rows { get; } = [];
 
-    public NodePage(NodeRuntimeInstaller installer)
+    public NodePage(
+        NodeRuntimeInstaller installer,
+        ComposerToolManager toolManager,
+        PhpRuntimePolicy runtimePolicy,
+        WindowsUserPathManager userPathManager
+    )
     {
         this.installer = installer;
+        this.toolManager = toolManager;
+        this.runtimePolicy = runtimePolicy;
+        this.userPathManager = userPathManager;
         InitializeComponent();
     }
 
@@ -36,6 +47,7 @@ public sealed partial class NodePage : Page
         try
         {
             var release = await installer.InstallAsync(major);
+            SynchronizeUserPath();
             OperationStatusText.Text = AppLocalization.Format(
                 "NodeVersionInstalled",
                 release.Version
@@ -62,6 +74,7 @@ public sealed partial class NodePage : Page
                     AppLocalization.Format("NodeMajorNotInstalled", major)
                 );
             installer.SetActive(version);
+            SynchronizeUserPath();
             await RefreshRowsAsync();
         }
         catch (Exception error)
@@ -88,6 +101,7 @@ public sealed partial class NodePage : Page
         try
         {
             installer.Remove(version);
+            SynchronizeUserPath();
             await RefreshRowsAsync();
         }
         catch (Exception error)
@@ -134,6 +148,13 @@ public sealed partial class NodePage : Page
         OperationProgress.IsActive = working;
         OperationStatusText.Text = status;
         IsEnabled = !working;
+    }
+
+    private void SynchronizeUserPath()
+    {
+        userPathManager.Synchronize(
+            toolManager.CommandLineDirectories(runtimePolicy.Load().PhpCycle)
+        );
     }
 
     private async Task ShowErrorAsync(string message)

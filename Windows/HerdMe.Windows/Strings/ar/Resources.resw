@@ -8,6 +8,10 @@
   <data name="TrayQuitCommand.Label" xml:space="preserve"><value>إنهاء HerdMe</value></data>
   <data name="TrayStartAllCommand.Label" xml:space="preserve"><value>تشغيل الكل</value></data>
   <data name="TrayStopAllCommand.Label" xml:space="preserve"><value>إيقاف الكل</value></data>
+  <data name="TrayOpenCommandLabel" xml:space="preserve"><value>فتح HerdMe</value></data>
+  <data name="TrayQuitCommandLabel" xml:space="preserve"><value>إنهاء HerdMe</value></data>
+  <data name="TrayStartAllCommandLabel" xml:space="preserve"><value>تشغيل الكل</value></data>
+  <data name="TrayStopAllCommandLabel" xml:space="preserve"><value>إيقاف الكل</value></data>
   <data name="NavGeneral.Content" xml:space="preserve"><value>عام</value></data>
   <data name="NavSites.Content" xml:space="preserve"><value>المواقع</value></data>
   <data name="NavPhp.Content" xml:space="preserve"><value>PHP</value></data>
@@ -20,9 +24,10 @@
   <data name="NavAbout.Content" xml:space="preserve"><value>حول</value></data>
   <data name="OnboardingWelcomeTitle.Text" xml:space="preserve"><value>مرحباً بك في HerdMe</value></data>
   <data name="OnboardingWelcomeDescription.Text" xml:space="preserve"><value>يحتاج HerdMe إلى إعداد بيئة التطوير المحلية. سيطلب Windows موافقة المسؤول.</value></data>
-  <data name="OnboardingSetupSummary.Text" xml:space="preserve"><value>PHP {0}  |  Composer  |  Laravel Installer  |  Node.js {1}  |  HTTPS</value></data>
+  <data name="OnboardingSetupSummaryText" xml:space="preserve"><value>PHP {0}  |  Git  |  Composer  |  Laravel Installer  |  Node.js {1}  |  HTTPS</value></data>
   <data name="OnboardingSetupButton.Text" xml:space="preserve"><value>إعداد HerdMe</value></data>
   <data name="OnboardingFailureTitle.Text" xml:space="preserve"><value>تعذر إكمال الإعداد</value></data>
+  <data name="OnboardingFailureMessage" xml:space="preserve"><value>توقف الإعداد أثناء: {0}. أعد المحاولة. إذا تكرر الفشل، افتح التفاصيل التقنية لمعرفة الخطأ.</value></data>
   <data name="OnboardingFailureDetails.Header" xml:space="preserve"><value>التفاصيل التقنية</value></data>
   <data name="OnboardingCopyFailureDetailsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>نسخ التفاصيل التقنية</value></data>
   <data name="OnboardingCopyFailureDetailsTooltip.Text" xml:space="preserve"><value>نسخ التفاصيل التقنية</value></data>
@@ -38,6 +43,8 @@
   <data name="OnboardingStageCertificateDetail" xml:space="preserve"><value>إضافة جهة شهادات HerdMe المحلية إلى مخزن الثقة في Windows.</value></data>
   <data name="OnboardingStagePhpTitle" xml:space="preserve"><value>تثبيت PHP {0}</value></data>
   <data name="OnboardingStagePhpDetail" xml:space="preserve"><value>تثبيت بيئة التشغيل الافتراضية والتحقق من كل إضافات Laravel المطلوبة.</value></data>
+  <data name="OnboardingStageGitTitle" xml:space="preserve"><value>تثبيت Git</value></data>
+  <data name="OnboardingStageGitDetail" xml:space="preserve"><value>تثبيت نسخة Git for Windows الموثقة والمستخدمة في المشاريع وأدوات سطر الأوامر.</value></data>
   <data name="OnboardingStageComposerTitle" xml:space="preserve"><value>تثبيت Composer وLaravel Installer</value></data>
   <data name="OnboardingStageComposerDetail" xml:space="preserve"><value>تجهيز أدوات PHP المُدارة والمستخدمة لإنشاء مشاريع Laravel.</value></data>
   <data name="OnboardingStageNodeTitle" xml:space="preserve"><value>تثبيت Node.js {0}</value></data>
@@ -53,6 +60,7 @@
   <data name="GeneralLaunchAtSigninTitle.Text" xml:space="preserve"><value>التشغيل عند تسجيل الدخول</value></data>
   <data name="GeneralLaunchAtSigninDescription.Text" xml:space="preserve"><value>إبقاء المواقع المحلية متاحة بعد تسجيل الدخول إلى Windows.</value></data>
   <data name="GeneralLocalDomainsTitle.Text" xml:space="preserve"><value>النطاقات المحلية</value></data>
+  <data name="GeneralDomainSuffixLabel.Text" xml:space="preserve"><value>لاحقة النطاق</value></data>
   <data name="GeneralDomainsChecking.Text" xml:space="preserve"><value>جارٍ التحقق</value></data>
   <data name="GeneralRemoveDomains.Content" xml:space="preserve"><value>إزالة</value></data>
   <data name="GeneralSetupDomains.Content" xml:space="preserve"><value>إعداد</value></data>
@@ -164,16 +172,14 @@
   <data name="ServicesPortColumn.Text" xml:space="preserve"><value>المنفذ</value></data>
   <data name="ServicesVersionColumn.Text" xml:space="preserve"><value>الإصدار</value></data>
   <data name="ServicesStatusColumn.Text" xml:space="preserve"><value>الحالة</value></data>
-  <data name="ServicesAutomaticStart.OnContent" xml:space="preserve"><value>تلقائي</value></data>
-  <data name="ServicesAutomaticStart.OffContent" xml:space="preserve"><value>تلقائي</value></data>
+  <data name="ServicesAutomaticStartMenu.Text" xml:space="preserve"><value>تشغيل تلقائي</value></data>
+  <data name="ServicesMoreTooltip.Text" xml:space="preserve"><value>المزيد من إجراءات الخدمة</value></data>
   <data name="ServicesInstallTooltip.Text" xml:space="preserve"><value>تثبيت بيئة التشغيل أو تحديثها</value></data>
   <data name="ServicesOpenDataTooltip.Text" xml:space="preserve"><value>فتح مجلد البيانات</value></data>
   <data name="ServicesEnvironmentTooltip.Text" xml:space="preserve"><value>إضافة اتصال الخدمة إلى ملف .env لأحد المواقع</value></data>
   <data name="ServicesConsoleTooltip.Text" xml:space="preserve"><value>فتح لوحة تحكم الخدمة</value></data>
-  <data name="ServicesConsoleButton.Text" xml:space="preserve"><value>لوحة التحكم</value></data>
   <data name="ServicesCopyConnectionTooltip.Text" xml:space="preserve"><value>نسخ رابط الاتصال بقاعدة البيانات</value></data>
   <data name="ServicesTablePlusTooltip.Text" xml:space="preserve"><value>فتح قاعدة البيانات في TablePlus</value></data>
-  <data name="ServicesTablePlusButton.Text" xml:space="preserve"><value>TablePlus</value></data>
   <data name="ServicesDeleteTooltip.Text" xml:space="preserve"><value>حذف نسخة الخدمة</value></data>
   <data name="ServicesEmptyState.Text" xml:space="preserve"><value>لم تُضف أي خدمات</value></data>
   <data name="ServicesPortOwnerHerdMe" xml:space="preserve"><value>خدمة أخرى في HerdMe</value></data>
@@ -208,10 +214,10 @@
   <data name="SitesPageTitle.Text" xml:space="preserve"><value>المواقع</value></data>
   <data name="SitesEnvironmentStatus.Text" xml:space="preserve"><value>متوقفة</value></data>
   <data name="SitesCreateLaravelButton.Text" xml:space="preserve"><value>إنشاء مشروع Laravel</value></data>
-  <data name="SitesEnvironmentButton.Text" xml:space="preserve"><value>تشغيل الكل</value></data>
-  <data name="SitesDomainField.Header" xml:space="preserve"><value>النطاق</value></data>
   <data name="SitesRefreshTooltip.Text" xml:space="preserve"><value>تحديث المواقع</value></data>
-  <data name="SitesFoldersExpander.Header" xml:space="preserve"><value>مجلدات المواقع والمشاريع المرتبطة</value></data>
+  <data name="SitesFoldersExpander.Header" xml:space="preserve"><value>المجلدات المضافة (Park) والمشاريع المرتبطة</value></data>
+  <data name="SitesParkFolderButton.Text" xml:space="preserve"><value>إضافة مجلد Park</value></data>
+  <data name="SitesParkFolderMissing" xml:space="preserve"><value>المجلد المحدد غير موجود: {0}</value></data>
   <data name="SitesRootPathField.PlaceholderText" xml:space="preserve"><value>مجلد المواقع</value></data>
   <data name="SitesChooseFolderTooltip.Text" xml:space="preserve"><value>اختيار مجلد</value></data>
   <data name="SitesAddFolderTooltip.Text" xml:space="preserve"><value>إضافة مجلد</value></data>

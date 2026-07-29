@@ -9,6 +9,7 @@ retain their upstream licenses.
 | --- | --- | --- |
 | PHP | PHP License 3.01 | https://www.php.net/license/3_01.txt |
 | Xdebug | PHP License 3.01 | https://xdebug.org/docs/license |
+| Git for Windows (MinGit) | GPL-2.0 | https://github.com/git-for-windows/git |
 | Composer | MIT | https://github.com/composer/composer |
 | Laravel Installer | MIT | https://github.com/laravel/installer |
 | Node.js | MIT | https://github.com/nodejs/node |
@@ -25,6 +26,7 @@ retain their upstream licenses.
 | RustFS | Apache-2.0 | https://github.com/rustfs/rustfs |
 | H.NotifyIcon | MIT | https://github.com/HavenDV/H.NotifyIcon |
 | Windows App SDK | MIT | https://github.com/microsoft/WindowsAppSDK |
+| Microsoft Visual C++ Runtime | Microsoft Software License Terms | https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/ |
 
 Downloaded binaries are stored only in HerdMe-owned application data and are
 not copied into source distributions or relicensed under HerdMe's MIT license.
@@ -37,12 +39,19 @@ trust model is intentionally different from its direct archive downloads.
 Node.js archives are
 downloaded from the official Node.js release directory and must match the exact
 filename and SHA-256 digest published in that release's `SHASUMS256.txt` before
-they are unpacked. The Composer installer must match Composer's separately
+they are unpacked. The Windows MinGit archive is selected from the official Git
+for Windows GitHub release and must match the asset's published size and
+SHA-256 digest before it is unpacked. The Composer installer must match Composer's separately
 published SHA-384 signature before it is executed.
 Xdebug source archives for macOS are downloaded from `xdebug.org` only after
 HerdMe extracts the exact release filename and SHA-256 digest published on the
 official download page. The archive digest and every archive path are checked
 before extraction and compilation.
+
+The Windows build copies the signed x64 Microsoft VC143 app-local runtime from
+the licensed Visual Studio C++ build tools into the HerdMe package. HerdMe then
+copies those runtime files beside each managed PHP executable so PHP works on a
+clean Windows installation without a system-wide Visual C++ installation.
 
 Windows service packages require their published SHA-256 digest when available.
 The MySQL Windows ZIP is the explicit exception: Oracle currently publishes MD5

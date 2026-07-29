@@ -50,6 +50,7 @@
     <Compile Include="../HerdMe.Windows/Services/ApplicationDiagnostics.cs" Link="Services/ApplicationDiagnostics.cs" />
     <Compile Include="../HerdMe.Windows/Services/DiagnosticLog.cs" Link="Services/DiagnosticLog.cs" />
     <Compile Include="../HerdMe.Windows/Services/FastCgiClient.cs" Link="Services/FastCgiClient.cs" />
+    <Compile Include="../HerdMe.Windows/Services/GitRuntimeInstaller.cs" Link="Services/GitRuntimeInstaller.cs" />
     <Compile Include="../HerdMe.Windows/Services/LaravelProjectCreator.cs" Link="Services/LaravelProjectCreator.cs" />
     <Compile Include="../HerdMe.Windows/Services/LocalHttpSiteServer.cs" Link="Services/LocalHttpSiteServer.cs" />
     <Compile Include="../HerdMe.Windows/Services/NodeRuntimeInstaller.cs" Link="Services/NodeRuntimeInstaller.cs" />
@@ -73,6 +74,7 @@
     <Compile Include="../HerdMe.Windows/Services/WindowsCertificateManager.cs" Link="Services/WindowsCertificateManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsLocalEnvironment.cs" Link="Services/WindowsLocalEnvironment.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsStartupManager.cs" Link="Services/WindowsStartupManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/WindowsUserPathManager.cs" Link="Services/WindowsUserPathManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/XdebugManager.cs" Link="Services/XdebugManager.cs" />
   </ItemGroup>
 

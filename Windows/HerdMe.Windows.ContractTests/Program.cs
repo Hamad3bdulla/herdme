@@ -13,6 +13,11 @@ using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
 
 var npmRunnerFixture = Environment.GetEnvironmentVariable("HERDME_NPM_RUNNER_FIXTURE");
+if (Environment.GetEnvironmentVariable("HERDME_CORE_CLIENT_FAILURE_FIXTURE") == "1")
+{
+    Environment.ExitCode = 42;
+    return;
+}
 if (npmRunnerFixture == "arguments")
 {
     Console.Write(JsonSerializer.Serialize(args));
@@ -30,7 +35,7 @@ if (args.SequenceEqual(["-m"], StringComparer.Ordinal))
     foreach (var module in new[]
     {
         "ctype", "curl", "dom", "fileinfo", "filter", "hash", "mbstring",
-        "openssl", "pcre", "pdo", "session", "tokenizer", "xml"
+        "openssl", "pcre", "pdo", "session", "tokenizer", "xml", "zip"
     })
     {
         Console.WriteLine(module);
@@ -40,11 +45,19 @@ if (args.SequenceEqual(["-m"], StringComparer.Ordinal))
 
 var verifyLiveServices = args.Contains("--live-service-releases", StringComparer.Ordinal);
 var verifyLiveRuntimes = args.Contains("--live-runtime-releases", StringComparer.Ordinal);
-if (verifyLiveServices || verifyLiveRuntimes)
+var verifyLiveGitInstall = args.Contains("--live-git-install", StringComparer.Ordinal);
+var verifyLiveManagedCommandPath = args.Contains(
+    "--live-managed-command-path",
+    StringComparer.Ordinal
+);
+if (verifyLiveServices || verifyLiveRuntimes || verifyLiveGitInstall
+    || verifyLiveManagedCommandPath)
 {
     if (verifyLiveServices) await VerifyLiveServiceReleasesAsync();
     if (verifyLiveRuntimes) await VerifyLiveRuntimeReleasesAsync();
-    Console.WriteLine("HerdMe Windows live release checks passed");
+    if (verifyLiveGitInstall) await VerifyLiveGitInstallAsync();
+    if (verifyLiveManagedCommandPath) await VerifyLiveManagedCommandPathAsync();
+    Console.WriteLine("HerdMe Windows live checks passed");
     return;
 }
 

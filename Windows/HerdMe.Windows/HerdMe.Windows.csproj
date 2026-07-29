@@ -15,6 +15,7 @@
     <ProjectPriIndexName>HerdMe.Windows</ProjectPriIndexName>
     <HerdMeVersionFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../VERSION'))</HerdMeVersionFile>
     <HerdMeBuildNumberFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../BUILD_NUMBER'))</HerdMeBuildNumberFile>
+    <HerdMeVCRuntimeDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../build/windows-vc143-runtime'))</HerdMeVCRuntimeDirectory>
     <HerdMeVersion>$([System.IO.File]::ReadAllText('$(HerdMeVersionFile)').Trim())</HerdMeVersion>
     <HerdMeBuildNumber>$([System.IO.File]::ReadAllText('$(HerdMeBuildNumberFile)').Trim())</HerdMeBuildNumber>
     <Version>$(HerdMeVersion)</Version>
@@ -35,6 +36,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="$(HerdMeVCRuntimeDirectory)\*.dll" Condition="Exists('$(HerdMeVCRuntimeDirectory)')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Link>Prerequisites\VC143\%(Filename)%(Extension)</Link>
+      <TargetPath>Prerequisites\VC143\%(Filename)%(Extension)</TargetPath>
+    </Content>
+    <Content Include="Assets\HerdMe.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>Assets\HerdMe.ico</TargetPath>
+    </Content>
     <Content Include="Runtime\herdme-core.exe" Condition="Exists('Runtime\herdme-core.exe')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>Runtime\herdme-core.exe</TargetPath>

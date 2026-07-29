@@ -10,6 +10,7 @@ public sealed class WindowsCertificateManager
     internal const string CredentialScope = "Certificates/v1";
     internal const string AuthorityCredentialKind = "authority";
     internal const string ServerCredentialKind = "server";
+    internal const X509KeyStorageFlags Pkcs12KeyStorageFlags = X509KeyStorageFlags.UserKeySet;
     private static readonly TimeSpan ServerRenewalWindow = TimeSpan.FromDays(30);
     private readonly WindowsCredentialStore credentialStore;
     private readonly string certificateDirectory;
@@ -337,7 +338,7 @@ public sealed class WindowsCertificateManager
         return new X509Certificate2(
             contents,
             password,
-            X509KeyStorageFlags.EphemeralKeySet
+            Pkcs12KeyStorageFlags
         );
     }
 #pragma warning restore SYSLIB0057

@@ -55,6 +55,39 @@ internal static partial class ContractChecks
             extensions.Compatible && extensions.Missing.Count == 0,
             "CoreClient pipes PHP module output through the real core executable"
         );
+
+        var previousFailureFixture = Environment.GetEnvironmentVariable(
+            "HERDME_CORE_CLIENT_FAILURE_FIXTURE"
+        );
+        try
+        {
+            Environment.SetEnvironmentVariable("HERDME_CORE_CLIENT_FAILURE_FIXTURE", "1");
+            InvalidOperationException? processFailure = null;
+            try
+            {
+                await new CoreClient(contractExecutable).DoctorAsync();
+            }
+            catch (InvalidOperationException error)
+            {
+                processFailure = error;
+            }
+            Check(
+                processFailure?.Message.Contains(
+                    Path.GetFileName(contractExecutable),
+                    StringComparison.Ordinal
+                ) == true
+                    && processFailure.Message.Contains("exit code 42", StringComparison.Ordinal)
+                    && processFailure.Message.Contains("0x0000002A", StringComparison.Ordinal),
+                "CoreClient reports the failed executable and numeric exit code"
+            );
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(
+                "HERDME_CORE_CLIENT_FAILURE_FIXTURE",
+                previousFailureFixture
+            );
+        }
     }
 
     internal static string ContractExecutablePath()
@@ -250,40 +283,6 @@ internal static partial class ContractChecks
         Directory.CreateDirectory(externalRoot);
         await File.WriteAllTextAsync(Path.Combine(externalRoot, "secret.txt"), "external secret must not be served");
         var externalLink = Path.Combine(publicRoot, "external-link");
-        try
-        {
-            Directory.CreateSymbolicLink(externalLink, externalRoot);
-        }
-        catch (Exception error) when (
-            OperatingSystem.IsWindows()
-            && error is IOException or UnauthorizedAccessException or PlatformNotSupportedException
-        )
-        {
-            using var junction = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe")
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                ArgumentList =
-                {
-                    "/d",
-                    "/s",
-                    "/c",
-                    $"mklink /J \"{externalLink}\" \"{externalRoot}\""
-                }
-            }) ?? throw new InvalidOperationException("Windows could not start mklink for the junction contract.");
-            var junctionOutput = await junction.StandardOutput.ReadToEndAsync();
-            var junctionError = await junction.StandardError.ReadToEndAsync();
-            await junction.WaitForExitAsync();
-            if (junction.ExitCode != 0 || !Directory.Exists(externalLink))
-            {
-                throw new InvalidOperationException(
-                    $"Windows could not create the junction contract (exit {junction.ExitCode}): "
-                    + junctionOutput + junctionError
-                );
-            }
-        }
 
         var occupiedReservation = new TcpListener(IPAddress.Loopback, 0);
         occupiedReservation.Start();
@@ -302,6 +301,29 @@ internal static partial class ContractChecks
                 fallbackPort: fallbackPort
             );
             Check(selectedFallback == fallbackPort, "local HTTP falls back to the configured high port");
+
+            var exactPortRejected = false;
+            await using var exactPortServer = new LocalHttpSiteServer();
+            try
+            {
+                await exactPortServer.StartAsync(
+                    [new LocalSiteDefinition("exact.local-test", siteRoot)],
+                    phpFastCgiPort: 1,
+                    preferredPort: occupiedPort,
+                    fallbackPort: null
+                );
+            }
+            catch (InvalidOperationException error)
+            {
+                exactPortRejected = error.Message.Contains(
+                    occupiedPort.ToString(),
+                    StringComparison.Ordinal
+                );
+            }
+            Check(
+                exactPortRejected,
+                "portless local-site mode rejects a hidden fallback port"
+            );
         }
         finally
         {
@@ -473,10 +495,56 @@ internal static partial class ContractChecks
         );
         Check(absoluteTraversal.StartsWith("HTTP/1.1 403 Forbidden\r\n", StringComparison.Ordinal), "local HTTP blocks traversal in absolute proxy targets");
 
-        var reparseEscape = await SendHttpRequestAsync(
-            port,
-            "GET /external-link/secret.txt HTTP/1.1\r\nHost: demo.local-test\r\nConnection: close\r\n\r\n"
-        );
+        string reparseEscape;
+        try
+        {
+            try
+            {
+                Directory.CreateSymbolicLink(externalLink, externalRoot);
+            }
+            catch (Exception error) when (
+                OperatingSystem.IsWindows()
+                && error is IOException or UnauthorizedAccessException or PlatformNotSupportedException
+            )
+            {
+                using var junction = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe")
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    ArgumentList =
+                    {
+                        "/d",
+                        "/s",
+                        "/c",
+                        "mklink",
+                        "/J",
+                        externalLink,
+                        externalRoot
+                    }
+                }) ?? throw new InvalidOperationException("Windows could not start mklink for the junction contract.");
+                var junctionOutput = await junction.StandardOutput.ReadToEndAsync();
+                var junctionError = await junction.StandardError.ReadToEndAsync();
+                await junction.WaitForExitAsync();
+                if (junction.ExitCode != 0 || !Directory.Exists(externalLink))
+                {
+                    throw new InvalidOperationException(
+                        $"Windows could not create the junction contract (exit {junction.ExitCode}): "
+                        + junctionOutput + junctionError
+                    );
+                }
+            }
+
+            reparseEscape = await SendHttpRequestAsync(
+                port,
+                "GET /external-link/secret.txt HTTP/1.1\r\nHost: demo.local-test\r\nConnection: close\r\n\r\n"
+            );
+        }
+        finally
+        {
+            if (Directory.Exists(externalLink)) Directory.Delete(externalLink);
+        }
         Check(
             reparseEscape.StartsWith("HTTP/1.1 403 Forbidden\r\n", StringComparison.Ordinal),
             "local HTTP blocks symlink and junction escapes outside the document root"
@@ -821,6 +889,16 @@ internal static partial class ContractChecks
         Check(Version.TryParse(laravel, out _), "Laravel Installer metadata includes a stable version");
         Console.WriteLine($"laravel-installer: {laravel}");
 
+        var gitInstaller = new GitRuntimeInstaller();
+        var git = await gitInstaller.ResolveReleaseAsync(timeout.Token);
+        Check(Version.TryParse(git.Version, out _), "Git release metadata includes a stable version");
+        Check(git.FileName.EndsWith("-64-bit.zip", StringComparison.Ordinal), "Git selects MinGit x64");
+        Check(git.Size > 0, "Git release metadata includes the archive size");
+        Check(git.Sha256.Length == 64 && git.Sha256.All(Uri.IsHexDigit), "Git includes SHA-256");
+        Check(git.DownloadUri.Scheme == Uri.UriSchemeHttps, "Git uses HTTPS");
+        await ProbeDownloadAsync(probe, git.DownloadUri, "Git for Windows", timeout.Token);
+        Console.WriteLine($"git: {git.Version} [Sha256] {git.DownloadUri}");
+
         var xdebugMetadata = await probe.GetStringAsync(
             "https://api.github.com/repos/xdebug/xdebug/releases/latest",
             timeout.Token
@@ -845,6 +923,199 @@ internal static partial class ContractChecks
         finally
         {
             if (Directory.Exists(xdebugRoot)) Directory.Delete(xdebugRoot, true);
+        }
+    }
+
+    internal static async Task VerifyLiveGitInstallAsync()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            throw new PlatformNotSupportedException("The live MinGit install requires Windows.");
+        }
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+        var supportRoot = Path.Combine(
+            Path.GetTempPath(),
+            "herdme-live-git-" + Guid.NewGuid().ToString("N")
+        );
+        Directory.CreateDirectory(supportRoot);
+        try
+        {
+            var installer = new GitRuntimeInstaller(supportRoot);
+            var git = await installer.EnsureInstalledAsync(timeout.Token);
+            Check(File.Exists(git), "the live MinGit install produces cmd\\git.exe");
+
+            var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["PATH"] = string.Join(Path.PathSeparator, [
+                    Path.GetDirectoryName(git)!,
+                    Environment.SystemDirectory
+                ])
+            };
+            var cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+            var version = await ComposerToolManager.RunAsync(
+                cmd,
+                ["/d", "/s", "/c", "git --version"],
+                supportRoot,
+                environment,
+                timeout.Token
+            );
+            Check(
+                version.StartsWith("git version ", StringComparison.OrdinalIgnoreCase),
+                "a clean CMD resolves the managed Git command from PATH"
+            );
+
+            var repository = Path.Combine(supportRoot, "project");
+            Directory.CreateDirectory(repository);
+            await ComposerToolManager.RunAsync(
+                cmd,
+                ["/d", "/s", "/c", "git init --quiet"],
+                repository,
+                environment,
+                timeout.Token
+            );
+            Check(
+                Directory.Exists(Path.Combine(repository, ".git")),
+                "managed Git initializes a real repository from a clean CMD"
+            );
+            Console.WriteLine(version);
+        }
+        finally
+        {
+            await LaravelProjectCreator.DeleteStagingDirectoryAsync(supportRoot);
+        }
+    }
+
+    internal static async Task VerifyLiveManagedCommandPathAsync()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            throw new PlatformNotSupportedException("The managed command PATH check requires Windows.");
+        }
+        var coreExecutable = Environment.GetEnvironmentVariable("HERDME_CORE_TEST_EXECUTABLE");
+        if (string.IsNullOrWhiteSpace(coreExecutable) || !File.Exists(coreExecutable))
+        {
+            throw new InvalidOperationException(
+                "Set HERDME_CORE_TEST_EXECUTABLE to the built herdme-core.exe."
+            );
+        }
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        var core = new CoreClient(coreExecutable);
+        var vcRuntimeRoot = Path.Combine(
+            FindRepositoryRoot(),
+            "build",
+            "windows-vc143-runtime"
+        );
+        var php = new PhpRuntimeInstaller(core, vcRuntimeRoot: vcRuntimeRoot);
+        var policy = new PhpRuntimePolicy(core);
+        var node = new NodeRuntimeInstaller();
+        var tools = new ComposerToolManager(
+            coreClient: core,
+            phpInstaller: php,
+            phpPolicy: policy,
+            nodeInstaller: node
+        );
+        var git = new GitRuntimeInstaller(tools.SupportRoot);
+        var userPath = new WindowsUserPathManager(tools.SupportRoot);
+        var setup = new InitialSetupManager(
+            coreClient: core,
+            phpInstaller: php,
+            phpPolicy: policy,
+            composerTools: tools,
+            nodeInstaller: node,
+            gitInstaller: git,
+            userPathManager: userPath
+        );
+        await setup.EnsureCommandLineToolsAsync(cancellationToken: timeout.Token);
+
+        var cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+        var emptyEnvironment = new Dictionary<string, string>();
+        foreach (var (command, expected) in new Dictionary<string, string>
+        {
+            ["php --version"] = "PHP ",
+            ["composer --version --no-ansi"] = "Composer version ",
+            ["laravel --version --no-ansi"] = "Laravel Installer ",
+            ["node --version"] = "v",
+            ["npm --version"] = ".",
+            ["git --version"] = "git version "
+        })
+        {
+            var output = await ComposerToolManager.RunAsync(
+                cmd,
+                ["/d", "/s", "/c", command],
+                tools.SupportRoot,
+                emptyEnvironment,
+                timeout.Token
+            );
+            Check(
+                output.Contains(expected, StringComparison.OrdinalIgnoreCase),
+                $"a new CMD can execute managed {command.Split(' ')[0]}"
+            );
+            Console.WriteLine(output.Split('\n', StringSplitOptions.RemoveEmptyEntries)[0].Trim());
+        }
+
+        var supportPrefix = Path.GetFullPath(tools.SupportRoot)
+            .TrimEnd(Path.DirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        foreach (var command in new[] { "php", "composer", "laravel", "node", "npm", "git" })
+        {
+            var resolved = await ComposerToolManager.RunAsync(
+                cmd,
+                ["/d", "/s", "/c", "where " + command],
+                tools.SupportRoot,
+                emptyEnvironment,
+                timeout.Token
+            );
+            var first = resolved.Split(
+                ['\r', '\n'],
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+            )[0];
+            Check(
+                Path.GetFullPath(first).StartsWith(supportPrefix, StringComparison.OrdinalIgnoreCase),
+                $"CMD resolves {command} from HerdMe before system tools"
+            );
+        }
+
+        var projectRoot = Path.Combine(
+            Path.GetTempPath(),
+            "herdme-live-laravel-git-" + Guid.NewGuid().ToString("N")
+        );
+        Directory.CreateDirectory(projectRoot);
+        try
+        {
+            var creator = new LaravelProjectCreator(
+                tools,
+                php,
+                policy,
+                node,
+                git,
+                userPath
+            );
+            var project = await creator.CreateAsync(
+                new LaravelProjectRequest(
+                    "git-smoke",
+                    projectRoot,
+                    "None",
+                    "Pest",
+                    InstallBoost: false,
+                    InitializeGit: true
+                ),
+                cancellationToken: timeout.Token
+            );
+            Check(File.Exists(Path.Combine(project, "artisan")), "managed Laravel creates artisan");
+            Check(
+                File.Exists(Path.Combine(project, "vendor", "autoload.php")),
+                "managed Composer installs Laravel dependencies"
+            );
+            Check(
+                Directory.Exists(Path.Combine(project, ".git")),
+                "Laravel project creation initializes a repository with managed Git"
+            );
+            Console.WriteLine("Laravel managed-Git project creation passed");
+        }
+        finally
+        {
+            await LaravelProjectCreator.DeleteStagingDirectoryAsync(projectRoot);
         }
     }
 

@@ -8,6 +8,10 @@ project(HerdMeCore VERSION "${HERDME_VERSION}" LANGUAGES CXX)
 set(HERDME_FUZZING_ENGINE "none" CACHE STRING "Fuzzing engine: none, standalone, or libfuzzer")
 set_property(CACHE HERDME_FUZZING_ENGINE PROPERTY STRINGS none standalone libfuzzer)
 
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 add_library(herdme-core-library src/core.cpp)
 target_include_directories(herdme-core-library PUBLIC include)
 target_compile_features(herdme-core-library PUBLIC cxx_std_20)

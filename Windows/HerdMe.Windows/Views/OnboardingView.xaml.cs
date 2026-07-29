@@ -10,12 +10,13 @@ public sealed partial class OnboardingView : UserControl
 {
     private InitialSetupManager? setupManager;
     private bool isRunning;
+    private InitialSetupStage currentStage = InitialSetupStage.Welcome;
 
     public OnboardingView()
     {
         InitializeComponent();
         SetupSummaryText.Text = AppLocalization.Format(
-            "OnboardingSetupSummary.Text",
+            "OnboardingSetupSummaryText",
             RuntimeCatalog.DefaultPhpCycle,
             RuntimeCatalog.DefaultNodeMajor
         );
@@ -42,7 +43,10 @@ public sealed partial class OnboardingView : UserControl
         }
         catch (Exception error)
         {
-            FailureText.Text = error.Message;
+            FailureText.Text = AppLocalization.Format(
+                "OnboardingFailureMessage",
+                LocalizedStageTitle(currentStage)
+            );
             FailureDetailsText.Text = error.ToString();
             FailureDetailsExpander.IsExpanded = false;
             ShowOnly(FailurePanel);
@@ -69,18 +73,8 @@ public sealed partial class OnboardingView : UserControl
     private void UpdateProgress(InitialSetupStage stage)
     {
         if (stage == InitialSetupStage.Completed) return;
-        StageTitleText.Text = stage switch
-        {
-            InitialSetupStage.Php => AppLocalization.Format(
-                "OnboardingStagePhpTitle",
-                RuntimeCatalog.DefaultPhpCycle
-            ),
-            InitialSetupStage.Node => AppLocalization.Format(
-                "OnboardingStageNodeTitle",
-                RuntimeCatalog.DefaultNodeMajor
-            ),
-            _ => AppLocalization.Get($"OnboardingStage{stage}Title")
-        };
+        currentStage = stage;
+        StageTitleText.Text = LocalizedStageTitle(stage);
         StageDetailText.Text = AppLocalization.Get($"OnboardingStage{stage}Detail");
         var index = InitialSetupStages.Installation.ToList().IndexOf(stage);
         if (index < 0)
@@ -95,6 +89,22 @@ public sealed partial class OnboardingView : UserControl
             index + 1,
             InitialSetupStages.Installation.Count
         );
+    }
+
+    private static string LocalizedStageTitle(InitialSetupStage stage)
+    {
+        return stage switch
+        {
+            InitialSetupStage.Php => AppLocalization.Format(
+                "OnboardingStagePhpTitle",
+                RuntimeCatalog.DefaultPhpCycle
+            ),
+            InitialSetupStage.Node => AppLocalization.Format(
+                "OnboardingStageNodeTitle",
+                RuntimeCatalog.DefaultNodeMajor
+            ),
+            _ => AppLocalization.Get($"OnboardingStage{stage}Title")
+        };
     }
 
     private void ShowOnly(FrameworkElement visible)

@@ -14,6 +14,8 @@ public sealed class InitialSetupManager
     private readonly PhpRuntimePolicy phpPolicy;
     private readonly ComposerToolManager composerTools;
     private readonly NodeRuntimeInstaller nodeInstaller;
+    private readonly GitRuntimeInstaller gitInstaller;
+    private readonly WindowsUserPathManager userPathManager;
 
     public InitialSetupManager(
         SiteConfigurationStore? settingsStore = null,
@@ -23,7 +25,9 @@ public sealed class InitialSetupManager
         PhpRuntimeInstaller? phpInstaller = null,
         PhpRuntimePolicy? phpPolicy = null,
         ComposerToolManager? composerTools = null,
-        NodeRuntimeInstaller? nodeInstaller = null
+        NodeRuntimeInstaller? nodeInstaller = null,
+        GitRuntimeInstaller? gitInstaller = null,
+        WindowsUserPathManager? userPathManager = null
     )
     {
         this.settingsStore = settingsStore ?? new SiteConfigurationStore();
@@ -38,6 +42,9 @@ public sealed class InitialSetupManager
             phpPolicy: this.phpPolicy
         );
         this.nodeInstaller = nodeInstaller ?? new NodeRuntimeInstaller(this.composerTools.SupportRoot);
+        this.gitInstaller = gitInstaller ?? new GitRuntimeInstaller(this.composerTools.SupportRoot);
+        this.userPathManager = userPathManager
+            ?? new WindowsUserPathManager(this.composerTools.SupportRoot);
     }
 
     public async Task RunAsync(
@@ -59,12 +66,32 @@ public sealed class InitialSetupManager
         progress.Report(InitialSetupStage.Certificate);
         if (!certificateManager.IsAuthorityTrusted()) certificateManager.TrustAuthority();
 
-        progress.Report(InitialSetupStage.Php);
-        if (!phpInstaller.IsInstalled(DefaultPhpCycle))
+        await EnsureCommandLineToolsAsync(progress, cancellationToken);
+
+        progress.Report(InitialSetupStage.Finishing);
+        settings = settingsStore.Load();
+        settings.OnboardingCompleted = true;
+        settingsStore.Save(settings);
+        progress.Report(InitialSetupStage.Completed);
+    }
+
+    public async Task EnsureCommandLineToolsAsync(
+        IProgress<InitialSetupStage>? progress = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var phpSettings = phpPolicy.Load();
+        var phpCycle = PhpRuntimeInstaller.IsSupportedCycle(phpSettings.PhpCycle)
+            ? phpSettings.PhpCycle
+            : DefaultPhpCycle;
+
+        progress?.Report(InitialSetupStage.Php);
+        if (!phpInstaller.IsInstalled(phpCycle))
         {
-            await phpInstaller.InstallAsync(DefaultPhpCycle, cancellationToken);
+            await phpInstaller.InstallAsync(phpCycle, cancellationToken);
         }
-        var phpExecutable = phpInstaller.PhpExecutable(DefaultPhpCycle);
+        phpInstaller.EnsureManagedConfiguration(phpCycle);
+        var phpExecutable = phpInstaller.PhpExecutable(phpCycle);
         var extensionReport = await coreClient.ValidatePhpAsync(phpExecutable, cancellationToken);
         if (!extensionReport.Compatible)
         {
@@ -73,31 +100,17 @@ public sealed class InitialSetupManager
                 + string.Join(", ", extensionReport.Missing)
             );
         }
-        var phpSettings = phpPolicy.Load();
-        phpSettings.PhpCycle = DefaultPhpCycle;
+        phpSettings.PhpCycle = phpCycle;
         phpPolicy.Save(phpSettings);
 
-        progress.Report(InitialSetupStage.Composer);
-        await composerTools.EnsureLaravelInstallerAsync(DefaultPhpCycle, cancellationToken);
+        progress?.Report(InitialSetupStage.Git);
+        await gitInstaller.EnsureInstalledAsync(cancellationToken);
 
-        progress.Report(InitialSetupStage.Node);
-        var installedNode = nodeInstaller.InstalledVersion(DefaultNodeCycle);
-        if (installedNode is null)
-        {
-            installedNode = (await nodeInstaller.InstallAsync(
-                DefaultNodeCycle,
-                cancellationToken
-            )).Version;
-        }
-        else
-        {
-            nodeInstaller.SetActive(installedNode);
-        }
+        progress?.Report(InitialSetupStage.Composer);
+        await composerTools.EnsureLaravelInstallerAsync(phpCycle, cancellationToken);
 
-        progress.Report(InitialSetupStage.Finishing);
-        settings = settingsStore.Load();
-        settings.OnboardingCompleted = true;
-        settingsStore.Save(settings);
-        progress.Report(InitialSetupStage.Completed);
+        progress?.Report(InitialSetupStage.Node);
+        await nodeInstaller.EnsureActiveRuntimeAsync(DefaultNodeCycle, cancellationToken);
+        userPathManager.Synchronize(composerTools.CommandLineDirectories(phpCycle));
     }
 }

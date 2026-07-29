@@ -174,7 +174,12 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             : null;
         if (instance.DefinitionId == "mariadb")
         {
-            await InitializeMariaDbAsync(dataDirectory, cancellationToken);
+            await InitializeMariaDbAsync(
+                dataDirectory,
+                instance.Port,
+                credentials!,
+                cancellationToken
+            );
         }
         else if (instance.DefinitionId == "mysql")
         {
@@ -368,7 +373,6 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                     $"--datadir={dataDirectory}",
                     $"--port={instance.Port}",
                     "--bind-address=127.0.0.1",
-                    "--skip-name-resolve",
                     $"--pid-file={Path.Combine(dataDirectory, "mariadb.pid")}"
                 ],
                 new Dictionary<string, string>()
@@ -384,7 +388,6 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                     $"--port={instance.Port}",
                     "--bind-address=127.0.0.1",
                     "--mysqlx=0",
-                    "--skip-name-resolve",
                     $"--pid-file={Path.Combine(dataDirectory, "mysql.pid")}"
                 ],
                 new Dictionary<string, string>()
@@ -513,6 +516,8 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     private async Task InitializeMariaDbAsync(
         string dataDirectory,
+        int port,
+        ServiceCredentials credentials,
         CancellationToken cancellationToken
     )
     {
@@ -533,10 +538,14 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        startInfo.ArgumentList.Add("--no-defaults");
-        startInfo.ArgumentList.Add("--auth-root-authentication-method=normal");
-        startInfo.ArgumentList.Add($"--basedir={runtimeDirectory}");
-        startInfo.ArgumentList.Add($"--datadir={dataDirectory}");
+        foreach (var argument in BuildMariaDbInitializationArguments(
+            dataDirectory,
+            port,
+            credentials
+        ))
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("MariaDB's data directory could not be initialized.");
         var standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
@@ -547,6 +556,27 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         {
             throw new InvalidOperationException("MariaDB initialization failed: " + output.Trim());
         }
+    }
+
+    internal static IReadOnlyList<string> BuildMariaDbInitializationArguments(
+        string dataDirectory,
+        int port,
+        ServiceCredentials credentials
+    )
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(dataDirectory);
+        if (port is <= 0 or > 65_535) throw new ArgumentOutOfRangeException(nameof(port));
+        ArgumentNullException.ThrowIfNull(credentials);
+        if (!credentials.IsValid)
+        {
+            throw new ArgumentException("MariaDB requires valid managed credentials.", nameof(credentials));
+        }
+        return
+        [
+            $"--datadir={dataDirectory}",
+            $"--password={credentials.Secret}",
+            $"--port={port}"
+        ];
     }
 
     private async Task InitializeMySqlAsync(

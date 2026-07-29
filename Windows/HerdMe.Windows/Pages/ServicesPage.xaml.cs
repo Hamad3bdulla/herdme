@@ -103,22 +103,20 @@ public sealed partial class ServicesPage : Page
         {
             DefinitionId = definition.Id,
             Name = string.IsNullOrWhiteSpace(ServiceNameBox.Text) ? definition.Name : ServiceNameBox.Text.Trim(),
-            Port = port
+            Port = port,
+            StartAutomatically = true
         };
         instances.Add(instance);
         manager.SaveInstances(instances);
-        await RefreshRowsAsync();
-        if (manager.IsInstalled(definition.Id)) return;
-
         SetWorking(true, AppLocalization.Format("ServicesInstalling", instance.Name));
         try
         {
-            var release = await manager.InstallAsync(instance.DefinitionId);
-            OperationStatusText.Text = AppLocalization.Format(
-                "ServicesVersionInstalled",
-                instance.Name,
-                release.Version
-            );
+            if (!manager.IsInstalled(definition.Id))
+            {
+                await manager.InstallAsync(instance.DefinitionId);
+            }
+            OperationStatusText.Text = AppLocalization.Format("ServicesStarting", instance.Name);
+            await manager.StartAsync(instance.Id);
         }
         catch (Exception error)
         {
@@ -189,11 +187,13 @@ public sealed partial class ServicesPage : Page
 
     private void AutomaticStart_Toggled(object sender, RoutedEventArgs e)
     {
-        if (refreshing || sender is not ToggleSwitch toggle || toggle.Tag is not Guid id) return;
+        if (refreshing
+            || sender is not ToggleMenuFlyoutItem toggle
+            || toggle.Tag is not Guid id) return;
         var instances = manager.LoadInstances().ToList();
         var instance = instances.FirstOrDefault(candidate => candidate.Id == id);
-        if (instance is null || instance.StartAutomatically == toggle.IsOn) return;
-        instance.StartAutomatically = toggle.IsOn;
+        if (instance is null || instance.StartAutomatically == toggle.IsChecked) return;
+        instance.StartAutomatically = toggle.IsChecked;
         manager.SaveInstances(instances);
     }
 

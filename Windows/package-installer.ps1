@@ -50,6 +50,9 @@ function Find-InnoCompiler([string]$RequestedPath) {
     if ($null -ne $command) { return $command.Source }
 
     $candidates = @()
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $candidates += Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"
+    }
     if (-not [string]::IsNullOrWhiteSpace(${env:ProgramFiles(x86)})) {
         $candidates += Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
     }
@@ -77,6 +80,17 @@ if (-not $SkipPortableBuild) {
 
 $requiredFiles = @(
     "HerdMe.Windows.exe",
+    "Assets\HerdMe.ico",
+    "Prerequisites\VC143\concrt140.dll",
+    "Prerequisites\VC143\msvcp140.dll",
+    "Prerequisites\VC143\msvcp140_1.dll",
+    "Prerequisites\VC143\msvcp140_2.dll",
+    "Prerequisites\VC143\msvcp140_atomic_wait.dll",
+    "Prerequisites\VC143\msvcp140_codecvt_ids.dll",
+    "Prerequisites\VC143\vccorlib140.dll",
+    "Prerequisites\VC143\vcruntime140.dll",
+    "Prerequisites\VC143\vcruntime140_1.dll",
+    "Prerequisites\VC143\vcruntime140_threads.dll",
     "Runtime\herdme-core.exe",
     "Microsoft.WindowsAppRuntime.dll",
     "Microsoft.ui.xaml.dll",

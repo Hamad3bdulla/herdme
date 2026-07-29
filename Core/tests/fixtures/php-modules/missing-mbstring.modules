@@ -11,5 +11,6 @@ pdo
 session
 tokenizer
 xml
+zip
 [Zend Modules]
 mbstring

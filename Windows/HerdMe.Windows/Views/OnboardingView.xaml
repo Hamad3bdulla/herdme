@@ -8,23 +8,29 @@
             <RowDefinition Height="7" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Padding="48">
+        <ScrollViewer
+            Grid.Row="0"
+            HorizontalScrollBarVisibility="Disabled"
+            VerticalContentAlignment="Center"
+            VerticalScrollBarVisibility="Auto">
+        <Grid Padding="32,20">
             <StackPanel
                 x:Name="WelcomePanel"
-                MaxWidth="540"
+                AutomationProperties.AutomationId="OnboardingWelcomePanel"
+                MaxWidth="620"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Spacing="18">
+                Spacing="14">
                 <Border
-                    Width="72"
-                    Height="72"
+                    Width="64"
+                    Height="64"
                     HorizontalAlignment="Center"
                     Background="#FFED1F2B"
                     CornerRadius="8">
                     <TextBlock
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        FontSize="38"
+                        FontSize="34"
                         FontWeight="Bold"
                         Foreground="White"
                         Text="H" />
@@ -32,9 +38,11 @@
                 <TextBlock
                     x:Uid="OnboardingWelcomeTitle"
                     HorizontalAlignment="Center"
-                    FontSize="36"
+                    FontSize="32"
                     FontWeight="Bold"
-                    Text="Welcome to HerdMe" />
+                    Text="Welcome to HerdMe"
+                    TextAlignment="Center"
+                    TextWrapping="Wrap" />
                 <TextBlock
                     x:Uid="OnboardingWelcomeDescription"
                     HorizontalAlignment="Center"
@@ -43,15 +51,18 @@
                     TextAlignment="Center"
                     TextWrapping="Wrap" />
                 <TextBlock
-                    x:Uid="OnboardingSetupSummary"
                     x:Name="SetupSummaryText"
                     HorizontalAlignment="Center"
                     FontSize="12"
                     FontWeight="SemiBold"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="" />
+                    Text=""
+                    TextAlignment="Center"
+                    TextWrapping="Wrap" />
                 <Button
+                    AutomationProperties.AutomationId="OnboardingStartButton"
                     HorizontalAlignment="Center"
+                    MinWidth="168"
                     Padding="20,9"
                     Background="#FFED1F2B"
                     Click="Start_Click"
@@ -66,7 +77,7 @@
 
             <StackPanel
                 x:Name="ProgressPanel"
-                MaxWidth="540"
+                MaxWidth="620"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Spacing="18"
@@ -106,7 +117,7 @@
 
             <StackPanel
                 x:Name="FailurePanel"
-                MaxWidth="540"
+                MaxWidth="620"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Spacing="18"
@@ -176,7 +187,7 @@
 
             <StackPanel
                 x:Name="CompletedPanel"
-                MaxWidth="540"
+                MaxWidth="620"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Spacing="18"
@@ -213,6 +224,7 @@
                 </Button>
             </StackPanel>
         </Grid>
+        </ScrollViewer>
 
         <Rectangle Grid.Row="1" Fill="#FFED1F2B" />
     </Grid>

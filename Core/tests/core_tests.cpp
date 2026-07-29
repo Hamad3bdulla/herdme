@@ -124,10 +124,10 @@ int main() {
     expect(long_label.size() <= 63, "normalized DNS labels must fit the 63-byte limit");
     expect(long_label == herdme::dns_label(long_name), "DNS normalization must be deterministic");
 
-    const std::vector<std::string> expected = {"ctype",   "curl", "dom", "fileinfo", "filter",    "hash", "mbstring",
-                                               "openssl", "pcre", "pdo", "session",  "tokenizer", "xml"};
+    const std::vector<std::string> expected = {"ctype", "curl",    "dom",     "fileinfo", "filter", "hash", "mbstring",
+                                               "openssl", "pcre", "pdo",     "session",  "tokenizer", "xml", "zip"};
     expect(herdme::laravel_required_php_extensions() == expected,
-           "Laravel 13 requires the exact 13-module runtime contract");
+           "Laravel and Composer require the exact 14-module runtime contract");
 
     std::string complete = "[PHP Modules]\n";
     for (const auto &extension : expected) complete += extension + "\n";
@@ -138,7 +138,7 @@ int main() {
 
     const auto incomplete =
         herdme::inspect_php_module_output("[PHP Modules]\nctype\nCURL\ndom\nfileinfo\nfilter\nhash\n"
-                                          "openssl\npcre\npdo\nsession\ntokenizer\nxml\n");
+                                          "openssl\npcre\npdo\nsession\ntokenizer\nxml\nzip\n");
     expect(!incomplete.compatible, "missing mbstring must reject the runtime");
     expect(incomplete.missing == std::vector<std::string>{"mbstring"}, "the report must identify mbstring exactly");
     const auto extension_json = herdme::php_extensions_json(incomplete);
@@ -234,6 +234,30 @@ int main() {
            "runtime inspection must identify managed Node.js");
     expect(composer_runtime != nullptr && !composer_runtime->usable && composer_runtime->source == "missing",
            "runtime inspection must identify missing tools");
+#ifdef _WIN32
+    EnvironmentVariableGuard runtime_profile_guard("USERPROFILE");
+    runtime_profile_guard.set(runtime_fixture.string());
+    const auto private_config_bin = runtime_fixture / ".config" / "external-tool" / "bin";
+    const auto private_local_bin = runtime_fixture / "DevHerd Local" / "aliases";
+    write_file(private_config_bin / "php.bat");
+    write_file(private_local_bin / "php.bat");
+    path_guard.set(private_config_bin.string() + ";" + private_local_bin.string());
+    const auto private_runtimes = herdme::inspect_runtimes();
+    const auto *private_php = runtime_named(private_runtimes, "php");
+    expect(private_php != nullptr && !private_php->usable && !private_php->executable &&
+               private_php->source == "missing",
+           "runtime inspection must not probe or expose another application's private PATH runtime");
+
+    const auto system_runtime_bin = runtime_fixture / "System" / "bin";
+    write_file(system_runtime_bin / "php.bat");
+    path_guard.set(private_config_bin.string() + ";" + private_local_bin.string() + ";" +
+                   system_runtime_bin.string());
+    const auto fallback_runtimes = herdme::inspect_runtimes();
+    const auto *fallback_php = runtime_named(fallback_runtimes, "php");
+    expect(fallback_php != nullptr && fallback_php->usable && fallback_php->source == "system" &&
+               fallback_php->executable == system_runtime_bin / "php.bat",
+           "runtime inspection must continue past a private PATH directory to a system runtime");
+#endif
     std::filesystem::remove_all(runtime_fixture, cleanup_error);
 
     const auto fixture = unique_fixture("herdme-core-link-");

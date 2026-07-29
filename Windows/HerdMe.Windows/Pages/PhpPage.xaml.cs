@@ -11,6 +11,7 @@ public sealed partial class PhpPage : Page
     private readonly PhpRuntimePolicy runtimePolicy;
     private readonly PhpRuntimeInstaller runtimeInstaller;
     private readonly ComposerToolManager toolManager;
+    private readonly WindowsUserPathManager userPathManager;
     private PhpRuntimeSettings settings;
     private bool loaded;
 
@@ -18,13 +19,15 @@ public sealed partial class PhpPage : Page
         CoreClient coreClient,
         PhpRuntimePolicy runtimePolicy,
         PhpRuntimeInstaller runtimeInstaller,
-        ComposerToolManager toolManager
+        ComposerToolManager toolManager,
+        WindowsUserPathManager userPathManager
     )
     {
         this.coreClient = coreClient;
         this.runtimePolicy = runtimePolicy;
         this.runtimeInstaller = runtimeInstaller;
         this.toolManager = toolManager;
+        this.userPathManager = userPathManager;
         InitializeComponent();
         settings = runtimePolicy.Load();
         var availableCycles = PhpRuntimeInstaller.SupportedCycles
@@ -181,6 +184,7 @@ public sealed partial class PhpPage : Page
         try
         {
             var versions = await toolManager.InstallOrUpdateAsync(cycle);
+            SynchronizeUserPath(cycle);
             ComposerVersionText.Text = AppLocalization.Format(
                 "PhpComposerVersion",
                 $"v{versions.Composer}"
@@ -215,6 +219,7 @@ public sealed partial class PhpPage : Page
             var release = await runtimeInstaller.InstallAsync(cycle);
             settings.PhpCycle = cycle;
             runtimePolicy.Save(settings);
+            SynchronizeUserPath(cycle);
             RuntimeStatusText.Text = AppLocalization.Format(
                 "PhpVersionInstalled",
                 release.Version
@@ -243,9 +248,15 @@ public sealed partial class PhpPage : Page
             : (int)UploadLimitBox.Value;
         settings.PhpCycle = PhpCycleBox.SelectedItem?.ToString() ?? settings.PhpCycle;
         runtimePolicy.Save(settings);
+        SynchronizeUserPath(settings.PhpCycle);
         settings = runtimePolicy.Load();
         MemoryLimitBox.Value = settings.MemoryLimitMegabytes;
         UploadLimitBox.Value = settings.MaxUploadMegabytes;
         SaveStatusText.Text = AppLocalization.Get("PhpSavedForNextStart");
+    }
+
+    private void SynchronizeUserPath(string phpCycle)
+    {
+        userPathManager.Synchronize(toolManager.CommandLineDirectories(phpCycle));
     }
 }

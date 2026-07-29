@@ -26,20 +26,19 @@
                 </StackPanel>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Click="ParkFolder_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <SymbolIcon Symbol="Folder" />
+                        <TextBlock x:Uid="SitesParkFolderButton" Text="Park folder" />
+                    </StackPanel>
+                </Button>
                 <Button x:Name="CreateLaravelButton" Click="CreateLaravel_Click">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <SymbolIcon Symbol="Add" />
                         <TextBlock x:Uid="SitesCreateLaravelButton" Text="Create Laravel" />
                     </StackPanel>
                 </Button>
-                <Button x:Name="EnvironmentButton" Click="Environment_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <SymbolIcon x:Name="EnvironmentButtonIcon" Symbol="Play" />
-                        <TextBlock x:Uid="SitesEnvironmentButton" x:Name="EnvironmentButtonText" Text="Start all" />
-                    </StackPanel>
-                </Button>
-                <TextBox x:Uid="SitesDomainField" x:Name="TldTextBox" Width="104" Header="Domain" Text="test" />
-                <Button VerticalAlignment="Bottom" Click="Scan_Click">
+                <Button Click="Scan_Click">
                     <ToolTipService.ToolTip>
                         <ToolTip><TextBlock x:Uid="SitesRefreshTooltip" Text="Refresh sites" /></ToolTip>
                     </ToolTipService.ToolTip>
@@ -48,7 +47,7 @@
             </StackPanel>
         </Grid>
 
-        <Expander x:Uid="SitesFoldersExpander" Grid.Row="1" Header="Site folders and linked projects">
+        <Expander x:Uid="SitesFoldersExpander" Grid.Row="1" Header="Parked folders and linked projects" IsExpanded="True">
             <Grid Padding="0,12,0,4" ColumnSpacing="8" RowSpacing="8">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />

@@ -13,5 +13,6 @@ pdo
 session
 tokenizer
 xml
+zip
 [Zend Modules]
 Xdebug

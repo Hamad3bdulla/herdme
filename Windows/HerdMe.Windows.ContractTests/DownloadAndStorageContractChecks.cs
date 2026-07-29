@@ -54,6 +54,45 @@ internal static partial class ContractChecks
                 "managed downloads retry 429 and 5xx responses before succeeding"
             );
         }
+
+        var packageBytes = Encoding.UTF8.GetBytes("verified service package");
+        var packageChecksum = Convert.ToHexString(SHA256.HashData(packageBytes));
+        var interruptedPackageHandler = new SequenceHttpMessageHandler(
+            _ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("incomplete")
+            },
+            _ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(packageBytes)
+            }
+        );
+        using (var packageClient = new HttpClient(interruptedPackageHandler))
+        {
+            var packagePath = Path.Combine(supportRoot, "retried-service-package.zip");
+            Directory.CreateDirectory(Path.GetDirectoryName(packagePath)!);
+            await ServicePackageInstaller.DownloadAndVerifyAsync(
+                new ServicePackageRelease(
+                    "mariadb",
+                    "1.0.0",
+                    "mariadb.zip",
+                    ServicePackageChecksumAlgorithm.Sha256,
+                    packageChecksum,
+                    new Uri("https://downloads.example.test/mariadb.zip"),
+                    true
+                ),
+                packagePath,
+                CancellationToken.None,
+                packageClient,
+                maximumAttempts: 2,
+                delayFactory: _ => TimeSpan.Zero
+            );
+            Check(
+                File.ReadAllBytes(packagePath).SequenceEqual(packageBytes)
+                    && interruptedPackageHandler.CallCount == 2,
+                "service downloads discard incomplete files and retry checksum verification"
+            );
+        }
         var networkFailureHandler = new SequenceHttpMessageHandler(
             _ => throw new HttpRequestException("temporary connection failure"),
             _ => new HttpResponseMessage(HttpStatusCode.OK)

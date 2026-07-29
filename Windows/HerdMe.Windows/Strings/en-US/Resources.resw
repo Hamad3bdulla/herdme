@@ -8,6 +8,10 @@
   <data name="TrayQuitCommand.Label" xml:space="preserve"><value>Quit HerdMe</value></data>
   <data name="TrayStartAllCommand.Label" xml:space="preserve"><value>Start all</value></data>
   <data name="TrayStopAllCommand.Label" xml:space="preserve"><value>Stop all</value></data>
+  <data name="TrayOpenCommandLabel" xml:space="preserve"><value>Open HerdMe</value></data>
+  <data name="TrayQuitCommandLabel" xml:space="preserve"><value>Quit HerdMe</value></data>
+  <data name="TrayStartAllCommandLabel" xml:space="preserve"><value>Start all</value></data>
+  <data name="TrayStopAllCommandLabel" xml:space="preserve"><value>Stop all</value></data>
   <data name="NavGeneral.Content" xml:space="preserve"><value>General</value></data>
   <data name="NavSites.Content" xml:space="preserve"><value>Sites</value></data>
   <data name="NavPhp.Content" xml:space="preserve"><value>PHP</value></data>
@@ -20,9 +24,10 @@
   <data name="NavAbout.Content" xml:space="preserve"><value>About</value></data>
   <data name="OnboardingWelcomeTitle.Text" xml:space="preserve"><value>Welcome to HerdMe</value></data>
   <data name="OnboardingWelcomeDescription.Text" xml:space="preserve"><value>HerdMe needs to prepare the local development environment. Windows will ask for administrator approval.</value></data>
-  <data name="OnboardingSetupSummary.Text" xml:space="preserve"><value>PHP {0}  |  Composer  |  Laravel Installer  |  Node.js {1}  |  HTTPS</value></data>
+  <data name="OnboardingSetupSummaryText" xml:space="preserve"><value>PHP {0}  |  Git  |  Composer  |  Laravel Installer  |  Node.js {1}  |  HTTPS</value></data>
   <data name="OnboardingSetupButton.Text" xml:space="preserve"><value>Set up HerdMe</value></data>
   <data name="OnboardingFailureTitle.Text" xml:space="preserve"><value>Setup could not finish</value></data>
+  <data name="OnboardingFailureMessage" xml:space="preserve"><value>Setup stopped during: {0}. Try again. If it fails again, open Technical details for the exact error.</value></data>
   <data name="OnboardingFailureDetails.Header" xml:space="preserve"><value>Technical details</value></data>
   <data name="OnboardingCopyFailureDetailsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Copy technical details</value></data>
   <data name="OnboardingCopyFailureDetailsTooltip.Text" xml:space="preserve"><value>Copy technical details</value></data>
@@ -38,6 +43,8 @@
   <data name="OnboardingStageCertificateDetail" xml:space="preserve"><value>Adding the HerdMe local certificate authority to the Windows trust store.</value></data>
   <data name="OnboardingStagePhpTitle" xml:space="preserve"><value>Installing PHP {0}</value></data>
   <data name="OnboardingStagePhpDetail" xml:space="preserve"><value>Installing the default runtime and checking every extension required by Laravel.</value></data>
+  <data name="OnboardingStageGitTitle" xml:space="preserve"><value>Installing Git</value></data>
+  <data name="OnboardingStageGitDetail" xml:space="preserve"><value>Installing the verified Git for Windows runtime used by projects and command-line tools.</value></data>
   <data name="OnboardingStageComposerTitle" xml:space="preserve"><value>Installing Composer and Laravel Installer</value></data>
   <data name="OnboardingStageComposerDetail" xml:space="preserve"><value>Preparing the managed PHP tools used to create Laravel projects.</value></data>
   <data name="OnboardingStageNodeTitle" xml:space="preserve"><value>Installing Node.js {0}</value></data>
@@ -53,6 +60,7 @@
   <data name="GeneralLaunchAtSigninTitle.Text" xml:space="preserve"><value>Launch at sign-in</value></data>
   <data name="GeneralLaunchAtSigninDescription.Text" xml:space="preserve"><value>Keep local sites available after signing in to Windows.</value></data>
   <data name="GeneralLocalDomainsTitle.Text" xml:space="preserve"><value>Local domains</value></data>
+  <data name="GeneralDomainSuffixLabel.Text" xml:space="preserve"><value>Domain suffix</value></data>
   <data name="GeneralDomainsChecking.Text" xml:space="preserve"><value>Checking</value></data>
   <data name="GeneralRemoveDomains.Content" xml:space="preserve"><value>Remove</value></data>
   <data name="GeneralSetupDomains.Content" xml:space="preserve"><value>Set up</value></data>
@@ -164,16 +172,14 @@
   <data name="ServicesPortColumn.Text" xml:space="preserve"><value>Port</value></data>
   <data name="ServicesVersionColumn.Text" xml:space="preserve"><value>Version</value></data>
   <data name="ServicesStatusColumn.Text" xml:space="preserve"><value>Status</value></data>
-  <data name="ServicesAutomaticStart.OnContent" xml:space="preserve"><value>Auto</value></data>
-  <data name="ServicesAutomaticStart.OffContent" xml:space="preserve"><value>Auto</value></data>
+  <data name="ServicesAutomaticStartMenu.Text" xml:space="preserve"><value>Start automatically</value></data>
+  <data name="ServicesMoreTooltip.Text" xml:space="preserve"><value>More service actions</value></data>
   <data name="ServicesInstallTooltip.Text" xml:space="preserve"><value>Install or update runtime</value></data>
   <data name="ServicesOpenDataTooltip.Text" xml:space="preserve"><value>Open data directory</value></data>
   <data name="ServicesEnvironmentTooltip.Text" xml:space="preserve"><value>Add service connection to a site .env</value></data>
   <data name="ServicesConsoleTooltip.Text" xml:space="preserve"><value>Open service console</value></data>
-  <data name="ServicesConsoleButton.Text" xml:space="preserve"><value>Console</value></data>
   <data name="ServicesCopyConnectionTooltip.Text" xml:space="preserve"><value>Copy database connection URL</value></data>
   <data name="ServicesTablePlusTooltip.Text" xml:space="preserve"><value>Open database in TablePlus</value></data>
-  <data name="ServicesTablePlusButton.Text" xml:space="preserve"><value>TablePlus</value></data>
   <data name="ServicesDeleteTooltip.Text" xml:space="preserve"><value>Delete service instance</value></data>
   <data name="ServicesEmptyState.Text" xml:space="preserve"><value>No services added</value></data>
   <data name="ServicesPortOwnerHerdMe" xml:space="preserve"><value>another HerdMe service</value></data>
@@ -208,10 +214,10 @@
   <data name="SitesPageTitle.Text" xml:space="preserve"><value>Sites</value></data>
   <data name="SitesEnvironmentStatus.Text" xml:space="preserve"><value>Stopped</value></data>
   <data name="SitesCreateLaravelButton.Text" xml:space="preserve"><value>Create Laravel</value></data>
-  <data name="SitesEnvironmentButton.Text" xml:space="preserve"><value>Start all</value></data>
-  <data name="SitesDomainField.Header" xml:space="preserve"><value>Domain</value></data>
   <data name="SitesRefreshTooltip.Text" xml:space="preserve"><value>Refresh sites</value></data>
-  <data name="SitesFoldersExpander.Header" xml:space="preserve"><value>Site folders and linked projects</value></data>
+  <data name="SitesFoldersExpander.Header" xml:space="preserve"><value>Parked folders and linked projects</value></data>
+  <data name="SitesParkFolderButton.Text" xml:space="preserve"><value>Park folder</value></data>
+  <data name="SitesParkFolderMissing" xml:space="preserve"><value>The selected folder does not exist: {0}</value></data>
   <data name="SitesRootPathField.PlaceholderText" xml:space="preserve"><value>Site folder</value></data>
   <data name="SitesChooseFolderTooltip.Text" xml:space="preserve"><value>Choose folder</value></data>
   <data name="SitesAddFolderTooltip.Text" xml:space="preserve"><value>Add folder</value></data>

@@ -10,7 +10,7 @@ public sealed class WindowsSiteSettings
 
     public string Tld { get; set; } = "test";
 
-    public bool StartAutomatically { get; set; }
+    public bool StartAutomatically { get; set; } = true;
 
     public bool ShowPreviews { get; set; } = true;
 

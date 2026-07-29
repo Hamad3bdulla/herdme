@@ -17,6 +17,7 @@ public sealed partial class DashboardPage : Page
     private readonly WindowsHostsManager hostsManager;
     private readonly WindowsCertificateManager certificateManager;
     private CancellationTokenSource? refreshCancellation;
+    private bool? usesCompactLayout;
 
     public DashboardPage(
         CoreClient coreClient,
@@ -43,6 +44,96 @@ public sealed partial class DashboardPage : Page
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         await RefreshAsync();
+    }
+
+    private void Page_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var compact = e.NewSize.Width < 680;
+        if (usesCompactLayout == compact) return;
+        usesCompactLayout = compact;
+
+        DashboardLayout.Padding = compact
+            ? new Thickness(18, 18, 18, 20)
+            : new Thickness(28, 22, 28, 24);
+        SummaryCardsGrid.RowSpacing = compact ? 12 : 0;
+        SummaryColumn0.Width = new GridLength(1, GridUnitType.Star);
+        SummaryColumn1.Width = new GridLength(1, GridUnitType.Star);
+        SummaryColumn2.Width = compact
+            ? new GridLength(0)
+            : new GridLength(1, GridUnitType.Star);
+        SummaryColumn3.Width = compact
+            ? new GridLength(0)
+            : new GridLength(1, GridUnitType.Star);
+        PositionSummaryCard(SitesCard, row: 0, column: 0);
+        PositionSummaryCard(ServicesCard, row: 0, column: 1);
+        PositionSummaryCard(MailCard, row: compact ? 1 : 0, column: compact ? 0 : 2);
+        PositionSummaryCard(DumpsCard, row: compact ? 1 : 0, column: compact ? 1 : 3);
+
+        EnvironmentLabelColumn.Width = compact
+            ? new GridLength(1, GridUnitType.Star)
+            : new GridLength(170);
+        EnvironmentStatusColumn.Width = compact
+            ? GridLength.Auto
+            : new GridLength(140);
+        EnvironmentDetailColumn.Width = compact
+            ? new GridLength(0)
+            : new GridLength(1, GridUnitType.Star);
+        PositionEnvironmentRow(
+            EnvironmentLabelText,
+            EnvironmentStatusText,
+            EnvironmentDetailText,
+            compact,
+            wideRow: 0,
+            compactRow: 0
+        );
+        PositionEnvironmentRow(
+            DomainsLabelText,
+            DomainsStatusText,
+            DomainsDetailText,
+            compact,
+            wideRow: 1,
+            compactRow: 2
+        );
+        PositionEnvironmentRow(
+            CertificateLabelText,
+            CertificateStatusText,
+            CertificateDetailText,
+            compact,
+            wideRow: 2,
+            compactRow: 4
+        );
+
+        RecentActivityGrid.RowSpacing = compact ? 18 : 0;
+        Grid.SetRow(RecentDumpsPanel, compact ? 1 : 0);
+        Grid.SetColumn(RecentDumpsPanel, compact ? 0 : 1);
+    }
+
+    private static void PositionSummaryCard(Button card, int row, int column)
+    {
+        Grid.SetRow(card, row);
+        Grid.SetColumn(card, column);
+    }
+
+    private static void PositionEnvironmentRow(
+        TextBlock label,
+        TextBlock status,
+        TextBlock detail,
+        bool compact,
+        int wideRow,
+        int compactRow
+    )
+    {
+        var primaryRow = compact ? compactRow : wideRow;
+        Grid.SetRow(label, primaryRow);
+        Grid.SetColumn(label, 0);
+        Grid.SetRow(status, primaryRow);
+        Grid.SetColumn(status, 1);
+        Grid.SetRow(detail, compact ? compactRow + 1 : wideRow);
+        Grid.SetColumn(detail, compact ? 0 : 2);
+        Grid.SetColumnSpan(detail, compact ? 2 : 1);
+        detail.Padding = compact
+            ? new Thickness(0, 0, 0, 8)
+            : new Thickness(0, 8, 0, 8);
     }
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)

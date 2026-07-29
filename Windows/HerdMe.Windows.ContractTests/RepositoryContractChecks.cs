@@ -120,8 +120,16 @@ internal static partial class ContractChecks
                 && ReferenceEquals(
                     PrivateDependency<NodeRuntimeInstaller>(services.ProjectCreator, "nodeInstaller"),
                     services.NodeInstaller
+                )
+                && ReferenceEquals(
+                    PrivateDependency<GitRuntimeInstaller>(services.ProjectCreator, "gitInstaller"),
+                    services.GitInstaller
+                )
+                && ReferenceEquals(
+                    PrivateDependency<WindowsUserPathManager>(services.ProjectCreator, "userPathManager"),
+                    services.UserPath
                 ),
-            "Laravel project creation reuses the application-owned runtime services"
+            "Laravel project creation reuses the application-owned runtime, Git, and PATH services"
         );
         Check(
             ReferenceEquals(
@@ -158,8 +166,16 @@ internal static partial class ContractChecks
                 && ReferenceEquals(
                     PrivateDependency<NodeRuntimeInstaller>(services.InitialSetup, "nodeInstaller"),
                     services.NodeInstaller
+                )
+                && ReferenceEquals(
+                    PrivateDependency<GitRuntimeInstaller>(services.InitialSetup, "gitInstaller"),
+                    services.GitInstaller
+                )
+                && ReferenceEquals(
+                    PrivateDependency<WindowsUserPathManager>(services.InitialSetup, "userPathManager"),
+                    services.UserPath
                 ),
-            "first-run setup reuses the application-owned settings and runtime services"
+            "first-run setup reuses the application-owned settings, runtime, Git, and PATH services"
         );
 
         var windowsRoot = Path.Combine(repositoryRoot, "Windows", "HerdMe.Windows");
@@ -176,14 +192,15 @@ internal static partial class ContractChecks
         Check(
             pageSources.All(source => !Regex.IsMatch(
                 source,
-                @"new\s+(CoreClient|SiteConfigurationStore|PhpRuntimeInstaller|PhpRuntimePolicy|ComposerToolManager|NodeRuntimeInstaller|WindowsLocalEnvironment|WindowsServiceManager)\s*\("
+                @"new\s+(CoreClient|SiteConfigurationStore|PhpRuntimeInstaller|PhpRuntimePolicy|ComposerToolManager|NodeRuntimeInstaller|GitRuntimeInstaller|WindowsUserPathManager|WindowsLocalEnvironment|WindowsServiceManager)\s*\("
             )),
             "Windows pages do not construct duplicate application services"
         );
 
         var mainWindowSource = File.ReadAllText(Path.Combine(windowsRoot, "MainWindow.xaml.cs"));
         Check(
-            mainWindowSource.Contains("public MainWindow(AppServices services", StringComparison.Ordinal)
+            mainWindowSource.Contains("public MainWindow(", StringComparison.Ordinal)
+                && mainWindowSource.Contains("AppServices services", StringComparison.Ordinal)
                 && mainWindowSource.Contains("if (ContentFrame.Content is null) ShowPage(\"dashboard\")", StringComparison.Ordinal)
                 && !mainWindowSource.Contains("ContentFrame.Navigate", StringComparison.Ordinal),
             "the main window injects dependencies and always creates its initial dashboard"
@@ -229,6 +246,14 @@ internal static partial class ContractChecks
         var installerPath = Path.Combine(repositoryRoot, "Windows", "installer.iss");
         var installerText = File.ReadAllText(installerPath);
         var setup = ParseInnoSection(installerText, "Setup");
+        var coreCmake = File.ReadAllText(Path.Combine(repositoryRoot, "Core", "CMakeLists.txt"));
+        Check(
+            coreCmake.Contains(
+                "CMAKE_MSVC_RUNTIME_LIBRARY \"MultiThreaded$<$<CONFIG:Debug>:Debug>\"",
+                StringComparison.Ordinal
+            ),
+            "the Windows core statically links the MSVC runtime for clean machines"
+        );
         Check(
             setup.GetValueOrDefault("PrivilegesRequired") == "lowest"
                 && setup.GetValueOrDefault("DefaultDirName") == @"{localappdata}\Programs\HerdMe",
@@ -249,6 +274,11 @@ internal static partial class ContractChecks
                 && setup.GetValueOrDefault("CloseApplicationsFilter") == "HerdMe.Windows.exe"
                 && setup.GetValueOrDefault("RestartApplications") == "no",
             "the Windows installer closes HerdMe safely without restarting it during upgrades"
+        );
+        Check(
+            setup.GetValueOrDefault("WizardResizable") == "no"
+                && setup.GetValueOrDefault("WizardSizePercent") == "100",
+            "the Windows installer keeps a fixed wizard size"
         );
         Check(
             installerText.Contains(
@@ -353,6 +383,42 @@ internal static partial class ContractChecks
 
         var appSource = File.ReadAllText(
             Path.Combine(repositoryRoot, "Windows", "HerdMe.Windows", "App.xaml.cs")
+        );
+        var mainWindowSource = File.ReadAllText(
+            Path.Combine(repositoryRoot, "Windows", "HerdMe.Windows", "MainWindow.xaml.cs")
+        );
+        var dashboardXaml = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "Windows",
+            "HerdMe.Windows",
+            "Pages",
+            "DashboardPage.xaml"
+        ));
+        var dashboardSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "Windows",
+            "HerdMe.Windows",
+            "Pages",
+            "DashboardPage.xaml.cs"
+        ));
+        Check(
+            mainWindowSource.Contains("GetDpiForWindow", StringComparison.Ordinal)
+                && mainWindowSource.Contains("LogicalWindowWidth * scale", StringComparison.Ordinal)
+                && mainWindowSource.Contains("displayArea.WorkArea", StringComparison.Ordinal)
+                && mainWindowSource.Contains("MoveAndResize", StringComparison.Ordinal)
+                && mainWindowSource.Contains("IsResizable = false", StringComparison.Ordinal)
+                && mainWindowSource.Contains("IsMaximizable = false", StringComparison.Ordinal)
+                && mainWindowSource.Contains("IsMinimizable = false", StringComparison.Ordinal),
+            "the main window keeps a fixed DPI-aware size within the display work area"
+        );
+        Check(
+            dashboardXaml.Contains("SizeChanged=\"Page_SizeChanged\"", StringComparison.Ordinal)
+                && dashboardXaml.Contains("x:Name=\"SummaryCardsGrid\"", StringComparison.Ordinal)
+                && dashboardXaml.Contains("TextWrapping=\"Wrap\"", StringComparison.Ordinal)
+                && dashboardSource.Contains("e.NewSize.Width < 680", StringComparison.Ordinal)
+                && dashboardSource.Contains("PositionEnvironmentRow", StringComparison.Ordinal)
+                && dashboardSource.Contains("RecentDumpsPanel", StringComparison.Ordinal),
+            "the dashboard switches to a compact layout instead of clipping at high display scales"
         );
         var environmentSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
@@ -544,12 +610,18 @@ internal static partial class ContractChecks
         var appCodeBehind = File.ReadAllText(Path.Combine(projectRoot, "App.xaml.cs"));
         Check(
             appCodeBehind.Contains("new TaskbarIcon", StringComparison.Ordinal)
-                && appCodeBehind.Contains("new GeneratedIconSource", StringComparison.Ordinal)
+                && appCodeBehind.Contains("new BitmapImage", StringComparison.Ordinal)
                 && appCodeBehind.Contains(
-                    "global::Windows.UI.Color.FromArgb",
+                    "ms-appx:///Assets/HerdMe.ico",
                     StringComparison.Ordinal
-                ),
-            "the Windows tray icon is created with the H.NotifyIcon generated icon source API"
+                )
+                && appCodeBehind.Contains(
+                    "ContextMenuMode = ContextMenuMode.PopupMenu",
+                    StringComparison.Ordinal
+                )
+                && !appCodeBehind.Contains("ContextMenuMode.SecondWindow", StringComparison.Ordinal)
+                && !appCodeBehind.Contains("new GeneratedIconSource", StringComparison.Ordinal),
+            "the Windows tray uses the packaged icon and a work-area-aware popup menu"
         );
         Check(
             !appCodeBehind.Contains("Resources[\"OpenHerdMeCommand\"]", StringComparison.Ordinal)
@@ -558,26 +630,63 @@ internal static partial class ContractChecks
                 && !appCodeBehind.Contains("Resources[\"StopAllCommand\"]", StringComparison.Ordinal)
                 && appCodeBehind.Contains("new XamlUICommand", StringComparison.Ordinal)
                 && appCodeBehind.Contains(
-                    "AppLocalization.Get(\"TrayOpenCommand.Label\")",
+                    "AppLocalization.Get(\"TrayOpenCommandLabel\")",
                     StringComparison.Ordinal
                 )
                 && appCodeBehind.Contains(
-                    "AppLocalization.Get(\"TrayQuitCommand.Label\")",
+                    "AppLocalization.Get(\"TrayQuitCommandLabel\")",
                     StringComparison.Ordinal
                 )
                 && appCodeBehind.Contains(
-                    "AppLocalization.Get(\"TrayStartAllCommand.Label\")",
+                    "AppLocalization.Get(\"TrayStartAllCommandLabel\")",
                     StringComparison.Ordinal
                 )
                 && appCodeBehind.Contains(
-                    "AppLocalization.Get(\"TrayStopAllCommand.Label\")",
+                    "AppLocalization.Get(\"TrayStopAllCommandLabel\")",
                     StringComparison.Ordinal
                 ),
-            "the Windows tray commands are constructed from localized strings at runtime"
+            "the Windows tray commands use direct ResourceLoader keys at runtime"
         );
 
         var projectDocument = XDocument.Load(
             Path.Combine(projectRoot, "HerdMe.Windows.csproj")
+        );
+        Check(
+            projectDocument.Descendants()
+                .Any(element =>
+                    element.Name.LocalName == "Content"
+                    && element.Attribute("Include")?.Value == @"Assets\HerdMe.ico"
+                    && element.Elements().Any(child =>
+                        child.Name.LocalName == "CopyToOutputDirectory"
+                        && child.Value == "PreserveNewest"
+                    )
+                    && element.Elements().Any(child =>
+                        child.Name.LocalName == "CopyToPublishDirectory"
+                        && child.Value == "PreserveNewest"
+                    )
+                ),
+            "the Windows tray icon is copied to build and publish outputs"
+        );
+        Check(
+            projectDocument.Descendants()
+                .Any(element =>
+                    element.Name.LocalName == "Content"
+                    && element.Attribute("Include")?.Value
+                        == @"$(HerdMeVCRuntimeDirectory)\*.dll"
+                    && element.Elements().Any(child =>
+                        child.Name.LocalName == "CopyToOutputDirectory"
+                        && child.Value == "PreserveNewest"
+                    )
+                    && element.Elements().Any(child =>
+                        child.Name.LocalName == "CopyToPublishDirectory"
+                        && child.Value == "PreserveNewest"
+                    )
+                    && element.Elements().Any(child =>
+                        child.Name.LocalName == "TargetPath"
+                        && child.Value == @"Prerequisites\VC143\%(Filename)%(Extension)"
+                    )
+                ),
+            "the app-local Visual C++ runtime is copied to build and publish outputs"
         );
         Check(
             projectDocument.Descendants()
@@ -643,8 +752,15 @@ internal static partial class ContractChecks
         );
         Check(
             buildTools.Contains("Find-HerdMeMSBuild", StringComparison.Ordinal)
-                && buildTools.Contains("System.Security.Permissions.dll", StringComparison.Ordinal),
-            "the Windows build locates Visual Studio MSBuild and patches its XAML task dependency"
+                && buildTools.Contains("System.Security.Permissions.dll", StringComparison.Ordinal)
+                && buildTools.Contains("Copy-HerdMeVCRuntime", StringComparison.Ordinal)
+                && buildTools.Contains("Microsoft.VC143.CRT", StringComparison.Ordinal)
+                && buildTools.Contains("Get-AuthenticodeSignature", StringComparison.Ordinal)
+                && buildScript.Contains(
+                    "Copy-HerdMeVCRuntime -DestinationDirectory",
+                    StringComparison.Ordinal
+                ),
+            "the Windows build locates signed Visual Studio build and app-local runtime dependencies"
         );
         var portablePackaging = File.ReadAllText(
             Path.Combine(windowsDirectory, "package-portable.ps1")
@@ -655,8 +771,12 @@ internal static partial class ContractChecks
                 && portablePackaging.Contains(
                     "/p:UseXamlCompilerExecutable=false",
                     StringComparison.Ordinal
+                )
+                && portablePackaging.Contains(
+                    @"Prerequisites\VC143\vcruntime140.dll",
+                    StringComparison.Ordinal
                 ),
-            "the portable Windows publish uses the validated Visual Studio MSBuild path"
+            "the portable Windows publish uses validated MSBuild and includes the PHP VC runtime"
         );
         Check(
             File.ReadAllText(Path.Combine(windowsDirectory, "check-format.ps1"))
@@ -715,6 +835,19 @@ internal static partial class ContractChecks
         Check(
             acceptanceSource.Contains("Assert-WinUiNavigation $primary", StringComparison.Ordinal),
             "native Windows acceptance executes the WinUI navigation smoke test"
+        );
+        Check(
+            acceptanceSource.Contains("Assert-FixedMainWindow $primary", StringComparison.Ordinal)
+                && acceptanceSource.Contains("CanMaximize", StringComparison.Ordinal)
+                && acceptanceSource.Contains("CanMinimize", StringComparison.Ordinal)
+                && acceptanceSource.Contains("CanResize", StringComparison.Ordinal),
+            "native Windows acceptance rejects resizable main windows"
+        );
+        Check(
+            acceptanceSource.Contains("Assert-OnboardingLayout $onboarding", StringComparison.Ordinal)
+                && acceptanceSource.Contains("OnboardingStartButton", StringComparison.Ordinal)
+                && acceptanceSource.Contains("IsOffscreen", StringComparison.Ordinal),
+            "native Windows acceptance rejects clipped first-run onboarding"
         );
         var sitesPageCodeBehind = File.ReadAllText(
             Path.Combine(projectRoot, "Pages", "SitesPage.xaml.cs")
@@ -787,7 +920,7 @@ internal static partial class ContractChecks
         {
             "NavPhp.Content",
             "NavNode.Content",
-            "OnboardingSetupSummary.Text",
+            "OnboardingSetupSummaryText",
             "PhpPageTitle.Text",
             "NodePageTitle.Text",
             "PhpComposerVersion",
@@ -813,6 +946,100 @@ internal static partial class ContractChecks
         Check(
             nonArabicTranslationKeys.Length == 0,
             $"Windows Arabic resources contain Arabic text: {string.Join(", ", nonArabicTranslationKeys)}"
+        );
+        var onboardingSource = File.ReadAllText(
+            Path.Combine(projectRoot, "Views", "OnboardingView.xaml.cs")
+        );
+        var onboardingXaml = File.ReadAllText(
+            Path.Combine(projectRoot, "Views", "OnboardingView.xaml")
+        );
+        Check(
+            onboardingSource.Contains(
+                "\"OnboardingSetupSummaryText\"",
+                StringComparison.Ordinal
+            )
+                && !onboardingSource.Contains(
+                    "\"OnboardingSetupSummary.Text\"",
+                    StringComparison.Ordinal
+            ),
+            "the onboarding summary uses a direct ResourceLoader key at runtime"
+        );
+        Check(
+            onboardingXaml.Contains("VerticalScrollBarVisibility=\"Auto\"", StringComparison.Ordinal)
+                && onboardingXaml.Contains("TextWrapping=\"Wrap\"", StringComparison.Ordinal)
+                && onboardingSource.Contains("OnboardingFailureMessage", StringComparison.Ordinal)
+                && !onboardingSource.Contains("FailureText.Text = error.Message", StringComparison.Ordinal),
+            "onboarding stays scrollable and keeps raw failures in technical details"
+        );
+        var phpInstallerSource = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "Services",
+            "PhpRuntimeInstaller.cs"
+        ));
+        Check(
+            phpInstallerSource.Contains("extension = zip", StringComparison.Ordinal)
+                && phpInstallerSource.Contains("php_{extension}.dll", StringComparison.Ordinal)
+                && phpInstallerSource.Contains("HasRequiredConfiguration", StringComparison.Ordinal),
+            "managed PHP enables and validates ZIP for Composer on clean Windows hosts"
+        );
+        var composerToolsSource = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "Services",
+            "ComposerToolManager.cs"
+        ));
+        Check(
+            composerToolsSource.Contains("ComposerCommandPath", StringComparison.Ordinal)
+                && composerToolsSource.Contains("EnsureComposerCommand", StringComparison.Ordinal)
+                && composerToolsSource.Contains(
+                    @"%~dp0..\\Runtimes\\php\\",
+                    StringComparison.Ordinal
+                ),
+            "Laravel project creation exposes managed Composer to child commands on clean hosts"
+        );
+        var gitInstallerSource = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "Services",
+            "GitRuntimeInstaller.cs"
+        ));
+        var userPathSource = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "Services",
+            "WindowsUserPathManager.cs"
+        ));
+        var initialSetupSource = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "Services",
+            "InitialSetupManager.cs"
+        ));
+        var projectCreatorSource = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "Services",
+            "LaravelProjectCreator.cs"
+        ));
+        Check(
+            gitInstallerSource.Contains("git-for-windows/git/releases/latest", StringComparison.Ordinal)
+                && gitInstallerSource.Contains("MinGitArchivePattern", StringComparison.Ordinal)
+                && gitInstallerSource.Contains("sha256:", StringComparison.Ordinal)
+                && gitInstallerSource.Contains("release.Size", StringComparison.Ordinal),
+            "managed Git uses the official MinGit x64 asset with size and SHA-256 verification"
+        );
+        Check(
+            initialSetupSource.Contains("EnsureCommandLineToolsAsync", StringComparison.Ordinal)
+                && initialSetupSource.Contains("InitialSetupStage.Git", StringComparison.Ordinal)
+                && initialSetupSource.Contains("gitInstaller.EnsureInstalledAsync", StringComparison.Ordinal)
+                && initialSetupSource.Contains("userPathManager.Synchronize", StringComparison.Ordinal),
+            "first-run and upgrade repair install Git with the complete command-line toolchain"
+        );
+        Check(
+            projectCreatorSource.Contains("gitInstaller.EnsureInstalledAsync", StringComparison.Ordinal)
+                && !projectCreatorSource.Contains("\"git.exe\"", StringComparison.Ordinal),
+            "Laravel project creation uses managed Git instead of requiring system Git"
+        );
+        Check(
+            userPathSource.Contains("EnvironmentVariableTarget.User", StringComparison.Ordinal)
+                && userPathSource.Contains("SendMessageTimeout", StringComparison.Ordinal)
+                && userPathSource.Contains("WmSettingChange", StringComparison.Ordinal),
+            "the managed PHP, Composer, Laravel, Node, npm, and Git paths persist for new CMD sessions"
         );
         foreach (var key in english.Keys)
         {
@@ -967,6 +1194,17 @@ internal static partial class ContractChecks
         var servicesPageSource = File.ReadAllText(
             Path.Combine(projectRoot, "Pages", "ServicesPage.xaml.cs")
         );
+        var servicesPageXaml = File.ReadAllText(
+            Path.Combine(projectRoot, "Pages", "ServicesPage.xaml")
+        );
+        Check(
+            servicesPageSource.Contains("StartAutomatically = true", StringComparison.Ordinal)
+                && servicesPageSource.Contains("await manager.StartAsync(instance.Id)", StringComparison.Ordinal)
+                && servicesPageXaml.Contains("Click=\"Toggle_Click\"", StringComparison.Ordinal)
+                && servicesPageXaml.Contains("ServicesMoreTooltip", StringComparison.Ordinal)
+                && servicesPageXaml.Contains("Mode=OneTime", StringComparison.Ordinal),
+            "Windows Services installs, starts, and exposes unclipped controls for new instances"
+        );
         var servicesResourceKeys = Regex.Matches(
             servicesPageSource,
             @"""(?<key>Services[A-Za-z0-9]+)""",
@@ -1003,6 +1241,26 @@ internal static partial class ContractChecks
         );
         var sitesPageXaml = File.ReadAllText(
             Path.Combine(projectRoot, "Pages", "SitesPage.xaml")
+        );
+        var generalPageXaml = File.ReadAllText(
+            Path.Combine(projectRoot, "Pages", "GeneralPage.xaml")
+        );
+        var generalPageSource = File.ReadAllText(
+            Path.Combine(projectRoot, "Pages", "GeneralPage.xaml.cs")
+        );
+        Check(
+            !sitesPageXaml.Contains("EnvironmentButton", StringComparison.Ordinal)
+                && !sitesPageXaml.Contains("TldTextBox", StringComparison.Ordinal)
+                && generalPageXaml.Contains("x:Name=\"TldTextBox\"", StringComparison.Ordinal)
+                && sitesPageSource.Contains("SynchronizeSitesAsync(scanned)", StringComparison.Ordinal),
+            "Windows Sites starts automatically and keeps the domain suffix in General"
+        );
+        Check(
+            generalPageSource.Contains("ManagedRuntimeChecks()", StringComparison.Ordinal)
+                && !generalPageSource.Contains("report.Runtimes", StringComparison.Ordinal)
+                && new[] { "composer", "laravel", "node", "npm", "git" }.All(tool =>
+                    generalPageSource.Contains($"\"{tool}\"", StringComparison.Ordinal)),
+            "Windows General reports HerdMe-managed command-line tools instead of the launch PATH"
         );
         Check(
             new[]

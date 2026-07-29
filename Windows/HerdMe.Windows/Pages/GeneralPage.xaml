@@ -47,6 +47,20 @@
                             <Button x:Name="InstallDomainsButton" x:Uid="GeneralSetupDomains" Content="Set Up" Click="InstallDomains_Click" />
                         </StackPanel>
                     </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="180" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            x:Uid="GeneralDomainSuffixLabel"
+                            Text="Domain suffix"
+                            VerticalAlignment="Center" />
+                        <TextBox
+                            x:Name="TldTextBox"
+                            Grid.Column="1"
+                            LostFocus="TldTextBox_LostFocus" />
+                    </Grid>
                     <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
