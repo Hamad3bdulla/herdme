@@ -31,7 +31,12 @@ struct DashboardView: View {
                             Int64(sitesCoordinator.sites.count)
                         ),
                         symbol: "server.rack",
-                        tint: .blue
+                        tint: .blue,
+                        statusColor: summaryStatusColor(
+                            running: runningSiteCount,
+                            total: sitesCoordinator.sites.count
+                        ),
+                        accessibilityIdentifier: "dashboard.metric.sites"
                     ) { navigation.selectedPage = .sites }
                     DashboardMetricCard(
                         title: "Services",
@@ -42,7 +47,12 @@ struct DashboardView: View {
                             Int64(model.configuration.serviceInstances.count)
                         ),
                         symbol: "externaldrive",
-                        tint: .green
+                        tint: .green,
+                        statusColor: summaryStatusColor(
+                            running: runningServiceCount,
+                            total: model.configuration.serviceInstances.count
+                        ),
+                        accessibilityIdentifier: "dashboard.metric.services"
                     ) { navigation.selectedPage = .services }
                     DashboardMetricCard(
                         title: "Mail",
@@ -51,7 +61,9 @@ struct DashboardView: View {
                             ? String(localized: "Capture server running")
                             : String(localized: "Capture server stopped"),
                         symbol: "envelope",
-                        tint: .indigo
+                        tint: .indigo,
+                        statusColor: captureStatusColor(isRunning: mailCoordinator.isServerRunning),
+                        accessibilityIdentifier: "dashboard.metric.mail"
                     ) { navigation.selectedPage = .mail }
                     DashboardMetricCard(
                         title: "Dumps",
@@ -60,7 +72,9 @@ struct DashboardView: View {
                             ? String(localized: "Capture server running")
                             : String(localized: "Capture server stopped"),
                         symbol: "shippingbox.and.arrow.backward",
-                        tint: .orange
+                        tint: .orange,
+                        statusColor: captureStatusColor(isRunning: dumpsCoordinator.isServerRunning),
+                        accessibilityIdentifier: "dashboard.metric.dumps"
                     ) { navigation.selectedPage = .dumps }
                 }
 
@@ -214,6 +228,17 @@ struct DashboardView: View {
         model.configuration.serviceInstances.filter { servicesCoordinator.state(for: $0).isRunning }.count
     }
 
+    private func summaryStatusColor(running: Int, total: Int) -> Color {
+        guard total > 0 else { return .secondary }
+        if running == total { return .green }
+        if running > 0 { return .orange }
+        return .red
+    }
+
+    private func captureStatusColor(isRunning: Bool) -> Color {
+        isRunning ? .green : .red
+    }
+
     private var environmentDetail: String {
         guard environmentCoordinator.status == .running else {
             return String(localized: "Local sites are not currently being served")
@@ -305,38 +330,52 @@ private struct DashboardMetricCard: View {
     let detail: String
     let symbol: String
     let tint: Color
+    let statusColor: Color
+    let accessibilityIdentifier: String
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    Image(systemName: symbol)
-                        .foregroundStyle(tint)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(tint.opacity(0.12))
+                        Image(systemName: symbol)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(tint)
+                    }
+                    .frame(width: 36, height: 36)
                     Spacer()
-                    Image(systemName: "chevron.forward")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                    Text(value)
+                        .font(.title2.weight(.semibold).monospacedDigit())
                 }
-                Text(value)
-                    .font(.title2.weight(.semibold).monospacedDigit())
                 Text(title)
                     .font(.callout.weight(.medium))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .padding(.top, 14)
+                Spacer(minLength: 8)
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 7, height: 7)
+                        .accessibilityHidden(true)
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
             }
-            .frame(maxWidth: .infinity, minHeight: 116, alignment: .leading)
-            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 114, alignment: .leading)
+            .padding(16)
             .background(Color(nsColor: .controlBackgroundColor))
             .overlay {
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 6)
                     .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 }
 
