@@ -439,11 +439,14 @@ internal static partial class ContractChecks
         Check(
             dashboardXaml.Contains("SizeChanged=\"Page_SizeChanged\"", StringComparison.Ordinal)
                 && dashboardXaml.Contains("x:Name=\"SummaryCardsGrid\"", StringComparison.Ordinal)
+                && dashboardXaml.Contains("x:Key=\"DashboardSummaryCardStyle\"", StringComparison.Ordinal)
+                && dashboardXaml.Contains("Property=\"HorizontalAlignment\" Value=\"Stretch\"", StringComparison.Ordinal)
                 && dashboardXaml.Contains("TextWrapping=\"Wrap\"", StringComparison.Ordinal)
                 && dashboardSource.Contains("e.NewSize.Width < 680", StringComparison.Ordinal)
+                && dashboardSource.Contains("SummaryStatusBrush", StringComparison.Ordinal)
                 && dashboardSource.Contains("PositionEnvironmentRow", StringComparison.Ordinal)
                 && dashboardSource.Contains("RecentDumpsPanel", StringComparison.Ordinal),
-            "the dashboard switches to a compact layout instead of clipping at high display scales"
+            "the dashboard keeps polished equal-width cards and switches to a compact layout without clipping"
         );
         var environmentSource = File.ReadAllText(Path.Combine(
             repositoryRoot,

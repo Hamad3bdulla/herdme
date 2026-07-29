@@ -230,19 +230,19 @@
   <data name="SitesCountInitial.Text" xml:space="preserve"><value>لا توجد مواقع</value></data>
   <data name="SitesEmptyState.Text" xml:space="preserve"><value>لم يتم العثور على مواقع</value></data>
   <data name="SitesNoSelection.Text" xml:space="preserve"><value>حدد موقعاً</value></data>
-  <data name="SitesOpenBrowserTooltip.Text" xml:space="preserve"><value>فتح في المتصفح</value></data>
-  <data name="SitesCopyTooltip.Text" xml:space="preserve"><value>نسخ رابط الموقع أو مساره</value></data>
   <data name="SitesCopyLinkMenu.Text" xml:space="preserve"><value>نسخ الرابط</value></data>
   <data name="SitesCopyPathMenu.Text" xml:space="preserve"><value>نسخ المسار</value></data>
-  <data name="SitesOpenFolderTooltip.Text" xml:space="preserve"><value>فتح مجلد المشروع</value></data>
-  <data name="SitesEditEnvironmentTooltip.Text" xml:space="preserve"><value>تعديل .env</value></data>
-  <data name="SitesOpenTerminalTooltip.Text" xml:space="preserve"><value>فتح الطرفية</value></data>
-  <data name="SitesOpenLogsTooltip.Text" xml:space="preserve"><value>فتح سجلات الموقع</value></data>
-  <data name="SitesArtisanTooltip.Text" xml:space="preserve"><value>تشغيل أمر Artisan</value></data>
-  <data name="SitesNpmTooltip.Text" xml:space="preserve"><value>تشغيل سكربت npm</value></data>
-  <data name="SitesConfigureRuntimesTooltip.Text" xml:space="preserve"><value>ضبط PHP وNode.js</value></data>
-  <data name="SitesUnlinkTooltip.Text" xml:space="preserve"><value>إلغاء ربط المشروع</value></data>
-  <data name="SitesMoveToRecycleBinTooltip.Text" xml:space="preserve"><value>نقل المشروع إلى سلة المحذوفات</value></data>
+  <data name="SitesOpenBrowserCommand.Label" xml:space="preserve"><value>فتح في المتصفح</value></data>
+  <data name="SitesCopyCommand.Label" xml:space="preserve"><value>نسخ رابط الموقع أو مساره</value></data>
+  <data name="SitesOpenFolderCommand.Label" xml:space="preserve"><value>فتح مجلد المشروع</value></data>
+  <data name="SitesOpenTerminalCommand.Label" xml:space="preserve"><value>فتح الطرفية</value></data>
+  <data name="SitesEditEnvironmentCommand.Label" xml:space="preserve"><value>تعديل .env</value></data>
+  <data name="SitesOpenLogsCommand.Label" xml:space="preserve"><value>فتح سجلات الموقع</value></data>
+  <data name="SitesArtisanCommand.Label" xml:space="preserve"><value>تشغيل أمر Artisan</value></data>
+  <data name="SitesNpmCommand.Label" xml:space="preserve"><value>تشغيل سكربت npm</value></data>
+  <data name="SitesConfigureRuntimesCommand.Label" xml:space="preserve"><value>ضبط PHP وNode.js</value></data>
+  <data name="SitesUnlinkCommand.Label" xml:space="preserve"><value>إلغاء ربط المشروع</value></data>
+  <data name="SitesMoveToRecycleBinCommand.Label" xml:space="preserve"><value>نقل المشروع إلى سلة المحذوفات</value></data>
   <data name="SitesMoveToRecycleBinTitle" xml:space="preserve"><value>نقل {0} إلى سلة المحذوفات؟</value></data>
   <data name="SitesMoveToRecycleBinMessage" xml:space="preserve"><value>سيُنقل مجلد المشروع إلى سلة المحذوفات ويمكن استعادته منها.</value></data>
   <data name="SitesMoveToRecycleBin" xml:space="preserve"><value>نقل إلى سلة المحذوفات</value></data>
@@ -253,6 +253,7 @@
   <data name="SitesPreviewUnavailable.Text" xml:space="preserve"><value>المعاينة غير متاحة</value></data>
   <data name="SitesRetryPreviewButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إعادة محاولة معاينة الموقع</value></data>
   <data name="SitesRetryPreviewTooltip.Text" xml:space="preserve"><value>إعادة محاولة المعاينة</value></data>
+  <data name="SitesProjectDetailsTitle.Text" xml:space="preserve"><value>تفاصيل المشروع</value></data>
   <data name="SitesFrameworkLabel.Text" xml:space="preserve"><value>إطار العمل</value></data>
   <data name="SitesRuntimeLabel.Text" xml:space="preserve"><value>بيئة التشغيل</value></data>
   <data name="SitesRegistrationLabel.Text" xml:space="preserve"><value>نوع الإضافة</value></data>

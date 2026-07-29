@@ -6,6 +6,34 @@
     Loaded="Page_Loaded"
     SizeChanged="Page_SizeChanged"
     Unloaded="Page_Unloaded">
+    <Page.Resources>
+        <Style x:Key="DashboardSummaryCardStyle" TargetType="Button">
+            <Setter Property="MinHeight" Value="148" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        <Style x:Key="DashboardSummaryCountStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="28" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="DashboardSummaryLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="DashboardSummaryStatusStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+    </Page.Resources>
     <Grid x:Name="DashboardLayout" Padding="28,22,28,24" RowSpacing="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -60,72 +88,136 @@
                         x:Uid="DashboardSitesCard"
                         x:Name="SitesCard"
                         Click="OpenSites_Click"
-                        Padding="14"
-                        HorizontalContentAlignment="Stretch"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
+                        Style="{StaticResource DashboardSummaryCardStyle}"
                         AutomationProperties.Name="Open sites">
-                        <StackPanel Spacing="7">
-                            <SymbolIcon Symbol="Folder" HorizontalAlignment="Left" />
-                            <TextBlock x:Name="SitesCountText" Text="0" FontSize="26" FontWeight="SemiBold" />
-                            <TextBlock x:Uid="DashboardSitesLabel" Text="Sites" FontWeight="SemiBold" />
-                            <TextBlock x:Name="SitesStatusText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                        </StackPanel>
+                        <Grid MinHeight="114">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource ControlFillColorDefaultBrush}">
+                                    <SymbolIcon Symbol="Folder" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock x:Name="SitesCountText" Grid.Column="1" Text="0" HorizontalAlignment="Right" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            </Grid>
+                            <TextBlock x:Uid="DashboardSitesLabel" Grid.Row="1" Margin="0,14,0,0" Text="Sites" Style="{StaticResource DashboardSummaryLabelStyle}" />
+                            <Grid Grid.Row="2" Margin="0,8,0,0" ColumnSpacing="8" VerticalAlignment="Bottom">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Ellipse x:Name="SitesStatusDot" Width="7" Height="7" VerticalAlignment="Center" Fill="{ThemeResource SystemFillColorNeutralBrush}" />
+                                <TextBlock x:Name="SitesStatusText" Grid.Column="1" Style="{StaticResource DashboardSummaryStatusStyle}" />
+                            </Grid>
+                        </Grid>
                     </Button>
                     <Button
                         x:Uid="DashboardServicesCard"
                         x:Name="ServicesCard"
                         Grid.Column="1"
                         Click="OpenServices_Click"
-                        Padding="14"
-                        HorizontalContentAlignment="Stretch"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
+                        Style="{StaticResource DashboardSummaryCardStyle}"
                         AutomationProperties.Name="Open services">
-                        <StackPanel Spacing="7">
-                            <SymbolIcon Symbol="AllApps" HorizontalAlignment="Left" />
-                            <TextBlock x:Name="ServicesCountText" Text="0" FontSize="26" FontWeight="SemiBold" />
-                            <TextBlock x:Uid="DashboardServicesLabel" Text="Services" FontWeight="SemiBold" />
-                            <TextBlock x:Name="ServicesStatusText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                        </StackPanel>
+                        <Grid MinHeight="114">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource ControlFillColorDefaultBrush}">
+                                    <SymbolIcon Symbol="AllApps" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock x:Name="ServicesCountText" Grid.Column="1" Text="0" HorizontalAlignment="Right" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            </Grid>
+                            <TextBlock x:Uid="DashboardServicesLabel" Grid.Row="1" Margin="0,14,0,0" Text="Services" Style="{StaticResource DashboardSummaryLabelStyle}" />
+                            <Grid Grid.Row="2" Margin="0,8,0,0" ColumnSpacing="8" VerticalAlignment="Bottom">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Ellipse x:Name="ServicesStatusDot" Width="7" Height="7" VerticalAlignment="Center" Fill="{ThemeResource SystemFillColorNeutralBrush}" />
+                                <TextBlock x:Name="ServicesStatusText" Grid.Column="1" Style="{StaticResource DashboardSummaryStatusStyle}" />
+                            </Grid>
+                        </Grid>
                     </Button>
                     <Button
                         x:Uid="DashboardMailCard"
                         x:Name="MailCard"
                         Grid.Column="2"
                         Click="OpenMail_Click"
-                        Padding="14"
-                        HorizontalContentAlignment="Stretch"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
+                        Style="{StaticResource DashboardSummaryCardStyle}"
                         AutomationProperties.Name="Open mail">
-                        <StackPanel Spacing="7">
-                            <SymbolIcon Symbol="Mail" HorizontalAlignment="Left" />
-                            <TextBlock x:Name="MailCountText" Text="0" FontSize="26" FontWeight="SemiBold" />
-                            <TextBlock x:Uid="DashboardMailLabel" Text="Mail" FontWeight="SemiBold" />
-                            <TextBlock x:Name="MailStatusText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                        </StackPanel>
+                        <Grid MinHeight="114">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource ControlFillColorDefaultBrush}">
+                                    <SymbolIcon Symbol="Mail" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock x:Name="MailCountText" Grid.Column="1" Text="0" HorizontalAlignment="Right" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            </Grid>
+                            <TextBlock x:Uid="DashboardMailLabel" Grid.Row="1" Margin="0,14,0,0" Text="Mail" Style="{StaticResource DashboardSummaryLabelStyle}" />
+                            <Grid Grid.Row="2" Margin="0,8,0,0" ColumnSpacing="8" VerticalAlignment="Bottom">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Ellipse x:Name="MailStatusDot" Width="7" Height="7" VerticalAlignment="Center" Fill="{ThemeResource SystemFillColorNeutralBrush}" />
+                                <TextBlock x:Name="MailStatusText" Grid.Column="1" Style="{StaticResource DashboardSummaryStatusStyle}" />
+                            </Grid>
+                        </Grid>
                     </Button>
                     <Button
                         x:Uid="DashboardDumpsCard"
                         x:Name="DumpsCard"
                         Grid.Column="3"
                         Click="OpenDumps_Click"
-                        Padding="14"
-                        HorizontalContentAlignment="Stretch"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
+                        Style="{StaticResource DashboardSummaryCardStyle}"
                         AutomationProperties.Name="Open dumps">
-                        <StackPanel Spacing="7">
-                            <SymbolIcon Symbol="View" HorizontalAlignment="Left" />
-                            <TextBlock x:Name="DumpsCountText" Text="0" FontSize="26" FontWeight="SemiBold" />
-                            <TextBlock x:Uid="DashboardDumpsLabel" Text="Dumps" FontWeight="SemiBold" />
-                            <TextBlock x:Name="DumpsStatusText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                        </StackPanel>
+                        <Grid MinHeight="114">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource ControlFillColorDefaultBrush}">
+                                    <SymbolIcon Symbol="View" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock x:Name="DumpsCountText" Grid.Column="1" Text="0" HorizontalAlignment="Right" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            </Grid>
+                            <TextBlock x:Uid="DashboardDumpsLabel" Grid.Row="1" Margin="0,14,0,0" Text="Dumps" Style="{StaticResource DashboardSummaryLabelStyle}" />
+                            <Grid Grid.Row="2" Margin="0,8,0,0" ColumnSpacing="8" VerticalAlignment="Bottom">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Ellipse x:Name="DumpsStatusDot" Width="7" Height="7" VerticalAlignment="Center" Fill="{ThemeResource SystemFillColorNeutralBrush}" />
+                                <TextBlock x:Name="DumpsStatusText" Grid.Column="1" Style="{StaticResource DashboardSummaryStatusStyle}" />
+                            </Grid>
+                        </Grid>
                     </Button>
                 </Grid>
 

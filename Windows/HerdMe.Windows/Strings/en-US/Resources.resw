@@ -230,19 +230,19 @@
   <data name="SitesCountInitial.Text" xml:space="preserve"><value>0 sites</value></data>
   <data name="SitesEmptyState.Text" xml:space="preserve"><value>No sites found</value></data>
   <data name="SitesNoSelection.Text" xml:space="preserve"><value>Select a site</value></data>
-  <data name="SitesOpenBrowserTooltip.Text" xml:space="preserve"><value>Open in browser</value></data>
-  <data name="SitesCopyTooltip.Text" xml:space="preserve"><value>Copy site link or path</value></data>
   <data name="SitesCopyLinkMenu.Text" xml:space="preserve"><value>Copy link</value></data>
   <data name="SitesCopyPathMenu.Text" xml:space="preserve"><value>Copy path</value></data>
-  <data name="SitesOpenFolderTooltip.Text" xml:space="preserve"><value>Open project folder</value></data>
-  <data name="SitesEditEnvironmentTooltip.Text" xml:space="preserve"><value>Edit .env</value></data>
-  <data name="SitesOpenTerminalTooltip.Text" xml:space="preserve"><value>Open terminal</value></data>
-  <data name="SitesOpenLogsTooltip.Text" xml:space="preserve"><value>Open site logs</value></data>
-  <data name="SitesArtisanTooltip.Text" xml:space="preserve"><value>Run Artisan command</value></data>
-  <data name="SitesNpmTooltip.Text" xml:space="preserve"><value>Run npm script</value></data>
-  <data name="SitesConfigureRuntimesTooltip.Text" xml:space="preserve"><value>Configure PHP and Node.js</value></data>
-  <data name="SitesUnlinkTooltip.Text" xml:space="preserve"><value>Unlink project</value></data>
-  <data name="SitesMoveToRecycleBinTooltip.Text" xml:space="preserve"><value>Move project to Recycle Bin</value></data>
+  <data name="SitesOpenBrowserCommand.Label" xml:space="preserve"><value>Open in browser</value></data>
+  <data name="SitesCopyCommand.Label" xml:space="preserve"><value>Copy site link or path</value></data>
+  <data name="SitesOpenFolderCommand.Label" xml:space="preserve"><value>Open project folder</value></data>
+  <data name="SitesOpenTerminalCommand.Label" xml:space="preserve"><value>Open terminal</value></data>
+  <data name="SitesEditEnvironmentCommand.Label" xml:space="preserve"><value>Edit .env</value></data>
+  <data name="SitesOpenLogsCommand.Label" xml:space="preserve"><value>Open site logs</value></data>
+  <data name="SitesArtisanCommand.Label" xml:space="preserve"><value>Run Artisan command</value></data>
+  <data name="SitesNpmCommand.Label" xml:space="preserve"><value>Run npm script</value></data>
+  <data name="SitesConfigureRuntimesCommand.Label" xml:space="preserve"><value>Configure PHP and Node.js</value></data>
+  <data name="SitesUnlinkCommand.Label" xml:space="preserve"><value>Unlink project</value></data>
+  <data name="SitesMoveToRecycleBinCommand.Label" xml:space="preserve"><value>Move project to Recycle Bin</value></data>
   <data name="SitesMoveToRecycleBinTitle" xml:space="preserve"><value>Move {0} to Recycle Bin?</value></data>
   <data name="SitesMoveToRecycleBinMessage" xml:space="preserve"><value>The project folder will be moved to the Recycle Bin and can be restored from there.</value></data>
   <data name="SitesMoveToRecycleBin" xml:space="preserve"><value>Move to Recycle Bin</value></data>
@@ -253,6 +253,7 @@
   <data name="SitesPreviewUnavailable.Text" xml:space="preserve"><value>Preview unavailable</value></data>
   <data name="SitesRetryPreviewButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Retry site preview</value></data>
   <data name="SitesRetryPreviewTooltip.Text" xml:space="preserve"><value>Retry preview</value></data>
+  <data name="SitesProjectDetailsTitle.Text" xml:space="preserve"><value>Project details</value></data>
   <data name="SitesFrameworkLabel.Text" xml:space="preserve"><value>Framework</value></data>
   <data name="SitesRuntimeLabel.Text" xml:space="preserve"><value>Runtime</value></data>
   <data name="SitesRegistrationLabel.Text" xml:space="preserve"><value>Registration</value></data>

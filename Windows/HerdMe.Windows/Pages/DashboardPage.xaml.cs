@@ -199,20 +199,24 @@ public sealed partial class DashboardPage : Page
                 runningSites,
                 sites.Count
             );
+            SitesStatusDot.Fill = SummaryStatusBrush(runningSites, sites.Count);
             ServicesCountText.Text = instances.Count.ToString();
             ServicesStatusText.Text = AppLocalization.Format(
                 "DashboardRunningCount",
                 runningServices,
                 instances.Count
             );
+            ServicesStatusDot.Fill = SummaryStatusBrush(runningServices, instances.Count);
             MailCountText.Text = messages.Count.ToString();
             MailStatusText.Text = AppLocalization.Get(
                 mailCapture.IsRunning ? "DashboardCaptureRunning" : "DashboardCaptureStopped"
             );
+            MailStatusDot.Fill = CaptureStatusBrush(mailCapture.IsRunning);
             DumpsCountText.Text = dumps.Count.ToString();
             DumpsStatusText.Text = AppLocalization.Get(
                 dumpCapture.IsRunning ? "DashboardCaptureRunning" : "DashboardCaptureStopped"
             );
+            DumpsStatusDot.Fill = CaptureStatusBrush(dumpCapture.IsRunning);
 
             UpdateEnvironmentStatus(domainsConfigured, certificateTrusted, settings.Tld);
             UpdateHealth(domainsConfigured, certificateTrusted, failure: null);
@@ -235,6 +239,25 @@ public sealed partial class DashboardPage : Page
                 RefreshProgress.IsActive = false;
             }
         }
+    }
+
+    private static Brush SummaryStatusBrush(int running, int total)
+    {
+        var resource = total == 0
+            ? "SystemFillColorNeutralBrush"
+            : running == total
+                ? "SystemFillColorSuccessBrush"
+                : running > 0
+                    ? "SystemFillColorCautionBrush"
+                    : "SystemFillColorCriticalBrush";
+        return (Brush)Application.Current.Resources[resource];
+    }
+
+    private static Brush CaptureStatusBrush(bool running)
+    {
+        return (Brush)Application.Current.Resources[
+            running ? "SystemFillColorSuccessBrush" : "SystemFillColorCriticalBrush"
+        ];
     }
 
     private void UpdateEnvironmentStatus(

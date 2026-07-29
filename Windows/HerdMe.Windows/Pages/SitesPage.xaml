@@ -6,7 +6,39 @@
     AutomationProperties.AutomationId="SitesPageRoot"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
-    <Grid Padding="24" RowSpacing="12">
+    <Page.Resources>
+        <Style x:Key="SitesToolSurfaceStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        <Style x:Key="SitesIconButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        <Style x:Key="SitesListItemStyle" TargetType="ListViewItem">
+            <Setter Property="MinHeight" Value="58" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        <Style x:Key="SitesRootItemStyle" TargetType="ListViewItem">
+            <Setter Property="MinWidth" Value="220" />
+            <Setter Property="MaxWidth" Value="320" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+    </Page.Resources>
+    <Grid Padding="28,22,28,24" RowSpacing="14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -47,61 +79,97 @@
             </StackPanel>
         </Grid>
 
-        <Expander x:Uid="SitesFoldersExpander" Grid.Row="1" Header="Parked folders and linked projects" IsExpanded="True">
-            <Grid Padding="0,12,0,4" ColumnSpacing="8" RowSpacing="8">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBox x:Uid="SitesRootPathField" x:Name="RootPathTextBox" PlaceholderText="Site folder" />
-                <Button Grid.Column="1" Click="Browse_Click">
-                    <ToolTipService.ToolTip>
-                        <ToolTip><TextBlock x:Uid="SitesChooseFolderTooltip" Text="Choose folder" /></ToolTip>
-                    </ToolTipService.ToolTip>
-                    <SymbolIcon Symbol="Folder" />
-                </Button>
-                <Button Grid.Column="2" Click="AddRoot_Click">
-                    <ToolTipService.ToolTip>
-                        <ToolTip><TextBlock x:Uid="SitesAddFolderTooltip" Text="Add folder" /></ToolTip>
-                    </ToolTipService.ToolTip>
-                    <SymbolIcon Symbol="Add" />
-                </Button>
-                <Button Grid.Column="3" Click="RemoveRoot_Click">
-                    <ToolTipService.ToolTip>
-                        <ToolTip><TextBlock x:Uid="SitesRemoveFolderTooltip" Text="Remove selected folder" /></ToolTip>
-                    </ToolTipService.ToolTip>
-                    <SymbolIcon Symbol="Remove" />
-                </Button>
-                <Button Grid.Column="4" Click="LinkSite_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <SymbolIcon Symbol="Link" />
-                        <TextBlock x:Uid="SitesLinkProjectButton" Text="Link project" />
-                    </StackPanel>
-                </Button>
-                <ListView
-                    x:Name="RootList"
-                    Grid.Row="1"
-                    Grid.ColumnSpan="5"
-                    MaxHeight="88"
-                    ItemsSource="{x:Bind Roots}" />
-            </Grid>
-        </Expander>
+        <Border Grid.Row="1" Style="{StaticResource SitesToolSurfaceStyle}">
+            <Expander
+                x:Uid="SitesFoldersExpander"
+                Header="Parked folders and linked projects"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch"
+                IsExpanded="True">
+                <Grid Padding="16,10,16,14" ColumnSpacing="8" RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox
+                        x:Uid="SitesRootPathField"
+                        x:Name="RootPathTextBox"
+                        Height="36"
+                        PlaceholderText="Site folder" />
+                    <Button Grid.Column="1" Click="Browse_Click" Style="{StaticResource SitesIconButtonStyle}">
+                        <ToolTipService.ToolTip>
+                            <ToolTip><TextBlock x:Uid="SitesChooseFolderTooltip" Text="Choose folder" /></ToolTip>
+                        </ToolTipService.ToolTip>
+                        <SymbolIcon Symbol="Folder" />
+                    </Button>
+                    <Button Grid.Column="2" Click="AddRoot_Click" Style="{StaticResource SitesIconButtonStyle}">
+                        <ToolTipService.ToolTip>
+                            <ToolTip><TextBlock x:Uid="SitesAddFolderTooltip" Text="Add folder" /></ToolTip>
+                        </ToolTipService.ToolTip>
+                        <SymbolIcon Symbol="Add" />
+                    </Button>
+                    <Button Grid.Column="3" Click="RemoveRoot_Click" Style="{StaticResource SitesIconButtonStyle}">
+                        <ToolTipService.ToolTip>
+                            <ToolTip><TextBlock x:Uid="SitesRemoveFolderTooltip" Text="Remove selected folder" /></ToolTip>
+                        </ToolTipService.ToolTip>
+                        <SymbolIcon Symbol="Remove" />
+                    </Button>
+                    <Button Grid.Column="4" Height="36" Click="LinkSite_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <SymbolIcon Symbol="Link" />
+                            <TextBlock x:Uid="SitesLinkProjectButton" Text="Link project" />
+                        </StackPanel>
+                    </Button>
+                    <ListView
+                        x:Name="RootList"
+                        Grid.Row="1"
+                        Grid.ColumnSpan="5"
+                        Height="40"
+                        ItemsSource="{x:Bind Roots}"
+                        ItemContainerStyle="{StaticResource SitesRootItemStyle}"
+                        ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                        ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                        <ListView.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <ItemsStackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ListView.ItemsPanel>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="10,6" ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <SymbolIcon Symbol="Folder" />
+                                    <TextBlock
+                                        Grid.Column="1"
+                                        Text="{Binding}"
+                                        TextTrimming="CharacterEllipsis"
+                                        VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </Expander>
+        </Border>
 
-        <Grid Grid.Row="2" ColumnSpacing="12">
+        <Grid Grid.Row="2" ColumnSpacing="14">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="280" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12">
-                <Grid RowSpacing="10">
+            <Border Padding="12" Style="{StaticResource SitesToolSurfaceStyle}">
+                <Grid RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
@@ -116,32 +184,47 @@
                         x:Name="SiteList"
                         Grid.Row="1"
                         ItemsSource="{x:Bind VisibleSites}"
+                        ItemContainerStyle="{StaticResource SitesListItemStyle}"
                         SelectionChanged="SiteList_SelectionChanged">
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:SiteRecord">
-                                <StackPanel Padding="6" Spacing="2">
-                                    <StackPanel.ContextFlyout>
+                                <Grid Padding="10,7" ColumnSpacing="10">
+                                    <Grid.ContextFlyout>
                                         <MenuFlyout>
                                             <MenuFlyoutItem x:Uid="SitesContextCopyLink" Text="Copy link" Tag="{x:Bind Path}" Click="CopySiteLinkFromMenu_Click" />
                                             <MenuFlyoutItem x:Uid="SitesContextCopyPath" Text="Copy path" Tag="{x:Bind Path}" Click="CopySitePathFromMenu_Click" />
                                             <MenuFlyoutSeparator />
                                             <MenuFlyoutItem x:Uid="SitesContextRemoveSite" Text="Remove site..." Tag="{x:Bind Path}" Click="RemoveSiteFromMenu_Click" />
                                         </MenuFlyout>
-                                    </StackPanel.ContextFlyout>
-                                    <TextBlock Text="{x:Bind Domain}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                    <Grid ColumnSpacing="8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{x:Bind Framework}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Grid.Column="1" Text="{x:Bind GitSummary}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Right" />
-                                    </Grid>
-                                </StackPanel>
+                                    </Grid.ContextFlyout>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border
+                                        Width="32"
+                                        Height="32"
+                                        Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                        CornerRadius="6"
+                                        VerticalAlignment="Center">
+                                        <SymbolIcon Symbol="Globe" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock Text="{x:Bind Domain}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{x:Bind Framework}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="1" Text="{x:Bind GitSummary}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Right" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6">
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6" Margin="0,2,0,0">
                         <TextBlock x:Uid="SitesCountInitial" x:Name="SiteCountText" Text="0 sites" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         <ProgressRing x:Name="ScanProgress" Width="18" Height="18" />
                     </StackPanel>
@@ -152,137 +235,129 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Column="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
+            <Border Grid.Column="1" Style="{StaticResource SitesToolSurfaceStyle}">
                 <Grid>
                     <StackPanel x:Name="NoSelectionState" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
                         <FontIcon Glyph="&#xE774;" FontSize="42" />
                         <TextBlock x:Uid="SitesNoSelection" Text="Select a site" Style="{StaticResource SubtitleTextBlockStyle}" />
                     </StackPanel>
 
-                    <ScrollViewer x:Name="SiteDetail" Visibility="Collapsed">
-                        <StackPanel Spacing="14">
-                            <Grid ColumnSpacing="12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock x:Name="SiteNameText" Style="{StaticResource SubtitleTextBlockStyle}" TextWrapping="Wrap" />
-                                    <TextBlock x:Name="DomainText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                                    <Button Click="OpenSite_Click">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="SitesOpenBrowserTooltip" Text="Open in browser" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="Globe" />
-                                    </Button>
-                                    <Button>
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="SitesCopyTooltip" Text="Copy site link or path" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="Copy" />
-                                        <Button.Flyout>
-                                            <MenuFlyout>
-                                                <MenuFlyoutItem x:Uid="SitesCopyLinkMenu" Text="Copy link" Click="CopySelectedSiteLink_Click" />
-                                                <MenuFlyoutItem x:Uid="SitesCopyPathMenu" Text="Copy path" Click="CopySelectedSitePath_Click" />
-                                            </MenuFlyout>
-                                        </Button.Flyout>
-                                    </Button>
-                                    <Button Click="OpenFolder_Click">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="SitesOpenFolderTooltip" Text="Open project folder" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="Folder" />
-                                    </Button>
-                                    <Button Click="EditEnvironment_Click">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="SitesEditEnvironmentTooltip" Text="Edit .env" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="Edit" />
-                                    </Button>
-                                    <Button Click="OpenTerminal_Click">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="SitesOpenTerminalTooltip" Text="Open terminal" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="OpenFile" />
-                                    </Button>
-                                    <Button Click="OpenLogs_Click">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="SitesOpenLogsTooltip" Text="Open site logs" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="Document" />
-                                    </Button>
-                                    <Button x:Name="ArtisanButton" Click="Artisan_Click">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="SitesArtisanTooltip" Text="Run Artisan command" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="Play" />
-                                    </Button>
-                                    <Button x:Name="NpmButton" Click="Npm_Click">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="SitesNpmTooltip" Text="Run npm script" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="Library" />
-                                    </Button>
-                                    <Button Click="EditRuntimes_Click">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="SitesConfigureRuntimesTooltip" Text="Configure PHP and Node.js" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="Setting" />
-                                    </Button>
-                                    <Button x:Name="UnlinkButton" Click="UnlinkSelectedSite_Click">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="SitesUnlinkTooltip" Text="Unlink project" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="Remove" />
-                                    </Button>
-                                    <Button x:Name="RemoveSiteButton" Click="MoveSelectedSiteToRecycleBin_Click" Visibility="Collapsed">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="SitesMoveToRecycleBinTooltip" Text="Move project to Recycle Bin" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="Delete" />
-                                    </Button>
-                                </StackPanel>
-                            </Grid>
-
-                            <Grid ColumnSpacing="12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
+                    <Grid x:Name="SiteDetail" Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid Padding="16,14,16,8" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock
+                                    x:Name="SiteNameText"
+                                    Style="{StaticResource SubtitleTextBlockStyle}"
+                                    TextWrapping="Wrap"
+                                    TextTrimming="CharacterEllipsis" />
+                                <TextBlock
+                                    x:Name="DomainText"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                 <TextBlock x:Uid="SitesLivePreviewLabel" Text="Live preview" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <ToggleSwitch x:Name="PreviewToggle" Grid.Column="1" IsOn="True" Toggled="PreviewToggle_Toggled" />
-                            </Grid>
-                            <Border x:Name="PreviewBorder" Height="210" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6">
-                                <Grid>
-                                    <WebView2
-                                        x:Name="SitePreview"
-                                        NavigationCompleted="SitePreview_NavigationCompleted"
-                                        SizeChanged="SitePreview_SizeChanged" />
-                                    <StackPanel
-                                        x:Name="PreviewFailureState"
-                                        Visibility="Collapsed"
-                                        Spacing="8"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center">
-                                        <SymbolIcon Symbol="Important" />
-                                        <TextBlock x:Uid="SitesPreviewUnavailable" Text="Preview unavailable" FontWeight="SemiBold" />
-                                        <Button
-                                            x:Uid="SitesRetryPreviewButton"
-                                            HorizontalAlignment="Center"
-                                            Click="RetryPreview_Click"
-                                            AutomationProperties.Name="Retry site preview">
-                                            <ToolTipService.ToolTip>
-                                                <ToolTip><TextBlock x:Uid="SitesRetryPreviewTooltip" Text="Retry preview" /></ToolTip>
-                                            </ToolTipService.ToolTip>
-                                            <SymbolIcon Symbol="Refresh" />
-                                        </Button>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
+                                <ToggleSwitch x:Name="PreviewToggle" IsOn="True" Toggled="PreviewToggle_Toggled" />
+                            </StackPanel>
+                        </Grid>
 
-                            <Grid ColumnSpacing="12" RowSpacing="0">
+                        <CommandBar
+                            Grid.Row="1"
+                            Margin="8,0"
+                            Background="Transparent"
+                            DefaultLabelPosition="Collapsed"
+                            IsDynamicOverflowEnabled="True">
+                            <CommandBar.PrimaryCommands>
+                                <AppBarButton x:Uid="SitesOpenBrowserCommand" Label="Open in browser" Click="OpenSite_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Globe" /></AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton x:Uid="SitesCopyCommand" Label="Copy site link or path">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Copy" /></AppBarButton.Icon>
+                                    <AppBarButton.Flyout>
+                                        <MenuFlyout>
+                                            <MenuFlyoutItem x:Uid="SitesCopyLinkMenu" Text="Copy link" Click="CopySelectedSiteLink_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesCopyPathMenu" Text="Copy path" Click="CopySelectedSitePath_Click" />
+                                        </MenuFlyout>
+                                    </AppBarButton.Flyout>
+                                </AppBarButton>
+                                <AppBarButton x:Uid="SitesOpenFolderCommand" Label="Open project folder" Click="OpenFolder_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Folder" /></AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton x:Uid="SitesOpenTerminalCommand" Label="Open terminal" Click="OpenTerminal_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="OpenFile" /></AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton x:Uid="SitesEditEnvironmentCommand" Label="Edit .env" Click="EditEnvironment_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Edit" /></AppBarButton.Icon>
+                                </AppBarButton>
+                            </CommandBar.PrimaryCommands>
+                            <CommandBar.SecondaryCommands>
+                                <AppBarButton x:Uid="SitesOpenLogsCommand" Label="Open site logs" Click="OpenLogs_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Document" /></AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton x:Uid="SitesArtisanCommand" x:Name="ArtisanButton" Label="Run Artisan command" Click="Artisan_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Play" /></AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton x:Uid="SitesNpmCommand" x:Name="NpmButton" Label="Run npm script" Click="Npm_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Library" /></AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton x:Uid="SitesConfigureRuntimesCommand" Label="Configure PHP and Node.js" Click="EditRuntimes_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Setting" /></AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton x:Uid="SitesUnlinkCommand" x:Name="UnlinkButton" Label="Unlink project" Click="UnlinkSelectedSite_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Remove" /></AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton
+                                    x:Uid="SitesMoveToRecycleBinCommand"
+                                    x:Name="RemoveSiteButton"
+                                    Label="Move project to Recycle Bin"
+                                    Click="MoveSelectedSiteToRecycleBin_Click"
+                                    Visibility="Collapsed">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Delete" /></AppBarButton.Icon>
+                                </AppBarButton>
+                            </CommandBar.SecondaryCommands>
+                        </CommandBar>
+
+                        <ScrollViewer Grid.Row="2" Padding="16,6,16,16" VerticalScrollBarVisibility="Auto">
+                            <StackPanel Spacing="14">
+                                <Border x:Name="PreviewBorder" Height="160" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6">
+                                    <Grid>
+                                        <WebView2
+                                            x:Name="SitePreview"
+                                            NavigationCompleted="SitePreview_NavigationCompleted"
+                                            SizeChanged="SitePreview_SizeChanged" />
+                                        <StackPanel
+                                            x:Name="PreviewFailureState"
+                                            Visibility="Collapsed"
+                                            Spacing="8"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center">
+                                            <SymbolIcon Symbol="Important" />
+                                            <TextBlock x:Uid="SitesPreviewUnavailable" Text="Preview unavailable" FontWeight="SemiBold" />
+                                            <Button
+                                                x:Uid="SitesRetryPreviewButton"
+                                                HorizontalAlignment="Center"
+                                                Click="RetryPreview_Click"
+                                                AutomationProperties.Name="Retry site preview">
+                                                <ToolTipService.ToolTip>
+                                                    <ToolTip><TextBlock x:Uid="SitesRetryPreviewTooltip" Text="Retry preview" /></ToolTip>
+                                                </ToolTipService.ToolTip>
+                                                <SymbolIcon Symbol="Refresh" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <TextBlock x:Uid="SitesProjectDetailsTitle" Text="Project details" FontWeight="SemiBold" FontSize="16" />
+
+                                <Grid ColumnSpacing="12" RowSpacing="0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="140" />
                                     <ColumnDefinition Width="*" />
@@ -319,9 +394,10 @@
                                 <TextBlock x:Name="GitText" Grid.Row="8" Grid.Column="1" Padding="0,10" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
                                 <TextBlock x:Uid="SitesAssociatedServicesLabel" Grid.Row="9" Text="Associated services" Padding="0,10" FontWeight="SemiBold" />
                                 <TextBlock x:Name="AssociatedServicesText" Grid.Row="9" Grid.Column="1" Padding="0,10" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
-                            </Grid>
-                        </StackPanel>
-                    </ScrollViewer>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
                 </Grid>
             </Border>
         </Grid>
