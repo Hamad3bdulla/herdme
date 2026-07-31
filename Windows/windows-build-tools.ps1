@@ -11,16 +11,24 @@ function Find-HerdMeVisualStudioInstallation {
         throw "Visual Studio was not found. Install Visual Studio 2022 with C++ build tools."
     }
 
-    $installationPath = [string](& $vswhere `
+    $installationPath = & $vswhere `
         -latest `
         -products * `
         -requires Microsoft.Component.MSBuild Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
         -property installationPath |
-        Select-Object -First 1)
-    $installationPath = $installationPath.Trim()
+        Select-Object -First 1
+    if ([string]::IsNullOrWhiteSpace([string]$installationPath)) {
+        $installationPath = & $vswhere `
+            -latest `
+            -products * `
+            -requires Microsoft.Component.MSBuild `
+            -property installationPath |
+            Select-Object -First 1
+    }
     if ([string]::IsNullOrWhiteSpace($installationPath)) {
         throw "Visual Studio with MSBuild and the x64 C++ tools was not found."
     }
+    $installationPath = ([string]$installationPath).Trim()
 
     $msvcDirectory = Join-Path $installationPath "VC\Tools\MSVC"
     if (-not (Test-Path -LiteralPath $msvcDirectory -PathType Container)) {
@@ -43,18 +51,17 @@ function Copy-HerdMeVCRuntime {
 
     $installationPath = Find-HerdMeVisualStudioInstallation
     $redistRoot = Join-Path $installationPath "VC\Redist\MSVC"
-    if (-not (Test-Path -LiteralPath $redistRoot -PathType Container)) {
-        throw "The selected Visual Studio installation is missing VC redistributables at $redistRoot."
+    $runtimeDirectory = $null
+    if (Test-Path -LiteralPath $redistRoot -PathType Container) {
+        $runtimeDirectory = Get-ChildItem -LiteralPath $redistRoot -Directory |
+            Where-Object { $_.Name -match '^\d+(?:\.\d+){2,3}$' } |
+            Sort-Object { [Version]$_.Name } -Descending |
+            ForEach-Object { Join-Path $_.FullName "x64\Microsoft.VC143.CRT" } |
+            Where-Object { Test-Path -LiteralPath $_ -PathType Container } |
+            Select-Object -First 1
     }
-
-    $runtimeDirectory = Get-ChildItem -LiteralPath $redistRoot -Directory |
-        Where-Object { $_.Name -match '^\d+(?:\.\d+){2,3}$' } |
-        Sort-Object { [Version]$_.Name } -Descending |
-        ForEach-Object { Join-Path $_.FullName "x64\Microsoft.VC143.CRT" } |
-        Where-Object { Test-Path -LiteralPath $_ -PathType Container } |
-        Select-Object -First 1
-    if ([string]::IsNullOrWhiteSpace($runtimeDirectory)) {
-        throw "The x64 Microsoft.VC143.CRT app-local runtime was not found under $redistRoot."
+    if ([string]::IsNullOrWhiteSpace([string]$runtimeDirectory)) {
+        $runtimeDirectory = [Environment]::SystemDirectory
     }
 
     $runtimeFiles = @(

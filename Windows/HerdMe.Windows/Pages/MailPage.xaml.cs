@@ -3,7 +3,6 @@ using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Windows.ApplicationModel.DataTransfer;
 using System.Net;
 using System.Runtime.InteropServices;
 using Microsoft.Web.WebView2.Core;
@@ -13,15 +12,23 @@ namespace HerdMe.Windows.Pages;
 public sealed partial class MailPage : Page
 {
     private readonly MailCaptureService mail;
+    private readonly CoreClient coreClient;
+    private readonly SiteConfigurationStore siteSettings;
     private readonly List<CapturedMail> allMessages = [];
     private bool previewConfigured;
     private Guid? previewMessageId;
 
     public ObservableCollection<CapturedMail> Messages { get; } = [];
 
-    public MailPage(MailCaptureService mail)
+    public MailPage(
+        MailCaptureService mail,
+        CoreClient coreClient,
+        SiteConfigurationStore siteSettings
+    )
     {
         this.mail = mail;
+        this.coreClient = coreClient;
+        this.siteSettings = siteSettings;
         InitializeComponent();
     }
 
@@ -65,11 +72,83 @@ public sealed partial class MailPage : Page
         }
     }
 
-    private void CopyEnvironment_Click(object sender, RoutedEventArgs e)
+    private async void AddToEnvironment_Click(object sender, RoutedEventArgs e)
     {
-        var package = new DataPackage();
-        package.SetText("MAIL_MAILER=smtp\r\nMAIL_HOST=127.0.0.1\r\nMAIL_PORT=2525");
-        Clipboard.SetContent(package);
+        try
+        {
+            var settings = siteSettings.Load();
+            var sites = await coreClient.ScanAsync(
+                settings.Roots,
+                settings.Tld,
+                settings.LinkedSites
+            );
+            if (sites.Count == 0)
+            {
+                await ShowErrorAsync(AppLocalization.Get("ServicesAddSiteBeforeEnvironment"));
+                return;
+            }
+
+            var siteBox = new ComboBox
+            {
+                Header = AppLocalization.Get("ServicesSiteField"),
+                ItemsSource = sites,
+                DisplayMemberPath = nameof(SiteRecord.Name),
+                SelectedIndex = 0,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            var pathText = new TextBlock
+            {
+                Text = Path.Combine(sites[0].Path, ".env"),
+                TextWrapping = TextWrapping.Wrap,
+                Opacity = 0.7
+            };
+            siteBox.SelectionChanged += (_, _) =>
+            {
+                if (siteBox.SelectedItem is SiteRecord site)
+                {
+                    pathText.Text = Path.Combine(site.Path, ".env");
+                }
+            };
+            var content = new StackPanel { Spacing = 10 };
+            content.Children.Add(siteBox);
+            content.Children.Add(pathText);
+            if (XamlRoot is not { } xamlRoot) return;
+            var dialog = new ContentDialog
+            {
+                XamlRoot = xamlRoot,
+                Title = AppLocalization.Get("MailEnvironmentDialogTitle"),
+                Content = content,
+                PrimaryButtonText = AppLocalization.Get("ServicesAddToEnvironment"),
+                CloseButtonText = AppLocalization.Get("CommonCancel"),
+                DefaultButton = ContentDialogButton.Primary
+            };
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary
+                || siteBox.SelectedItem is not SiteRecord selectedSite)
+            {
+                return;
+            }
+
+            var update = ServiceEnvironmentFile.Update(
+                selectedSite.Path,
+                MailEnvironmentConfiguration.Variables(
+                    mail.Port ?? MailCaptureService.DefaultPort
+                ),
+                "HerdMe Mail"
+            );
+            await ShowMessageAsync(
+                AppLocalization.Get("ServicesEnvironmentUpdatedTitle"),
+                AppLocalization.Format(
+                    "MailEnvironmentUpdatedMessage",
+                    update.AddedKeys,
+                    update.UpdatedKeys,
+                    selectedSite.Name
+                )
+            );
+        }
+        catch (Exception error)
+        {
+            await ShowErrorAsync(error.Message);
+        }
     }
 
     private void MessageList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -259,10 +338,16 @@ public sealed partial class MailPage : Page
 
     private async Task ShowErrorAsync(string message)
     {
+        await ShowMessageAsync("HerdMe", message);
+    }
+
+    private async Task ShowMessageAsync(string title, string message)
+    {
+        if (XamlRoot is not { } xamlRoot) return;
         var dialog = new ContentDialog
         {
-            XamlRoot = XamlRoot,
-            Title = "HerdMe",
+            XamlRoot = xamlRoot,
+            Title = title,
             Content = message,
             CloseButtonText = AppLocalization.Get("CommonOk")
         };

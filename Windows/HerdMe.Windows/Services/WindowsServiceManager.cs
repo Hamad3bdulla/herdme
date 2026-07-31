@@ -12,14 +12,23 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly object sync = new();
+    private readonly object configurationSync = new();
+    private readonly object installationSync = new();
     private readonly SemaphoreSlim lifecycle = new(1, 1);
     private readonly Dictionary<Guid, ActiveService> active = [];
+    private readonly Dictionary<string, Task<ServicePackageRelease>> installations = new(
+        StringComparer.OrdinalIgnoreCase
+    );
     private readonly ServicePackageInstaller installer;
     private readonly WindowsServiceCredentialStore credentialStore;
+    private readonly Func<string, CancellationToken, Task<ServicePackageRelease>> installPackage;
+    private IReadOnlyList<ManagedServiceInstance> lastKnownInstances = [];
+    private bool hasLoadedInstances;
 
     public WindowsServiceManager(
         string? supportRoot = null,
-        WindowsServiceCredentialStore? credentialStore = null
+        WindowsServiceCredentialStore? credentialStore = null,
+        Func<string, CancellationToken, Task<ServicePackageRelease>>? installPackage = null
     )
     {
         SupportRoot = supportRoot ?? Path.Combine(
@@ -28,7 +37,10 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         );
         installer = new ServicePackageInstaller(SupportRoot);
         this.credentialStore = credentialStore ?? new WindowsServiceCredentialStore();
+        this.installPackage = installPackage ?? installer.InstallAsync;
     }
+
+    public event EventHandler? Changed;
 
     public string SupportRoot { get; }
 
@@ -40,20 +52,37 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     public IReadOnlyList<ManagedServiceInstance> LoadInstances()
     {
-        if (!File.Exists(ConfigurationPath)) return [];
-        LastLoadWarning = null;
-        LastBackupPath = null;
-        try
+        lock (configurationSync)
         {
-            var loaded = JsonSerializer.Deserialize<List<ManagedServiceInstance>>(
-                File.ReadAllText(ConfigurationPath)
-            ) ?? throw new JsonException("The service settings document is empty.");
-            return Normalize(loaded);
-        }
-        catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException)
-        {
-            PreserveUnreadableConfiguration();
-            return [];
+            if (!File.Exists(ConfigurationPath))
+            {
+                return hasLoadedInstances ? Normalize(lastKnownInstances) : [];
+            }
+            LastLoadWarning = null;
+            LastBackupPath = null;
+            try
+            {
+                var loaded = JsonSerializer.Deserialize<List<ManagedServiceInstance>>(
+                    File.ReadAllText(ConfigurationPath)
+                ) ?? throw new JsonException("The service settings document is empty.");
+                lastKnownInstances = Normalize(loaded);
+                hasLoadedInstances = true;
+                return Normalize(lastKnownInstances);
+            }
+            catch (JsonException)
+            {
+                PreserveUnreadableConfiguration();
+                lastKnownInstances = [];
+                hasLoadedInstances = true;
+                return [];
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                LastLoadWarning =
+                    $"HerdMe could not read its service settings right now: {error.Message} "
+                    + "The last known service list is still being used.";
+                return Normalize(lastKnownInstances);
+            }
         }
     }
 
@@ -83,11 +112,19 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         {
             foreach (var instance in normalized) _ = credentialStore.GetOrCreate(instance.Id);
         }
-        var directory = Path.GetDirectoryName(ConfigurationPath)!;
-        Directory.CreateDirectory(directory);
-        var temporary = ConfigurationPath + ".tmp";
-        File.WriteAllText(temporary, JsonSerializer.Serialize(normalized, JsonOptions));
-        File.Move(temporary, ConfigurationPath, true);
+        lock (configurationSync)
+        {
+            var directory = Path.GetDirectoryName(ConfigurationPath)!;
+            Directory.CreateDirectory(directory);
+            var temporary = ConfigurationPath + ".tmp";
+            File.WriteAllText(temporary, JsonSerializer.Serialize(normalized, JsonOptions));
+            File.Move(temporary, ConfigurationPath, true);
+            lastKnownInstances = normalized;
+            hasLoadedInstances = true;
+            LastLoadWarning = null;
+            LastBackupPath = null;
+        }
+        RaiseChanged();
     }
 
     public ManagedServiceState State(Guid id, string definitionId)
@@ -99,6 +136,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                 return ManagedServiceState.Running;
             }
         }
+        if (IsInstalling(definitionId)) return ManagedServiceState.Installing;
         return installer.IsInstalled(definitionId)
             ? ManagedServiceState.Stopped
             : ManagedServiceState.NotInstalled;
@@ -108,10 +146,72 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     public string InstalledVersion(string definitionId) => installer.InstalledVersion(definitionId) ?? "-";
 
+    public bool IsInstalling(string definitionId)
+    {
+        lock (installationSync) return installations.ContainsKey(definitionId);
+    }
+
     public Task<ServicePackageRelease> InstallAsync(
         string definitionId,
         CancellationToken cancellationToken = default
-    ) => installer.InstallAsync(definitionId, cancellationToken);
+    )
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled<ServicePackageRelease>(cancellationToken);
+        }
+
+        var normalizedDefinitionId = ManagedServiceCatalog.Get(definitionId).Id;
+        Task<ServicePackageRelease> operation;
+        TaskCompletionSource<ServicePackageRelease>? completion = null;
+        lock (installationSync)
+        {
+            if (!installations.TryGetValue(normalizedDefinitionId, out operation!))
+            {
+                completion = new TaskCompletionSource<ServicePackageRelease>(
+                    TaskCreationOptions.RunContinuationsAsynchronously
+                );
+                operation = completion.Task;
+                installations[normalizedDefinitionId] = operation;
+            }
+        }
+
+        if (completion is not null)
+        {
+            RaiseChanged();
+            _ = CompleteInstallationAsync(normalizedDefinitionId, completion);
+        }
+        return cancellationToken.CanBeCanceled
+            ? operation.WaitAsync(cancellationToken)
+            : operation;
+    }
+
+    private async Task CompleteInstallationAsync(
+        string definitionId,
+        TaskCompletionSource<ServicePackageRelease> completion
+    )
+    {
+        try
+        {
+            completion.TrySetResult(await installPackage(definitionId, CancellationToken.None));
+        }
+        catch (Exception error)
+        {
+            completion.TrySetException(error);
+        }
+        finally
+        {
+            lock (installationSync)
+            {
+                if (installations.TryGetValue(definitionId, out var current)
+                    && ReferenceEquals(current, completion.Task))
+                {
+                    installations.Remove(definitionId);
+                }
+            }
+            RaiseChanged();
+        }
+    }
 
     public Task<ServicePackageRelease> ResolveReleaseAsync(
         string definitionId,
@@ -245,6 +345,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                     consolePort > 0 ? consolePort : null
                 );
             }
+            RaiseChanged();
         }
         catch
         {
@@ -288,6 +389,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         {
             service.Process.Dispose();
             service.Job.Dispose();
+            RaiseChanged();
         }
     }
 
@@ -506,6 +608,8 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     private static bool RequiresLaunchCredentials(string definitionId) => definitionId is
         "typesense" or "minio" or "rustfs";
+
+    private void RaiseChanged() => Changed?.Invoke(this, EventArgs.Empty);
 
     public async ValueTask DisposeAsync()
     {

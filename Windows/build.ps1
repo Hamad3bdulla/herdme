@@ -24,11 +24,27 @@ $vcRuntimeDirectory = Join-Path $repoRoot "build\windows-vc143-runtime"
 
 Copy-HerdMeVCRuntime -DestinationDirectory $vcRuntimeDirectory
 
-cmake -S (Join-Path $repoRoot "Core") -B $coreBuild -A $Architecture -DBUILD_TESTING=ON
+$singleConfigurationGenerators = @("Ninja", "NMake Makefiles")
+$singleConfigurationBuild = $env:CMAKE_GENERATOR -in $singleConfigurationGenerators
+$cmakeConfigureArguments = @(
+    "-S", (Join-Path $repoRoot "Core"),
+    "-B", $coreBuild,
+    "-DBUILD_TESTING=ON"
+)
+if ($singleConfigurationBuild) {
+    $cmakeConfigureArguments += "-DCMAKE_BUILD_TYPE=$Configuration"
+} else {
+    $cmakeConfigureArguments += @("-A", $Architecture)
+}
+cmake @cmakeConfigureArguments
 if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed." }
 cmake --build $coreBuild --config $Configuration
 if ($LASTEXITCODE -ne 0) { throw "The portable core build failed." }
-$coreExecutable = Join-Path $coreBuild "$Configuration\herdme-core.exe"
+$coreExecutable = if ($singleConfigurationBuild) {
+    Join-Path $coreBuild "herdme-core.exe"
+} else {
+    Join-Path $coreBuild "$Configuration\herdme-core.exe"
+}
 if (-not (Test-Path $coreExecutable -PathType Leaf)) {
     throw "The portable core executable was not produced at $coreExecutable."
 }

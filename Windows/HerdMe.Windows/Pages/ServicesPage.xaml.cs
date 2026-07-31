@@ -14,6 +14,9 @@ public sealed partial class ServicesPage : Page
     private readonly CoreClient coreClient;
     private readonly SiteConfigurationStore siteSettings;
     private bool refreshing;
+    private bool loaded;
+    private bool working;
+    private CancellationTokenSource? refreshCancellation;
 
     public IReadOnlyList<ManagedServiceDefinition> Definitions { get; } = ManagedServiceCatalog.All;
 
@@ -45,7 +48,28 @@ public sealed partial class ServicesPage : Page
         }
     }
 
-    private async void Page_Loaded(object sender, RoutedEventArgs e) => await RefreshRowsAsync();
+    private async void Page_Loaded(object sender, RoutedEventArgs e)
+    {
+        loaded = true;
+        manager.Changed -= Manager_Changed;
+        manager.Changed += Manager_Changed;
+        await RefreshRowsAsync();
+    }
+
+    private void Page_Unloaded(object sender, RoutedEventArgs e)
+    {
+        loaded = false;
+        manager.Changed -= Manager_Changed;
+        Interlocked.Exchange(ref refreshCancellation, null)?.Cancel();
+    }
+
+    private void Manager_Changed(object? sender, EventArgs e)
+    {
+        DispatcherQueue.TryEnqueue(async () =>
+        {
+            if (loaded) await RefreshRowsAsync();
+        });
+    }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await RefreshRowsAsync();
 
@@ -372,7 +396,20 @@ public sealed partial class ServicesPage : Page
 
     private async Task RefreshRowsAsync()
     {
+        var cancellation = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(ref refreshCancellation, cancellation);
+        previous?.Cancel();
         var instances = manager.LoadInstances();
+        if (!loaded)
+        {
+            Interlocked.CompareExchange(ref refreshCancellation, null, cancellation);
+            cancellation.Dispose();
+            return;
+        }
+        RenderRows(
+            instances,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        );
         var installedDefinitionIds = instances
             .Select(instance => instance.DefinitionId)
             .Where(manager.IsInstalled)
@@ -382,56 +419,97 @@ public sealed partial class ServicesPage : Page
         {
             try
             {
-                var release = await manager.ResolveReleaseAsync(definitionId);
+                var release = await manager.ResolveReleaseAsync(
+                    definitionId,
+                    cancellation.Token
+                );
                 return (DefinitionId: definitionId, Version: release.Version);
             }
-            catch (Exception)
+            catch (Exception error) when (
+                error is not OperationCanceledException || !cancellation.IsCancellationRequested
+            )
             {
                 return (DefinitionId: definitionId, Version: (string?)null);
             }
         });
-        var latestVersions = (await Task.WhenAll(releaseTasks))
-            .Where(result => result.Version is not null)
-            .ToDictionary(
-                result => result.DefinitionId,
-                result => result.Version!,
-                StringComparer.OrdinalIgnoreCase
-            );
-
-        refreshing = true;
-        Rows.Clear();
-        foreach (var instance in instances)
+        try
         {
-            var installedVersion = manager.InstalledVersion(instance.DefinitionId);
-            latestVersions.TryGetValue(instance.DefinitionId, out var latestVersion);
-            var state = manager.State(instance.Id, instance.DefinitionId);
-            Rows.Add(new ManagedServiceRow
-            {
-                Id = instance.Id,
-                DefinitionId = instance.DefinitionId,
-                Name = instance.Name,
-                Port = instance.Port,
-                Version = installedVersion,
-                State = state,
-                Status = StateLabel(state),
-                InstallLabel = AppLocalization.Get(
-                    state == ManagedServiceState.NotInstalled ? "CommonInstall" : "CommonUpdate"
-                ),
-                ToggleLabel = AppLocalization.Get(
-                    state == ManagedServiceState.Running ? "ServicesStop" : "ServicesStart"
-                ),
-                StartAutomatically = instance.StartAutomatically,
-                IsUpdateAvailable = latestVersion is not null
-                    && RuntimeVersionComparison.IsNewer(latestVersion, installedVersion),
-                ConsolePort = manager.ConsolePort(instance.Id),
-                ConnectionDisplay = state == ManagedServiceState.Running
-                    ? TablePlusConnection.DisplayAddress(instance)
-                    : null
-            });
+            var latestVersions = (await Task.WhenAll(releaseTasks))
+                .Where(result => result.Version is not null)
+                .ToDictionary(
+                    result => result.DefinitionId,
+                    result => result.Version!,
+                    StringComparer.OrdinalIgnoreCase
+                );
+            cancellation.Token.ThrowIfCancellationRequested();
+            if (!loaded) return;
+            RenderRows(instances, latestVersions);
         }
-        ServiceList.Visibility = Rows.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
-        EmptyState.Visibility = Rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        refreshing = false;
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            Interlocked.CompareExchange(ref refreshCancellation, null, cancellation);
+            cancellation.Dispose();
+        }
+    }
+
+    private void RenderRows(
+        IReadOnlyList<ManagedServiceInstance> instances,
+        IReadOnlyDictionary<string, string> latestVersions
+    )
+    {
+        refreshing = true;
+        try
+        {
+            Rows.Clear();
+            foreach (var instance in instances)
+            {
+                var installedVersion = manager.InstalledVersion(instance.DefinitionId);
+                latestVersions.TryGetValue(instance.DefinitionId, out var latestVersion);
+                var state = manager.State(instance.Id, instance.DefinitionId);
+                Rows.Add(new ManagedServiceRow
+                {
+                    Id = instance.Id,
+                    DefinitionId = instance.DefinitionId,
+                    Name = instance.Name,
+                    Port = instance.Port,
+                    Version = installedVersion,
+                    State = state,
+                    Status = StateLabel(state),
+                    InstallLabel = AppLocalization.Get(
+                        state == ManagedServiceState.NotInstalled ? "CommonInstall" : "CommonUpdate"
+                    ),
+                    ToggleLabel = AppLocalization.Get(
+                        state == ManagedServiceState.Running ? "ServicesStop" : "ServicesStart"
+                    ),
+                    StartAutomatically = instance.StartAutomatically,
+                    IsUpdateAvailable = latestVersion is not null
+                        && RuntimeVersionComparison.IsNewer(latestVersion, installedVersion),
+                    ConsolePort = manager.ConsolePort(instance.Id),
+                    ConnectionDisplay = state == ManagedServiceState.Running
+                        ? TablePlusConnection.DisplayAddress(instance)
+                        : null
+                });
+            }
+            ServiceList.Visibility = Rows.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+            EmptyState.Visibility = Rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (!working)
+            {
+                var installing = instances.FirstOrDefault(instance =>
+                    manager.IsInstalling(instance.DefinitionId)
+                );
+                OperationProgress.IsActive = installing is not null;
+                OperationStatusText.Text = installing is null
+                    ? string.Empty
+                    : AppLocalization.Format("ServicesInstalling", installing.Name);
+            }
+        }
+        finally
+        {
+            refreshing = false;
+        }
     }
 
     private bool TryGetInstance(object sender, out ManagedServiceInstance instance)
@@ -444,6 +522,7 @@ public sealed partial class ServicesPage : Page
 
     private void SetWorking(bool working, string status)
     {
+        this.working = working;
         OperationProgress.IsActive = working;
         OperationStatusText.Text = status;
         IsEnabled = !working;
@@ -454,6 +533,7 @@ public sealed partial class ServicesPage : Page
         return AppLocalization.Get(state switch
         {
             ManagedServiceState.NotInstalled => "CommonNotInstalled",
+            ManagedServiceState.Installing => "ServicesInstallingState",
             ManagedServiceState.Stopped => "ServicesStopped",
             ManagedServiceState.Running => "ServicesRunning",
             _ => "ServicesUnknown"
@@ -478,9 +558,14 @@ public sealed partial class ServicesPage : Page
 
     private async Task ShowMessageAsync(string title, string message)
     {
+        if (!loaded || XamlRoot is not { } xamlRoot)
+        {
+            OperationStatusText.Text = message;
+            return;
+        }
         var dialog = new ContentDialog
         {
-            XamlRoot = XamlRoot,
+            XamlRoot = xamlRoot,
             Title = title,
             Content = message,
             CloseButtonText = AppLocalization.Get("CommonOk")

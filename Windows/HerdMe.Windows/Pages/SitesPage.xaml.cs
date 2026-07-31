@@ -1410,11 +1410,27 @@ public sealed partial class SitesPage : Page
             SelectedIndex = 0,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
-        var customBox = new TextBox
+        IReadOnlyList<string> artisanSuggestions = ArtisanCommandCatalog.Suggestions;
+        var customBox = new AutoSuggestBox
         {
             Header = AppLocalization.Get("SitesArtisanCustomCommandField"),
             PlaceholderText = "route:list --path=api",
+            ItemsSource = artisanSuggestions,
+            UpdateTextOnSelect = true,
             Visibility = Visibility.Collapsed
+        };
+        customBox.TextChanged += (_, args) =>
+        {
+            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
+            var query = customBox.Text.Trim();
+            customBox.ItemsSource = artisanSuggestions
+                .Where(command => query.Length == 0
+                    || command.Contains(query, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+        };
+        customBox.SuggestionChosen += (_, args) =>
+        {
+            if (args.SelectedItem is string command) customBox.Text = command;
         };
         presetBox.SelectionChanged += (_, _) =>
         {
@@ -1437,13 +1453,17 @@ public sealed partial class SitesPage : Page
             IsReadOnly = true,
             AcceptsReturn = true,
             TextWrapping = TextWrapping.NoWrap,
-            MinHeight = 280,
-            MaxHeight = 420,
+            Height = 240,
+            VerticalAlignment = VerticalAlignment.Top,
             FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
         };
         ScrollViewer.SetVerticalScrollBarVisibility(outputBox, ScrollBarVisibility.Auto);
         ScrollViewer.SetHorizontalScrollBarVisibility(outputBox, ScrollBarVisibility.Auto);
-        var runButton = new Button { Content = AppLocalization.Get("SitesRun") };
+        var runButton = new Button
+        {
+            Content = AppLocalization.Get("SitesRun"),
+            Style = (Style)Application.Current.Resources["AccentButtonStyle"]
+        };
         var cancelButton = new Button
         {
             Content = AppLocalization.Get("SitesCancel"),
@@ -1457,18 +1477,52 @@ public sealed partial class SitesPage : Page
         };
         buttons.Children.Add(cancelButton);
         buttons.Children.Add(runButton);
-        var content = new StackPanel { Spacing = 12, MinWidth = 620 };
+        var content = new StackPanel { Spacing = 12, Width = 500 };
         content.Children.Add(presetBox);
         content.Children.Add(customBox);
+        content.Children.Add(buttons);
         content.Children.Add(statusRow);
         content.Children.Add(outputBox);
-        content.Children.Add(buttons);
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
             Title = AppLocalization.Format("SitesArtisanDialogTitle", site.Name),
             Content = content,
             CloseButtonText = AppLocalization.Get("SitesClose")
+        };
+        using var suggestionCancellation = new CancellationTokenSource();
+        dialog.Opened += async (_, _) =>
+        {
+            try
+            {
+                var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
+                var php = phpInstaller.PhpExecutable(cycle);
+                await runtimePolicy.PrepareLaunchAsync(
+                    php,
+                    cycle,
+                    suggestionCancellation.Token
+                );
+                artisanSuggestions = await ArtisanCommandRunner.DiscoverCommandsAsync(
+                    php,
+                    site.Path,
+                    composerTools.ManagedEnvironment(cycle),
+                    suggestionCancellation.Token
+                );
+                customBox.ItemsSource = artisanSuggestions;
+            }
+            catch (OperationCanceledException) when (suggestionCancellation.IsCancellationRequested)
+            {
+                // Closing the dialog cancels command discovery without changing the fallback list.
+            }
+            catch (Exception error)
+            {
+                await DiagnosticLog.WriteFailureAsync(
+                    "artisan",
+                    "suggestions",
+                    $"Artisan command discovery for {site.Name} failed.",
+                    error.ToString()
+                );
+            }
         };
 
         var running = false;
@@ -1480,6 +1534,7 @@ public sealed partial class SitesPage : Page
         };
         dialog.Closing += (_, args) =>
         {
+            suggestionCancellation.Cancel();
             if (!running) return;
             args.Cancel = true;
             statusText.Text = AppLocalization.Get("SitesArtisanCancelling");
@@ -1586,13 +1641,30 @@ public sealed partial class SitesPage : Page
             return;
         }
 
-        var scriptBox = new ComboBox
+        IReadOnlyList<string> scriptSuggestions = discoveredScripts
+            .Select(script => script.Name)
+            .ToArray();
+        var scriptBox = new AutoSuggestBox
         {
             Header = AppLocalization.Get("SitesNpmScriptField"),
-            ItemsSource = discoveredScripts.Select(script => new DisplayOption(script.Name, script.Name)).ToArray(),
-            SelectedIndex = 0,
+            ItemsSource = scriptSuggestions,
+            Text = scriptSuggestions[0],
+            UpdateTextOnSelect = true,
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            MinWidth = 520
+            MinWidth = 440
+        };
+        scriptBox.TextChanged += (_, args) =>
+        {
+            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
+            var query = scriptBox.Text.Trim();
+            scriptBox.ItemsSource = scriptSuggestions
+                .Where(script => query.Length == 0
+                    || script.Contains(query, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+        };
+        scriptBox.SuggestionChosen += (_, args) =>
+        {
+            if (args.SelectedItem is string script) scriptBox.Text = script;
         };
         var reloadButton = new Button
         {
@@ -1622,13 +1694,17 @@ public sealed partial class SitesPage : Page
             IsReadOnly = true,
             AcceptsReturn = true,
             TextWrapping = TextWrapping.NoWrap,
-            MinHeight = 280,
-            MaxHeight = 420,
+            Height = 240,
+            VerticalAlignment = VerticalAlignment.Top,
             FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
         };
         ScrollViewer.SetVerticalScrollBarVisibility(outputBox, ScrollBarVisibility.Auto);
         ScrollViewer.SetHorizontalScrollBarVisibility(outputBox, ScrollBarVisibility.Auto);
-        var runButton = new Button { Content = AppLocalization.Get("SitesRun") };
+        var runButton = new Button
+        {
+            Content = AppLocalization.Get("SitesRun"),
+            Style = (Style)Application.Current.Resources["AccentButtonStyle"]
+        };
         var cancelButton = new Button
         {
             Content = AppLocalization.Get("SitesCancel"),
@@ -1642,11 +1718,11 @@ public sealed partial class SitesPage : Page
         };
         buttons.Children.Add(cancelButton);
         buttons.Children.Add(runButton);
-        var content = new StackPanel { Spacing = 12, MinWidth = 620 };
+        var content = new StackPanel { Spacing = 12, Width = 500 };
         content.Children.Add(scriptRow);
+        content.Children.Add(buttons);
         content.Children.Add(statusRow);
         content.Children.Add(outputBox);
-        content.Children.Add(buttons);
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
@@ -1666,10 +1742,9 @@ public sealed partial class SitesPage : Page
             try
             {
                 var reloaded = await Task.Run(() => NpmScriptCatalog.Discover(site.Path));
-                scriptBox.ItemsSource = reloaded
-                    .Select(script => new DisplayOption(script.Name, script.Name))
-                    .ToArray();
-                scriptBox.SelectedIndex = 0;
+                scriptSuggestions = reloaded.Select(script => script.Name).ToArray();
+                scriptBox.ItemsSource = scriptSuggestions;
+                scriptBox.Text = scriptSuggestions[0];
                 statusText.Text = AppLocalization.Get("SitesNpmReady");
                 outputBox.Text = string.Empty;
             }
@@ -1705,7 +1780,9 @@ public sealed partial class SitesPage : Page
         };
         runButton.Click += async (_, _) =>
         {
-            if (running || scriptBox.SelectedItem is not DisplayOption selectedScript) return;
+            if (running) return;
+            var selectedScript = scriptBox.Text.Trim();
+            if (selectedScript.Length == 0) return;
 
             using var cancellation = new CancellationTokenSource();
             npmCancellation = cancellation;
@@ -1723,7 +1800,7 @@ public sealed partial class SitesPage : Page
                     nodeInstaller,
                     site.Path,
                     site.NodeVersion,
-                    selectedScript.Value
+                    selectedScript
                 );
                 statusText.Text = AppLocalization.Get("SitesNpmRunning");
                 var result = await NpmScriptRunner.RunAsync(

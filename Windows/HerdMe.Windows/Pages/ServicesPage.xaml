@@ -4,7 +4,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:HerdMe.Windows.Models"
     AutomationProperties.AutomationId="ServicesPageRoot"
-    Loaded="Page_Loaded">
+    Loaded="Page_Loaded"
+    Unloaded="Page_Unloaded">
     <Grid Padding="32" RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -122,7 +123,7 @@
                                     <Button Tag="{x:Bind Id}" Click="Toggle_Click" IsEnabled="{x:Bind CanToggle}">
                                         <TextBlock Text="{x:Bind ToggleLabel}" />
                                     </Button>
-                                    <Button>
+                                    <Button IsEnabled="{x:Bind CanManage}">
                                         <ToolTipService.ToolTip>
                                             <ToolTip><TextBlock x:Uid="ServicesMoreTooltip" Text="More service actions" /></ToolTip>
                                         </ToolTipService.ToolTip>

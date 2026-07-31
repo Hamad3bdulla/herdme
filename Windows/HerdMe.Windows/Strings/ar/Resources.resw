@@ -187,6 +187,7 @@
   <data name="ServicesPortConflictNoAlternative" xml:space="preserve"><value>المنفذ {0} مستخدم بالفعل بواسطة {1}. لا يتوفر حالياً منفذ محلي بديل.</value></data>
   <data name="ServicesPortConflictSuggested" xml:space="preserve"><value>المنفذ {0} مستخدم بالفعل بواسطة {1}. تم اختيار المنفذ المقترح {2}؛ اضغط إضافة مرة أخرى لاستخدامه.</value></data>
   <data name="ServicesInstalling" xml:space="preserve"><value>جارٍ تثبيت {0}</value></data>
+  <data name="ServicesInstallingState" xml:space="preserve"><value>جارٍ التثبيت</value></data>
   <data name="ServicesVersionInstalled" xml:space="preserve"><value>تم تثبيت {0} {1}</value></data>
   <data name="ServicesStopBeforeUpdate" xml:space="preserve"><value>أوقف هذه الخدمة قبل تحديث بيئة تشغيلها.</value></data>
   <data name="ServicesStopping" xml:space="preserve"><value>جارٍ إيقاف {0}</value></data>
@@ -384,7 +385,9 @@
   <data name="SitesProjectStageCompletedTitle" xml:space="preserve"><value>تم إنشاء الموقع</value></data>
   <data name="SitesProjectStageCompletedDetail" xml:space="preserve"><value>مشروعك جاهز للفتح.</value></data>
   <data name="MailPageTitle.Text" xml:space="preserve"><value>البريد</value></data>
-  <data name="MailCopyEnvironmentButton.Text" xml:space="preserve"><value>نسخ إعدادات .env</value></data>
+  <data name="MailEnvironmentButton.Text" xml:space="preserve"><value>إضافة إلى .env...</value></data>
+  <data name="MailEnvironmentDialogTitle" xml:space="preserve"><value>إضافة إعدادات البريد إلى .env</value></data>
+  <data name="MailEnvironmentUpdatedMessage" xml:space="preserve"><value>تمت إضافة {0} متغيرات بريد وتحديث {1} متغيرات في {2}.</value></data>
   <data name="MailCaptureTitle.Text" xml:space="preserve"><value>التقاط SMTP</value></data>
   <data name="MailStoppedInitial.Text" xml:space="preserve"><value>متوقف</value></data>
   <data name="MailServerTooltip.Text" xml:space="preserve"><value>بدء التقاط SMTP أو إيقافه</value></data>

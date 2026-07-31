@@ -255,6 +255,14 @@ internal static partial class ContractChecks
             "the Windows core statically links the MSVC runtime for clean machines"
         );
         Check(
+            coreCmake.Contains("if(MINGW)", StringComparison.Ordinal)
+                && coreCmake.Contains(
+                    "target_link_options(herdme-core PRIVATE -static)",
+                    StringComparison.Ordinal
+                ),
+            "the MinGW Windows core does not require external C++ runtime DLLs"
+        );
+        Check(
             setup.GetValueOrDefault("PrivilegesRequired") == "lowest"
                 && setup.GetValueOrDefault("DefaultDirName") == @"{localappdata}\Programs\HerdMe",
             "the Windows installer remains per-user and does not require elevation"
@@ -1228,10 +1236,18 @@ internal static partial class ContractChecks
         Check(
             servicesPageSource.Contains("StartAutomatically = true", StringComparison.Ordinal)
                 && servicesPageSource.Contains("await manager.StartAsync(instance.Id)", StringComparison.Ordinal)
+                && servicesPageSource.Contains("manager.Changed += Manager_Changed", StringComparison.Ordinal)
+                && servicesPageSource.Contains("previous?.Cancel()", StringComparison.Ordinal)
+                && servicesPageXaml.Contains("Unloaded=\"Page_Unloaded\"", StringComparison.Ordinal)
                 && servicesPageXaml.Contains("Click=\"Toggle_Click\"", StringComparison.Ordinal)
                 && servicesPageXaml.Contains("ServicesMoreTooltip", StringComparison.Ordinal)
                 && servicesPageXaml.Contains("Mode=OneTime", StringComparison.Ordinal),
-            "Windows Services installs, starts, and exposes unclipped controls for new instances"
+            "Windows Services keeps installation state across navigation and exposes unclipped controls"
+        );
+        Check(
+            servicesPageSource.IndexOf("RenderRows(", StringComparison.Ordinal)
+                < servicesPageSource.IndexOf("await Task.WhenAll", StringComparison.Ordinal),
+            "Windows Services renders persisted rows before remote update checks complete"
         );
         var servicesResourceKeys = Regex.Matches(
             servicesPageSource,
@@ -1244,6 +1260,21 @@ internal static partial class ContractChecks
             servicesResourceKeys.Length > 0
                 && servicesResourceKeys.All(english.ContainsKey),
             "Windows Services dynamic display strings use localized resources"
+        );
+
+        var mailPageSource = File.ReadAllText(
+            Path.Combine(projectRoot, "Pages", "MailPage.xaml.cs")
+        );
+        var mailPageXaml = File.ReadAllText(
+            Path.Combine(projectRoot, "Pages", "MailPage.xaml")
+        );
+        Check(
+            mailPageSource.Contains("ServiceEnvironmentFile.Update(", StringComparison.Ordinal)
+                && mailPageSource.Contains("mail.Port ?? MailCaptureService.DefaultPort", StringComparison.Ordinal)
+                && !mailPageSource.Contains("Clipboard.SetContent", StringComparison.Ordinal)
+                && mailPageXaml.Contains("Click=\"AddToEnvironment_Click\"", StringComparison.Ordinal)
+                && mailPageXaml.Contains("x:Uid=\"MailEnvironmentButton\"", StringComparison.Ordinal),
+            "Windows Mail selects a site and writes its active SMTP settings directly to .env"
         );
 
         var sitesPageSource = File.ReadAllText(
@@ -1430,6 +1461,35 @@ internal static partial class ContractChecks
     internal static void VerifyArtisanCommandContracts(string repositoryRoot)
     {
         Check(
+            ArtisanCommandCatalog.Suggestions.Contains("route:list", StringComparer.Ordinal)
+                && ArtisanCommandCatalog.Suggestions.Contains("optimize:clear", StringComparer.Ordinal)
+                && ArtisanCommandCatalog.Suggestions.Count >= 20,
+            "Artisan custom commands expose useful autocomplete suggestions"
+        );
+        var discoveredSuggestions = ArtisanCommandCatalog.ParseCommandListJson(
+            """
+            {
+              "commands": [
+                { "name": "route:list" },
+                { "name": "vendor:package-command" },
+                { "name": "vendor:package-command" }
+              ]
+            }
+            """
+        );
+        Check(
+            discoveredSuggestions.SequenceEqual(["route:list", "vendor:package-command"])
+                && ArtisanCommandCatalog.MergeSuggestions(discoveredSuggestions)
+                    .Contains("vendor:package-command", StringComparer.Ordinal),
+            "Artisan autocomplete discovers every command registered by the project"
+        );
+        Check(
+            ArtisanCommandCatalog.ParseCommandListJson(
+                """{ "commands": { "about": {}, "package:sync": {} } }"""
+            ).SequenceEqual(["about", "package:sync"]),
+            "Artisan autocomplete accepts Symfony object-shaped command lists"
+        );
+        Check(
             ArtisanCommandCatalog.Parse(
                 "artisan route:list --path='api v1' --name=\"users.show\""
             ).SequenceEqual(["route:list", "--path=api v1", "--name=users.show"]),
@@ -1469,6 +1529,27 @@ internal static partial class ContractChecks
                 && !source.Contains("powershell.exe", StringComparison.OrdinalIgnoreCase)
                 && !source.Contains("cmd.exe", StringComparison.OrdinalIgnoreCase),
             "Artisan runs without a visible console or command shell"
+        );
+        var sitesSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "Windows",
+            "HerdMe.Windows",
+            "Pages",
+            "SitesPage.xaml.cs"
+        ));
+        Check(
+            sitesSource.Contains("new AutoSuggestBox", StringComparison.Ordinal)
+                && sitesSource.Contains("ArtisanCommandCatalog.Suggestions", StringComparison.Ordinal)
+                && sitesSource.Contains("DiscoverCommandsAsync", StringComparison.Ordinal)
+                && sitesSource.Contains("AccentButtonStyle", StringComparison.Ordinal)
+                && sitesSource.Contains("content.Children.Add(buttons);", StringComparison.Ordinal)
+                && Regex.Matches(
+                    sitesSource,
+                    @"new StackPanel \{ Spacing = 12, Width = 500 \}"
+                ).Count == 2
+                && sitesSource.Contains("MinWidth = 440", StringComparison.Ordinal)
+                && !sitesSource.Contains("MinWidth = 620", StringComparison.Ordinal),
+            "Artisan and npm dialogs expose visible primary actions and autocomplete"
         );
     }
 

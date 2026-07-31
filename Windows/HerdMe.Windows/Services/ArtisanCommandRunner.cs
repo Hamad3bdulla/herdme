@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 
 namespace HerdMe.Windows.Services;
 
@@ -15,13 +16,50 @@ public sealed record ArtisanCommandSpec(
     TimeSpan Timeout
 );
 
-public sealed record ArtisanCommandResult(int ExitCode, string Output);
+public sealed record ArtisanCommandResult(
+    int ExitCode,
+    string Output,
+    string StandardOutput = "",
+    string StandardError = ""
+);
 
 public static class ArtisanCommandCatalog
 {
     private const int MaximumCommandBytes = 4 * 1_024;
     private const int MaximumArgumentBytes = 512;
     private const int MaximumArguments = 32;
+
+    public static IReadOnlyList<string> Suggestions { get; } = Array.AsReadOnly(
+        new[]
+        {
+            "about",
+            "cache:clear",
+            "config:cache",
+            "config:clear",
+            "db:seed",
+            "down",
+            "env",
+            "key:generate",
+            "migrate",
+            "migrate:fresh --seed",
+            "migrate:rollback",
+            "migrate:status",
+            "optimize",
+            "optimize:clear",
+            "queue:failed",
+            "queue:restart",
+            "queue:work",
+            "route:cache",
+            "route:clear",
+            "route:list",
+            "schedule:list",
+            "storage:link",
+            "test",
+            "up",
+            "view:cache",
+            "view:clear"
+        }
+    );
 
     public static IReadOnlyList<ArtisanCommandPreset> Presets { get; } = Array.AsReadOnly(
         new[]
@@ -41,6 +79,64 @@ public static class ArtisanCommandCatalog
         return preset.Id == "custom"
             ? new ArtisanCommandSpec(Parse(customCommand), preset.Timeout)
             : new ArtisanCommandSpec(preset.Arguments, preset.Timeout);
+    }
+
+    public static IReadOnlyList<string> ParseCommandListJson(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        if (!document.RootElement.TryGetProperty("commands", out var commands))
+        {
+            throw new InvalidDataException("The Artisan command list has no commands collection.");
+        }
+
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        if (commands.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var command in commands.EnumerateArray())
+            {
+                if (command.ValueKind == JsonValueKind.Object
+                    && command.TryGetProperty("name", out var name)
+                    && name.ValueKind == JsonValueKind.String)
+                {
+                    AddCommandName(names, name.GetString());
+                }
+            }
+        }
+        else if (commands.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var command in commands.EnumerateObject())
+            {
+                AddCommandName(names, command.Name);
+            }
+        }
+        else
+        {
+            throw new InvalidDataException("The Artisan commands collection is invalid.");
+        }
+
+        return names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    public static IReadOnlyList<string> MergeSuggestions(IEnumerable<string> discoveredCommands)
+    {
+        return discoveredCommands
+            .Concat(Suggestions)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(command => command, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static void AddCommandName(ISet<string> names, string? value)
+    {
+        var name = value?.Trim();
+        if (string.IsNullOrWhiteSpace(name)
+            || name.Length > 128
+            || name.StartsWith("-", StringComparison.Ordinal)
+            || name.Any(character => char.IsWhiteSpace(character) || char.IsControl(character)))
+        {
+            return;
+        }
+        names.Add(name);
     }
 
     public static IReadOnlyList<string> Parse(string command)
@@ -194,8 +290,20 @@ public static class ArtisanCommandRunner
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("The selected PHP runtime could not start Artisan.");
         var capture = new BoundedOutputCapture(MaximumCapturedCharacters);
-        var standardOutput = PumpAsync(process.StandardOutput, capture, outputProgress);
-        var standardError = PumpAsync(process.StandardError, capture, outputProgress);
+        var capturedStandardOutput = new BoundedOutputCapture(MaximumCapturedCharacters);
+        var capturedStandardError = new BoundedOutputCapture(MaximumCapturedCharacters);
+        var standardOutput = PumpAsync(
+            process.StandardOutput,
+            capture,
+            capturedStandardOutput,
+            outputProgress
+        );
+        var standardError = PumpAsync(
+            process.StandardError,
+            capture,
+            capturedStandardError,
+            outputProgress
+        );
         using var timeoutCancellation = new CancellationTokenSource(timeout);
         using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
@@ -223,12 +331,46 @@ public static class ArtisanCommandRunner
             );
         }
         await Task.WhenAll(standardOutput, standardError);
-        return new ArtisanCommandResult(process.ExitCode, capture.Value);
+        return new ArtisanCommandResult(
+            process.ExitCode,
+            capture.Value,
+            capturedStandardOutput.Value,
+            capturedStandardError.Value
+        );
+    }
+
+    public static async Task<IReadOnlyList<string>> DiscoverCommandsAsync(
+        string phpExecutable,
+        string projectDirectory,
+        IReadOnlyDictionary<string, string> environment,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var result = await RunAsync(
+            phpExecutable,
+            projectDirectory,
+            ["list", "--format=json", "--no-ansi", "--no-interaction"],
+            environment,
+            TimeSpan.FromSeconds(30),
+            cancellationToken: cancellationToken
+        );
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(result.StandardError)
+                    ? "Artisan could not list the project's commands."
+                    : result.StandardError.Trim()
+            );
+        }
+        return ArtisanCommandCatalog.MergeSuggestions(
+            ArtisanCommandCatalog.ParseCommandListJson(result.StandardOutput)
+        );
     }
 
     private static async Task PumpAsync(
         StreamReader reader,
         BoundedOutputCapture capture,
+        BoundedOutputCapture streamCapture,
         IProgress<string>? outputProgress
     )
     {
@@ -239,6 +381,7 @@ public static class ArtisanCommandRunner
             if (count == 0) return;
             var chunk = new string(buffer, 0, count);
             capture.Append(chunk);
+            streamCapture.Append(chunk);
             outputProgress?.Report(chunk);
         }
     }

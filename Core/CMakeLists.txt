@@ -104,6 +104,13 @@ if(BUILD_TESTING)
     set_tests_properties(herdme-core-version PROPERTIES PASS_REGULAR_EXPRESSION "^${PROJECT_VERSION}")
 endif()
 
+if(MINGW)
+    target_link_options(herdme-core PRIVATE -static)
+    if(BUILD_TESTING)
+        target_link_options(herdme-core-tests PRIVATE -static)
+    endif()
+endif()
+
 if(MSVC)
     target_compile_options(herdme-core-library PRIVATE /W4 /WX /permissive-)
     target_compile_options(herdme-core PRIVATE /W4 /WX /permissive-)

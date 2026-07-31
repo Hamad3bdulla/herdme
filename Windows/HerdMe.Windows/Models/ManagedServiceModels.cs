@@ -57,6 +57,7 @@ public sealed class ManagedServiceInstance
 public enum ManagedServiceState
 {
     NotInstalled,
+    Installing,
     Stopped,
     Running
 }
@@ -92,7 +93,9 @@ public sealed class ManagedServiceRow
 
     public string ToggleLabel { get; set; } = string.Empty;
 
-    public bool CanToggle => State != ManagedServiceState.NotInstalled;
+    public bool CanToggle => State is ManagedServiceState.Stopped or ManagedServiceState.Running;
+
+    public bool CanManage => State != ManagedServiceState.Installing;
 
     public bool CanOpenConsole => State == ManagedServiceState.Running
         && (DefinitionId is "minio" or "rustfs")

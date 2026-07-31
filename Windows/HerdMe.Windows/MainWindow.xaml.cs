@@ -193,7 +193,11 @@ public sealed partial class MainWindow : Window
                 );
                 break;
             case "mail":
-                ContentFrame.Content = new MailPage(services.Mail);
+                ContentFrame.Content = new MailPage(
+                    services.Mail,
+                    services.Core,
+                    services.SiteSettings
+                );
                 break;
             case "dumps":
                 ContentFrame.Content = new DumpsPage(services.Dumps);

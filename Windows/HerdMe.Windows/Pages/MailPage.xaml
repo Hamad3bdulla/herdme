@@ -14,10 +14,10 @@
         </Grid.RowDefinitions>
         <Grid>
             <TextBlock x:Uid="MailPageTitle" AutomationProperties.AutomationId="MailPageRoot" Text="Mail" Style="{StaticResource TitleTextBlockStyle}" />
-            <Button HorizontalAlignment="Right" Click="CopyEnvironment_Click">
+            <Button HorizontalAlignment="Right" Click="AddToEnvironment_Click">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <SymbolIcon Symbol="Copy" />
-                    <TextBlock x:Uid="MailCopyEnvironmentButton" Text="Copy .env" />
+                    <SymbolIcon Symbol="Edit" />
+                    <TextBlock x:Uid="MailEnvironmentButton" Text="Add to .env..." />
                 </StackPanel>
             </Button>
         </Grid>

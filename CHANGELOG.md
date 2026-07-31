@@ -5,6 +5,8 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-31
+
 ### Added
 
 - Measure macOS application and production-domain line coverage from the Xcode
@@ -79,6 +81,19 @@ Semantic Versioning for public releases.
 
 ### Fixed
 
+- Keep managed-service installations running across navigation and retain the
+  service list when returning to the Services page.
+- Write copied mail connection values directly to the selected site's `.env`
+  file instead of only placing them on the clipboard.
+- Ship the Windows application self-contained so Setup does not ask users to
+  download .NET after installation.
+- Put managed `npm.cmd` and `npx.cmd` shims ahead of the Node runtime in the
+  user PATH so PowerShell never selects the execution-policy-blocked scripts.
+- Add searchable Artisan command and npm script suggestions, discover every
+  command registered by the selected Laravel project, and keep the Run and
+  Cancel controls visible above bounded output.
+- Statically link the MinGW C++ runtime into `herdme-core.exe` so a clean
+  Windows installation does not fail because `libc++.dll` is missing.
 - Move PHP, Node, Composer, Laravel Installer, and Xdebug refresh state into the
   injected macOS runtime coordinator, update installed/latest versions
   atomically after successful operations, and cover the coordinator contract
@@ -303,5 +318,6 @@ Semantic Versioning for public releases.
 - Unique 256-bit credentials for managed storage and Typesense instances, stored
   in macOS Keychain or Windows Credential Manager and shared with `.env` export.
 
-[Unreleased]: https://github.com/Hamad3bdulla/herdme/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Hamad3bdulla/herdme/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Hamad3bdulla/herdme/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Hamad3bdulla/herdme/releases/tag/v0.1.0

@@ -206,6 +206,16 @@ public partial class App : Application
 
     private async Task StartBackgroundServicesAsync()
     {
+        await StartAndLogAsync("command-line path", () =>
+        {
+            services.NodeInstaller.RepairActiveCommandShims();
+            services.UserPath.Synchronize(
+                services.ComposerTools.CommandLineDirectories(
+                    services.RuntimePolicy.Load().PhpCycle
+                )
+            );
+            return Task.CompletedTask;
+        });
         await StartAndLogAsync("mail capture", () => services.Mail.StartAsync());
         await StartAndLogAsync("dump capture", () => services.Dumps.StartAsync());
         await StartAndLogAsync("managed services", () => services.Services.StartEnabledAsync());

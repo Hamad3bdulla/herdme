@@ -24,6 +24,8 @@ public sealed class NodeRuntimeInstaller
 
     public string SettingsPath => Path.Combine(SupportRoot, "Config", "node.json");
 
+    public string CommandShimDirectory => Path.Combine(SupportRoot, "bin");
+
     public NodeRuntimeSettings LoadSettings()
     {
         try
@@ -53,6 +55,7 @@ public sealed class NodeRuntimeInstaller
             JsonSerializer.Serialize(new NodeRuntimeSettings { ActiveVersion = version }, JsonOptions)
         );
         File.Move(temporary, SettingsPath, true);
+        EnsureCommandShims(version);
     }
 
     public string? InstalledVersion(string major)
@@ -93,6 +96,7 @@ public sealed class NodeRuntimeInstaller
             if (File.Exists(Path.Combine(activeDirectory, "node.exe"))
                 && File.Exists(Path.Combine(activeDirectory, "npm.cmd")))
             {
+                EnsureCommandShims(active);
                 return activeDirectory;
             }
         }
@@ -111,6 +115,16 @@ public sealed class NodeRuntimeInstaller
             throw new InvalidDataException("The verified Node.js package did not contain npm.cmd.");
         }
         return installedDirectory;
+    }
+
+    public bool RepairActiveCommandShims()
+    {
+        var active = LoadSettings().ActiveVersion;
+        if (string.IsNullOrWhiteSpace(active)) return false;
+        var runtimeDirectory = Path.Combine(RuntimeRoot, active);
+        if (!File.Exists(Path.Combine(runtimeDirectory, "node.exe"))) return false;
+        EnsureCommandShims(active);
+        return true;
     }
 
     public async Task<NodeWindowsRelease> ResolveReleaseAsync(
@@ -231,6 +245,58 @@ public sealed class NodeRuntimeInstaller
             SettingsPath,
             JsonSerializer.Serialize(new NodeRuntimeSettings { ActiveVersion = fallback ?? string.Empty }, JsonOptions)
         );
+        if (fallback is not null) EnsureCommandShims(fallback);
+        else RemoveCommandShims();
+    }
+
+    private void EnsureCommandShims(string version)
+    {
+        var runtimeDirectory = Path.Combine(RuntimeRoot, version);
+        var node = Path.Combine(runtimeDirectory, "node.exe");
+        var npmCli = Path.Combine(runtimeDirectory, "node_modules", "npm", "bin", "npm-cli.js");
+        var npxCli = Path.Combine(runtimeDirectory, "node_modules", "npm", "bin", "npx-cli.js");
+        if (!File.Exists(node) || !File.Exists(npmCli) || !File.Exists(npxCli))
+        {
+            throw new InvalidDataException("The selected Node.js runtime is missing npm command files.");
+        }
+
+        Directory.CreateDirectory(CommandShimDirectory);
+        WriteCommandShim(
+            Path.Combine(CommandShimDirectory, "npm.cmd"),
+            runtimeDirectory,
+            "npm-cli.js"
+        );
+        WriteCommandShim(
+            Path.Combine(CommandShimDirectory, "npx.cmd"),
+            runtimeDirectory,
+            "npx-cli.js"
+        );
+    }
+
+    private void RemoveCommandShims()
+    {
+        foreach (var command in new[] { "npm.cmd", "npx.cmd" })
+        {
+            var path = Path.Combine(CommandShimDirectory, command);
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    private static void WriteCommandShim(string path, string runtimeDirectory, string cliName)
+    {
+        var runtimeRelativePath = Path.GetRelativePath(
+            Path.GetDirectoryName(path)!,
+            runtimeDirectory
+        );
+        var content = string.Join("\r\n", [
+            "@echo off",
+            $"set \"HERDME_NODE=%~dp0{runtimeRelativePath}\"",
+            $"\"%HERDME_NODE%\\node.exe\" \"%HERDME_NODE%\\node_modules\\npm\\bin\\{cliName}\" %*",
+            string.Empty
+        ]);
+        if (File.Exists(path)
+            && File.ReadAllText(path).Equals(content, StringComparison.Ordinal)) return;
+        File.WriteAllText(path, content, new System.Text.UTF8Encoding(false));
     }
 
     private static async Task DownloadAndVerifyAsync(

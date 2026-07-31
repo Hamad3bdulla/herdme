@@ -9,6 +9,8 @@ namespace HerdMe.Windows.Services;
 
 public sealed class MailCaptureService : IAsyncDisposable
 {
+    public const int DefaultPort = 2_525;
+
     private readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
     private readonly ConcurrentDictionary<int, Task> sessions = new();
     private readonly string supportRoot;
@@ -41,7 +43,7 @@ public sealed class MailCaptureService : IAsyncDisposable
 
     public string DirectoryPath => Path.Combine(supportRoot, "Mail");
 
-    public Task StartAsync(int port = 2_525, CancellationToken cancellationToken = default)
+    public Task StartAsync(int port = DefaultPort, CancellationToken cancellationToken = default)
     {
         if (IsRunning) return Task.CompletedTask;
         if (port is < 0 or > 65_535) throw new ArgumentOutOfRangeException(nameof(port));

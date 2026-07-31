@@ -171,6 +171,34 @@ internal static partial class ContractChecks
             "Composer and Laravel child commands receive managed Git on PATH"
         );
 
+        var installedNode = new NodeRuntimeInstaller(supportRoot);
+        var activeNodeDirectory = Path.Combine(installedNode.RuntimeRoot, "22.99.0");
+        var activeNpmBin = Path.Combine(activeNodeDirectory, "node_modules", "npm", "bin");
+        Directory.CreateDirectory(activeNpmBin);
+        File.WriteAllText(Path.Combine(activeNodeDirectory, "node.exe"), "managed node");
+        File.WriteAllText(Path.Combine(activeNodeDirectory, "npm.cmd"), "upstream npm command");
+        File.WriteAllText(Path.Combine(activeNpmBin, "npm-cli.js"), "managed npm CLI");
+        File.WriteAllText(Path.Combine(activeNpmBin, "npx-cli.js"), "managed npx CLI");
+        installedNode.SetActive("22.99.0");
+        var npmCommand = Path.Combine(installedNode.CommandShimDirectory, "npm.cmd");
+        var npxCommand = Path.Combine(installedNode.CommandShimDirectory, "npx.cmd");
+        Check(
+            File.Exists(npmCommand)
+                && File.Exists(npxCommand)
+                && File.ReadAllText(npmCommand).Contains("npm-cli.js", StringComparison.Ordinal)
+                && File.ReadAllText(npxCommand).Contains("npx-cli.js", StringComparison.Ordinal)
+                && File.ReadAllText(npmCommand).EndsWith("%*\r\n", StringComparison.Ordinal),
+            "Node activation creates PATH-first npm and npx command shims that bypass PowerShell script policy"
+        );
+        File.Delete(npmCommand);
+        File.Delete(npxCommand);
+        Check(
+            installedNode.RepairActiveCommandShims()
+                && File.Exists(npmCommand)
+                && File.Exists(npxCommand),
+            "Application startup repairs npm and npx command shims for existing installations"
+        );
+
         var managedBin = Path.GetDirectoryName(installedTools.ComposerCommandPath)!;
         var managedPhp = Path.GetDirectoryName(installedPhp.PhpExecutable("8.4"))!;
         var managedNode = Path.Combine(supportRoot, "Runtimes", "node", "22.99.0");

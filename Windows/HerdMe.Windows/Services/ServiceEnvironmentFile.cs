@@ -1,4 +1,5 @@
 using System.Text;
+using System.Globalization;
 using HerdMe.Windows.Models;
 
 namespace HerdMe.Windows.Services;
@@ -80,6 +81,20 @@ public static class ServiceEnvironmentConfiguration
     }
 }
 
+public static class MailEnvironmentConfiguration
+{
+    public static IReadOnlyList<ServiceEnvironmentVariable> Variables(int port)
+    {
+        if (port is <= 0 or > 65_535) throw new ArgumentOutOfRangeException(nameof(port));
+        return
+        [
+            new ServiceEnvironmentVariable("MAIL_MAILER", "smtp"),
+            new ServiceEnvironmentVariable("MAIL_HOST", "127.0.0.1"),
+            new ServiceEnvironmentVariable("MAIL_PORT", port.ToString(CultureInfo.InvariantCulture))
+        ];
+    }
+}
+
 public static class ServiceEnvironmentFile
 {
     private const long MaximumEnvironmentFileBytes = 4 * 1_024 * 1_024;
@@ -91,16 +106,28 @@ public static class ServiceEnvironmentFile
         ServiceCredentials credentials
     )
     {
+        return Update(
+            projectPath,
+            ServiceEnvironmentConfiguration.Variables(instance, credentials),
+            instance.Name
+        );
+    }
+
+    public static ServiceEnvironmentUpdate Update(
+        string projectPath,
+        IReadOnlyList<ServiceEnvironmentVariable> variables,
+        string sourceName
+    )
+    {
         var fullProjectPath = Path.GetFullPath(projectPath);
         if (!Directory.Exists(fullProjectPath))
         {
             throw new DirectoryNotFoundException("The selected project directory is no longer available.");
         }
 
-        var variables = ServiceEnvironmentConfiguration.Variables(instance, credentials);
         if (variables.Count == 0)
         {
-            throw new NotSupportedException($"HerdMe does not have .env variables for {instance.Name}.");
+            throw new NotSupportedException($"HerdMe does not have .env variables for {sourceName}.");
         }
 
         var environmentPath = Path.Combine(fullProjectPath, ".env");
@@ -122,7 +149,7 @@ public static class ServiceEnvironmentFile
             initialContents = string.Empty;
         }
 
-        var merged = Merge(initialContents, variables, instance.Name);
+        var merged = Merge(initialContents, variables, sourceName);
         var temporaryPath = Path.Combine(
             fullProjectPath,
             $".env.herdme-{Guid.NewGuid():N}.tmp"

@@ -129,6 +129,119 @@ internal static partial class ContractChecks
             environmentContents.Split("\r\n").Count(line => line.StartsWith("DB_HOST=", StringComparison.Ordinal)) == 1,
             "service .env updates keep one effective assignment per managed key"
         );
+        var mailEnvironmentProject = Path.Combine(supportRoot, "mail-environment-project");
+        Directory.CreateDirectory(mailEnvironmentProject);
+        await File.WriteAllTextAsync(
+            Path.Combine(mailEnvironmentProject, ".env.example"),
+            "APP_NAME=MailExample\nMAIL_HOST=localhost\n"
+        );
+        var firstMailEnvironmentUpdate = ServiceEnvironmentFile.Update(
+            mailEnvironmentProject,
+            MailEnvironmentConfiguration.Variables(2_525),
+            "HerdMe Mail"
+        );
+        var secondMailEnvironmentUpdate = ServiceEnvironmentFile.Update(
+            mailEnvironmentProject,
+            MailEnvironmentConfiguration.Variables(2_526),
+            "HerdMe Mail"
+        );
+        var mailEnvironmentContents = await File.ReadAllTextAsync(
+            Path.Combine(mailEnvironmentProject, ".env")
+        );
+        Check(
+            firstMailEnvironmentUpdate.CreatedFile
+                && firstMailEnvironmentUpdate.AddedKeys == 2
+                && firstMailEnvironmentUpdate.UpdatedKeys == 1,
+            "mail .env updates create a site file from .env.example"
+        );
+        Check(
+            !secondMailEnvironmentUpdate.CreatedFile
+                && secondMailEnvironmentUpdate.AddedKeys == 0
+                && secondMailEnvironmentUpdate.UpdatedKeys == 3
+                && mailEnvironmentContents.Contains("MAIL_MAILER=smtp\n", StringComparison.Ordinal)
+                && mailEnvironmentContents.Contains("MAIL_HOST=127.0.0.1\n", StringComparison.Ordinal)
+                && mailEnvironmentContents.Contains("MAIL_PORT=2526\n", StringComparison.Ordinal)
+                && mailEnvironmentContents.Split('\n').Count(line =>
+                    line.StartsWith("MAIL_PORT=", StringComparison.Ordinal)
+                ) == 1,
+            "mail .env updates write the active SMTP port without duplicating variables"
+        );
+
+        var serviceConfigurationRoot = Path.Combine(supportRoot, "stable-service-configuration");
+        var serviceConfigurationManager = new WindowsServiceManager(serviceConfigurationRoot);
+        var persistedInstance = new ManagedServiceInstance
+        {
+            DefinitionId = "mysql",
+            Name = "Persistent MySQL",
+            Port = 3_308
+        };
+        Directory.CreateDirectory(Path.GetDirectoryName(serviceConfigurationManager.ConfigurationPath)!);
+        await File.WriteAllTextAsync(
+            serviceConfigurationManager.ConfigurationPath,
+            JsonSerializer.Serialize(new[] { persistedInstance })
+        );
+        Check(
+            serviceConfigurationManager.LoadInstances().Single().Id == persistedInstance.Id,
+            "service settings load an initial persisted instance"
+        );
+        using (var configurationLock = new FileStream(
+            serviceConfigurationManager.ConfigurationPath,
+            FileMode.Open,
+            FileAccess.ReadWrite,
+            FileShare.None
+        ))
+        {
+            var retainedInstances = serviceConfigurationManager.LoadInstances();
+            Check(
+                retainedInstances.Count == 1
+                    && retainedInstances[0].Id == persistedInstance.Id
+                    && File.Exists(serviceConfigurationManager.ConfigurationPath),
+                "a transient service settings lock keeps the last known list and original file"
+            );
+        }
+        Check(
+            serviceConfigurationManager.LoadInstances().Single().Id == persistedInstance.Id,
+            "service settings recover after a transient read conflict"
+        );
+
+        var installStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishInstall = new TaskCompletionSource<ServicePackageRelease>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        await using var operationManager = new WindowsServiceManager(
+            Path.Combine(supportRoot, "shared-service-install"),
+            installPackage: async (definitionId, cancellationToken) =>
+            {
+                installStarted.TrySetResult();
+                return await finishInstall.Task.WaitAsync(cancellationToken);
+            }
+        );
+        var operationChanges = 0;
+        operationManager.Changed += (_, _) => Interlocked.Increment(ref operationChanges);
+        var firstInstall = operationManager.InstallAsync("mysql");
+        await installStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var secondInstall = operationManager.InstallAsync("mysql");
+        Check(
+            ReferenceEquals(firstInstall, secondInstall)
+                && operationManager.IsInstalling("mysql")
+                && operationManager.State(Guid.NewGuid(), "mysql") == ManagedServiceState.Installing,
+            "service installation remains shared and visible while pages change"
+        );
+        finishInstall.SetResult(new ServicePackageRelease(
+            "mysql",
+            "9.9.9",
+            "mysql.zip",
+            ServicePackageChecksumAlgorithm.Sha256,
+            new string('0', 64),
+            new Uri("https://example.test/mysql.zip"),
+            true
+        ));
+        await Task.WhenAll(firstInstall, secondInstall).WaitAsync(TimeSpan.FromSeconds(2));
+        await Task.Yield();
+        Check(
+            !operationManager.IsInstalling("mysql") && operationChanges >= 2,
+            "service installation publishes its completed state to a returning page"
+        );
         var editorProject = Path.Combine(supportRoot, "environment-editor-project");
         Directory.CreateDirectory(editorProject);
         await File.WriteAllTextAsync(

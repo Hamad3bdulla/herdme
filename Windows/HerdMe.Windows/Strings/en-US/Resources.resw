@@ -187,6 +187,7 @@
   <data name="ServicesPortConflictNoAlternative" xml:space="preserve"><value>Port {0} is already used by {1}. No alternative loopback port is currently available.</value></data>
   <data name="ServicesPortConflictSuggested" xml:space="preserve"><value>Port {0} is already used by {1}. Suggested port {2} is now selected; press Add again to use it.</value></data>
   <data name="ServicesInstalling" xml:space="preserve"><value>Installing {0}</value></data>
+  <data name="ServicesInstallingState" xml:space="preserve"><value>Installing</value></data>
   <data name="ServicesVersionInstalled" xml:space="preserve"><value>{0} {1} installed</value></data>
   <data name="ServicesStopBeforeUpdate" xml:space="preserve"><value>Stop this service before updating its runtime.</value></data>
   <data name="ServicesStopping" xml:space="preserve"><value>Stopping {0}</value></data>
@@ -384,7 +385,9 @@
   <data name="SitesProjectStageCompletedTitle" xml:space="preserve"><value>Site created</value></data>
   <data name="SitesProjectStageCompletedDetail" xml:space="preserve"><value>Your project is ready to open.</value></data>
   <data name="MailPageTitle.Text" xml:space="preserve"><value>Mail</value></data>
-  <data name="MailCopyEnvironmentButton.Text" xml:space="preserve"><value>Copy .env</value></data>
+  <data name="MailEnvironmentButton.Text" xml:space="preserve"><value>Add to .env...</value></data>
+  <data name="MailEnvironmentDialogTitle" xml:space="preserve"><value>Add mail settings to .env</value></data>
+  <data name="MailEnvironmentUpdatedMessage" xml:space="preserve"><value>Added {0} and updated {1} mail variables in {2}.</value></data>
   <data name="MailCaptureTitle.Text" xml:space="preserve"><value>SMTP capture</value></data>
   <data name="MailStoppedInitial.Text" xml:space="preserve"><value>Stopped</value></data>
   <data name="MailServerTooltip.Text" xml:space="preserve"><value>Start or stop SMTP capture</value></data>
