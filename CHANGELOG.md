@@ -5,6 +5,15 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-07-31
+
+### Fixed
+
+- Enable PHP `intl` and `exif` automatically for Filament and Spatie packages,
+  and repair existing HerdMe PHP runtimes before Composer or Laravel commands run.
+- Prefer a Laravel project's `public/index.php` over a stale `index.html` when
+  a moved project contains both files.
+
 ## [0.1.5] - 2026-07-31
 
 ### Fixed

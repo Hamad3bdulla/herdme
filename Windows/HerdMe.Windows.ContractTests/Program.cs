@@ -35,7 +35,7 @@ if (args.SequenceEqual(["-m"], StringComparer.Ordinal))
     foreach (var module in new[]
     {
         "ctype", "curl", "dom", "fileinfo", "filter", "hash", "mbstring",
-        "openssl", "pcre", "pdo", "session", "tokenizer", "xml", "zip"
+        "exif", "intl", "openssl", "pcre", "pdo", "session", "tokenizer", "xml", "zip"
     })
     {
         Console.WriteLine(module);

@@ -3,9 +3,11 @@ PHP 8.4 startup notice that must not be treated as an extension
 ctype
 curl
 dom
+exif
 fileinfo
 filter
 hash
+intl
 mbstring
 openssl
 pcre

@@ -2,9 +2,11 @@
 ctype
 CURL
 dom
+exif
 fileinfo
 filter
 hash
+intl
 openssl
 pcre
 pdo

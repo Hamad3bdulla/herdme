@@ -124,10 +124,11 @@ int main() {
     expect(long_label.size() <= 63, "normalized DNS labels must fit the 63-byte limit");
     expect(long_label == herdme::dns_label(long_name), "DNS normalization must be deterministic");
 
-    const std::vector<std::string> expected = {"ctype",   "curl", "dom", "fileinfo", "filter",    "hash", "mbstring",
-                                               "openssl", "pcre", "pdo", "session",  "tokenizer", "xml",  "zip"};
+    const std::vector<std::string> expected = {"ctype",   "curl",      "dom",      "exif",    "fileinfo", "filter",
+                                               "hash",    "intl",      "mbstring", "openssl", "pcre",     "pdo",
+                                               "session", "tokenizer", "xml",      "zip"};
     expect(herdme::laravel_required_php_extensions() == expected,
-           "Laravel and Composer require the exact 14-module runtime contract");
+           "Laravel and Composer require the exact 16-module runtime contract");
 
     std::string complete = "[PHP Modules]\n";
     for (const auto &extension : expected) complete += extension + "\n";
@@ -137,7 +138,7 @@ int main() {
     expect(compatible.missing.empty(), "complete PHP module output must have no missing modules");
 
     const auto incomplete =
-        herdme::inspect_php_module_output("[PHP Modules]\nctype\nCURL\ndom\nfileinfo\nfilter\nhash\n"
+        herdme::inspect_php_module_output("[PHP Modules]\nctype\nCURL\ndom\nexif\nfileinfo\nfilter\nhash\nintl\n"
                                           "openssl\npcre\npdo\nsession\ntokenizer\nxml\nzip\n");
     expect(!incomplete.compatible, "missing mbstring must reject the runtime");
     expect(incomplete.missing == std::vector<std::string>{"mbstring"}, "the report must identify mbstring exactly");

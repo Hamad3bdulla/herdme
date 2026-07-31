@@ -19,6 +19,8 @@ public sealed class PhpRuntimeInstaller
         "curl",
         "fileinfo",
         "mbstring",
+        "exif",
+        "intl",
         "openssl",
         "pdo_mysql",
         "zip"
@@ -418,6 +420,8 @@ public sealed class PhpRuntimeInstaller
         extension = curl
         extension = fileinfo
         extension = mbstring
+        extension = exif
+        extension = intl
         extension = openssl
         extension = pdo_mysql
         extension = zip

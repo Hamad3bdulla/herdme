@@ -1,13 +1,13 @@
 {
   "releases": [
     {
-      "version": "0.1.5",
+      "version": "0.1.6",
       "build": 1,
       "channel": "stable",
-      "notes": "Routes Symfony VarDumper output from every HerdMe-served PHP site to the Dumps tab automatically, without requiring project .env changes or Laravel cache commands.",
+      "notes": "Enables PHP intl and exif automatically for Filament and Spatie packages, repairs existing managed PHP runtimes before Composer starts, and routes moved Laravel projects to public/index.php instead of stale index.html placeholders.",
       "downloadURLs": {
-        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.5/HerdMe-0.1.5-macOS.zip",
-        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.5/HerdMe-0.1.5-win-x64-setup.exe"
+        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.6/HerdMe-0.1.6-macOS.zip",
+        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.6/HerdMe-0.1.6-win-x64-setup.exe"
       }
     },
     {

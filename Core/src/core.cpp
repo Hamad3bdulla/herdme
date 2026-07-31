@@ -358,9 +358,9 @@ std::vector<RuntimeCheck> inspect_runtimes() {
 }
 
 const std::vector<std::string> &laravel_required_php_extensions() {
-    static const std::vector<std::string> extensions = {"ctype",   "curl",      "dom",     "fileinfo", "filter",
-                                                        "hash",    "mbstring",  "openssl", "pcre",     "pdo",
-                                                        "session", "tokenizer", "xml",     "zip"};
+    static const std::vector<std::string> extensions = {
+        "ctype",    "curl",    "dom",  "exif", "fileinfo", "filter",    "hash", "intl",
+        "mbstring", "openssl", "pcre", "pdo",  "session",  "tokenizer", "xml",  "zip"};
     return extensions;
 }
 

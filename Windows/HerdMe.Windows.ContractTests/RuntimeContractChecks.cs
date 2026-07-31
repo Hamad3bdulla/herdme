@@ -743,6 +743,51 @@ internal static partial class ContractChecks
             allowFastCgiCompletion.TrySetResult(true);
             streamingFastCgiListener.Stop();
         }
+
+        var movedLaravelRoot = Path.Combine(supportRoot, "moved-laravel-site");
+        var movedLaravelPublic = Path.Combine(movedLaravelRoot, "public");
+        Directory.CreateDirectory(movedLaravelPublic);
+        var movedLaravelIndex = Path.Combine(movedLaravelPublic, "index.php");
+        await File.WriteAllTextAsync(movedLaravelIndex, "<?php // Laravel front controller");
+        await File.WriteAllTextAsync(
+            Path.Combine(movedLaravelPublic, "index.html"),
+            "legacy hosting placeholder"
+        );
+        var movedLaravelFastCgiListener = new TcpListener(IPAddress.Loopback, 0);
+        movedLaravelFastCgiListener.Start(1);
+        var movedLaravelFastCgiPort = ((IPEndPoint)movedLaravelFastCgiListener.LocalEndpoint).Port;
+        var movedLaravelFixture = HandleLaravelIndexFastCgiFixtureAsync(
+            movedLaravelFastCgiListener,
+            movedLaravelIndex
+        );
+        try
+        {
+            var movedLaravelHttpReservation = new TcpListener(IPAddress.Loopback, 0);
+            movedLaravelHttpReservation.Start();
+            var movedLaravelHttpPort = ((IPEndPoint)movedLaravelHttpReservation.LocalEndpoint).Port;
+            movedLaravelHttpReservation.Stop();
+            await using var movedLaravelServer = new LocalHttpSiteServer();
+            await movedLaravelServer.StartAsync(
+                [new LocalSiteDefinition("moved-laravel.local-test", movedLaravelRoot)],
+                phpFastCgiPort: movedLaravelFastCgiPort,
+                preferredPort: movedLaravelHttpPort
+            );
+
+            var movedLaravelResponse = await SendHttpRequestAsync(
+                movedLaravelHttpPort,
+                "GET / HTTP/1.1\r\nHost: moved-laravel.local-test\r\nConnection: close\r\n\r\n"
+            );
+            Check(
+                movedLaravelResponse.EndsWith("Laravel front controller", StringComparison.Ordinal)
+                    && !movedLaravelResponse.Contains("legacy hosting placeholder", StringComparison.Ordinal),
+                "moved Laravel sites prefer public/index.php over stale hosting placeholders"
+            );
+            await movedLaravelFixture.WaitAsync(TimeSpan.FromSeconds(3));
+        }
+        finally
+        {
+            movedLaravelFastCgiListener.Stop();
+        }
     }
 
     internal static async Task TestCancelledCommandKillsTreeAsync(string supportRoot)
@@ -1268,6 +1313,49 @@ internal static partial class ContractChecks
         );
 
         var body = Encoding.UTF8.GetBytes("fixed FastCGI response");
+        await WriteFastCgiRecordAsync(
+            stream,
+            6,
+            Encoding.UTF8.GetBytes(
+                "Status: 200 OK\r\nContent-Type: text/plain\r\n"
+                    + $"Content-Length: {body.Length}\r\n\r\n"
+            )
+        );
+        await WriteFastCgiRecordAsync(stream, 6, body);
+        await WriteFastCgiRecordAsync(stream, 3, new byte[8]);
+    }
+
+    internal static async Task HandleLaravelIndexFastCgiFixtureAsync(
+        TcpListener listener,
+        string expectedScript
+    )
+    {
+        using var client = await listener.AcceptTcpClientAsync();
+        await using var stream = client.GetStream();
+        using var encodedParameters = new MemoryStream();
+        while (true)
+        {
+            var header = new byte[8];
+            await ReadExactlyAsync(stream, header);
+            var length = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(4, 2));
+            var content = new byte[length];
+            if (length > 0) await ReadExactlyAsync(stream, content);
+            if (header[6] > 0) await ReadExactlyAsync(stream, new byte[header[6]]);
+            if (header[1] == 4 && length > 0) encodedParameters.Write(content);
+            if (header[1] == 5 && length == 0) break;
+        }
+        var parameters = DecodeFastCgiParameters(encodedParameters.ToArray());
+        Check(
+            string.Equals(
+                parameters.GetValueOrDefault("SCRIPT_FILENAME"),
+                Path.GetFullPath(expectedScript),
+                StringComparison.OrdinalIgnoreCase
+            )
+                && parameters.GetValueOrDefault("SCRIPT_NAME") == "/index.php",
+            "local HTTP dispatches a moved Laravel site to its PHP front controller"
+        );
+
+        var body = Encoding.UTF8.GetBytes("Laravel front controller");
         await WriteFastCgiRecordAsync(
             stream,
             6,

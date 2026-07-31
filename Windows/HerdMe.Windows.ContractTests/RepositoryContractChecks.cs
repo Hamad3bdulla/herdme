@@ -1061,6 +1061,8 @@ internal static partial class ContractChecks
         ));
         Check(
             phpInstallerSource.Contains("extension = zip", StringComparison.Ordinal)
+                && phpInstallerSource.Contains("extension = exif", StringComparison.Ordinal)
+                && phpInstallerSource.Contains("extension = intl", StringComparison.Ordinal)
                 && phpInstallerSource.Contains("php_{extension}.dll", StringComparison.Ordinal)
                 && phpInstallerSource.Contains("HasRequiredConfiguration", StringComparison.Ordinal),
             "managed PHP enables and validates ZIP for Composer on clean Windows hosts"
@@ -1117,6 +1119,18 @@ internal static partial class ContractChecks
             projectCreatorSource.Contains("gitInstaller.EnsureInstalledAsync", StringComparison.Ordinal)
                 && !projectCreatorSource.Contains("\"git.exe\"", StringComparison.Ordinal),
             "Laravel project creation uses managed Git instead of requiring system Git"
+        );
+        var phpRepairIndex = projectCreatorSource.IndexOf(
+            "phpInstaller.EnsureManagedConfiguration(settings.PhpCycle)",
+            StringComparison.Ordinal
+        );
+        var laravelInstallerIndex = projectCreatorSource.IndexOf(
+            "tools.EnsureLaravelInstallerAsync(settings.PhpCycle",
+            StringComparison.Ordinal
+        );
+        Check(
+            phpRepairIndex >= 0 && phpRepairIndex < laravelInstallerIndex,
+            "Laravel project creation repairs managed PHP before Composer starts"
         );
         Check(
             userPathSource.Contains("EnvironmentVariableTarget.User", StringComparison.Ordinal)

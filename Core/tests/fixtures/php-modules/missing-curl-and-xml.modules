@@ -1,9 +1,11 @@
 [PHP Modules]
 ctype
 dom
+exif
 fileinfo
 filter
 hash
+intl
 mbstring
 openssl
 pcre

@@ -461,19 +461,20 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         if (Directory.Exists(candidate))
         {
             var resolvedDirectory = ResolveInside(candidate, root);
-            foreach (var index in new[] { "index.html", "index.htm" })
+            // PHP front controllers must win over stale static placeholders in moved Laravel projects.
+            foreach (var index in new[] { "index.php", "index.html", "index.htm" })
             {
                 var file = Path.Combine(resolvedDirectory, index);
                 if (File.Exists(file))
                 {
-                    return new ResolvedResource(ResolveInside(file, root), null, null, null);
+                    var resolved = ResolveInside(file, root);
+                    if (index.Equals("index.php", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var name = requestPath.EndsWith('/') ? requestPath + index : requestPath + "/" + index;
+                        return new ResolvedResource(null, resolved, name, null);
+                    }
+                    return new ResolvedResource(resolved, null, null, null);
                 }
-            }
-            var phpIndex = Path.Combine(resolvedDirectory, "index.php");
-            if (File.Exists(phpIndex))
-            {
-                var name = requestPath.EndsWith('/') ? requestPath + "index.php" : requestPath + "/index.php";
-                return new ResolvedResource(null, ResolveInside(phpIndex, root), name, null);
             }
         }
         else if (File.Exists(candidate))

@@ -721,11 +721,13 @@ internal static partial class ContractChecks
             PhpRuntimeInstaller.RequiredManagedExtensions.Contains(
                 "pdo_mysql",
                 StringComparer.OrdinalIgnoreCase
-            ) && PhpRuntimeInstaller.ManagedPhpIni.Contains(
-                "extension = pdo_mysql",
-                StringComparison.Ordinal
-            ),
-            "managed PHP enables Laravel's MySQL PDO driver"
+            )
+                && PhpRuntimeInstaller.RequiredManagedExtensions.Contains("exif", StringComparer.OrdinalIgnoreCase)
+                && PhpRuntimeInstaller.RequiredManagedExtensions.Contains("intl", StringComparer.OrdinalIgnoreCase)
+                && PhpRuntimeInstaller.ManagedPhpIni.Contains("extension = pdo_mysql", StringComparison.Ordinal)
+                && PhpRuntimeInstaller.ManagedPhpIni.Contains("extension = exif", StringComparison.Ordinal)
+                && PhpRuntimeInstaller.ManagedPhpIni.Contains("extension = intl", StringComparison.Ordinal),
+            "managed PHP enables Laravel's database and image internationalization extensions"
         );
         var phpConfiguration = Path.Combine(phpRuntime, "php.ini");
         await File.WriteAllTextAsync(
