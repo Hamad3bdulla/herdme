@@ -5,6 +5,13 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-07-31
+
+### Fixed
+
+- Route Symfony VarDumper output from every HerdMe-served PHP site to the local
+  Dumps tab automatically, without requiring per-project `.env` changes.
+
 ## [0.1.4] - 2026-07-31
 
 ### Added

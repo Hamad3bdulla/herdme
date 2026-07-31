@@ -1,6 +1,16 @@
 {
   "releases": [
     {
+      "version": "0.1.5",
+      "build": 1,
+      "channel": "stable",
+      "notes": "Routes Symfony VarDumper output from every HerdMe-served PHP site to the Dumps tab automatically, without requiring project .env changes or Laravel cache commands.",
+      "downloadURLs": {
+        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.5/HerdMe-0.1.5-macOS.zip",
+        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.5/HerdMe-0.1.5-win-x64-setup.exe"
+      }
+    },
+    {
       "version": "0.1.4",
       "build": 1,
       "channel": "stable",

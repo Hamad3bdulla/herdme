@@ -425,7 +425,9 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             ["REMOTE_ADDR"] = "127.0.0.1",
             ["REMOTE_PORT"] = "0",
             ["SERVER_ADDR"] = "127.0.0.1",
-            ["CONTENT_LENGTH"] = request.Body.Length.ToString()
+            ["CONTENT_LENGTH"] = request.Body.Length.ToString(),
+            ["VAR_DUMPER_FORMAT"] = "server",
+            ["VAR_DUMPER_SERVER"] = "127.0.0.1:9912"
         };
         if (secure) values["HTTPS"] = "on";
         values["HTTP_X_FORWARDED_PROTO"] = secure ? "https" : "http";

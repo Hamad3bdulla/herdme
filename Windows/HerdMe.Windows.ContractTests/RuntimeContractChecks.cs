@@ -1242,6 +1242,7 @@ internal static partial class ContractChecks
     {
         using var client = await listener.AcceptTcpClientAsync();
         await using var stream = client.GetStream();
+        using var encodedParameters = new MemoryStream();
         using var requestBody = new MemoryStream();
         while (true)
         {
@@ -1251,9 +1252,16 @@ internal static partial class ContractChecks
             var content = new byte[length];
             if (length > 0) await ReadExactlyAsync(stream, content);
             if (header[6] > 0) await ReadExactlyAsync(stream, new byte[header[6]]);
+            if (header[1] == 4 && length > 0) encodedParameters.Write(content);
             if (header[1] == 5 && length > 0) requestBody.Write(content);
             if (header[1] == 5 && length == 0) break;
         }
+        var parameters = DecodeFastCgiParameters(encodedParameters.ToArray());
+        Check(
+            parameters.GetValueOrDefault("VAR_DUMPER_FORMAT") == "server"
+                && parameters.GetValueOrDefault("VAR_DUMPER_SERVER") == "127.0.0.1:9912",
+            "local HTTP routes Symfony VarDumper payloads to HerdMe automatically"
+        );
         Check(
             requestBody.ToArray().SequenceEqual(expectedBody),
             "local HTTP decodes chunked request bodies before FastCGI"
