@@ -564,4 +564,12 @@
   <data name="SitesDetailsGitChanges" xml:space="preserve"><value>{0}, {1} changes</value></data>
   <data name="SitesDetailsNoServices" xml:space="preserve"><value>No associated services</value></data>
   <data name="SitesDetailsUnavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="UpdateServiceUnavailableStatus" xml:space="preserve"><value>Update service unavailable</value></data>
+  <data name="UpdateServiceUnavailableTitle" xml:space="preserve"><value>Updates could not be checked</value></data>
+  <data name="UpdateServiceUnavailableMessage" xml:space="preserve"><value>HerdMe could not reach the update service, so it cannot confirm whether this is the newest version. Check your internet connection and try again.</value></data>
+  <data name="UpdateDialogTitle" xml:space="preserve"><value>HerdMe {0} is available</value></data>
+  <data name="UpdateLater" xml:space="preserve"><value>Later</value></data>
+  <data name="UpdateDownload" xml:space="preserve"><value>Download</value></data>
+  <data name="UpdateDownloadOpenFailed" xml:space="preserve"><value>Download could not be opened</value></data>
+  <data name="UpdateOpenInBrowser" xml:space="preserve"><value>Open {0} in a browser.</value></data>
 </root>

@@ -94,4 +94,19 @@ internal static class ApplicationDiagnostics
             }
         );
     }
+
+    internal static Task<bool> WriteAutomaticUpdateCheckFailureAsync(
+        Exception error,
+        string? supportRoot = null
+    )
+    {
+        return DiagnosticLog.WriteFailureAsync(
+            "application-update",
+            "automatic-check",
+            "HerdMe could not check for application updates automatically.",
+            error.ToString(),
+            supportRoot,
+            context: new Dictionary<string, string?> { ["phase"] = "startup" }
+        );
+    }
 }

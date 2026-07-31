@@ -79,13 +79,21 @@ public sealed partial class AboutPage : Page
                 UpdateChannelDisplayName(channel)
             );
             var result = await updateManager.CheckAsync(channel);
-            if (result.AvailableRelease is { } release)
+            if (result.UsedBundledFallback)
+            {
+                UpdateStatusText.Text = AppLocalization.Get("UpdateServiceUnavailableStatus");
+                await ShowMessageAsync(
+                    AppLocalization.Get("UpdateServiceUnavailableTitle"),
+                    AppLocalization.Get("UpdateServiceUnavailableMessage")
+                );
+            }
+            else if (result.AvailableRelease is { } release)
             {
                 UpdateStatusText.Text = AppLocalization.Format(
                     "AboutVersionAvailable",
                     release.Version
                 );
-                await ShowUpdateAsync(release);
+                await AppUpdatePrompt.ShowAsync(XamlRoot, release);
             }
             else
             {
@@ -175,40 +183,6 @@ public sealed partial class AboutPage : Page
         catch (Exception error)
         {
             await ShowMessageAsync(AppLocalization.Get("AboutLinkOpenFailed"), error.Message);
-        }
-    }
-
-    private async Task ShowUpdateAsync(AppUpdateRelease release)
-    {
-        var downloadAvailable = Uri.TryCreate(
-            release.PlatformDownloadUrl,
-            UriKind.Absolute,
-            out var downloadUri
-        ) && downloadUri.Scheme == Uri.UriSchemeHttps;
-        var dialog = new ContentDialog
-        {
-            XamlRoot = XamlRoot,
-            Title = AppLocalization.Format("AboutUpdateDialogTitle", release.Version),
-            Content = release.Notes,
-            CloseButtonText = downloadAvailable
-                ? AppLocalization.Get("AboutLater")
-                : AppLocalization.Get("CommonOk"),
-            DefaultButton = downloadAvailable
-                ? ContentDialogButton.Primary
-                : ContentDialogButton.Close
-        };
-        if (downloadAvailable)
-        {
-            dialog.PrimaryButtonText = AppLocalization.Get("AboutDownload");
-        }
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary
-            && downloadUri is not null
-            && !await Launcher.LaunchUriAsync(downloadUri))
-        {
-            await ShowMessageAsync(
-                AppLocalization.Get("AboutDownloadOpenFailed"),
-                AppLocalization.Format("AboutOpenInBrowser", downloadUri.AbsoluteUri)
-            );
         }
     }
 

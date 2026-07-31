@@ -97,10 +97,6 @@ public sealed partial class GeneralPage : Page
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         await RefreshAsync();
-        if (settingsStore.Load().AutomaticUpdates)
-        {
-            await CheckForUpdatesAsync(userInitiated: false);
-        }
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e)
@@ -408,13 +404,24 @@ public sealed partial class GeneralPage : Page
                 channelName
             );
             var result = await updateManager.CheckAsync(channel);
-            if (result.AvailableRelease is { } release)
+            if (result.UsedBundledFallback)
+            {
+                UpdateStatusText.Text = AppLocalization.Get("UpdateServiceUnavailableStatus");
+                if (userInitiated)
+                {
+                    await ShowMessageAsync(
+                        AppLocalization.Get("UpdateServiceUnavailableTitle"),
+                        AppLocalization.Get("UpdateServiceUnavailableMessage")
+                    );
+                }
+            }
+            else if (result.AvailableRelease is { } release)
             {
                 UpdateStatusText.Text = AppLocalization.Format(
                     "GeneralVersionAvailable",
                     release.Version
                 );
-                await ShowUpdateAsync(release);
+                await AppUpdatePrompt.ShowAsync(XamlRoot, release);
             }
             else
             {
@@ -450,33 +457,6 @@ public sealed partial class GeneralPage : Page
         {
             UpdateProgress.IsActive = false;
             CheckNowButton.IsEnabled = true;
-        }
-    }
-
-    private async Task ShowUpdateAsync(AppUpdateRelease release)
-    {
-        var downloadAvailable = Uri.TryCreate(
-            release.PlatformDownloadUrl,
-            UriKind.Absolute,
-            out var downloadUri
-        );
-        var dialog = new ContentDialog
-        {
-            XamlRoot = XamlRoot,
-            Title = AppLocalization.Format("GeneralUpdateDialogTitle", release.Version),
-            Content = release.Notes,
-            CloseButtonText = downloadAvailable
-                ? AppLocalization.Get("GeneralLater")
-                : AppLocalization.Get("CommonOk")
-        };
-        if (downloadAvailable)
-        {
-            dialog.PrimaryButtonText = AppLocalization.Get("GeneralDownload");
-        }
-        var choice = await dialog.ShowAsync();
-        if (choice == ContentDialogResult.Primary && downloadUri is not null)
-        {
-            Process.Start(new ProcessStartInfo(downloadUri.AbsoluteUri) { UseShellExecute = true });
         }
     }
 

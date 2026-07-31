@@ -16,7 +16,9 @@ public partial class App : Application
     private TaskbarIcon? trayIcon;
     private volatile bool exitRequested;
     private int backgroundServicesStarted;
+    private int automaticUpdateCheckStarted;
     private int reportingUnhandledError;
+    private bool suppressAutomaticUpdateCheck;
 
     public App()
     {
@@ -52,12 +54,14 @@ public partial class App : Application
             "--acceptance-onboarding",
             StringComparer.OrdinalIgnoreCase
         );
+        suppressAutomaticUpdateCheck = acceptanceRun || onboardingAcceptance;
         MainWindow = new MainWindow(
             services,
             skipOnboarding: acceptanceRun,
             forceOnboarding: onboardingAcceptance
         );
-        MainWindow.InitialSetupCompleted += (_, _) => _ = StartBackgroundServicesOnceAsync();
+        MainWindow.InitialSetupCompleted += MainWindow_InitialSetupCompleted;
+        MainWindow.Activated += MainWindow_Activated;
         MainWindow.Closed += MainWindow_Closed;
         if (!MainWindow.RequiresOnboarding
             && Environment.GetCommandLineArgs().Contains("--background", StringComparer.OrdinalIgnoreCase))
@@ -70,6 +74,56 @@ public partial class App : Application
         }
         _ = ListenForActivationAsync();
         if (!MainWindow.RequiresOnboarding) _ = StartBackgroundServicesOnceAsync();
+    }
+
+    private void MainWindow_InitialSetupCompleted(object? sender, EventArgs args)
+    {
+        _ = StartBackgroundServicesOnceAsync();
+        StartAutomaticUpdateCheckOnce();
+    }
+
+    private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
+    {
+        if (args.WindowActivationState == WindowActivationState.Deactivated) return;
+        StartAutomaticUpdateCheckOnce();
+    }
+
+    private void StartAutomaticUpdateCheckOnce()
+    {
+        if (suppressAutomaticUpdateCheck || MainWindow.RequiresOnboarding || exitRequested) return;
+        var settings = services.SiteSettings.Load();
+        if (!settings.AutomaticUpdates) return;
+        if (Interlocked.Exchange(ref automaticUpdateCheckStarted, 1) != 0) return;
+        _ = CheckForApplicationUpdateAsync(settings.UpdateChannel);
+    }
+
+    private async Task CheckForApplicationUpdateAsync(string channel)
+    {
+        try
+        {
+            var result = await services.Updates.CheckAsync(channel);
+            if (result.UsedBundledFallback || result.AvailableRelease is not { } release) return;
+            var xamlRoot = await WaitForMainWindowXamlRootAsync();
+            if (xamlRoot is null) return;
+            await AppUpdatePrompt.ShowAsync(xamlRoot, release);
+        }
+        catch (Exception error)
+        {
+            await ApplicationDiagnostics.WriteAutomaticUpdateCheckFailureAsync(error);
+        }
+    }
+
+    private static async Task<XamlRoot?> WaitForMainWindowXamlRootAsync()
+    {
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            if (MainWindow.Content is FrameworkElement { XamlRoot: { } xamlRoot })
+            {
+                return xamlRoot;
+            }
+            await Task.Delay(100);
+        }
+        return null;
     }
 
     private Task ListenForActivationAsync()

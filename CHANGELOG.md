@@ -5,6 +5,20 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-07-31
+
+### Added
+
+- Check for HerdMe updates once when the Windows application starts and notify
+  the user with release notes and the correct x64 installer link.
+
+### Fixed
+
+- Report that the update service is unavailable when the remote feed cannot be
+  reached instead of incorrectly claiming that the bundled version is current.
+- Wait until the WinUI root is ready before showing a fast automatic update
+  result, and suppress startup checks during onboarding and acceptance runs.
+
 ## [0.1.2] - 2026-07-31
 
 ### Fixed
@@ -331,7 +345,8 @@ Semantic Versioning for public releases.
 - Unique 256-bit credentials for managed storage and Typesense instances, stored
   in macOS Keychain or Windows Credential Manager and shared with `.env` export.
 
-[Unreleased]: https://github.com/Hamad3bdulla/herdme/compare/preview-0.1.2...HEAD
+[Unreleased]: https://github.com/Hamad3bdulla/herdme/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/Hamad3bdulla/herdme/releases/tag/v0.1.3
 [0.1.2]: https://github.com/Hamad3bdulla/herdme/releases/tag/preview-0.1.2
 [0.1.1]: https://github.com/Hamad3bdulla/herdme/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Hamad3bdulla/herdme/releases/tag/v0.1.0

@@ -564,4 +564,12 @@
   <data name="SitesDetailsGitChanges" xml:space="preserve"><value>{0}، {1} تغييرات</value></data>
   <data name="SitesDetailsNoServices" xml:space="preserve"><value>لا توجد خدمات مرتبطة</value></data>
   <data name="SitesDetailsUnavailable" xml:space="preserve"><value>غير متاح</value></data>
+  <data name="UpdateServiceUnavailableStatus" xml:space="preserve"><value>خدمة التحديث غير متاحة</value></data>
+  <data name="UpdateServiceUnavailableTitle" xml:space="preserve"><value>تعذر التحقق من التحديثات</value></data>
+  <data name="UpdateServiceUnavailableMessage" xml:space="preserve"><value>تعذر على HerdMe الاتصال بخدمة التحديث، لذلك لا يمكنه التأكد من أن هذا هو أحدث إصدار. تحقق من اتصال الإنترنت وحاول مرة أخرى.</value></data>
+  <data name="UpdateDialogTitle" xml:space="preserve"><value>يتوفر HerdMe {0}</value></data>
+  <data name="UpdateLater" xml:space="preserve"><value>لاحقاً</value></data>
+  <data name="UpdateDownload" xml:space="preserve"><value>تنزيل</value></data>
+  <data name="UpdateDownloadOpenFailed" xml:space="preserve"><value>تعذر فتح التنزيل</value></data>
+  <data name="UpdateOpenInBrowser" xml:space="preserve"><value>افتح {0} في المتصفح.</value></data>
 </root>

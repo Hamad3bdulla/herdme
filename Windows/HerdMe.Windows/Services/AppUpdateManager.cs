@@ -27,7 +27,8 @@ public sealed record AppUpdateRelease(
 public sealed record AppUpdateCheck(
     string CurrentVersion,
     int CurrentBuild,
-    AppUpdateRelease? AvailableRelease
+    AppUpdateRelease? AvailableRelease,
+    bool UsedBundledFallback = false
 )
 {
     public bool IsAvailable => AvailableRelease is not null;
@@ -137,7 +138,12 @@ public sealed class AppUpdateManager
                 $"No {normalizedChannel} release is available in the update feed."
             );
         var available = IsNewer(latest) ? latest : null;
-        return new AppUpdateCheck(currentVersion, currentBuild, available);
+        return new AppUpdateCheck(
+            currentVersion,
+            currentBuild,
+            available,
+            feed.UsedBundledFallback
+        );
     }
 
     private async Task<FeedPayload> ReadFeedAsync(CancellationToken cancellationToken)
@@ -157,7 +163,8 @@ public sealed class AppUpdateManager
                 {
                     return new FeedPayload(
                         await ReadFileAsync(fallback, cancellationToken),
-                        RequireSignature: false
+                        RequireSignature: false,
+                        UsedBundledFallback: true
                     );
                 }
                 response.EnsureSuccessStatusCode();
@@ -168,20 +175,23 @@ public sealed class AppUpdateManager
                 await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
                 return new FeedPayload(
                     await ReadBoundedAsync(input, cancellationToken),
-                    RequireSignature: true
+                    RequireSignature: true,
+                    UsedBundledFallback: false
                 );
             }
             if (uri.IsFile)
             {
                 return new FeedPayload(
                     await ReadFileAsync(uri.LocalPath, cancellationToken),
-                    RequireSignature: false
+                    RequireSignature: false,
+                    UsedBundledFallback: false
                 );
             }
         }
         return new FeedPayload(
             await ReadFileAsync(feedLocation, cancellationToken),
-            RequireSignature: false
+            RequireSignature: false,
+            UsedBundledFallback: false
         );
     }
 
@@ -390,7 +400,11 @@ public sealed class AppUpdateManager
             && uri.Scheme is "http" or "https";
     }
 
-    private sealed record FeedPayload(byte[] Data, bool RequireSignature);
+    private sealed record FeedPayload(
+        byte[] Data,
+        bool RequireSignature,
+        bool UsedBundledFallback
+    );
 
     private bool IsNewer(AppUpdateRelease release)
     {

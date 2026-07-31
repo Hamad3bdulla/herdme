@@ -381,7 +381,10 @@ internal static partial class ContractChecks
         );
         var updateManager = new AppUpdateManager(updateFeed, "1.0.0", 10);
         var stableUpdate = await updateManager.CheckAsync("Stable");
-        Check(stableUpdate.AvailableRelease?.Build == 11, "equal versions compare release builds");
+        Check(
+            stableUpdate.AvailableRelease?.Build == 11 && !stableUpdate.UsedBundledFallback,
+            "equal versions compare release builds without marking local feeds as fallback data"
+        );
         var betaUpdate = await updateManager.CheckAsync("Beta");
         Check(betaUpdate.AvailableRelease?.Version == "1.0.1", "beta channel includes beta releases");
         Check(
@@ -402,10 +405,12 @@ internal static partial class ContractChecks
                 fallbackFeedLocation: updateFeed,
                 httpClient: unpublishedReleaseClient
             );
+            var unpublishedRelease = await unpublishedReleaseManager.CheckAsync("Stable");
             Check(
-                !(await unpublishedReleaseManager.CheckAsync("Stable")).IsAvailable
+                !unpublishedRelease.IsAvailable
+                    && unpublishedRelease.UsedBundledFallback
                     && unpublishedReleaseHandler.CallCount == 1,
-                "unpublished GitHub releases fall back to the bundled manifest without a 404 error"
+                "unavailable GitHub releases are explicitly marked when bundled data is used"
             );
         }
 

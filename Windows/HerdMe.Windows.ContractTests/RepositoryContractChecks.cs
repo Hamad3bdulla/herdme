@@ -490,8 +490,24 @@ internal static partial class ContractChecks
                     "WriteBackgroundServiceStartupFailureAsync",
                     StringComparison.Ordinal
                 )
-                && appSource.Contains("WriteUnhandledExceptionAsync", StringComparison.Ordinal),
+                && appSource.Contains("WriteUnhandledExceptionAsync", StringComparison.Ordinal)
+                && appSource.Contains(
+                    "WriteAutomaticUpdateCheckFailureAsync",
+                    StringComparison.Ordinal
+                ),
             "Windows application failures are routed exclusively through structured diagnostics"
+        );
+        Check(
+            appSource.Contains("MainWindow.Activated += MainWindow_Activated", StringComparison.Ordinal)
+                && appSource.Contains("settings.AutomaticUpdates", StringComparison.Ordinal)
+                && appSource.Contains(
+                    "Interlocked.Exchange(ref automaticUpdateCheckStarted, 1)",
+                    StringComparison.Ordinal
+                )
+                && appSource.Contains("services.Updates.CheckAsync(channel)", StringComparison.Ordinal)
+                && appSource.Contains("AppUpdatePrompt.ShowAsync", StringComparison.Ordinal)
+                && appSource.Contains("result.UsedBundledFallback", StringComparison.Ordinal),
+            "Windows checks once for application updates on activation and only prompts from the live feed"
         );
         Check(
             environmentSource.Contains(
