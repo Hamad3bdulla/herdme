@@ -5,6 +5,16 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-08-01
+
+### Fixed
+
+- Keep all local sites available while changing one site's PHP runtime, and
+  allow an isolated PHP runtime to start without Xdebug when that runtime's
+  Xdebug extension is not installed.
+- Create the Xdebug log directory before PHP starts so enabled debugging does
+  not flood the shared PHP error log with file-open warnings.
+
 ## [0.1.6] - 2026-07-31
 
 ### Fixed

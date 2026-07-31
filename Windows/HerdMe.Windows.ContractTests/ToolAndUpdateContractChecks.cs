@@ -296,6 +296,56 @@ internal static partial class ContractChecks
         Check(phpOptions["memory_limit"] == "16M", "PHP launch options use normalized memory settings");
         Check(phpOptions["upload_max_filesize"] == "100000M", "PHP launch options use normalized upload settings");
 
+        var debuggerSupportRoot = Path.Combine(supportRoot, "php-policy");
+        var isolatedDebuggerSettings = new PhpRuntimeSettings
+        {
+            PhpCycle = "8.3",
+            Debugger = new DebuggerSettings { Enabled = true }
+        };
+        var isolatedPhpOptions = PhpRuntimePolicy.BuildPhpOptions(
+            isolatedDebuggerSettings,
+            requireDebuggerExtension: false,
+            debuggerSupportRoot
+        );
+        Check(
+            !isolatedPhpOptions.ContainsKey("zend_extension"),
+            "isolated PHP runtimes start without Xdebug when their extension is not installed"
+        );
+        Check(
+            !PhpRuntimePolicy.RequiresDebuggerExtension("8.3", "8.5")
+                && PhpRuntimePolicy.RequiresDebuggerExtension("8.5", "8.5")
+                && PhpRuntimePolicy.RequiresDebuggerExtension(null, "8.5"),
+            "PHP launch policy requires Xdebug only for the default runtime"
+        );
+        Throws<InvalidOperationException>(
+            () => PhpRuntimePolicy.BuildPhpOptions(
+                isolatedDebuggerSettings,
+                requireDebuggerExtension: true,
+                debuggerSupportRoot
+            ),
+            "the default PHP runtime still requires its enabled Xdebug extension"
+        );
+
+        var xdebugExtension = Path.Combine(
+            debuggerSupportRoot,
+            "Extensions",
+            "php",
+            isolatedDebuggerSettings.PhpCycle,
+            "php_xdebug.dll"
+        );
+        Directory.CreateDirectory(Path.GetDirectoryName(xdebugExtension)!);
+        File.WriteAllBytes(xdebugExtension, [1]);
+        var debuggerPhpOptions = PhpRuntimePolicy.BuildPhpOptions(
+            isolatedDebuggerSettings,
+            requireDebuggerExtension: true,
+            debuggerSupportRoot
+        );
+        Check(
+            debuggerPhpOptions["zend_extension"] == xdebugExtension
+                && Directory.Exists(Path.Combine(debuggerSupportRoot, "Log", "xdebug")),
+            "PHP launch options prepare the Xdebug log directory"
+        );
+
         var xdebugFixture = """
             {
               "draft": false,

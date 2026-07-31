@@ -91,11 +91,15 @@ public sealed class PhpRuntimePolicy
         }
 
         var settings = Normalize(Load());
+        var requireDebuggerExtension = RequiresDebuggerExtension(
+            phpCycle,
+            settings.PhpCycle
+        );
         if (!string.IsNullOrWhiteSpace(phpCycle)) settings.PhpCycle = phpCycle;
         return new PhpRuntimeLaunchContract(
             extensions,
             settings,
-            BuildPhpOptions(settings)
+            BuildPhpOptions(settings, requireDebuggerExtension, SupportPath)
         );
     }
 
@@ -126,6 +130,15 @@ public sealed class PhpRuntimePolicy
 
     public static IReadOnlyDictionary<string, string> BuildPhpOptions(PhpRuntimeSettings input)
     {
+        return BuildPhpOptions(input, requireDebuggerExtension: true, SupportPath);
+    }
+
+    internal static IReadOnlyDictionary<string, string> BuildPhpOptions(
+        PhpRuntimeSettings input,
+        bool requireDebuggerExtension,
+        string supportPath
+    )
+    {
         var settings = Normalize(input);
         var options = new SortedDictionary<string, string>(StringComparer.Ordinal)
         {
@@ -135,10 +148,6 @@ public sealed class PhpRuntimePolicy
         };
         if (!settings.Debugger.Enabled) return options;
 
-        var supportPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "HerdMe"
-        );
         var extensionPath = Path.Combine(
             supportPath,
             "Extensions",
@@ -148,21 +157,39 @@ public sealed class PhpRuntimePolicy
         );
         if (!File.Exists(extensionPath))
         {
+            if (!requireDebuggerExtension) return options;
             throw new InvalidOperationException(
                 $"Install HerdMe Xdebug for PHP {settings.PhpCycle} before enabling the debugger."
             );
         }
+
+        var xdebugLogDirectory = Path.Combine(supportPath, "Log", "xdebug");
+        Directory.CreateDirectory(xdebugLogDirectory);
 
         options["zend_extension"] = extensionPath;
         options["xdebug.client_host"] = "127.0.0.1";
         options["xdebug.client_port"] = settings.Debugger.Port.ToString();
         options["xdebug.discover_client_host"] = "0";
         options["xdebug.idekey"] = settings.Debugger.IdeKey;
-        options["xdebug.log"] = Path.Combine(supportPath, "Log", "xdebug", "xdebug.log");
+        options["xdebug.log"] = Path.Combine(xdebugLogDirectory, "xdebug.log");
         options["xdebug.log_level"] = "1";
         options["xdebug.mode"] = "debug,develop";
         options["xdebug.start_with_request"] = settings.Debugger.DetectBreakpoints ? "trigger" : "yes";
         options["xdebug.trigger_value"] = settings.Debugger.IdeKey;
         return options;
     }
+
+    internal static bool RequiresDebuggerExtension(
+        string? requestedPhpCycle,
+        string defaultPhpCycle
+    )
+    {
+        return string.IsNullOrWhiteSpace(requestedPhpCycle)
+            || string.Equals(requestedPhpCycle, defaultPhpCycle, StringComparison.Ordinal);
+    }
+
+    private static string SupportPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "HerdMe"
+    );
 }

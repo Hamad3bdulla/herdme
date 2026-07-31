@@ -577,16 +577,13 @@ public sealed partial class SitesPage : Page
             DefaultButton = ContentDialogButton.Primary
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-        var wasRunning = environment.IsRunning;
         try
         {
-            if (wasRunning) await environment.StopAsync();
             var php = (phpBox.SelectedItem as DisplayOption)?.Value;
             var node = (nodeBox.SelectedItem as DisplayOption)?.Value;
             siteRuntimeStore.SetPhp(path, string.IsNullOrEmpty(php) ? null : php);
             siteRuntimeStore.SetNode(path, string.IsNullOrEmpty(node) ? null : node);
             await ScanAsync();
-            if (wasRunning) await environment.StartAsync(Sites);
         }
         catch (Exception error)
         {
