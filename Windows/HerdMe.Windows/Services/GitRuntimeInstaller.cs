@@ -72,6 +72,26 @@ public sealed partial class GitRuntimeInstaller
         }
     }
 
+    public async Task<string> InstallOrUpdateAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        await installLock.WaitAsync(cancellationToken);
+        try
+        {
+            var release = await ResolveReleaseAsync(cancellationToken);
+            var installed = InstalledVersion();
+            return installed is not null
+                && !RuntimeVersionComparison.IsNewer(release.Version, installed)
+                    ? GitExecutable(installed)
+                    : await InstallReleaseAsync(release, cancellationToken);
+        }
+        finally
+        {
+            installLock.Release();
+        }
+    }
+
     public async Task<GitWindowsRelease> ResolveReleaseAsync(
         CancellationToken cancellationToken = default
     )
@@ -137,6 +157,14 @@ public sealed partial class GitRuntimeInstaller
     private async Task<string> InstallCoreAsync(CancellationToken cancellationToken)
     {
         var release = await ResolveReleaseAsync(cancellationToken);
+        return await InstallReleaseAsync(release, cancellationToken);
+    }
+
+    private async Task<string> InstallReleaseAsync(
+        GitWindowsRelease release,
+        CancellationToken cancellationToken
+    )
+    {
         var cacheDirectory = Path.Combine(SupportRoot, "Cache", "git");
         Directory.CreateDirectory(cacheDirectory);
         Directory.CreateDirectory(RuntimeRoot);

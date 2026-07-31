@@ -494,6 +494,10 @@ internal static partial class ContractChecks
                 && appSource.Contains(
                     "WriteAutomaticUpdateCheckFailureAsync",
                     StringComparison.Ordinal
+                )
+                && appSource.Contains(
+                    "WriteManagedComponentUpdateCheckFailureAsync",
+                    StringComparison.Ordinal
                 ),
             "Windows application failures are routed exclusively through structured diagnostics"
         );
@@ -506,8 +510,20 @@ internal static partial class ContractChecks
                 )
                 && appSource.Contains("services.Updates.CheckAsync(channel)", StringComparison.Ordinal)
                 && appSource.Contains("AppUpdatePrompt.ShowAsync", StringComparison.Ordinal)
+                && appSource.Contains(
+                    "services.ComponentUpdates.CheckAsync()",
+                    StringComparison.Ordinal
+                )
+                && appSource.Contains(
+                    "ManagedComponentUpdatePrompt.ShowAsync",
+                    StringComparison.Ordinal
+                )
+                && appSource.Contains(
+                    "CheckForUpdatesInBackgroundAsync",
+                    StringComparison.Ordinal
+                )
                 && appSource.Contains("result.UsedBundledFallback", StringComparison.Ordinal),
-            "Windows checks once for application updates on activation and only prompts from the live feed"
+            "Windows checks once in the background for application and component updates and prompts from live results"
         );
         Check(
             environmentSource.Contains(

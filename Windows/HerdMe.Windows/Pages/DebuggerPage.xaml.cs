@@ -13,6 +13,7 @@ public sealed partial class DebuggerPage : Page
     private readonly PhpRuntimePolicy runtimePolicy;
     private readonly PhpRuntimeInstaller runtimeInstaller;
     private readonly XdebugManager xdebugManager;
+    private readonly ManagedComponentUpdateManager componentUpdateManager;
     private readonly SiteConfigurationStore siteSettings;
     private readonly WindowsLocalEnvironment environment;
     private PhpRuntimeSettings settings;
@@ -25,6 +26,7 @@ public sealed partial class DebuggerPage : Page
         PhpRuntimePolicy runtimePolicy,
         PhpRuntimeInstaller runtimeInstaller,
         XdebugManager xdebugManager,
+        ManagedComponentUpdateManager componentUpdateManager,
         SiteConfigurationStore siteSettings,
         WindowsLocalEnvironment environment
     )
@@ -33,6 +35,7 @@ public sealed partial class DebuggerPage : Page
         this.runtimePolicy = runtimePolicy;
         this.runtimeInstaller = runtimeInstaller;
         this.xdebugManager = xdebugManager;
+        this.componentUpdateManager = componentUpdateManager;
         this.siteSettings = siteSettings;
         this.environment = environment;
         InitializeComponent();
@@ -72,7 +75,51 @@ public sealed partial class DebuggerPage : Page
             InstallStatusText.Text = installation is null
                 ? AppLocalization.Get("DebuggerNotInstalled")
                 : AppLocalization.Format("DebuggerVersion", installation.Version);
-            InstallButton.IsEnabled = installation is null;
+            var update = installation is null
+                ? null
+                : componentUpdateManager.LatestUpdate($"xdebug:{settings.PhpCycle}");
+            if (installation is not null && update is not null
+                && !RuntimeVersionComparison.IsNewer(
+                    update.LatestVersion,
+                    installation.Version
+                ))
+            {
+                update = null;
+            }
+            if (installation is not null && update is null)
+            {
+                try
+                {
+                    var release = await xdebugManager.ResolveReleaseAsync(phpExecutable);
+                    if (RuntimeVersionComparison.IsNewer(
+                            release.Version,
+                            installation.Version
+                        ))
+                    {
+                        update = new ManagedComponentUpdate(
+                            $"xdebug:{settings.PhpCycle}",
+                            $"Xdebug (PHP {settings.PhpCycle})",
+                            installation.Version,
+                            release.Version,
+                            "debugger"
+                        );
+                    }
+                }
+                catch (Exception)
+                {
+                }
+            }
+            if (update is not null)
+            {
+                InstallStatusText.Text = AppLocalization.Format(
+                    "DebuggerUpdateAvailable",
+                    update.LatestVersion
+                );
+            }
+            InstallButtonText.Text = AppLocalization.Get(
+                update is null ? "CommonInstall" : "DebuggerUpdateButton"
+            );
+            InstallButton.IsEnabled = installation is null || update is not null;
             EnabledToggle.IsEnabled = installation is not null;
             if (installation is null)
             {
@@ -106,6 +153,7 @@ public sealed partial class DebuggerPage : Page
                 "DebuggerVersion",
                 installation.Version
             );
+            InstallButtonText.Text = AppLocalization.Get("CommonInstall");
             EnabledToggle.IsEnabled = true;
         }
         catch (Exception error)

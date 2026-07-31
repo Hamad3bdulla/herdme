@@ -143,26 +143,32 @@ public sealed partial class ComposerToolManager
         CancellationToken cancellationToken = default
     )
     {
-        if (!phpInstaller.IsInstalled(phpCycle)) return (null, null);
-        var php = phpInstaller.PhpExecutable(phpCycle);
-        string? composer = null;
-        if (File.Exists(ComposerPath))
+        return (
+            await ComposerVersionAsync(phpCycle, cancellationToken),
+            await LaravelInstallerVersionAsync(phpCycle, cancellationToken)
+        );
+    }
+
+    public async Task<string?> ComposerVersionAsync(
+        string phpCycle,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (!phpInstaller.IsInstalled(phpCycle) || !File.Exists(ComposerPath)) return null;
+        try
         {
-            try
-            {
-                composer = ExtractVersion(await RunAsync(
-                    php,
-                    [ComposerPath, "--version", "--no-ansi"],
-                    SupportRoot,
-                    ManagedEnvironment(phpCycle),
-                    cancellationToken
-                ));
-            }
-            catch (InvalidOperationException)
-            {
-            }
+            return ExtractVersion(await RunAsync(
+                phpInstaller.PhpExecutable(phpCycle),
+                [ComposerPath, "--version", "--no-ansi"],
+                SupportRoot,
+                ManagedEnvironment(phpCycle),
+                cancellationToken
+            ));
         }
-        return (composer, await LaravelInstallerVersionAsync(phpCycle, cancellationToken));
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     public async Task<string?> LaravelInstallerVersionAsync(

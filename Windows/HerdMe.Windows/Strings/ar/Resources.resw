@@ -67,7 +67,7 @@
   <data name="GeneralHttpsCertificateTitle.Text" xml:space="preserve"><value>شهادة HTTPS</value></data>
   <data name="GeneralCertificateChecking.Text" xml:space="preserve"><value>جارٍ التحقق</value></data>
   <data name="GeneralTrustCertificate.Content" xml:space="preserve"><value>توثيق</value></data>
-  <data name="GeneralApplicationUpdatesTitle.Text" xml:space="preserve"><value>تحديثات التطبيق</value></data>
+  <data name="GeneralApplicationUpdatesTitle.Text" xml:space="preserve"><value>التحديثات</value></data>
   <data name="GeneralStableChannel.Text" xml:space="preserve"><value>القناة المستقرة</value></data>
   <data name="GeneralCheckAutomatically.Text" xml:space="preserve"><value>التحقق تلقائياً</value></data>
   <data name="GeneralUpdateChannel.Text" xml:space="preserve"><value>قناة التحديث</value></data>
@@ -572,4 +572,16 @@
   <data name="UpdateDownload" xml:space="preserve"><value>تنزيل</value></data>
   <data name="UpdateDownloadOpenFailed" xml:space="preserve"><value>تعذر فتح التنزيل</value></data>
   <data name="UpdateOpenInBrowser" xml:space="preserve"><value>افتح {0} في المتصفح.</value></data>
+  <data name="ManagedUpdatesDialogTitle" xml:space="preserve"><value>تتوفر تحديثات للمكونات</value></data>
+  <data name="ManagedUpdatesDialogMessage" xml:space="preserve"><value>يمكن تحديث {0} من المكونات المثبتة:</value></data>
+  <data name="ManagedUpdateVersionLine" xml:space="preserve"><value>{0}: من {1} إلى {2}</value></data>
+  <data name="ManagedUpdatesMore" xml:space="preserve"><value>وتوجد {0} تحديثات أخرى.</value></data>
+  <data name="ManagedUpdatesView" xml:space="preserve"><value>عرض التحديثات</value></data>
+  <data name="ManagedUpdatesUpToDate" xml:space="preserve"><value>برنامج HerdMe وجميع المكونات المثبتة محدّثة.</value></data>
+  <data name="ManagedUpdatesPartialFailure" xml:space="preserve"><value>تعذر الاتصال ببعض خدمات تحديث المكونات: {0}. ستظل التحديثات الأخرى المتوفرة ظاهرة.</value></data>
+  <data name="GeneralUpdateGit" xml:space="preserve"><value>تحديث Git إلى {0}</value></data>
+  <data name="GeneralUpdatingGit" xml:space="preserve"><value>جارٍ تحديث Git</value></data>
+  <data name="GeneralGitUpdated" xml:space="preserve"><value>أصبح Git {0} جاهزًا.</value></data>
+  <data name="DebuggerUpdateButton" xml:space="preserve"><value>تحديث</value></data>
+  <data name="DebuggerUpdateAvailable" xml:space="preserve"><value>يتوفر Xdebug {0}.</value></data>
 </root>

@@ -5,6 +5,21 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-07-31
+
+### Added
+
+- Check installed PHP, Node.js/npm, Composer, Laravel Installer, Git, Xdebug,
+  and managed service releases in the background, then show one localized
+  notification for all available component updates.
+- Allow manual update checks to cover HerdMe and every installed component,
+  with direct update actions for managed Git and Xdebug releases.
+
+### Fixed
+
+- Keep component update results independent so one unavailable release source
+  does not hide updates returned by the remaining sources.
+
 ## [0.1.3] - 2026-07-31
 
 ### Added

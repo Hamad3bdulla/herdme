@@ -109,4 +109,26 @@ internal static class ApplicationDiagnostics
             context: new Dictionary<string, string?> { ["phase"] = "startup" }
         );
     }
+
+    internal static Task<bool> WriteManagedComponentUpdateCheckFailureAsync(
+        IReadOnlyList<ManagedComponentUpdateFailure> failures,
+        string? supportRoot = null
+    )
+    {
+        var components = string.Join(", ", failures.Select(failure => failure.Component));
+        var error = new AggregateException(failures.Select(failure => failure.Error));
+        return DiagnosticLog.WriteFailureAsync(
+            "component-updates",
+            "automatic-check",
+            "HerdMe could not check every managed component for updates automatically.",
+            error.ToString(),
+            supportRoot,
+            context: new Dictionary<string, string?>
+            {
+                ["phase"] = "startup",
+                ["failedComponents"] = components,
+                ["failureCount"] = failures.Count.ToString()
+            }
+        );
+    }
 }

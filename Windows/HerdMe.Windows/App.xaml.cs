@@ -17,8 +17,10 @@ public partial class App : Application
     private volatile bool exitRequested;
     private int backgroundServicesStarted;
     private int automaticUpdateCheckStarted;
+    private int automaticUpdatePromptStarted;
     private int reportingUnhandledError;
     private bool suppressAutomaticUpdateCheck;
+    private Task<AutomaticUpdateCheck>? automaticUpdateCheck;
 
     public App()
     {
@@ -73,19 +75,25 @@ public partial class App : Application
             MainWindow.Activate();
         }
         _ = ListenForActivationAsync();
-        if (!MainWindow.RequiresOnboarding) _ = StartBackgroundServicesOnceAsync();
+        if (!MainWindow.RequiresOnboarding)
+        {
+            _ = StartBackgroundServicesOnceAsync();
+            StartAutomaticUpdateCheckOnce();
+        }
     }
 
     private void MainWindow_InitialSetupCompleted(object? sender, EventArgs args)
     {
         _ = StartBackgroundServicesOnceAsync();
         StartAutomaticUpdateCheckOnce();
+        StartAutomaticUpdatePromptOnce();
     }
 
     private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
     {
         if (args.WindowActivationState == WindowActivationState.Deactivated) return;
         StartAutomaticUpdateCheckOnce();
+        StartAutomaticUpdatePromptOnce();
     }
 
     private void StartAutomaticUpdateCheckOnce()
@@ -94,24 +102,85 @@ public partial class App : Application
         var settings = services.SiteSettings.Load();
         if (!settings.AutomaticUpdates) return;
         if (Interlocked.Exchange(ref automaticUpdateCheckStarted, 1) != 0) return;
-        _ = CheckForApplicationUpdateAsync(settings.UpdateChannel);
+        automaticUpdateCheck = CheckForUpdatesInBackgroundAsync(settings.UpdateChannel);
     }
 
-    private async Task CheckForApplicationUpdateAsync(string channel)
+    private void StartAutomaticUpdatePromptOnce()
+    {
+        if (automaticUpdateCheck is null || exitRequested) return;
+        if (Interlocked.Exchange(ref automaticUpdatePromptStarted, 1) != 0) return;
+        _ = ShowAutomaticUpdatePromptsAsync(automaticUpdateCheck);
+    }
+
+    private async Task<AutomaticUpdateCheck> CheckForUpdatesInBackgroundAsync(string channel)
+    {
+        var applicationTask = CheckForApplicationUpdateAsync(channel);
+        var componentsTask = CheckForManagedComponentUpdatesAsync();
+        await Task.WhenAll(applicationTask, componentsTask);
+        return new AutomaticUpdateCheck(
+            await applicationTask,
+            await componentsTask
+        );
+    }
+
+    private async Task<AppUpdateRelease?> CheckForApplicationUpdateAsync(string channel)
     {
         try
         {
             var result = await services.Updates.CheckAsync(channel);
-            if (result.UsedBundledFallback || result.AvailableRelease is not { } release) return;
-            var xamlRoot = await WaitForMainWindowXamlRootAsync();
-            if (xamlRoot is null) return;
-            await AppUpdatePrompt.ShowAsync(xamlRoot, release);
+            return result.UsedBundledFallback ? null : result.AvailableRelease;
         }
         catch (Exception error)
         {
             await ApplicationDiagnostics.WriteAutomaticUpdateCheckFailureAsync(error);
+            return null;
         }
     }
+
+    private async Task<ManagedComponentUpdateCheck> CheckForManagedComponentUpdatesAsync()
+    {
+        try
+        {
+            var result = await services.ComponentUpdates.CheckAsync();
+            if (result.Failures.Count > 0)
+            {
+                await ApplicationDiagnostics.WriteManagedComponentUpdateCheckFailureAsync(
+                    result.Failures
+                );
+            }
+            return result;
+        }
+        catch (Exception error)
+        {
+            var failure = new ManagedComponentUpdateFailure("Managed components", error);
+            await ApplicationDiagnostics.WriteManagedComponentUpdateCheckFailureAsync([failure]);
+            return new ManagedComponentUpdateCheck([], [failure], DateTimeOffset.UtcNow);
+        }
+    }
+
+    private async Task ShowAutomaticUpdatePromptsAsync(Task<AutomaticUpdateCheck> checkTask)
+    {
+        var result = await checkTask;
+        if (exitRequested) return;
+        var xamlRoot = await WaitForMainWindowXamlRootAsync();
+        if (xamlRoot is null || exitRequested) return;
+
+        if (result.ApplicationRelease is { } release)
+        {
+            await AppUpdatePrompt.ShowAsync(xamlRoot, release);
+        }
+        if (exitRequested || result.Components.Updates.Count == 0) return;
+        var pageTag = await ManagedComponentUpdatePrompt.ShowAsync(
+            xamlRoot,
+            result.Components
+        );
+        if (pageTag is not null) MainWindow.NavigateToPage(pageTag);
+    }
+
+    private sealed record AutomaticUpdateCheck(
+        AppUpdateRelease? ApplicationRelease,
+        ManagedComponentUpdateCheck Components
+    );
 
     private static async Task<XamlRoot?> WaitForMainWindowXamlRootAsync()
     {

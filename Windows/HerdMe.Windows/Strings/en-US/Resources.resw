@@ -67,7 +67,7 @@
   <data name="GeneralHttpsCertificateTitle.Text" xml:space="preserve"><value>HTTPS certificate</value></data>
   <data name="GeneralCertificateChecking.Text" xml:space="preserve"><value>Checking</value></data>
   <data name="GeneralTrustCertificate.Content" xml:space="preserve"><value>Trust</value></data>
-  <data name="GeneralApplicationUpdatesTitle.Text" xml:space="preserve"><value>Application updates</value></data>
+  <data name="GeneralApplicationUpdatesTitle.Text" xml:space="preserve"><value>Updates</value></data>
   <data name="GeneralStableChannel.Text" xml:space="preserve"><value>Stable channel</value></data>
   <data name="GeneralCheckAutomatically.Text" xml:space="preserve"><value>Check automatically</value></data>
   <data name="GeneralUpdateChannel.Text" xml:space="preserve"><value>Update channel</value></data>
@@ -572,4 +572,16 @@
   <data name="UpdateDownload" xml:space="preserve"><value>Download</value></data>
   <data name="UpdateDownloadOpenFailed" xml:space="preserve"><value>Download could not be opened</value></data>
   <data name="UpdateOpenInBrowser" xml:space="preserve"><value>Open {0} in a browser.</value></data>
+  <data name="ManagedUpdatesDialogTitle" xml:space="preserve"><value>Component updates are available</value></data>
+  <data name="ManagedUpdatesDialogMessage" xml:space="preserve"><value>{0} installed components can be updated:</value></data>
+  <data name="ManagedUpdateVersionLine" xml:space="preserve"><value>{0}: {1} to {2}</value></data>
+  <data name="ManagedUpdatesMore" xml:space="preserve"><value>And {0} more updates.</value></data>
+  <data name="ManagedUpdatesView" xml:space="preserve"><value>View updates</value></data>
+  <data name="ManagedUpdatesUpToDate" xml:space="preserve"><value>HerdMe and all installed components are up to date.</value></data>
+  <data name="ManagedUpdatesPartialFailure" xml:space="preserve"><value>Some component update services could not be reached: {0}. Other available updates are still shown.</value></data>
+  <data name="GeneralUpdateGit" xml:space="preserve"><value>Update Git to {0}</value></data>
+  <data name="GeneralUpdatingGit" xml:space="preserve"><value>Updating Git</value></data>
+  <data name="GeneralGitUpdated" xml:space="preserve"><value>Git {0} is ready.</value></data>
+  <data name="DebuggerUpdateButton" xml:space="preserve"><value>Update</value></data>
+  <data name="DebuggerUpdateAvailable" xml:space="preserve"><value>Xdebug {0} is available.</value></data>
 </root>

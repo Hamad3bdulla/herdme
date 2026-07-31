@@ -1,6 +1,16 @@
 {
   "releases": [
     {
+      "version": "0.1.4",
+      "build": 1,
+      "channel": "stable",
+      "notes": "Checks PHP, Node.js/npm, Composer, Laravel Installer, Git, Xdebug, MySQL, and every installed managed service for updates in the background, then shows one notification for all available component updates.",
+      "downloadURLs": {
+        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.4/HerdMe-0.1.4-macOS.zip",
+        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.4/HerdMe-0.1.4-win-x64-setup.exe"
+      }
+    },
+    {
       "version": "0.1.3",
       "build": 1,
       "channel": "stable",

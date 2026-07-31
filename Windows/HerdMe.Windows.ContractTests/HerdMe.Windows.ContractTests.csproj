@@ -36,6 +36,7 @@
     <Compile Include="../HerdMe.Windows/Services/InitialSetupManager.cs" Link="Services/InitialSetupManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/MailMimeParser.cs" Link="Services/MailMimeParser.cs" />
     <Compile Include="../HerdMe.Windows/Services/MailCaptureService.cs" Link="Services/MailCaptureService.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ManagedComponentUpdateManager.cs" Link="Services/ManagedComponentUpdateManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/ManagedDownloadClient.cs" Link="Services/ManagedDownloadClient.cs" />
     <Compile Include="../HerdMe.Windows/Services/ServicePackageInstaller.cs" Link="Services/ServicePackageInstaller.cs" />
     <Compile Include="../HerdMe.Windows/Services/ServiceEnvironmentFile.cs" Link="Services/ServiceEnvironmentFile.cs" />

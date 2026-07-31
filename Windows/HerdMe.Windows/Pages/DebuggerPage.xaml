@@ -18,7 +18,7 @@
                         <Button x:Name="InstallButton" Click="Install_Click" IsEnabled="False">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <SymbolIcon Symbol="Download" />
-                                <TextBlock x:Uid="DebuggerInstallButton" Text="Install" />
+                                <TextBlock x:Name="InstallButtonText" x:Uid="DebuggerInstallButton" Text="Install" />
                             </StackPanel>
                         </Button>
                     </StackPanel>

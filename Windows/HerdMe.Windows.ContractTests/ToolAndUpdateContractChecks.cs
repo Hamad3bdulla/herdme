@@ -366,6 +366,79 @@ internal static partial class ContractChecks
             "About product links use absolute HTTPS addresses"
         );
 
+        var managedUpdateProbeStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        var managedUpdateProbeRelease = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        var managedUpdateProbeCalls = 0;
+        var managedUpdateManager = new ManagedComponentUpdateManager(
+            new ManagedComponentUpdateProbe("PHP", async _ =>
+            {
+                Interlocked.Increment(ref managedUpdateProbeCalls);
+                managedUpdateProbeStarted.TrySetResult();
+                await managedUpdateProbeRelease.Task;
+                return
+                [
+                    new ManagedComponentUpdate(
+                        "php:8.4",
+                        "PHP 8.4",
+                        "8.4.1",
+                        "8.4.2",
+                        "php"
+                    )
+                ];
+            }),
+            new ManagedComponentUpdateProbe(
+                "MySQL",
+                _ => throw new HttpRequestException("fixture unavailable")
+            ),
+            new ManagedComponentUpdateProbe(
+                "Duplicate",
+                _ => Task.FromResult<IReadOnlyList<ManagedComponentUpdate>>(
+                [
+                    new ManagedComponentUpdate(
+                        "php:8.4",
+                        "PHP duplicate",
+                        "8.4.0",
+                        "8.4.3",
+                        "php"
+                    ),
+                    new ManagedComponentUpdate(
+                        "node:22",
+                        "Node.js 22 / npm",
+                        "22.1.0",
+                        "22.2.0",
+                        "node"
+                    )
+                ])
+            )
+        );
+        var firstManagedUpdateCheck = managedUpdateManager.CheckAsync();
+        await managedUpdateProbeStarted.Task;
+        var joinedManagedUpdateCheck = managedUpdateManager.CheckAsync();
+        managedUpdateProbeRelease.TrySetResult();
+        await Task.WhenAll(firstManagedUpdateCheck, joinedManagedUpdateCheck);
+        var managedUpdateResult = await firstManagedUpdateCheck;
+        Check(
+            ReferenceEquals(firstManagedUpdateCheck, joinedManagedUpdateCheck)
+                && managedUpdateProbeCalls == 1,
+            "concurrent managed-component update checks share one background operation"
+        );
+        Check(
+            managedUpdateResult.Updates.Select(update => update.Id).SequenceEqual([
+                "php:8.4",
+                "node:22"
+            ])
+                && managedUpdateManager.LatestResult == managedUpdateResult,
+            "managed-component updates are cached, ordered, and deduplicated"
+        );
+        Check(
+            managedUpdateResult.Failures is [{ Component: "MySQL" }],
+            "one failed component feed does not hide updates from healthy feeds"
+        );
+
         var updateFeed = Path.Combine(supportRoot, "release-manifest.json");
         await File.WriteAllTextAsync(
             updateFeed,

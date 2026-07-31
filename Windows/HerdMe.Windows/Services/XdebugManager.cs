@@ -111,6 +111,24 @@ public sealed class XdebugManager
             ?? throw new InvalidOperationException("Xdebug validation failed after installation.");
     }
 
+    public async Task<XdebugWindowsRelease> ResolveReleaseAsync(
+        string phpExecutable,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var descriptor = await DescribePhpAsync(phpExecutable, cancellationToken);
+        var releaseMetadata = await HttpClient.GetStringAsync(
+            "https://api.github.com/repos/xdebug/xdebug/releases/latest",
+            cancellationToken
+        );
+        return SelectWindowsRelease(
+            releaseMetadata,
+            descriptor.Cycle,
+            descriptor.ThreadSafety,
+            descriptor.Architecture
+        );
+    }
+
     public async Task<string> PhpCycleAsync(
         string phpExecutable,
         CancellationToken cancellationToken = default

@@ -40,6 +40,15 @@ public sealed class AppServices
         Startup = new WindowsStartupManager();
         Updates = AppUpdateManager.Configured();
         Xdebug = new XdebugManager();
+        ComponentUpdates = new ManagedComponentUpdateManager(
+            PhpInstaller,
+            RuntimePolicy,
+            NodeInstaller,
+            ComposerTools,
+            GitInstaller,
+            Xdebug,
+            Services
+        );
         SiteRuntimes = new SiteRuntimeStore();
         InitialSetup = new InitialSetupManager(
             SiteSettings,
@@ -90,6 +99,8 @@ public sealed class AppServices
     public AppUpdateManager Updates { get; }
 
     public XdebugManager Xdebug { get; }
+
+    public ManagedComponentUpdateManager ComponentUpdates { get; }
 
     public SiteRuntimeStore SiteRuntimes { get; }
 

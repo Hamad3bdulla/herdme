@@ -50,13 +50,34 @@ var verifyLiveManagedCommandPath = args.Contains(
     "--live-managed-command-path",
     StringComparer.Ordinal
 );
+var verifyLiveManagedUpdates = args.Contains(
+    "--live-managed-updates",
+    StringComparer.Ordinal
+);
 if (verifyLiveServices || verifyLiveRuntimes || verifyLiveGitInstall
-    || verifyLiveManagedCommandPath)
+    || verifyLiveManagedCommandPath || verifyLiveManagedUpdates)
 {
     if (verifyLiveServices) await VerifyLiveServiceReleasesAsync();
     if (verifyLiveRuntimes) await VerifyLiveRuntimeReleasesAsync();
     if (verifyLiveGitInstall) await VerifyLiveGitInstallAsync();
     if (verifyLiveManagedCommandPath) await VerifyLiveManagedCommandPathAsync();
+    if (verifyLiveManagedUpdates)
+    {
+        var result = await new AppServices().ComponentUpdates.CheckAsync();
+        foreach (var update in result.Updates)
+        {
+            Console.WriteLine(
+                $"{update.Id}: {update.InstalledVersion} -> {update.LatestVersion}"
+            );
+        }
+        foreach (var failure in result.Failures)
+        {
+            Console.WriteLine($"{failure.Component}: unavailable ({failure.Error.Message})");
+        }
+        Console.WriteLine(
+            $"managed-updates: {result.Updates.Count} available, {result.Failures.Count} unavailable"
+        );
+    }
     Console.WriteLine("HerdMe Windows live checks passed");
     return;
 }

@@ -230,6 +230,37 @@ public sealed class PhpRuntimeInstaller
         );
     }
 
+    public async Task<IReadOnlyDictionary<string, string>> ResolveLatestVersionsAsync(
+        IEnumerable<string> cycles,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var requestedCycles = cycles
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        foreach (var cycle in requestedCycles) EnsureSupportedCycle(cycle);
+
+        using var stream = await HttpClient.GetStreamAsync(
+            "https://windows.php.net/downloads/releases/releases.json",
+            cancellationToken
+        );
+        using var document = await JsonDocument.ParseAsync(
+            stream,
+            cancellationToken: cancellationToken
+        );
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var cycle in requestedCycles)
+        {
+            if (!document.RootElement.TryGetProperty(cycle, out var release)) continue;
+            var version = release.GetProperty("version").GetString();
+            if (!string.IsNullOrWhiteSpace(version))
+            {
+                result[cycle] = RuntimeVersionComparison.Normalize(version);
+            }
+        }
+        return result;
+    }
+
     public async Task<PhpWindowsRelease> InstallAsync(
         string cycle,
         CancellationToken cancellationToken = default

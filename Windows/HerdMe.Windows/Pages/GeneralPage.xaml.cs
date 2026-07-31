@@ -20,6 +20,8 @@ public sealed partial class GeneralPage : Page
     private readonly WindowsCertificateManager certificateManager;
     private readonly SiteConfigurationStore settingsStore;
     private readonly AppUpdateManager updateManager;
+    private readonly ManagedComponentUpdateManager componentUpdateManager;
+    private readonly WindowsUserPathManager userPathManager;
     private bool loadingStartup;
     private bool loadingUpdateSettings;
 
@@ -36,7 +38,9 @@ public sealed partial class GeneralPage : Page
         WindowsHostsManager hostsManager,
         WindowsCertificateManager certificateManager,
         SiteConfigurationStore settingsStore,
-        AppUpdateManager updateManager
+        AppUpdateManager updateManager,
+        ManagedComponentUpdateManager componentUpdateManager,
+        WindowsUserPathManager userPathManager
     )
     {
         this.coreClient = coreClient;
@@ -50,6 +54,8 @@ public sealed partial class GeneralPage : Page
         this.certificateManager = certificateManager;
         this.settingsStore = settingsStore;
         this.updateManager = updateManager;
+        this.componentUpdateManager = componentUpdateManager;
+        this.userPathManager = userPathManager;
         InitializeComponent();
         CoreExecutableText.Text = coreClient.ExecutablePath;
         ToolTipService.SetToolTip(
@@ -173,6 +179,7 @@ public sealed partial class GeneralPage : Page
             PhpExtensionProgress.IsActive = false;
         }
         await RefreshLocalSetupAsync();
+        ApplyManagedUpdateState();
     }
 
     private IReadOnlyList<RuntimeCheck> ManagedRuntimeChecks()
@@ -395,6 +402,8 @@ public sealed partial class GeneralPage : Page
     {
         UpdateProgress.IsActive = true;
         CheckNowButton.IsEnabled = false;
+        AppUpdateCheck? applicationResult = null;
+        Exception? applicationError = null;
         try
         {
             var channel = SelectedUpdateChannel();
@@ -403,19 +412,20 @@ public sealed partial class GeneralPage : Page
                 "GeneralCheckingReleases",
                 channelName
             );
-            var result = await updateManager.CheckAsync(channel);
-            if (result.UsedBundledFallback)
+            var applicationTask = updateManager.CheckAsync(channel);
+            var componentsTask = componentUpdateManager.CheckAsync();
+            try
             {
-                UpdateStatusText.Text = AppLocalization.Get("UpdateServiceUnavailableStatus");
-                if (userInitiated)
-                {
-                    await ShowMessageAsync(
-                        AppLocalization.Get("UpdateServiceUnavailableTitle"),
-                        AppLocalization.Get("UpdateServiceUnavailableMessage")
-                    );
-                }
+                applicationResult = await applicationTask;
             }
-            else if (result.AvailableRelease is { } release)
+            catch (Exception error)
+            {
+                applicationError = error;
+            }
+            var components = await componentsTask;
+            ApplyManagedUpdateState();
+
+            if (applicationResult?.AvailableRelease is { } release)
             {
                 UpdateStatusText.Text = AppLocalization.Format(
                     "GeneralVersionAvailable",
@@ -423,21 +433,54 @@ public sealed partial class GeneralPage : Page
                 );
                 await AppUpdatePrompt.ShowAsync(XamlRoot, release);
             }
+            else if (applicationResult?.UsedBundledFallback == true || applicationError is not null)
+            {
+                UpdateStatusText.Text = AppLocalization.Get("UpdateServiceUnavailableStatus");
+            }
             else
             {
                 UpdateStatusText.Text = AppLocalization.Format(
                     "GeneralUpToDateStatus",
-                    result.CurrentVersion
+                    applicationResult?.CurrentVersion ?? string.Empty
                 );
-                if (userInitiated)
+            }
+
+            if (components.Updates.Count > 0)
+            {
+                var pageTag = await ManagedComponentUpdatePrompt.ShowAsync(XamlRoot, components);
+                if (pageTag is not null) App.MainWindow.NavigateToPage(pageTag);
+            }
+            else if (userInitiated)
+            {
+                if (applicationError is not null)
+                {
+                    await ShowMessageAsync(
+                        AppLocalization.Get("GeneralUpdateCheckFailed"),
+                        applicationError.Message
+                    );
+                }
+                else if (applicationResult?.UsedBundledFallback == true)
+                {
+                    await ShowMessageAsync(
+                        AppLocalization.Get("UpdateServiceUnavailableTitle"),
+                        AppLocalization.Get("UpdateServiceUnavailableMessage")
+                    );
+                }
+                else if (components.Failures.Count > 0)
+                {
+                    await ShowMessageAsync(
+                        AppLocalization.Get("UpdateServiceUnavailableTitle"),
+                        AppLocalization.Format(
+                            "ManagedUpdatesPartialFailure",
+                            string.Join(", ", components.Failures.Select(failure => failure.Component))
+                        )
+                    );
+                }
+                else if (applicationResult?.AvailableRelease is null)
                 {
                     await ShowMessageAsync(
                         AppLocalization.Get("GeneralUpToDateTitle"),
-                        AppLocalization.Format(
-                            "GeneralNewestRelease",
-                            result.CurrentVersion,
-                            channelName
-                        )
+                        AppLocalization.Get("ManagedUpdatesUpToDate")
                     );
                 }
             }
@@ -457,6 +500,49 @@ public sealed partial class GeneralPage : Page
         {
             UpdateProgress.IsActive = false;
             CheckNowButton.IsEnabled = true;
+        }
+    }
+
+    private void ApplyManagedUpdateState()
+    {
+        var gitUpdate = componentUpdateManager.LatestUpdate("git");
+        UpdateGitButton.Visibility = gitUpdate is null
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        if (gitUpdate is not null)
+        {
+            UpdateGitButtonText.Text = AppLocalization.Format(
+                "GeneralUpdateGit",
+                gitUpdate.LatestVersion
+            );
+        }
+    }
+
+    private async void UpdateGit_Click(object sender, RoutedEventArgs e)
+    {
+        UpdateGitButton.IsEnabled = false;
+        UpdateProgress.IsActive = true;
+        UpdateStatusText.Text = AppLocalization.Get("GeneralUpdatingGit");
+        try
+        {
+            await gitInstaller.InstallOrUpdateAsync();
+            userPathManager.Synchronize(
+                composerTools.CommandLineDirectories(runtimePolicy.Load().PhpCycle)
+            );
+            var version = gitInstaller.InstalledVersion() ?? string.Empty;
+            UpdateStatusText.Text = AppLocalization.Format("GeneralGitUpdated", version);
+            UpdateGitButton.Visibility = Visibility.Collapsed;
+            await componentUpdateManager.CheckAsync();
+            await RefreshAsync();
+        }
+        catch (Exception error)
+        {
+            await ShowMessageAsync("HerdMe", error.Message);
+        }
+        finally
+        {
+            UpdateProgress.IsActive = false;
+            UpdateGitButton.IsEnabled = true;
         }
     }
 

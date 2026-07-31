@@ -151,7 +151,9 @@ public sealed partial class MainWindow : Window
                     services.Hosts,
                     services.Certificates,
                     services.SiteSettings,
-                    services.Updates
+                    services.Updates,
+                    services.ComponentUpdates,
+                    services.UserPath
                 );
                 break;
             case "sites":
@@ -216,6 +218,7 @@ public sealed partial class MainWindow : Window
                     services.RuntimePolicy,
                     services.PhpInstaller,
                     services.Xdebug,
+                    services.ComponentUpdates,
                     services.SiteSettings,
                     services.Environment
                 );
@@ -235,7 +238,9 @@ public sealed partial class MainWindow : Window
                     services.Hosts,
                     services.Certificates,
                     services.SiteSettings,
-                    services.Updates
+                    services.Updates,
+                    services.ComponentUpdates,
+                    services.UserPath
                 );
                 break;
         }
