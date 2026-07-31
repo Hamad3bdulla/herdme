@@ -49,8 +49,16 @@ internal static partial class ContractChecks
         Check(
             RuntimeCatalog.Services.Select(service => service.Id).ToHashSet(StringComparer.Ordinal)
                 .SetEquals([
-                    "mariadb", "mysql", "postgresql", "mongodb", "redis",
-                    "valkey", "meilisearch", "typesense", "minio", "rustfs"
+                    "mariadb",
+                    "mysql",
+                    "postgresql",
+                    "mongodb",
+                    "redis",
+                    "valkey",
+                    "meilisearch",
+                    "typesense",
+                    "minio",
+                    "rustfs"
                 ]),
             "the shared catalog defines the complete service set"
         );
@@ -502,7 +510,7 @@ internal static partial class ContractChecks
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var inSection = false;
-        foreach (var rawLine in contents.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        foreach (var rawLine in contents.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
         {
             var line = rawLine.Trim();
             if (line.StartsWith('[') && line.EndsWith(']'))
@@ -528,7 +536,7 @@ internal static partial class ContractChecks
         ).Where(xamlPath =>
             !Path.GetRelativePath(projectRoot, xamlPath)
                 .Split(
-                    [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                    new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
                     StringSplitOptions.RemoveEmptyEntries
                 )
                 .Any(segment => segment is "bin" or "obj")
@@ -686,6 +694,13 @@ internal static partial class ContractChecks
 
         var projectDocument = XDocument.Load(
             Path.Combine(projectRoot, "HerdMe.Windows.csproj")
+        );
+        Check(
+            projectDocument.Descendants().Any(element =>
+                element.Name.LocalName == "WindowsSdkPackageVersion"
+                && element.Value == "10.0.19041.56"
+            ),
+            "the Windows project pins the Windows SDK reference required by its App SDK version"
         );
         Check(
             projectDocument.Descendants()
@@ -1276,6 +1291,30 @@ internal static partial class ContractChecks
                 && mailPageXaml.Contains("x:Uid=\"MailEnvironmentButton\"", StringComparison.Ordinal),
             "Windows Mail selects a site and writes its active SMTP settings directly to .env"
         );
+        Check(
+            mailPageSource.Contains("if (message is null)", StringComparison.Ordinal)
+                && mailPageSource.Contains(
+                    "if (!loaded || !IsCurrentPreviewSelection()) return;",
+                    StringComparison.Ordinal
+                )
+                && mailPageSource.Contains(
+                    "CoreWebView2WebErrorStatus.OperationCanceled",
+                    StringComparison.Ordinal
+                )
+                && mailPageSource.Contains(
+                    "CoreWebView2WebErrorStatus.ConnectionAborted",
+                    StringComparison.Ordinal
+                )
+                && mailPageXaml.Contains(
+                    "x:Name=\"HtmlPreview\"",
+                    StringComparison.Ordinal
+                )
+                && mailPageXaml.Contains(
+                    "Visibility=\"Collapsed\"",
+                    StringComparison.Ordinal
+                ),
+            "Windows Mail keeps an empty inbox neutral and ignores replaced WebView navigation"
+        );
 
         var sitesPageSource = File.ReadAllText(
             Path.Combine(projectRoot, "Pages", "SitesPage.xaml.cs")
@@ -1322,6 +1361,21 @@ internal static partial class ContractChecks
                     StringComparison.Ordinal
                 ),
             "Windows Sites initialization and preview changes never overwrite park roots"
+        );
+        Check(
+            sitesPageSource.Contains(
+                "if (!loaded || IsExpectedNavigationCancellation(args.WebErrorStatus)) return;",
+                StringComparison.Ordinal
+            )
+                && sitesPageSource.Contains(
+                    "CoreWebView2WebErrorStatus.OperationCanceled",
+                    StringComparison.Ordinal
+                )
+                && sitesPageSource.Contains(
+                    "CoreWebView2WebErrorStatus.ConnectionAborted",
+                    StringComparison.Ordinal
+                ),
+            "Windows Sites ignores WebView cancellations caused by navigation replacement or unload"
         );
         Check(
             sitesPageSource.Contains("DisplayOption", StringComparison.Ordinal)

@@ -15,6 +15,7 @@ public sealed partial class MailPage : Page
     private readonly CoreClient coreClient;
     private readonly SiteConfigurationStore siteSettings;
     private readonly List<CapturedMail> allMessages = [];
+    private bool loaded;
     private bool previewConfigured;
     private Guid? previewMessageId;
 
@@ -34,6 +35,7 @@ public sealed partial class MailPage : Page
 
     private void Page_Loaded(object sender, RoutedEventArgs e)
     {
+        loaded = true;
         mail.MessageCaptured += Mail_MessageCaptured;
         Reload();
         UpdateServerState();
@@ -41,6 +43,7 @@ public sealed partial class MailPage : Page
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
+        loaded = false;
         mail.MessageCaptured -= Mail_MessageCaptured;
     }
 
@@ -215,15 +218,20 @@ public sealed partial class MailPage : Page
     private async Task UpdatePreviewAsync(CapturedMail? message)
     {
         MailPreviewFailureState.Visibility = Visibility.Collapsed;
+        previewMessageId = message?.Id;
+        if (message is null)
+        {
+            HtmlPreview.Visibility = Visibility.Collapsed;
+            return;
+        }
         HtmlPreview.Visibility = Visibility.Visible;
         try
         {
             await HtmlPreview.EnsureCoreWebView2Async();
             if (!IsSelected(message)) return;
             ConfigurePreviewOnce();
-            var html = message?.HtmlBody
-                ?? $"<pre>{WebUtility.HtmlEncode(message?.Body ?? string.Empty)}</pre>";
-            previewMessageId = message?.Id;
+            var html = message.HtmlBody
+                ?? $"<pre>{WebUtility.HtmlEncode(message.Body)}</pre>";
             HtmlPreview.NavigateToString(MailMimeParser.SafeHtmlDocument(html));
         }
         catch (Exception error) when (error is InvalidOperationException or COMException)
@@ -238,19 +246,26 @@ public sealed partial class MailPage : Page
         CoreWebView2NavigationCompletedEventArgs args
     )
     {
-        if (!IsCurrentPreviewSelection()) return;
+        if (!loaded || !IsCurrentPreviewSelection()) return;
         if (args.IsSuccess)
         {
             MailPreviewFailureState.Visibility = Visibility.Collapsed;
             HtmlPreview.Visibility = Visibility.Visible;
             return;
         }
+        if (IsExpectedNavigationCancellation(args.WebErrorStatus)) return;
         await ReportPreviewFailureAsync(
             "navigation",
             MessageList.SelectedItem as CapturedMail,
             $"WebView2 status: {args.WebErrorStatus}"
         );
         ShowMailPreviewFailure();
+    }
+
+    private static bool IsExpectedNavigationCancellation(CoreWebView2WebErrorStatus status)
+    {
+        return status is CoreWebView2WebErrorStatus.OperationCanceled
+            or CoreWebView2WebErrorStatus.ConnectionAborted;
     }
 
     private void RetryMailPreview_Click(object sender, RoutedEventArgs e)

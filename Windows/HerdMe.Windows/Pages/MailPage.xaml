@@ -110,6 +110,7 @@
                             <Grid>
                                 <WebView2
                                     x:Name="HtmlPreview"
+                                    Visibility="Collapsed"
                                     NavigationCompleted="HtmlPreview_NavigationCompleted" />
                                 <StackPanel
                                     x:Name="MailPreviewFailureState"

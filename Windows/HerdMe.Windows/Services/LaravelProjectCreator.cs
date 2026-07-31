@@ -90,8 +90,12 @@ public sealed partial class LaravelProjectCreator
                     php,
                     [
                         tools.ComposerPath,
-                        "require", "laravel/boost", "--dev",
-                        "--no-interaction", "--no-progress", "--no-ansi"
+                        "require",
+                        "laravel/boost",
+                        "--dev",
+                        "--no-interaction",
+                        "--no-progress",
+                        "--no-ansi"
                     ],
                     stagedDestination,
                     tools.ManagedEnvironment(settings.PhpCycle),

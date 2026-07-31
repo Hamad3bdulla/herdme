@@ -513,7 +513,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         var current = pathRoot;
         var relative = Path.GetRelativePath(pathRoot, fullPath);
         foreach (var component in relative.Split(
-            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+            new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
             StringSplitOptions.RemoveEmptyEntries
         ))
         {

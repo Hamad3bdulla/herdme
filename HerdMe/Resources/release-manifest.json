@@ -1,6 +1,16 @@
 {
   "releases": [
     {
+      "version": "0.1.2",
+      "build": 1,
+      "channel": "stable",
+      "notes": "Prevents empty mail and replaced site previews from reporting WebView failures, pins compatible Windows SDK references for reproducible self-contained builds, and fixes the PowerShell 5.1 formatting gate.",
+      "downloadURLs": {
+        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/preview-0.1.2/HerdMe-0.1.2-macOS.zip",
+        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/preview-0.1.2/HerdMe-0.1.2-win-x64-setup.exe"
+      }
+    },
+    {
       "version": "0.1.1",
       "build": 1,
       "channel": "stable",

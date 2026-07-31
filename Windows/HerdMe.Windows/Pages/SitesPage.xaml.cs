@@ -968,7 +968,7 @@ public sealed partial class SitesPage : Page
     private static IReadOnlyDictionary<string, string> ParseEnvironment(string contents)
     {
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var line in contents.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        foreach (var line in contents.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
         {
             var value = line.TrimStart();
             if (value.Length == 0 || value.StartsWith('#')) continue;
@@ -1078,6 +1078,7 @@ public sealed partial class SitesPage : Page
         CoreWebView2NavigationCompletedEventArgs args
     )
     {
+        if (!loaded || IsExpectedNavigationCancellation(args.WebErrorStatus)) return;
         if (!args.IsSuccess)
         {
             if (selectedSite is not null)
@@ -1094,6 +1095,12 @@ public sealed partial class SitesPage : Page
         PreviewFailureState.Visibility = Visibility.Collapsed;
         SitePreview.Visibility = Visibility.Visible;
         await ApplyDesktopPreviewMetricsAsync();
+    }
+
+    private static bool IsExpectedNavigationCancellation(CoreWebView2WebErrorStatus status)
+    {
+        return status is CoreWebView2WebErrorStatus.OperationCanceled
+            or CoreWebView2WebErrorStatus.ConnectionAborted;
     }
 
     private async void SitePreview_SizeChanged(object sender, SizeChangedEventArgs e)

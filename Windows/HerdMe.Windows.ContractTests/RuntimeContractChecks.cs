@@ -754,7 +754,9 @@ internal static partial class ContractChecks
         {
             executable = "cmd.exe";
             arguments = [
-                "/d", "/s", "/c",
+                "/d",
+                "/s",
+                "/c",
                 $"ping 127.0.0.1 -n 3 >nul & echo completed>\"{marker}\""
             ];
         }
@@ -1067,7 +1069,7 @@ internal static partial class ContractChecks
                 timeout.Token
             );
             var first = resolved.Split(
-                ['\r', '\n'],
+                new[] { '\r', '\n' },
                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
             )[0];
             Check(

@@ -421,7 +421,7 @@ public sealed partial class DashboardPage : Page
     private static string SingleLine(string value)
     {
         return string.Join(" ", value.Split(
-            ['\r', '\n'],
+            new[] { '\r', '\n' },
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
         ));
     }

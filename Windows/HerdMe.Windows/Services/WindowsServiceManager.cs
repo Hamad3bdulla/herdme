@@ -498,9 +498,12 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                 executable,
                 runtimeDirectory,
                 [
-                    "-D", dataDirectory,
-                    "-h", "127.0.0.1",
-                    "-p", instance.Port.ToString()
+                    "-D",
+                    dataDirectory,
+                    "-h",
+                    "127.0.0.1",
+                    "-p",
+                    instance.Port.ToString()
                 ],
                 new Dictionary<string, string>()
             ),
@@ -508,9 +511,12 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                 executable,
                 runtimeDirectory,
                 [
-                    "--dbpath", dataDirectory,
-                    "--bind_ip", "127.0.0.1",
-                    "--port", instance.Port.ToString()
+                    "--dbpath",
+                    dataDirectory,
+                    "--bind_ip",
+                    "127.0.0.1",
+                    "--port",
+                    instance.Port.ToString()
                 ],
                 new Dictionary<string, string>()
             ),
@@ -518,12 +524,18 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                 executable,
                 dataDirectory,
                 [
-                    "--bind", "127.0.0.1",
-                    "--port", instance.Port.ToString(),
-                    "--dir", dataDirectory.Replace('\\', '/'),
-                    "--protected-mode", "yes",
-                    "--appendonly", "yes",
-                    "--daemonize", "no"
+                    "--bind",
+                    "127.0.0.1",
+                    "--port",
+                    instance.Port.ToString(),
+                    "--dir",
+                    dataDirectory.Replace('\\', '/'),
+                    "--protected-mode",
+                    "yes",
+                    "--appendonly",
+                    "yes",
+                    "--daemonize",
+                    "no"
                 ],
                 new Dictionary<string, string>()
             ),
@@ -542,9 +554,12 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                 executable,
                 dataDirectory,
                 [
-                    "server", dataDirectory,
-                    "--address", $"127.0.0.1:{instance.Port}",
-                    "--console-address", $"127.0.0.1:{minioConsolePort}"
+                    "server",
+                    dataDirectory,
+                    "--address",
+                    $"127.0.0.1:{instance.Port}",
+                    "--console-address",
+                    $"127.0.0.1:{minioConsolePort}"
                 ],
                 new Dictionary<string, string>
                 {
@@ -559,9 +574,12 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                 executable,
                 dataDirectory,
                 [
-                    "server", dataDirectory,
-                    "--address", $"127.0.0.1:{instance.Port}",
-                    "--console-address", $"127.0.0.1:{minioConsolePort}"
+                    "server",
+                    dataDirectory,
+                    "--address",
+                    $"127.0.0.1:{instance.Port}",
+                    "--console-address",
+                    $"127.0.0.1:{minioConsolePort}"
                 ],
                 new Dictionary<string, string>
                 {

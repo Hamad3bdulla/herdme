@@ -140,7 +140,7 @@ public static class SitePresentation
 
     internal static SiteGitStatus ParseGitStatus(string output)
     {
-        var lines = output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+        var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
         var header = lines.FirstOrDefault(line => line.StartsWith("## ", StringComparison.Ordinal));
         var branch = header is null ? null : ParseBranch(header[3..]);
         return new SiteGitStatus(

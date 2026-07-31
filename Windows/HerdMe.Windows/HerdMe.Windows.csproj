@@ -11,6 +11,7 @@
     <DefaultLanguage>en-US</DefaultLanguage>
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <WindowsSdkPackageVersion>10.0.19041.56</WindowsSdkPackageVersion>
     <PublishTrimmed>false</PublishTrimmed>
     <ProjectPriIndexName>HerdMe.Windows</ProjectPriIndexName>
     <HerdMeVersionFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../VERSION'))</HerdMeVersionFile>

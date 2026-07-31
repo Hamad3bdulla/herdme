@@ -140,9 +140,13 @@ public static class DatabaseServiceAuthenticator
         var bootstrap = await RunAsync(
             client,
             [
-                "--no-defaults", "--protocol=TCP", "--host=127.0.0.1", $"--port={instance.Port}",
+                "--no-defaults",
+                "--protocol=TCP",
+                "--host=127.0.0.1",
+                $"--port={instance.Port}",
                 $"--user={bootstrapUser}",
-                "--connect-timeout=1", "--batch"
+                "--connect-timeout=1",
+                "--batch"
             ],
             new Dictionary<string, string?> { ["MYSQL_PWD"] = bootstrapPassword },
             cancellationToken,
@@ -179,8 +183,14 @@ public static class DatabaseServiceAuthenticator
         var result = await RunAsync(
             client,
             [
-                "--no-defaults", "--protocol=TCP", "--host=127.0.0.1", $"--port={instance.Port}",
-                $"--user={username}", "--connect-timeout=1", "--batch", "--skip-column-names",
+                "--no-defaults",
+                "--protocol=TCP",
+                "--host=127.0.0.1",
+                $"--port={instance.Port}",
+                $"--user={username}",
+                "--connect-timeout=1",
+                "--batch",
+                "--skip-column-names",
                 "--execute=SELECT 1"
             ],
             new Dictionary<string, string?> { ["MYSQL_PWD"] = password },
@@ -311,8 +321,13 @@ public static class DatabaseServiceAuthenticator
     ) => RunAsync(
         client,
         [
-            "--host=127.0.0.1", $"--port={instance.Port}", $"--username={username}",
-            "--dbname=postgres", "--no-password", "--tuples-only", "--no-align",
+            "--host=127.0.0.1",
+            $"--port={instance.Port}",
+            $"--username={username}",
+            "--dbname=postgres",
+            "--no-password",
+            "--tuples-only",
+            "--no-align",
             "--set=ON_ERROR_STOP=1"
         ],
         PostgreSqlEnvironment(password, dataDirectory),

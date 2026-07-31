@@ -117,8 +117,12 @@ public sealed partial class ComposerToolManager
                 php,
                 [
                     ComposerPath,
-                    "global", "require", "laravel/installer:^5",
-                    "--no-interaction", "--no-progress", "--no-ansi"
+                    "global",
+                    "require",
+                    "laravel/installer:^5",
+                    "--no-interaction",
+                    "--no-progress",
+                    "--no-ansi"
                 ],
                 SupportRoot,
                 ManagedEnvironment(phpCycle),

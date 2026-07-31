@@ -507,7 +507,12 @@ internal static partial class ContractChecks
         var mongoData = Path.Combine("C:\\HerdMe", "Services", "mongo", "data");
         var mongoLaunch = WindowsServiceManager.BuildLaunchSpec(mongoInstance, mongoExecutable, mongoData);
         Check(mongoLaunch.Arguments.SequenceEqual([
-            "--dbpath", mongoData, "--bind_ip", "127.0.0.1", "--port", "27018"
+            "--dbpath",
+            mongoData,
+            "--bind_ip",
+            "127.0.0.1",
+            "--port",
+            "27018"
         ]), "MongoDB launch is loopback-only and uses the configured data and port");
         var mysqlInstance = new ManagedServiceInstance
         {
@@ -578,9 +583,12 @@ internal static partial class ContractChecks
             postgreSqlData
         );
         Check(postgreSqlLaunch.Arguments.SequenceEqual([
-            "-D", postgreSqlData,
-            "-h", "127.0.0.1",
-            "-p", "5433"
+            "-D",
+            postgreSqlData,
+            "-h",
+            "127.0.0.1",
+            "-p",
+            "5433"
         ]), "PostgreSQL launch binds only to loopback and uses its isolated data directory");
         var redisInstance = new ManagedServiceInstance
         {
@@ -596,12 +604,18 @@ internal static partial class ContractChecks
         );
         Check(
             redisLaunch.Arguments.SequenceEqual([
-                "--bind", "127.0.0.1",
-                "--port", "6380",
-                "--dir", redisData.Replace('\\', '/'),
-                "--protected-mode", "yes",
-                "--appendonly", "yes",
-                "--daemonize", "no"
+                "--bind",
+                "127.0.0.1",
+                "--port",
+                "6380",
+                "--dir",
+                redisData.Replace('\\', '/'),
+                "--protected-mode",
+                "yes",
+                "--appendonly",
+                "yes",
+                "--daemonize",
+                "no"
             ]),
             "Redis launch is persistent, protected, and loopback-only"
         );
@@ -631,9 +645,12 @@ internal static partial class ContractChecks
         );
         Check(
             rustFsLaunch.Arguments.SequenceEqual([
-                "server", rustFsData,
-                "--address", "127.0.0.1:9001",
-                "--console-address", "127.0.0.1:9002"
+                "server",
+                rustFsData,
+                "--address",
+                "127.0.0.1:9001",
+                "--console-address",
+                "127.0.0.1:9002"
             ]),
             "RustFS launch binds its API and console to loopback"
         );

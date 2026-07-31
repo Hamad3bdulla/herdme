@@ -64,7 +64,7 @@ $loadFailurePatterns = @(
     "Required references did not load"
 )
 foreach ($pattern in $loadFailurePatterns) {
-    if ($outputText.Contains($pattern, [StringComparison]::OrdinalIgnoreCase)) {
+    if ($outputText.IndexOf($pattern, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
         throw "C# formatting verification did not load the complete project: $pattern"
     }
 }

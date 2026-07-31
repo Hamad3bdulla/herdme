@@ -5,6 +5,19 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-31
+
+### Fixed
+
+- Keep an empty Mail inbox neutral and ignore WebView navigation cancellations
+  caused by switching pages or replacing a preview.
+- Keep Sites preview navigation cancellations out of diagnostics while still
+  reporting real loading failures.
+- Pin the Windows SDK reference version required by WinUI, WebView2, and the tray
+  icon dependency so .NET 8 release builds remain reproducible.
+- Use .NET 8-compatible explicit separator arrays and make the C# formatting
+  gate work on its documented PowerShell 5.1 baseline.
+
 ## [0.1.1] - 2026-07-31
 
 ### Added
@@ -318,6 +331,7 @@ Semantic Versioning for public releases.
 - Unique 256-bit credentials for managed storage and Typesense instances, stored
   in macOS Keychain or Windows Credential Manager and shared with `.env` export.
 
-[Unreleased]: https://github.com/Hamad3bdulla/herdme/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Hamad3bdulla/herdme/compare/preview-0.1.2...HEAD
+[0.1.2]: https://github.com/Hamad3bdulla/herdme/releases/tag/preview-0.1.2
 [0.1.1]: https://github.com/Hamad3bdulla/herdme/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Hamad3bdulla/herdme/releases/tag/v0.1.0

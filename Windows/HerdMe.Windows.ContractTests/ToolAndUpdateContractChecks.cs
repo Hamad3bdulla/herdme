@@ -70,7 +70,13 @@ internal static partial class ContractChecks
         );
         Check(
             laravelArguments.SequenceEqual([
-                "new", "demo-app", "--no-interaction", "--no-ansi", "--phpunit", "--react", "--no-node"
+                "new",
+                "demo-app",
+                "--no-interaction",
+                "--no-ansi",
+                "--phpunit",
+                "--react",
+                "--no-node"
             ]),
             "Laravel project arguments preserve the selected starter and test framework"
         );
@@ -84,8 +90,13 @@ internal static partial class ContractChecks
         );
         Check(
             customLaravelArguments.SequenceEqual([
-                "new", "custom-app", "--no-interaction", "--no-ansi", "--pest",
-                "--using=vendor/community-kit:^2.0", "--npm"
+                "new",
+                "custom-app",
+                "--no-interaction",
+                "--no-ansi",
+                "--pest",
+                "--using=vendor/community-kit:^2.0",
+                "--npm"
             ]),
             "Laravel custom starter kits use the official package option"
         );
