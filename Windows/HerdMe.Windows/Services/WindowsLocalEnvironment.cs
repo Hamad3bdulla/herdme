@@ -267,7 +267,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         var launches = new Dictionary<string, PreparedPhpLaunch>(StringComparer.Ordinal);
         foreach (var cycle in cycles)
         {
-            runtimeInstaller.EnsureManagedConfiguration(cycle);
+            await runtimeInstaller.EnsureManagedConfigurationAsync(cycle, cancellationToken);
             var php = runtimeInstaller.PhpExecutable(cycle);
             var contract = await runtimePolicy.PrepareLaunchAsync(php, cycle, cancellationToken);
             launches[cycle] = new PreparedPhpLaunch(

@@ -584,4 +584,17 @@
   <data name="GeneralGitUpdated" xml:space="preserve"><value>أصبح Git {0} جاهزًا.</value></data>
   <data name="DebuggerUpdateButton" xml:space="preserve"><value>تحديث</value></data>
   <data name="DebuggerUpdateAvailable" xml:space="preserve"><value>يتوفر Xdebug {0}.</value></data>
+  <data name="SitesCreateDatabaseCommand.Label" xml:space="preserve"><value>إنشاء قاعدة بيانات</value></data>
+  <data name="SitesDatabaseNoRunningService" xml:space="preserve"><value>شغّل خدمة MySQL أو MariaDB أو PostgreSQL قبل إنشاء قاعدة بيانات للموقع.</value></data>
+  <data name="SitesDatabaseServiceField" xml:space="preserve"><value>خدمة قاعدة البيانات</value></data>
+  <data name="SitesDatabaseNameField" xml:space="preserve"><value>اسم قاعدة البيانات</value></data>
+  <data name="SitesDatabaseNameValidation" xml:space="preserve"><value>ابدأ بحرف واستخدم الحروف والأرقام والشرطة السفلية فقط (63 محرفاً كحد أقصى).</value></data>
+  <data name="SitesDatabaseDialogTitle" xml:space="preserve"><value>إنشاء قاعدة بيانات للموقع {0}</value></data>
+  <data name="SitesDatabaseCreate" xml:space="preserve"><value>إنشاء قاعدة البيانات</value></data>
+  <data name="SitesDatabaseUsernameField" xml:space="preserve"><value>اسم المستخدم</value></data>
+  <data name="SitesDatabasePasswordField" xml:space="preserve"><value>كلمة المرور</value></data>
+  <data name="SitesDatabaseCreatedStatus" xml:space="preserve"><value>قاعدة البيانات ومستخدمها المستقل جاهزان.</value></data>
+  <data name="SitesDatabaseCreatedTitle" xml:space="preserve"><value>تم إنشاء قاعدة البيانات</value></data>
+  <data name="SitesDatabaseAddToEnvironment" xml:space="preserve"><value>إضافة إلى .env</value></data>
+  <data name="SitesDatabaseEnvironmentUpdated" xml:space="preserve"><value>تمت إضافة {0} متغيرات وتحديث {1} متغيرات في .env.</value></data>
 </root>

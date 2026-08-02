@@ -362,7 +362,7 @@ public sealed partial class ComposerToolManager
         {
             throw new InvalidOperationException($"Install HerdMe PHP {cycle} before installing Composer.");
         }
-        phpInstaller.EnsureManagedConfiguration(cycle);
+        await phpInstaller.EnsureManagedConfigurationAsync(cycle, cancellationToken);
         var php = phpInstaller.PhpExecutable(cycle);
         await phpPolicy.PrepareLaunchAsync(php, cancellationToken);
         return php;

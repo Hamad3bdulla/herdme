@@ -129,6 +129,73 @@ internal static partial class ContractChecks
             environmentContents.Split("\r\n").Count(line => line.StartsWith("DB_HOST=", StringComparison.Ordinal)) == 1,
             "service .env updates keep one effective assignment per managed key"
         );
+        Check(
+            SiteDatabaseProvisioner.SuggestedDatabaseName("  24 Demo Store!  ") == "site_24_demo_store",
+            "site database names are derived from display names as portable SQL identifiers"
+        );
+        Check(
+            SiteDatabaseProvisioner.IsValidDatabaseName("demo_store_2")
+                && !SiteDatabaseProvisioner.IsValidDatabaseName("2-demo"),
+            "site database names reject unsafe SQL identifiers"
+        );
+        var generatedDatabase = SiteDatabaseProvisioner.Generate("demo_store");
+        Check(
+            generatedDatabase.Username.StartsWith("herdme_", StringComparison.Ordinal)
+                && generatedDatabase.Username.Length == 23
+                && generatedDatabase.Password.Length == 48
+                && generatedDatabase.Password.All(char.IsAsciiHexDigit),
+            "site database credentials are generated in a portable restricted alphabet"
+        );
+        var siteDatabase = new SiteDatabaseProvisioning(
+            "demo_store",
+            "herdme_0123456789abcdef",
+            "0123456789abcdef0123456789abcdef0123456789abcdef"
+        );
+        var mysqlSiteSql = SiteDatabaseProvisioner.MySqlCreateDatabaseSql(siteDatabase);
+        Check(
+            mysqlSiteSql.Contains("CREATE DATABASE `demo_store`", StringComparison.Ordinal)
+                && mysqlSiteSql.Contains(
+                    "GRANT ALL PRIVILEGES ON `demo_store`.*",
+                    StringComparison.Ordinal
+                )
+                && !mysqlSiteSql.Contains("ON *.*", StringComparison.Ordinal),
+            "site MySQL users are limited to their own database"
+        );
+        var postgreSqlSiteSql = SiteDatabaseProvisioner.PostgreSqlCreateDatabaseSql(siteDatabase);
+        Check(
+            postgreSqlSiteSql.CreateRole.Contains(
+                "CREATE ROLE \"herdme_0123456789abcdef\" WITH LOGIN",
+                StringComparison.Ordinal
+            )
+                && postgreSqlSiteSql.CreateDatabase.Contains(
+                    "CREATE DATABASE \"demo_store\" OWNER \"herdme_0123456789abcdef\"",
+                    StringComparison.Ordinal
+                ),
+            "site PostgreSQL databases are owned by a dedicated login role"
+        );
+        var siteDatabaseProject = Path.Combine(supportRoot, "site-database-environment");
+        Directory.CreateDirectory(siteDatabaseProject);
+        var siteDatabaseUpdate = ServiceEnvironmentFile.Update(
+            siteDatabaseProject,
+            ServiceEnvironmentConfiguration.DatabaseVariables(environmentInstance, siteDatabase),
+            "Local MySQL database demo_store"
+        );
+        var siteDatabaseEnvironment = await File.ReadAllTextAsync(
+            Path.Combine(siteDatabaseProject, ".env")
+        );
+        Check(
+            siteDatabaseUpdate.AddedKeys == 6
+                && siteDatabaseEnvironment.Contains("DB_DATABASE=demo_store", StringComparison.Ordinal)
+                && siteDatabaseEnvironment.Contains(
+                    "DB_USERNAME=herdme_0123456789abcdef",
+                    StringComparison.Ordinal
+                )
+                && siteDatabaseEnvironment.Contains(
+                    "DB_PASSWORD=0123456789abcdef0123456789abcdef0123456789abcdef",
+                    StringComparison.Ordinal
+                ),
+            "site database credentials can be added to a project's .env"
+        );
         var mailEnvironmentProject = Path.Combine(supportRoot, "mail-environment-project");
         Directory.CreateDirectory(mailEnvironmentProject);
         await File.WriteAllTextAsync(

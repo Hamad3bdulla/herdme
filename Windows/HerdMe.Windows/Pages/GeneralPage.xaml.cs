@@ -140,7 +140,7 @@ public sealed partial class GeneralPage : Page
             {
                 try
                 {
-                    runtimeInstaller.EnsureManagedConfiguration(phpSettings.PhpCycle);
+                    await runtimeInstaller.EnsureManagedConfigurationAsync(phpSettings.PhpCycle);
                     var extensions = await coreClient.ValidatePhpAsync(phpPath);
                     PhpExtensionStatusText.Text = extensions.Compatible
                         ? AppLocalization.Get("GeneralLaravelCompatible")

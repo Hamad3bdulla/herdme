@@ -73,6 +73,32 @@ public static class ServiceEnvironmentConfiguration
         };
     }
 
+    public static IReadOnlyList<ServiceEnvironmentVariable> DatabaseVariables(
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning
+    )
+    {
+        ArgumentNullException.ThrowIfNull(instance);
+        ArgumentNullException.ThrowIfNull(provisioning);
+        const string host = "127.0.0.1";
+        var connection = instance.DefinitionId switch
+        {
+            "mysql" or "mariadb" => "mysql",
+            "postgresql" => "pgsql",
+            _ => throw new NotSupportedException(
+                $"HerdMe cannot add a site database from {instance.Name} to .env."
+            )
+        };
+        return Values(
+            ("DB_CONNECTION", connection),
+            ("DB_HOST", host),
+            ("DB_PORT", instance.Port.ToString(CultureInfo.InvariantCulture)),
+            ("DB_DATABASE", provisioning.DatabaseName),
+            ("DB_USERNAME", provisioning.Username),
+            ("DB_PASSWORD", provisioning.Password)
+        );
+    }
+
     private static IReadOnlyList<ServiceEnvironmentVariable> Values(
         params (string Key, string Value)[] values
     )

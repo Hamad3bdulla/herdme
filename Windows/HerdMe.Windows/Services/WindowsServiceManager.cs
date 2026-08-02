@@ -605,6 +605,46 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         return ServiceEnvironmentFile.Update(projectPath, instance, credentials);
     }
 
+    public async Task<SiteDatabaseProvisioning> CreateSiteDatabaseAsync(
+        ManagedServiceInstance instance,
+        string databaseName,
+        CancellationToken cancellationToken = default
+    )
+    {
+        ArgumentNullException.ThrowIfNull(instance);
+        var configured = LoadInstances().FirstOrDefault(candidate => candidate.Id == instance.Id)
+            ?? throw new InvalidOperationException("The database service no longer exists.");
+        if (!SiteDatabaseProvisioner.SupportedDefinitions.Contains(configured.DefinitionId))
+        {
+            throw new NotSupportedException($"{configured.Name} cannot create site databases.");
+        }
+        if (State(configured.Id, configured.DefinitionId) != ManagedServiceState.Running)
+        {
+            throw new InvalidOperationException($"Start {configured.Name} before creating a database.");
+        }
+        return await SiteDatabaseProvisioner.CreateAsync(
+            configured,
+            installer.ExecutablePath(configured.DefinitionId),
+            DataDirectory(configured.Id),
+            credentialStore.GetOrCreate(configured.Id),
+            databaseName,
+            cancellationToken
+        );
+    }
+
+    public ServiceEnvironmentUpdate AddSiteDatabaseToEnvironment(
+        string projectPath,
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning
+    )
+    {
+        return ServiceEnvironmentFile.Update(
+            projectPath,
+            ServiceEnvironmentConfiguration.DatabaseVariables(instance, provisioning),
+            $"{instance.Name} database {provisioning.DatabaseName}"
+        );
+    }
+
     public void OpenInTablePlus(ManagedServiceInstance instance)
     {
         TablePlusConnection.Open(ConnectionUri(instance));

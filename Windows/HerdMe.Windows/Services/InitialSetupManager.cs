@@ -87,7 +87,7 @@ public sealed class InitialSetupManager
         {
             await phpInstaller.InstallAsync(phpCycle, cancellationToken);
         }
-        phpInstaller.EnsureManagedConfiguration(phpCycle);
+        await phpInstaller.EnsureInstalledConfigurationsAsync(cancellationToken);
         var phpExecutable = phpInstaller.PhpExecutable(phpCycle);
         var extensionReport = await coreClient.ValidatePhpAsync(phpExecutable, cancellationToken);
         if (!extensionReport.Compatible)

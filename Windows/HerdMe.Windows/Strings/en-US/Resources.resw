@@ -584,4 +584,17 @@
   <data name="GeneralGitUpdated" xml:space="preserve"><value>Git {0} is ready.</value></data>
   <data name="DebuggerUpdateButton" xml:space="preserve"><value>Update</value></data>
   <data name="DebuggerUpdateAvailable" xml:space="preserve"><value>Xdebug {0} is available.</value></data>
+  <data name="SitesCreateDatabaseCommand.Label" xml:space="preserve"><value>Create database</value></data>
+  <data name="SitesDatabaseNoRunningService" xml:space="preserve"><value>Start a MySQL, MariaDB, or PostgreSQL service before creating a site database.</value></data>
+  <data name="SitesDatabaseServiceField" xml:space="preserve"><value>Database service</value></data>
+  <data name="SitesDatabaseNameField" xml:space="preserve"><value>Database name</value></data>
+  <data name="SitesDatabaseNameValidation" xml:space="preserve"><value>Start with a letter and use only letters, numbers, and underscores (maximum 63 characters).</value></data>
+  <data name="SitesDatabaseDialogTitle" xml:space="preserve"><value>Create a database for {0}</value></data>
+  <data name="SitesDatabaseCreate" xml:space="preserve"><value>Create database</value></data>
+  <data name="SitesDatabaseUsernameField" xml:space="preserve"><value>Username</value></data>
+  <data name="SitesDatabasePasswordField" xml:space="preserve"><value>Password</value></data>
+  <data name="SitesDatabaseCreatedStatus" xml:space="preserve"><value>The database and its dedicated user are ready.</value></data>
+  <data name="SitesDatabaseCreatedTitle" xml:space="preserve"><value>Database created</value></data>
+  <data name="SitesDatabaseAddToEnvironment" xml:space="preserve"><value>Add to .env</value></data>
+  <data name="SitesDatabaseEnvironmentUpdated" xml:space="preserve"><value>Added {0} and updated {1} variables in .env.</value></data>
 </root>

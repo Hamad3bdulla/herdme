@@ -1112,6 +1112,10 @@ internal static partial class ContractChecks
             initialSetupSource.Contains("EnsureCommandLineToolsAsync", StringComparison.Ordinal)
                 && initialSetupSource.Contains("InitialSetupStage.Git", StringComparison.Ordinal)
                 && initialSetupSource.Contains("gitInstaller.EnsureInstalledAsync", StringComparison.Ordinal)
+                && initialSetupSource.Contains(
+                    "phpInstaller.EnsureInstalledConfigurationsAsync(cancellationToken)",
+                    StringComparison.Ordinal
+                )
                 && initialSetupSource.Contains("userPathManager.Synchronize", StringComparison.Ordinal),
             "first-run and upgrade repair install Git with the complete command-line toolchain"
         );
@@ -1121,7 +1125,7 @@ internal static partial class ContractChecks
             "Laravel project creation uses managed Git instead of requiring system Git"
         );
         var phpRepairIndex = projectCreatorSource.IndexOf(
-            "phpInstaller.EnsureManagedConfiguration(settings.PhpCycle)",
+            "await phpInstaller.EnsureManagedConfigurationAsync(settings.PhpCycle, cancellationToken)",
             StringComparison.Ordinal
         );
         var laravelInstallerIndex = projectCreatorSource.IndexOf(

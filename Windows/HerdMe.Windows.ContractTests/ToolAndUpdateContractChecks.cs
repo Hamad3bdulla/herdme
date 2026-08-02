@@ -774,10 +774,52 @@ internal static partial class ContractChecks
             )
                 && PhpRuntimeInstaller.RequiredManagedExtensions.Contains("exif", StringComparer.OrdinalIgnoreCase)
                 && PhpRuntimeInstaller.RequiredManagedExtensions.Contains("intl", StringComparer.OrdinalIgnoreCase)
+                && PhpRuntimeInstaller.RequiredManagedExtensions.Contains("redis", StringComparer.OrdinalIgnoreCase)
+                && PhpRuntimeInstaller.RequiredManagedExtensions.Contains("pdo_sqlite", StringComparer.OrdinalIgnoreCase)
+                && PhpRuntimeInstaller.RequiredManagedExtensions.Contains("sqlite3", StringComparer.OrdinalIgnoreCase)
                 && PhpRuntimeInstaller.ManagedPhpIni.Contains("extension = pdo_mysql", StringComparison.Ordinal)
                 && PhpRuntimeInstaller.ManagedPhpIni.Contains("extension = exif", StringComparison.Ordinal)
-                && PhpRuntimeInstaller.ManagedPhpIni.Contains("extension = intl", StringComparison.Ordinal),
-            "managed PHP enables Laravel's database and image internationalization extensions"
+                && PhpRuntimeInstaller.ManagedPhpIni.Contains("extension = intl", StringComparison.Ordinal)
+                && PhpRuntimeInstaller.ManagedPhpIni.Contains("extension = redis", StringComparison.Ordinal)
+                && PhpRuntimeInstaller.ManagedPhpIni.Contains("extension = pdo_sqlite", StringComparison.Ordinal)
+                && PhpRuntimeInstaller.ManagedPhpIni.Contains("extension = sqlite3", StringComparison.Ordinal),
+            "managed PHP enables Laravel's database, cache, and internationalization extensions"
+        );
+        foreach (var cycle in PhpRuntimeInstaller.SupportedCycles)
+        {
+            var redisRelease = PhpRuntimeInstaller.RedisRelease(cycle);
+            Check(
+                redisRelease.Cycle == cycle
+                    && redisRelease.Version == "6.3.0"
+                    && redisRelease.FileName.Contains($"-{cycle}-nts-", StringComparison.Ordinal)
+                    && redisRelease.FileName.EndsWith("-x64.zip", StringComparison.Ordinal)
+                    && redisRelease.Sha256.Length == 64
+                    && redisRelease.Sha256.All(Uri.IsHexDigit)
+                    && redisRelease.DownloadUri.Scheme == Uri.UriSchemeHttps
+                    && redisRelease.DownloadUri.Host.Equals(
+                        "windows.php.net",
+                        StringComparison.OrdinalIgnoreCase
+                    ),
+                $"PHP {cycle} has a pinned official Redis extension package"
+            );
+        }
+        var redisArchive = Path.Combine(phpSupportRoot, "redis-extension.zip");
+        await using (var archiveStream = File.Create(redisArchive))
+        using (var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create))
+        {
+            var entry = archive.CreateEntry("php_redis.dll");
+            await using var entryStream = entry.Open();
+            await entryStream.WriteAsync("verified Redis DLL fixture"u8.ToArray());
+        }
+        var extractedRedis = Path.Combine(phpSupportRoot, "extracted-php_redis.dll");
+        await PhpRuntimeInstaller.ExtractRedisDllAsync(
+            redisArchive,
+            extractedRedis,
+            CancellationToken.None
+        );
+        Check(
+            await File.ReadAllTextAsync(extractedRedis) == "verified Redis DLL fixture",
+            "verified Redis archives extract only their expected extension DLL"
         );
         var phpConfiguration = Path.Combine(phpRuntime, "php.ini");
         await File.WriteAllTextAsync(

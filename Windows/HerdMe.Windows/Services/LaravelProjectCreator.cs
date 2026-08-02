@@ -65,7 +65,7 @@ public sealed partial class LaravelProjectCreator
         var settings = phpPolicy.Load();
         progress?.Report(LaravelProjectCreationStage.PreparingLaravelInstaller);
         // Repair runtimes installed by older HerdMe releases before any Composer command runs.
-        phpInstaller.EnsureManagedConfiguration(settings.PhpCycle);
+        await phpInstaller.EnsureManagedConfigurationAsync(settings.PhpCycle, cancellationToken);
         await tools.EnsureLaravelInstallerAsync(settings.PhpCycle, cancellationToken);
         var php = phpInstaller.PhpExecutable(settings.PhpCycle);
         var arguments = BuildLaravelArguments(request with { Name = name });

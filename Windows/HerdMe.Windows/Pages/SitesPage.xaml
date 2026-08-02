@@ -298,6 +298,9 @@
                                 <AppBarButton x:Uid="SitesEditEnvironmentCommand" Label="Edit .env" Click="EditEnvironment_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Edit" /></AppBarButton.Icon>
                                 </AppBarButton>
+                                <AppBarButton x:Uid="SitesCreateDatabaseCommand" x:Name="CreateDatabaseButton" Label="Create database" Click="CreateDatabase_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Library" /></AppBarButton.Icon>
+                                </AppBarButton>
                             </CommandBar.PrimaryCommands>
                             <CommandBar.SecondaryCommands>
                                 <AppBarButton x:Uid="SitesOpenLogsCommand" Label="Open site logs" Click="OpenLogs_Click">

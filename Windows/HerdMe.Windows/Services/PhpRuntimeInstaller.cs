@@ -1,10 +1,20 @@
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Collections.Concurrent;
 using HerdMe.Windows.Models;
 
 namespace HerdMe.Windows.Services;
 
 public sealed record PhpWindowsRelease(
+    string Cycle,
+    string Version,
+    string FileName,
+    string Sha256,
+    Uri DownloadUri
+);
+
+public sealed record PhpRedisWindowsRelease(
     string Cycle,
     string Version,
     string FileName,
@@ -23,8 +33,22 @@ public sealed class PhpRuntimeInstaller
         "intl",
         "openssl",
         "pdo_mysql",
+        "pdo_sqlite",
+        "redis",
+        "sqlite3",
         "zip"
     ];
+    private const string PhpRedisVersion = "6.3.0";
+    private static readonly IReadOnlyDictionary<string, (string Toolset, string Sha256)>
+        PhpRedisPackages = new Dictionary<string, (string, string)>(StringComparer.Ordinal)
+        {
+            ["8.0"] = ("vs16", "9d3143049d3c27e715ea92a023dfab92389df985aec224d6ed9d092b4ba5ea9a"),
+            ["8.1"] = ("vs16", "952ec845408e343f273eab109e62a9c7732178d93985120736da4a171d41b9b0"),
+            ["8.2"] = ("vs16", "b2b730b99b97352212b338c01f7dde577857e31c5f8e1d011ec2871e63f8f87c"),
+            ["8.3"] = ("vs16", "519fc1bdf54323d3ab08443c66f77e783d314c13b532e27cc8b390def7f81b60"),
+            ["8.4"] = ("vs17", "6db881ed172703962002d7e02dacc8ddb3f789904c648fee3e6ceec1319679cd"),
+            ["8.5"] = ("vs17", "481d6d1af45060ab41af6abe250faa270276fc47a493badc2e178024cdf6e255")
+        };
     private static readonly string[] VcRuntimeFiles =
     [
         "concrt140.dll",
@@ -39,9 +63,12 @@ public sealed class PhpRuntimeInstaller
         "vcruntime140_threads.dll"
     ];
     private static readonly HttpClient HttpClient = ManagedDownloadClient.Create();
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> ExtensionInstallLocks =
+        new(StringComparer.OrdinalIgnoreCase);
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly CoreClient coreClient;
     private readonly string vcRuntimeRoot;
+    private readonly string supportRoot;
 
     public static IReadOnlyList<string> SupportedCycles { get; } =
         RuntimeCatalog.InstallablePhpCycles;
@@ -58,11 +85,12 @@ public sealed class PhpRuntimeInstaller
             "Prerequisites",
             "VC143"
         );
-        RuntimeRoot = Path.Combine(
-            supportRoot ?? Path.Combine(
+        this.supportRoot = supportRoot ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "HerdMe"
-            ),
+            );
+        RuntimeRoot = Path.Combine(
+            this.supportRoot,
             "Runtimes",
             "php"
         );
@@ -118,6 +146,39 @@ public sealed class PhpRuntimeInstaller
         if (!HasRequiredConfiguration(configurationPath))
         {
             File.WriteAllText(configurationPath, PhpIni);
+        }
+    }
+
+    public async Task EnsureManagedConfigurationAsync(
+        string cycle,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var runtimeDirectory = Path.Combine(RuntimeRoot, cycle);
+        if (!IsInstalled(cycle))
+        {
+            throw new InvalidOperationException(
+                $"Install HerdMe PHP {cycle} before preparing its configuration."
+            );
+        }
+        await InstallRedisExtensionAsync(cycle, runtimeDirectory, false, cancellationToken);
+        EnsureManagedConfiguration(cycle);
+        var report = await ManagedExtensionReportAsync(PhpExecutable(cycle), cancellationToken);
+        if (MissingManagedExtensions(report).Contains("redis", StringComparer.OrdinalIgnoreCase))
+        {
+            await InstallRedisExtensionAsync(cycle, runtimeDirectory, true, cancellationToken);
+            report = await ManagedExtensionReportAsync(PhpExecutable(cycle), cancellationToken);
+        }
+        ValidateManagedExtensions(report, cycle);
+    }
+
+    public async Task EnsureInstalledConfigurationsAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        foreach (var cycle in InstalledCycles().Where(IsSupportedCycle))
+        {
+            await EnsureManagedConfigurationAsync(cycle, cancellationToken);
         }
     }
 
@@ -232,6 +293,27 @@ public sealed class PhpRuntimeInstaller
         );
     }
 
+    internal static PhpRedisWindowsRelease RedisRelease(string cycle)
+    {
+        EnsureSupportedCycle(cycle);
+        if (!PhpRedisPackages.TryGetValue(cycle, out var package))
+        {
+            throw new InvalidOperationException(
+                $"No verified Redis extension package is configured for PHP {cycle}."
+            );
+        }
+        var fileName = $"php_redis-{PhpRedisVersion}-{cycle}-nts-{package.Toolset}-x64.zip";
+        return new PhpRedisWindowsRelease(
+            cycle,
+            PhpRedisVersion,
+            fileName,
+            package.Sha256,
+            new Uri(
+                $"https://windows.php.net/downloads/pecl/releases/redis/{PhpRedisVersion}/{fileName}"
+            )
+        );
+    }
+
     public async Task<IReadOnlyDictionary<string, string>> ResolveLatestVersionsAsync(
         IEnumerable<string> cycles,
         CancellationToken cancellationToken = default
@@ -307,14 +389,11 @@ public sealed class PhpRuntimeInstaller
             }
 
             CopyVcRuntimeFiles(vcRuntimeRoot, stagingPath);
-            var extensions = await coreClient.ValidatePhpAsync(php, cancellationToken);
-            if (!extensions.Compatible)
-            {
-                throw new InvalidOperationException(
-                    "The PHP package is missing Laravel extensions: "
-                    + string.Join(", ", extensions.Missing)
-                );
-            }
+            await InstallRedisExtensionAsync(cycle, stagingPath, false, cancellationToken);
+            ValidateManagedExtensions(
+                await ManagedExtensionReportAsync(php, cancellationToken),
+                cycle
+            );
             await File.WriteAllTextAsync(
                 Path.Combine(stagingPath, "herdme-runtime.json"),
                 JsonSerializer.Serialize(new
@@ -414,6 +493,139 @@ public sealed class PhpRuntimeInstaller
         }
     }
 
+    private async Task InstallRedisExtensionAsync(
+        string cycle,
+        string runtimeDirectory,
+        bool overwrite,
+        CancellationToken cancellationToken
+    )
+    {
+        var extensionDirectory = Path.Combine(runtimeDirectory, "ext");
+        var destination = Path.Combine(extensionDirectory, "php_redis.dll");
+        var installLock = ExtensionInstallLocks.GetOrAdd(
+            Path.GetFullPath(destination),
+            _ => new SemaphoreSlim(1, 1)
+        );
+        await installLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (!overwrite && File.Exists(destination)) return;
+
+            var release = RedisRelease(cycle);
+            var cacheDirectory = Path.Combine(supportRoot, "Cache", "php-extensions");
+            Directory.CreateDirectory(cacheDirectory);
+            Directory.CreateDirectory(extensionDirectory);
+            var archivePath = Path.Combine(cacheDirectory, $"{Guid.NewGuid():N}.zip");
+            var candidate = Path.Combine(
+                extensionDirectory,
+                $"php_redis.{Guid.NewGuid():N}.tmp.dll"
+            );
+            try
+            {
+                await DownloadAndVerifyAsync(
+                    release.DownloadUri,
+                    release.Sha256,
+                    archivePath,
+                    "Redis extension",
+                    cancellationToken
+                );
+                await ExtractRedisDllAsync(archivePath, candidate, cancellationToken);
+                File.Move(candidate, destination, overwrite);
+            }
+            finally
+            {
+                if (File.Exists(archivePath)) File.Delete(archivePath);
+                if (File.Exists(candidate)) File.Delete(candidate);
+            }
+        }
+        finally
+        {
+            installLock.Release();
+        }
+    }
+
+    private async Task<PhpExtensionReport> ManagedExtensionReportAsync(
+        string phpExecutable,
+        CancellationToken cancellationToken
+    )
+    {
+        return await coreClient.ValidatePhpAsync(phpExecutable, cancellationToken);
+    }
+
+    private static string[] MissingManagedExtensions(PhpExtensionReport report)
+    {
+        var loaded = report.Loaded.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return report.Missing.Concat(
+            ManagedExtensions.Where(extension => !loaded.Contains(extension))
+        ).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    private static void ValidateManagedExtensions(PhpExtensionReport report, string cycle)
+    {
+        var missing = MissingManagedExtensions(report);
+        if (missing.Length > 0)
+        {
+            throw new InvalidOperationException(
+                $"HerdMe PHP {cycle} is missing required extensions: "
+                + string.Join(", ", missing)
+            );
+        }
+    }
+
+    private static async Task DownloadAndVerifyAsync(
+        Uri downloadUri,
+        string expectedSha256,
+        string destination,
+        string packageName,
+        CancellationToken cancellationToken
+    )
+    {
+        await using var source = await HttpClient.GetStreamAsync(downloadUri, cancellationToken);
+        await using var output = File.Create(destination);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var buffer = new byte[128 * 1_024];
+        while (true)
+        {
+            var count = await source.ReadAsync(buffer, cancellationToken);
+            if (count == 0) break;
+            await output.WriteAsync(buffer.AsMemory(0, count), cancellationToken);
+            hash.AppendData(buffer, 0, count);
+        }
+        var actual = Convert.ToHexString(hash.GetHashAndReset());
+        if (!actual.Equals(expectedSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                $"The {packageName} archive did not match its pinned SHA-256 checksum."
+            );
+        }
+    }
+
+    internal static async Task ExtractRedisDllAsync(
+        string archivePath,
+        string destination,
+        CancellationToken cancellationToken
+    )
+    {
+        using var archive = ZipFile.OpenRead(archivePath);
+        var entries = archive.Entries.Where(entry =>
+            entry.FullName.Equals("php_redis.dll", StringComparison.OrdinalIgnoreCase)
+        ).ToArray();
+        if (entries.Length != 1 || entries[0].Length == 0)
+        {
+            throw new InvalidDataException(
+                "The verified Redis extension archive did not contain exactly one php_redis.dll."
+            );
+        }
+        await using var input = entries[0].Open();
+        await using var output = new FileStream(
+            destination,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None
+        );
+        await input.CopyToAsync(output, cancellationToken);
+    }
+
     private const string PhpIni = """
         [PHP]
         extension_dir = "ext"
@@ -424,6 +636,9 @@ public sealed class PhpRuntimeInstaller
         extension = intl
         extension = openssl
         extension = pdo_mysql
+        extension = pdo_sqlite
+        extension = redis
+        extension = sqlite3
         extension = zip
         date.timezone = UTC
         cgi.fix_pathinfo = 1
