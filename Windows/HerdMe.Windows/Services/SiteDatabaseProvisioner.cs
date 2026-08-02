@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using HerdMe.Windows.Models;
 
@@ -160,6 +161,10 @@ public static class SiteDatabaseProvisioner
     {
         RequireValidProvisioning(provisioning);
         if (!File.Exists(source)) throw new FileNotFoundException("The SQL backup was not found.", source);
+        if (!IsSupportedImportFile(source))
+        {
+            throw new InvalidDataException("Choose a .sql or .sql.gz database export.");
+        }
         var mysql = instance.DefinitionId is "mysql" or "mariadb";
         var executable = mysql
             ? FindClient(
@@ -182,6 +187,13 @@ public static class SiteDatabaseProvisioner
             outputPath: null,
             cancellationToken
         );
+    }
+
+    internal static bool IsSupportedImportFile(string path)
+    {
+        var fileName = Path.GetFileName(path);
+        return fileName.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)
+            || fileName.EndsWith(".sql.gz", StringComparison.OrdinalIgnoreCase);
     }
 
     public static async Task ResetPasswordAsync(
@@ -601,9 +613,27 @@ public static class SiteDatabaseProvisioner
         CancellationToken cancellationToken
     )
     {
-        await using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        await source.CopyToAsync(process.StandardInput.BaseStream, cancellationToken);
-        process.StandardInput.Close();
+        try
+        {
+            await using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase))
+            {
+                await using var decompressed = new GZipStream(
+                    source,
+                    CompressionMode.Decompress,
+                    leaveOpen: false
+                );
+                await decompressed.CopyToAsync(process.StandardInput.BaseStream, cancellationToken);
+            }
+            else
+            {
+                await source.CopyToAsync(process.StandardInput.BaseStream, cancellationToken);
+            }
+        }
+        finally
+        {
+            process.StandardInput.Close();
+        }
     }
 
     private static async Task CopyOutputAsync(

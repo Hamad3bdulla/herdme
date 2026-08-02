@@ -330,6 +330,15 @@
   <data name="SitesArtisanPresetRouteList" xml:space="preserve"><value>قائمة المسارات</value></data>
   <data name="SitesArtisanPresetMigrationStatus" xml:space="preserve"><value>حالة ترحيلات قاعدة البيانات</value></data>
   <data name="SitesArtisanPresetMigrate" xml:space="preserve"><value>تشغيل الترحيلات</value></data>
+  <data name="SitesArtisanPresetSeed" xml:space="preserve"><value>تعبئة قاعدة البيانات</value></data>
+  <data name="SitesArtisanPresetMigrateSeed" xml:space="preserve"><value>تشغيل الترحيلات والتعبئة</value></data>
+  <data name="SitesArtisanPresetOptimize" xml:space="preserve"><value>تحسين التطبيق</value></data>
+  <data name="SitesArtisanPresetOptimizeClear" xml:space="preserve"><value>مسح كل ملفات التحسين المؤقتة</value></data>
+  <data name="SitesArtisanPresetCacheClear" xml:space="preserve"><value>مسح ذاكرة التطبيق المؤقتة</value></data>
+  <data name="SitesArtisanPresetConfigClear" xml:space="preserve"><value>مسح إعدادات التهيئة المؤقتة</value></data>
+  <data name="SitesArtisanPresetRouteClear" xml:space="preserve"><value>مسح ذاكرة المسارات المؤقتة</value></data>
+  <data name="SitesArtisanPresetViewClear" xml:space="preserve"><value>مسح القوالب المجمعة</value></data>
+  <data name="SitesArtisanPresetStorageLink" xml:space="preserve"><value>إنشاء رابط التخزين</value></data>
   <data name="SitesArtisanPresetQueueWorker" xml:space="preserve"><value>عامل قائمة الانتظار</value></data>
   <data name="SitesArtisanPresetCustom" xml:space="preserve"><value>مخصص</value></data>
   <data name="SitesNpmScriptField" xml:space="preserve"><value>السكربت</value></data>
@@ -584,6 +593,7 @@
   <data name="DebuggerUpdateButton" xml:space="preserve"><value>تحديث</value></data>
   <data name="DebuggerUpdateAvailable" xml:space="preserve"><value>يتوفر Xdebug {0}.</value></data>
   <data name="SitesCreateDatabaseCommand.Label" xml:space="preserve"><value>إنشاء قاعدة بيانات</value></data>
+  <data name="SitesImportDatabaseCommand.Label" xml:space="preserve"><value>استيراد قاعدة بيانات</value></data>
   <data name="SitesDatabaseNoRunningService" xml:space="preserve"><value>شغّل خدمة MySQL أو MariaDB أو PostgreSQL قبل إنشاء قاعدة بيانات للموقع.</value></data>
   <data name="SitesDatabaseServiceField" xml:space="preserve"><value>خدمة قاعدة البيانات</value></data>
   <data name="SitesDatabaseNameField" xml:space="preserve"><value>اسم قاعدة البيانات</value></data>
@@ -635,7 +645,7 @@
   <data name="SitesDatabaseManageTitle" xml:space="preserve"><value>قاعدة بيانات الموقع {0}</value></data>
   <data name="SitesDatabaseActionField" xml:space="preserve"><value>الإجراء</value></data>
   <data name="SitesDatabaseBackup" xml:space="preserve"><value>نسخ احتياطي إلى SQL</value></data>
-  <data name="SitesDatabaseRestore" xml:space="preserve"><value>استعادة نسخة SQL</value></data>
+  <data name="SitesDatabaseRestore" xml:space="preserve"><value>استيراد ملف SQL</value></data>
   <data name="SitesDatabaseResetPassword" xml:space="preserve"><value>إعادة تعيين كلمة المرور</value></data>
   <data name="SitesDatabaseOpenTablePlus" xml:space="preserve"><value>فتح في TablePlus</value></data>
   <data name="SitesDatabaseCopySettings" xml:space="preserve"><value>نسخ إعدادات الاتصال</value></data>
@@ -646,9 +656,9 @@
   <data name="SitesDatabaseServiceMissing" xml:space="preserve"><value>خدمة قاعدة البيانات المحددة في .env لم تعد مثبتة.</value></data>
   <data name="SitesDatabaseTablePlusUnavailable" xml:space="preserve"><value>لا يمكن فتح قاعدة البيانات هذه في TablePlus.</value></data>
   <data name="SitesDatabaseBackingUp" xml:space="preserve"><value>جارٍ نسخ قاعدة البيانات احتياطياً</value></data>
-  <data name="SitesDatabaseRestoring" xml:space="preserve"><value>جارٍ استعادة قاعدة البيانات</value></data>
-  <data name="SitesDatabaseRestoreConfirmTitle" xml:space="preserve"><value>استعادة قاعدة البيانات؟</value></data>
-  <data name="SitesDatabaseRestoreConfirm" xml:space="preserve"><value>سيتم استيراد ملف SQL إلى {0} وقد تتغير البيانات الحالية.</value></data>
+  <data name="SitesDatabaseRestoring" xml:space="preserve"><value>جارٍ استيراد قاعدة البيانات</value></data>
+  <data name="SitesDatabaseRestoreConfirmTitle" xml:space="preserve"><value>استيراد قاعدة البيانات؟</value></data>
+  <data name="SitesDatabaseRestoreConfirm" xml:space="preserve"><value>سيتم استيراد ملف SQL أو SQL.GZ إلى {0} وقد تتغير البيانات الحالية.</value></data>
   <data name="SitesDatabaseResettingPassword" xml:space="preserve"><value>جارٍ إعادة تعيين كلمة مرور قاعدة البيانات</value></data>
   <data name="SitesDatabaseDeleteConfirmTitle" xml:space="preserve"><value>حذف قاعدة البيانات نهائياً؟</value></data>
   <data name="SitesDatabaseDeleteConfirm" xml:space="preserve"><value>سيتم حذف {0} ومستخدمها المستقل نهائياً. أنشئ نسخة احتياطية أولاً.</value></data>

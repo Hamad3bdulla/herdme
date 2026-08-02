@@ -302,6 +302,9 @@
                                 <AppBarButton x:Uid="SitesCreateDatabaseCommand" x:Name="CreateDatabaseButton" Label="Create database" Click="CreateDatabase_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Library" /></AppBarButton.Icon>
                                 </AppBarButton>
+                                <AppBarButton x:Uid="SitesImportDatabaseCommand" Label="Import database" Click="ImportDatabase_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="OpenFile" /></AppBarButton.Icon>
+                                </AppBarButton>
                                 <AppBarButton x:Uid="SitesManageDatabaseCommand" Label="Manage database" Click="ManageDatabase_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Manage" /></AppBarButton.Icon>
                                 </AppBarButton>

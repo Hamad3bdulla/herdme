@@ -330,6 +330,15 @@
   <data name="SitesArtisanPresetRouteList" xml:space="preserve"><value>Route List</value></data>
   <data name="SitesArtisanPresetMigrationStatus" xml:space="preserve"><value>Migration Status</value></data>
   <data name="SitesArtisanPresetMigrate" xml:space="preserve"><value>Migrate</value></data>
+  <data name="SitesArtisanPresetSeed" xml:space="preserve"><value>Seed database</value></data>
+  <data name="SitesArtisanPresetMigrateSeed" xml:space="preserve"><value>Migrate and seed</value></data>
+  <data name="SitesArtisanPresetOptimize" xml:space="preserve"><value>Optimize application</value></data>
+  <data name="SitesArtisanPresetOptimizeClear" xml:space="preserve"><value>Clear all optimization caches</value></data>
+  <data name="SitesArtisanPresetCacheClear" xml:space="preserve"><value>Clear application cache</value></data>
+  <data name="SitesArtisanPresetConfigClear" xml:space="preserve"><value>Clear configuration cache</value></data>
+  <data name="SitesArtisanPresetRouteClear" xml:space="preserve"><value>Clear route cache</value></data>
+  <data name="SitesArtisanPresetViewClear" xml:space="preserve"><value>Clear compiled views</value></data>
+  <data name="SitesArtisanPresetStorageLink" xml:space="preserve"><value>Create storage link</value></data>
   <data name="SitesArtisanPresetQueueWorker" xml:space="preserve"><value>Queue Worker</value></data>
   <data name="SitesArtisanPresetCustom" xml:space="preserve"><value>Custom</value></data>
   <data name="SitesNpmScriptField" xml:space="preserve"><value>Script</value></data>
@@ -584,6 +593,7 @@
   <data name="DebuggerUpdateButton" xml:space="preserve"><value>Update</value></data>
   <data name="DebuggerUpdateAvailable" xml:space="preserve"><value>Xdebug {0} is available.</value></data>
   <data name="SitesCreateDatabaseCommand.Label" xml:space="preserve"><value>Create database</value></data>
+  <data name="SitesImportDatabaseCommand.Label" xml:space="preserve"><value>Import database</value></data>
   <data name="SitesDatabaseNoRunningService" xml:space="preserve"><value>Start a MySQL, MariaDB, or PostgreSQL service before creating a site database.</value></data>
   <data name="SitesDatabaseServiceField" xml:space="preserve"><value>Database service</value></data>
   <data name="SitesDatabaseNameField" xml:space="preserve"><value>Database name</value></data>
@@ -635,7 +645,7 @@
   <data name="SitesDatabaseManageTitle" xml:space="preserve"><value>Database for {0}</value></data>
   <data name="SitesDatabaseActionField" xml:space="preserve"><value>Action</value></data>
   <data name="SitesDatabaseBackup" xml:space="preserve"><value>Back up to SQL</value></data>
-  <data name="SitesDatabaseRestore" xml:space="preserve"><value>Restore SQL backup</value></data>
+  <data name="SitesDatabaseRestore" xml:space="preserve"><value>Import SQL file</value></data>
   <data name="SitesDatabaseResetPassword" xml:space="preserve"><value>Reset password</value></data>
   <data name="SitesDatabaseOpenTablePlus" xml:space="preserve"><value>Open in TablePlus</value></data>
   <data name="SitesDatabaseCopySettings" xml:space="preserve"><value>Copy connection settings</value></data>
@@ -646,9 +656,9 @@
   <data name="SitesDatabaseServiceMissing" xml:space="preserve"><value>The database service configured in .env is no longer installed.</value></data>
   <data name="SitesDatabaseTablePlusUnavailable" xml:space="preserve"><value>This database cannot be opened in TablePlus.</value></data>
   <data name="SitesDatabaseBackingUp" xml:space="preserve"><value>Backing up database</value></data>
-  <data name="SitesDatabaseRestoring" xml:space="preserve"><value>Restoring database</value></data>
-  <data name="SitesDatabaseRestoreConfirmTitle" xml:space="preserve"><value>Restore database?</value></data>
-  <data name="SitesDatabaseRestoreConfirm" xml:space="preserve"><value>The SQL file will be imported into {0}. Existing data may be changed.</value></data>
+  <data name="SitesDatabaseRestoring" xml:space="preserve"><value>Importing database</value></data>
+  <data name="SitesDatabaseRestoreConfirmTitle" xml:space="preserve"><value>Import database?</value></data>
+  <data name="SitesDatabaseRestoreConfirm" xml:space="preserve"><value>The SQL or SQL.GZ file will be imported into {0}. Existing data may be changed.</value></data>
   <data name="SitesDatabaseResettingPassword" xml:space="preserve"><value>Resetting database password</value></data>
   <data name="SitesDatabaseDeleteConfirmTitle" xml:space="preserve"><value>Delete database permanently?</value></data>
   <data name="SitesDatabaseDeleteConfirm" xml:space="preserve"><value>{0} and its dedicated user will be permanently deleted. Create a backup first.</value></data>

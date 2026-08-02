@@ -67,6 +67,15 @@ public static class ArtisanCommandCatalog
             new ArtisanCommandPreset("route-list", "Route List", ["route:list", "--no-interaction"], TimeSpan.FromMinutes(5)),
             new ArtisanCommandPreset("migrate-status", "Migration Status", ["migrate:status", "--no-interaction"], TimeSpan.FromMinutes(5)),
             new ArtisanCommandPreset("migrate", "Migrate", ["migrate", "--no-interaction"], TimeSpan.FromMinutes(15)),
+            new ArtisanCommandPreset("seed", "Seed Database", ["db:seed", "--no-interaction"], TimeSpan.FromMinutes(15)),
+            new ArtisanCommandPreset("migrate-seed", "Migrate and Seed", ["migrate", "--seed", "--no-interaction"], TimeSpan.FromMinutes(20)),
+            new ArtisanCommandPreset("optimize", "Optimize", ["optimize", "--no-interaction"], TimeSpan.FromMinutes(10)),
+            new ArtisanCommandPreset("optimize-clear", "Clear Optimization Caches", ["optimize:clear", "--no-interaction"], TimeSpan.FromMinutes(10)),
+            new ArtisanCommandPreset("cache-clear", "Clear Application Cache", ["cache:clear", "--no-interaction"], TimeSpan.FromMinutes(5)),
+            new ArtisanCommandPreset("config-clear", "Clear Configuration Cache", ["config:clear", "--no-interaction"], TimeSpan.FromMinutes(5)),
+            new ArtisanCommandPreset("route-clear", "Clear Route Cache", ["route:clear", "--no-interaction"], TimeSpan.FromMinutes(5)),
+            new ArtisanCommandPreset("view-clear", "Clear View Cache", ["view:clear", "--no-interaction"], TimeSpan.FromMinutes(5)),
+            new ArtisanCommandPreset("storage-link", "Create Storage Link", ["storage:link", "--no-interaction"], TimeSpan.FromMinutes(5)),
             new ArtisanCommandPreset("queue-work", "Queue Worker", ["queue:work", "--no-interaction"], TimeSpan.FromHours(24)),
             new ArtisanCommandPreset("custom", "Custom", [], TimeSpan.FromMinutes(15))
         }

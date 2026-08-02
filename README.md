@@ -34,8 +34,9 @@ C++20 core for shared contracts.
 - Provide local HTTP and HTTPS with a HerdMe-owned certificate authority.
 - Route Laravel through FastCGI and `public/index.php`, not FrankenPHP.
 - Select a different PHP and Node version for each site.
-- Preview sites, open them in a browser or editor, and run Artisan and npm
-  commands.
+- Preview sites, open them in a browser or editor, and run ready-made Artisan
+  actions for migrations, seeders, optimization, cache clearing, storage links,
+  plus custom Artisan and npm commands.
 - Inspect Laravel logs, Git status, route files, and project environment health.
 - Edit `.env` safely, create it from `.env.example`, and detect external changes
   before saving.
@@ -43,8 +44,8 @@ C++20 core for shared contracts.
   per site, with live status, captured output, cancellation, and clean shutdown.
 - Inspect and repair site health across `.env`, PHP extensions, Composer,
   dependencies, HTTPS, and the local environment.
-- Create, inspect, back up, restore, reset, open, and delete dedicated MySQL,
-  MariaDB, and PostgreSQL databases for each site.
+- Create, inspect, back up, import plain or gzip-compressed SQL, reset, open,
+  and delete dedicated MySQL, MariaDB, and PostgreSQL databases for each site.
 - Safely remove projects created by HerdMe while protecting linked projects and
   projects outside the managed sites directory from accidental deletion.
 

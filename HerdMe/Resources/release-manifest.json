@@ -4,7 +4,7 @@
       "version": "0.1.7",
       "build": 1,
       "channel": "stable",
-      "notes": "Adds complete per-site database management and backups, Composer commands, Queue and Scheduler controls, site health repair, unified progress and cancellation, faster site search actions, and Redis and SQLite repair across every managed PHP version.",
+      "notes": "Adds complete per-site database management with SQL and SQL.GZ import, ready-made Laravel migration, seeder, optimization, cache, and storage-link actions, Composer commands, Queue and Scheduler controls, site health repair, unified progress and cancellation, faster site search actions, and Redis and SQLite repair across every managed PHP version.",
       "downloadURLs": {
         "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.7/HerdMe-0.1.7-macOS.zip",
         "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.7/HerdMe-0.1.7-win-x64-setup.exe"

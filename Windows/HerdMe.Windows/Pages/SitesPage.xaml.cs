@@ -1777,6 +1777,7 @@ public sealed partial class SitesPage : Page
     {
         var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
         picker.FileTypeFilter.Add(".sql");
+        picker.FileTypeFilter.Add(".gz");
         InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
         var file = await picker.PickSingleFileAsync();
         if (file is null) return;
@@ -1799,6 +1800,17 @@ public sealed partial class SitesPage : Page
                 token
             )
         );
+    }
+
+    private async void ImportDatabase_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not { } site) return;
+        if (!TryCurrentSiteDatabase(site, out var instance, out var provisioning, out var error))
+        {
+            await ShowErrorAsync(error);
+            return;
+        }
+        await RestoreDatabaseAsync(site, instance, provisioning);
     }
 
     private async Task ResetDatabasePasswordAsync(
@@ -2685,6 +2697,15 @@ public sealed partial class SitesPage : Page
         "route-list" => "SitesArtisanPresetRouteList",
         "migrate-status" => "SitesArtisanPresetMigrationStatus",
         "migrate" => "SitesArtisanPresetMigrate",
+        "seed" => "SitesArtisanPresetSeed",
+        "migrate-seed" => "SitesArtisanPresetMigrateSeed",
+        "optimize" => "SitesArtisanPresetOptimize",
+        "optimize-clear" => "SitesArtisanPresetOptimizeClear",
+        "cache-clear" => "SitesArtisanPresetCacheClear",
+        "config-clear" => "SitesArtisanPresetConfigClear",
+        "route-clear" => "SitesArtisanPresetRouteClear",
+        "view-clear" => "SitesArtisanPresetViewClear",
+        "storage-link" => "SitesArtisanPresetStorageLink",
         "queue-work" => "SitesArtisanPresetQueueWorker",
         "custom" => "SitesArtisanPresetCustom",
         _ => throw new ArgumentOutOfRangeException(nameof(presetId), presetId, null)

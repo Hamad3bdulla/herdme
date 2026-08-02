@@ -31,6 +31,12 @@ internal static partial class ContractChecks
             () => ComposerCommandRunner.RequireArguments("--working-dir elsewhere"),
             "site Composer package input cannot inject command options"
         );
+        Check(
+            SiteDatabaseProvisioner.IsSupportedImportFile("site.sql")
+                && SiteDatabaseProvisioner.IsSupportedImportFile("site.SQL.GZ")
+                && !SiteDatabaseProvisioner.IsSupportedImportFile("site.dump"),
+            "site database imports accept plain or gzip-compressed SQL only"
+        );
         await using (var siteProcesses = new SiteProcessManager())
         {
             var processState = siteProcesses.State(
