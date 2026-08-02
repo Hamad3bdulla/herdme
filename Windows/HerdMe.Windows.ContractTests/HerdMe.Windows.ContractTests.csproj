@@ -33,6 +33,7 @@
     <Compile Include="../HerdMe.Windows/Services/ArtisanCommandRunner.cs" Link="Services/ArtisanCommandRunner.cs" />
     <Compile Include="../HerdMe.Windows/Services/NpmScriptRunner.cs" Link="Services/NpmScriptRunner.cs" />
     <Compile Include="../HerdMe.Windows/Services/ComposerToolManager.cs" Link="Services/ComposerToolManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ComposerCommandRunner.cs" Link="Services/ComposerCommandRunner.cs" />
     <Compile Include="../HerdMe.Windows/Services/InitialSetupManager.cs" Link="Services/InitialSetupManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/MailMimeParser.cs" Link="Services/MailMimeParser.cs" />
     <Compile Include="../HerdMe.Windows/Services/MailCaptureService.cs" Link="Services/MailCaptureService.cs" />
@@ -58,6 +59,8 @@
     <Compile Include="../HerdMe.Windows/Services/NodeRuntimeInstaller.cs" Link="Services/NodeRuntimeInstaller.cs" />
     <Compile Include="../HerdMe.Windows/Services/PhpFastCgiProcess.cs" Link="Services/PhpFastCgiProcess.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteConfigurationStore.cs" Link="Services/SiteConfigurationStore.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SiteHealthInspector.cs" Link="Services/SiteHealthInspector.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SiteProcessManager.cs" Link="Services/SiteProcessManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/SitePresentation.cs" Link="Services/SitePresentation.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteRemovalService.cs" Link="Services/SiteRemovalService.cs" />
     <Compile Include="../HerdMe.Windows/Services/LogPresentation.cs" Link="Services/LogPresentation.cs" />

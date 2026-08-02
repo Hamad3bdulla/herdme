@@ -179,7 +179,8 @@
                         x:Uid="SitesSearchField"
                         x:Name="SearchBox"
                         PlaceholderText="Search sites"
-                        TextChanged="SearchBox_TextChanged" />
+                        TextChanged="SearchBox_TextChanged"
+                        KeyDown="SearchBox_KeyDown" />
                     <ListView
                         x:Name="SiteList"
                         Grid.Row="1"
@@ -301,6 +302,9 @@
                                 <AppBarButton x:Uid="SitesCreateDatabaseCommand" x:Name="CreateDatabaseButton" Label="Create database" Click="CreateDatabase_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Library" /></AppBarButton.Icon>
                                 </AppBarButton>
+                                <AppBarButton x:Uid="SitesManageDatabaseCommand" Label="Manage database" Click="ManageDatabase_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Manage" /></AppBarButton.Icon>
+                                </AppBarButton>
                             </CommandBar.PrimaryCommands>
                             <CommandBar.SecondaryCommands>
                                 <AppBarButton x:Uid="SitesOpenLogsCommand" Label="Open site logs" Click="OpenLogs_Click">
@@ -311,6 +315,15 @@
                                 </AppBarButton>
                                 <AppBarButton x:Uid="SitesNpmCommand" x:Name="NpmButton" Label="Run npm script" Click="Npm_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Library" /></AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton x:Uid="SitesComposerCommand" x:Name="ComposerButton" Label="Run Composer command" Click="Composer_Click">
+                                    <AppBarButton.Icon><FontIcon Glyph="&#xE943;" /></AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton x:Uid="SitesDoctorCommand" Label="Check and repair site" Click="SiteDoctor_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Repair" /></AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton x:Uid="SitesPhpExtensionsCommand" Label="PHP extensions" Click="PhpExtensions_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Bullets" /></AppBarButton.Icon>
                                 </AppBarButton>
                                 <AppBarButton x:Uid="SitesConfigureRuntimesCommand" Label="Configure PHP and Node.js" Click="EditRuntimes_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Setting" /></AppBarButton.Icon>
@@ -331,6 +344,28 @@
 
                         <ScrollViewer Grid.Row="2" Padding="16,6,16,16" VerticalScrollBarVisibility="Auto">
                             <StackPanel Spacing="14">
+                                <InfoBar
+                                    x:Name="SiteOperationBar"
+                                    IsOpen="False"
+                                    IsClosable="True"
+                                    Severity="Informational">
+                                    <InfoBar.ActionButton>
+                                        <Button x:Uid="SitesCancelOperationButton" Content="Cancel" Click="CancelSiteOperation_Click" />
+                                    </InfoBar.ActionButton>
+                                </InfoBar>
+                                <ProgressBar x:Name="SiteOperationProgress" IsIndeterminate="True" Visibility="Collapsed" />
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button x:Uid="SitesQueueWorkerButton" x:Name="QueueWorkerButton" Content="Start queue" Click="QueueWorker_Click" />
+                                    <Button x:Uid="SitesSchedulerButton" x:Name="SchedulerButton" Grid.Column="1" Content="Start scheduler" Click="Scheduler_Click" />
+                                    <Button x:Uid="SitesBackgroundOutputButton" Grid.Column="2" Content="Output" Click="BackgroundOutput_Click" />
+                                    <TextBlock x:Name="BackgroundProcessesText" Grid.Column="3" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </Grid>
                                 <Border x:Name="PreviewBorder" Height="160" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6">
                                     <Grid>
                                         <WebView2
@@ -376,6 +411,9 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <TextBlock x:Uid="SitesFrameworkLabel" Text="Framework" Padding="0,10" FontWeight="SemiBold" />
                                 <TextBlock x:Name="FrameworkText" Grid.Column="1" Padding="0,10" />
@@ -397,6 +435,12 @@
                                 <TextBlock x:Name="GitText" Grid.Row="8" Grid.Column="1" Padding="0,10" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
                                 <TextBlock x:Uid="SitesAssociatedServicesLabel" Grid.Row="9" Text="Associated services" Padding="0,10" FontWeight="SemiBold" />
                                 <TextBlock x:Name="AssociatedServicesText" Grid.Row="9" Grid.Column="1" Padding="0,10" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                                <TextBlock x:Uid="SitesDatabaseDetailsLabel" Grid.Row="10" Text="Database" Padding="0,10" FontWeight="SemiBold" />
+                                <TextBlock x:Name="DatabaseDetailsText" Grid.Row="10" Grid.Column="1" Padding="0,10" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                                <TextBlock x:Uid="SitesProcessesDetailsLabel" Grid.Row="11" Text="Background processes" Padding="0,10" FontWeight="SemiBold" />
+                                <TextBlock x:Name="ProcessesDetailsText" Grid.Row="11" Grid.Column="1" Padding="0,10" TextWrapping="Wrap" />
+                                <TextBlock x:Uid="SitesHealthDetailsLabel" Grid.Row="12" Text="Site health" Padding="0,10" FontWeight="SemiBold" />
+                                <TextBlock x:Name="HealthDetailsText" Grid.Row="12" Grid.Column="1" Padding="0,10" TextWrapping="Wrap" />
                                 </Grid>
                             </StackPanel>
                         </ScrollViewer>

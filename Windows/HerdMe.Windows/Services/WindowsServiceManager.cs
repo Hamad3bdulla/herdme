@@ -645,6 +645,62 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         );
     }
 
+    public async Task BackupSiteDatabaseAsync(
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning,
+        string destination,
+        CancellationToken cancellationToken = default
+    ) => await SiteDatabaseProvisioner.BackupAsync(
+        instance,
+        installer.ExecutablePath(instance.DefinitionId),
+        DataDirectory(instance.Id),
+        provisioning,
+        destination,
+        cancellationToken
+    );
+
+    public async Task RestoreSiteDatabaseAsync(
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning,
+        string source,
+        CancellationToken cancellationToken = default
+    ) => await SiteDatabaseProvisioner.RestoreAsync(
+        instance,
+        installer.ExecutablePath(instance.DefinitionId),
+        DataDirectory(instance.Id),
+        provisioning,
+        source,
+        cancellationToken
+    );
+
+    public async Task ResetSiteDatabasePasswordAsync(
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning,
+        string newPassword,
+        CancellationToken cancellationToken = default
+    ) => await SiteDatabaseProvisioner.ResetPasswordAsync(
+        instance,
+        installer.ExecutablePath(instance.DefinitionId),
+        DataDirectory(instance.Id),
+        credentialStore.GetOrCreate(instance.Id),
+        provisioning,
+        newPassword,
+        cancellationToken
+    );
+
+    public async Task DeleteSiteDatabaseAsync(
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning,
+        CancellationToken cancellationToken = default
+    ) => await SiteDatabaseProvisioner.DeleteAsync(
+        instance,
+        installer.ExecutablePath(instance.DefinitionId),
+        DataDirectory(instance.Id),
+        credentialStore.GetOrCreate(instance.Id),
+        provisioning,
+        cancellationToken
+    );
+
     public void OpenInTablePlus(ManagedServiceInstance instance)
     {
         TablePlusConnection.Open(ConnectionUri(instance));

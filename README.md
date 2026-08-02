@@ -39,6 +39,12 @@ C++20 core for shared contracts.
 - Inspect Laravel logs, Git status, route files, and project environment health.
 - Edit `.env` safely, create it from `.env.example`, and detect external changes
   before saving.
+- Run Composer commands and keep Laravel queue workers and schedulers running
+  per site, with live status, captured output, cancellation, and clean shutdown.
+- Inspect and repair site health across `.env`, PHP extensions, Composer,
+  dependencies, HTTPS, and the local environment.
+- Create, inspect, back up, restore, reset, open, and delete dedicated MySQL,
+  MariaDB, and PostgreSQL databases for each site.
 - Safely remove projects created by HerdMe while protecting linked projects and
   projects outside the managed sites directory from accidental deletion.
 
@@ -49,6 +55,8 @@ C++20 core for shared contracts.
 - Validate Laravel's required extensions before serving a site:
   `ctype`, `curl`, `dom`, `fileinfo`, `filter`, `hash`, `mbstring`, `openssl`,
   `pcre`, `pdo`, `session`, `tokenizer`, and `xml`.
+- Enable and repair Redis, PDO SQLite, and SQLite3 across every installed
+  managed PHP version, and inspect loaded extensions from the site page.
 - Install and update Composer and Laravel Installer from the application.
 - On Windows, install verified MinGit and expose the managed PHP, Composer,
   Laravel Installer, Node.js, npm, and Git commands to new terminal sessions.

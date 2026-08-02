@@ -45,6 +45,26 @@ public static class TablePlusConnection
         return builder.Uri;
     }
 
+    public static Uri? UriForDatabase(
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning
+    )
+    {
+        if (instance.Port is <= 0 or > 65_535 || TargetFor(instance.DefinitionId) is not { } target)
+        {
+            return null;
+        }
+        return new UriBuilder
+        {
+            Scheme = target.Scheme,
+            Host = "127.0.0.1",
+            Port = instance.Port,
+            Path = provisioning.DatabaseName,
+            UserName = provisioning.Username,
+            Password = provisioning.Password
+        }.Uri;
+    }
+
     public static void Open(
         ManagedServiceInstance instance,
         ServiceCredentials? credentials = null

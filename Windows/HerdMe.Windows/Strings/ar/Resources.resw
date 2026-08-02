@@ -318,7 +318,6 @@
   <data name="SitesArtisanCustomCommandField" xml:space="preserve"><value>أمر مخصص</value></data>
   <data name="SitesArtisanReady" xml:space="preserve"><value>جاهز</value></data>
   <data name="SitesArtisanOutputPlaceholder" xml:space="preserve"><value>ستظهر النتيجة هنا.</value></data>
-  <data name="SitesRun" xml:space="preserve"><value>تشغيل</value></data>
   <data name="SitesArtisanDialogTitle" xml:space="preserve"><value>Artisan - {0}</value></data>
   <data name="SitesArtisanCancelling" xml:space="preserve"><value>جارٍ الإلغاء</value></data>
   <data name="SitesArtisanFailed" xml:space="preserve"><value>فشل</value></data>
@@ -597,4 +596,69 @@
   <data name="SitesDatabaseCreatedTitle" xml:space="preserve"><value>تم إنشاء قاعدة البيانات</value></data>
   <data name="SitesDatabaseAddToEnvironment" xml:space="preserve"><value>إضافة إلى .env</value></data>
   <data name="SitesDatabaseEnvironmentUpdated" xml:space="preserve"><value>تمت إضافة {0} متغيرات وتحديث {1} متغيرات في .env.</value></data>
+  <data name="SitesComposerCommand.Label" xml:space="preserve"><value>تشغيل أمر Composer</value></data>
+  <data name="SitesDoctorCommand.Label" xml:space="preserve"><value>فحص وإصلاح الموقع</value></data>
+  <data name="SitesPhpExtensionsCommand.Label" xml:space="preserve"><value>إضافات PHP</value></data>
+  <data name="SitesCancelOperationButton.Content" xml:space="preserve"><value>إلغاء</value></data>
+  <data name="SitesQueueWorkerButton.Content" xml:space="preserve"><value>تشغيل قائمة الانتظار</value></data>
+  <data name="SitesSchedulerButton.Content" xml:space="preserve"><value>تشغيل المجدول</value></data>
+  <data name="SitesStartQueueWorker" xml:space="preserve"><value>تشغيل قائمة الانتظار</value></data>
+  <data name="SitesStopQueueWorker" xml:space="preserve"><value>إيقاف قائمة الانتظار</value></data>
+  <data name="SitesStartScheduler" xml:space="preserve"><value>تشغيل المجدول</value></data>
+  <data name="SitesStopScheduler" xml:space="preserve"><value>إيقاف المجدول</value></data>
+  <data name="SitesRunning" xml:space="preserve"><value>يعمل</value></data>
+  <data name="SitesStopped" xml:space="preserve"><value>متوقف</value></data>
+  <data name="SitesBackgroundProcessStatus" xml:space="preserve"><value>قائمة الانتظار: {0} · المجدول: {1}</value></data>
+  <data name="SitesComposerCommandField" xml:space="preserve"><value>أمر Composer</value></data>
+  <data name="SitesComposerPreset" xml:space="preserve"><value>أمر Composer</value></data>
+  <data name="SitesComposerPackageField" xml:space="preserve"><value>الحزمة</value></data>
+  <data name="SitesComposerDialogTitle" xml:space="preserve"><value>Composer للموقع {0}</value></data>
+  <data name="SitesComposerPresetinstall" xml:space="preserve"><value>تثبيت الاعتماديات</value></data>
+  <data name="SitesComposerPresetupdate" xml:space="preserve"><value>تحديث الاعتماديات</value></data>
+  <data name="SitesComposerPresetvalidate" xml:space="preserve"><value>فحص composer.json</value></data>
+  <data name="SitesComposerPresetaudit" xml:space="preserve"><value>تدقيق الاعتماديات</value></data>
+  <data name="SitesComposerPresetdumpautoload" xml:space="preserve"><value>تحسين المحمل التلقائي</value></data>
+  <data name="SitesComposerPresetrequire" xml:space="preserve"><value>إضافة حزمة</value></data>
+  <data name="SitesRun" xml:space="preserve"><value>تشغيل</value></data>
+  <data name="SitesComposerRunning" xml:space="preserve"><value>جارٍ تشغيل Composer</value></data>
+  <data name="SitesComposerResultTitle" xml:space="preserve"><value>مخرجات Composer</value></data>
+  <data name="SitesDoctorTitle" xml:space="preserve"><value>صحة الموقع: {0}</value></data>
+  <data name="SitesRepair" xml:space="preserve"><value>إصلاح</value></data>
+  <data name="SitesRepairing" xml:space="preserve"><value>جارٍ إصلاح الموقع</value></data>
+  <data name="SitesPhpExtensionsRepairing" xml:space="preserve"><value>جارٍ فحص إضافات PHP</value></data>
+  <data name="SitesPhpExtensionsTitle" xml:space="preserve"><value>إضافات PHP {0} المحملة</value></data>
+  <data name="SitesOperationCompleted" xml:space="preserve"><value>اكتملت العملية</value></data>
+  <data name="SitesOperationCancelled" xml:space="preserve"><value>أُلغيت العملية</value></data>
+  <data name="SitesOperationFailed" xml:space="preserve"><value>فشلت العملية</value></data>
+  <data name="SitesNoCommandOutput" xml:space="preserve"><value>اكتمل الأمر دون مخرجات.</value></data>
+  <data name="SitesManageDatabaseCommand.Label" xml:space="preserve"><value>إدارة قاعدة البيانات</value></data>
+  <data name="SitesDatabaseManageTitle" xml:space="preserve"><value>قاعدة بيانات الموقع {0}</value></data>
+  <data name="SitesDatabaseActionField" xml:space="preserve"><value>الإجراء</value></data>
+  <data name="SitesDatabaseBackup" xml:space="preserve"><value>نسخ احتياطي إلى SQL</value></data>
+  <data name="SitesDatabaseRestore" xml:space="preserve"><value>استعادة نسخة SQL</value></data>
+  <data name="SitesDatabaseResetPassword" xml:space="preserve"><value>إعادة تعيين كلمة المرور</value></data>
+  <data name="SitesDatabaseOpenTablePlus" xml:space="preserve"><value>فتح في TablePlus</value></data>
+  <data name="SitesDatabaseCopySettings" xml:space="preserve"><value>نسخ إعدادات الاتصال</value></data>
+  <data name="SitesDatabaseDelete" xml:space="preserve"><value>حذف قاعدة البيانات</value></data>
+  <data name="SitesDatabaseRevealPassword" xml:space="preserve"><value>تضمين كلمة المرور</value></data>
+  <data name="SitesContinue" xml:space="preserve"><value>متابعة</value></data>
+  <data name="SitesDatabaseEnvironmentMissing" xml:space="preserve"><value>أضف اتصال قاعدة بيانات مُدارة إلى ملف .env لهذا الموقع أولاً.</value></data>
+  <data name="SitesDatabaseServiceMissing" xml:space="preserve"><value>خدمة قاعدة البيانات المحددة في .env لم تعد مثبتة.</value></data>
+  <data name="SitesDatabaseTablePlusUnavailable" xml:space="preserve"><value>لا يمكن فتح قاعدة البيانات هذه في TablePlus.</value></data>
+  <data name="SitesDatabaseBackingUp" xml:space="preserve"><value>جارٍ نسخ قاعدة البيانات احتياطياً</value></data>
+  <data name="SitesDatabaseRestoring" xml:space="preserve"><value>جارٍ استعادة قاعدة البيانات</value></data>
+  <data name="SitesDatabaseRestoreConfirmTitle" xml:space="preserve"><value>استعادة قاعدة البيانات؟</value></data>
+  <data name="SitesDatabaseRestoreConfirm" xml:space="preserve"><value>سيتم استيراد ملف SQL إلى {0} وقد تتغير البيانات الحالية.</value></data>
+  <data name="SitesDatabaseResettingPassword" xml:space="preserve"><value>جارٍ إعادة تعيين كلمة مرور قاعدة البيانات</value></data>
+  <data name="SitesDatabaseDeleteConfirmTitle" xml:space="preserve"><value>حذف قاعدة البيانات نهائياً؟</value></data>
+  <data name="SitesDatabaseDeleteConfirm" xml:space="preserve"><value>سيتم حذف {0} ومستخدمها المستقل نهائياً. أنشئ نسخة احتياطية أولاً.</value></data>
+  <data name="SitesDatabaseDeleting" xml:space="preserve"><value>جارٍ حذف قاعدة البيانات</value></data>
+  <data name="SitesDatabaseDetailsLabel.Text" xml:space="preserve"><value>قاعدة البيانات</value></data>
+  <data name="SitesProcessesDetailsLabel.Text" xml:space="preserve"><value>عمليات الخلفية</value></data>
+  <data name="SitesHealthDetailsLabel.Text" xml:space="preserve"><value>صحة الموقع</value></data>
+  <data name="SitesDatabaseNotConfigured" xml:space="preserve"><value>غير محددة في .env</value></data>
+  <data name="SitesHealthCheckAvailable" xml:space="preserve"><value>استخدم فحص وإصلاح الموقع للحصول على تقرير كامل.</value></data>
+  <data name="SitesHealthSummary" xml:space="preserve"><value>{0} من {1} فحوصات سليمة</value></data>
+  <data name="SitesBackgroundOutputButton.Content" xml:space="preserve"><value>المخرجات</value></data>
+  <data name="SitesBackgroundOutputTitle" xml:space="preserve"><value>مخرجات قائمة الانتظار والمجدول</value></data>
 </root>

@@ -94,6 +94,169 @@ public static class SiteDatabaseProvisioner
         return provisioning;
     }
 
+    public static async Task BackupAsync(
+        ManagedServiceInstance instance,
+        string serverExecutable,
+        string dataDirectory,
+        SiteDatabaseProvisioning provisioning,
+        string destination,
+        CancellationToken cancellationToken = default
+    )
+    {
+        RequireValidProvisioning(provisioning);
+        var environment = instance.DefinitionId is "mysql" or "mariadb"
+            ? new Dictionary<string, string?> { ["MYSQL_PWD"] = provisioning.Password }
+            : PostgreSqlEnvironment(provisioning.Password, dataDirectory);
+        string executable;
+        IReadOnlyList<string> arguments;
+        if (instance.DefinitionId is "mysql" or "mariadb")
+        {
+            executable = FindClient(
+                serverExecutable,
+                instance.DefinitionId == "mariadb"
+                    ? ["mariadb-dump.exe", "mysqldump.exe"]
+                    : ["mysqldump.exe"],
+                instance.Name
+            );
+            arguments =
+            [
+                "--no-defaults", "--protocol=TCP", "--host=127.0.0.1",
+                $"--port={instance.Port}", $"--user={provisioning.Username}",
+                "--single-transaction", "--routines", "--events", provisioning.DatabaseName
+            ];
+        }
+        else if (instance.DefinitionId == "postgresql")
+        {
+            executable = FindClient(serverExecutable, ["pg_dump.exe"], instance.Name);
+            arguments =
+            [
+                "--host=127.0.0.1", $"--port={instance.Port}",
+                $"--username={provisioning.Username}", "--no-password", "--format=plain",
+                "--no-owner", "--no-privileges", provisioning.DatabaseName
+            ];
+        }
+        else
+        {
+            throw new NotSupportedException($"{instance.Name} cannot back up site databases.");
+        }
+        await RunFileTransferAsync(
+            executable,
+            arguments,
+            environment,
+            inputPath: null,
+            outputPath: destination,
+            cancellationToken
+        );
+    }
+
+    public static async Task RestoreAsync(
+        ManagedServiceInstance instance,
+        string serverExecutable,
+        string dataDirectory,
+        SiteDatabaseProvisioning provisioning,
+        string source,
+        CancellationToken cancellationToken = default
+    )
+    {
+        RequireValidProvisioning(provisioning);
+        if (!File.Exists(source)) throw new FileNotFoundException("The SQL backup was not found.", source);
+        var mysql = instance.DefinitionId is "mysql" or "mariadb";
+        var executable = mysql
+            ? FindClient(
+                serverExecutable,
+                instance.DefinitionId == "mariadb" ? ["mariadb.exe", "mysql.exe"] : ["mysql.exe"],
+                instance.Name
+            )
+            : FindClient(serverExecutable, ["psql.exe"], instance.Name);
+        var arguments = mysql
+            ? [.. MySqlArguments(instance, provisioning.Username), $"--database={provisioning.DatabaseName}"]
+            : PostgreSqlArguments(instance, provisioning.Username, provisioning.DatabaseName);
+        var environment = mysql
+            ? new Dictionary<string, string?> { ["MYSQL_PWD"] = provisioning.Password }
+            : PostgreSqlEnvironment(provisioning.Password, dataDirectory);
+        await RunFileTransferAsync(
+            executable,
+            arguments,
+            environment,
+            source,
+            outputPath: null,
+            cancellationToken
+        );
+    }
+
+    public static async Task ResetPasswordAsync(
+        ManagedServiceInstance instance,
+        string serverExecutable,
+        string dataDirectory,
+        ServiceCredentials administrator,
+        SiteDatabaseProvisioning provisioning,
+        string newPassword,
+        CancellationToken cancellationToken = default
+    )
+    {
+        RequireValidProvisioning(provisioning);
+        if (!IsValidGeneratedValue(newPassword, 128))
+        {
+            throw new ArgumentException("The new database password is invalid.", nameof(newPassword));
+        }
+        var mysql = instance.DefinitionId is "mysql" or "mariadb";
+        var executable = mysql
+            ? FindClient(
+                serverExecutable,
+                instance.DefinitionId == "mariadb" ? ["mariadb.exe", "mysql.exe"] : ["mysql.exe"],
+                instance.Name
+            )
+            : FindClient(serverExecutable, ["psql.exe"], instance.Name);
+        var arguments = mysql
+            ? MySqlArguments(instance, administrator.Username)
+            : PostgreSqlArguments(instance, administrator.Username, "postgres");
+        var environment = mysql
+            ? new Dictionary<string, string?> { ["MYSQL_PWD"] = administrator.Secret }
+            : PostgreSqlEnvironment(administrator.Secret, dataDirectory);
+        var sql = mysql
+            ? $"ALTER USER '{provisioning.Username}'@'127.0.0.1' IDENTIFIED BY '{newPassword}';\n"
+            : $"ALTER ROLE \"{provisioning.Username}\" WITH PASSWORD '{newPassword}';\n";
+        RequireSuccess(
+            await RunAsync(executable, arguments, environment, sql, cancellationToken),
+            instance.Name,
+            "reset the site database password"
+        );
+    }
+
+    public static async Task DeleteAsync(
+        ManagedServiceInstance instance,
+        string serverExecutable,
+        string dataDirectory,
+        ServiceCredentials administrator,
+        SiteDatabaseProvisioning provisioning,
+        CancellationToken cancellationToken = default
+    )
+    {
+        RequireValidProvisioning(provisioning);
+        var mysql = instance.DefinitionId is "mysql" or "mariadb";
+        var executable = mysql
+            ? FindClient(
+                serverExecutable,
+                instance.DefinitionId == "mariadb" ? ["mariadb.exe", "mysql.exe"] : ["mysql.exe"],
+                instance.Name
+            )
+            : FindClient(serverExecutable, ["psql.exe"], instance.Name);
+        var arguments = mysql
+            ? MySqlArguments(instance, administrator.Username)
+            : PostgreSqlArguments(instance, administrator.Username, "postgres");
+        var environment = mysql
+            ? new Dictionary<string, string?> { ["MYSQL_PWD"] = administrator.Secret }
+            : PostgreSqlEnvironment(administrator.Secret, dataDirectory);
+        var sql = mysql
+            ? $"DROP DATABASE `{provisioning.DatabaseName}`;\nDROP USER '{provisioning.Username}'@'127.0.0.1';\n"
+            : $"DROP DATABASE \"{provisioning.DatabaseName}\";\nDROP ROLE \"{provisioning.Username}\";\n";
+        RequireSuccess(
+            await RunAsync(executable, arguments, environment, sql, cancellationToken),
+            instance.Name,
+            "delete the site database"
+        );
+    }
+
     internal static string MySqlCreateDatabaseSql(SiteDatabaseProvisioning provisioning)
     {
         RequireValidProvisioning(provisioning);
@@ -373,6 +536,90 @@ public static class SiteDatabaseProvisioner
         var standardOutput = (await output).Trim();
         _ = await error;
         return new CommandResult(process.ExitCode, standardOutput);
+    }
+
+    private static async Task RunFileTransferAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        IReadOnlyDictionary<string, string?> environment,
+        string? inputPath,
+        string? outputPath,
+        CancellationToken cancellationToken
+    )
+    {
+        if ((inputPath is null) == (outputPath is null))
+        {
+            throw new ArgumentException("Choose exactly one SQL transfer direction.");
+        }
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = executable,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = inputPath is not null,
+            RedirectStandardOutput = outputPath is not null,
+            RedirectStandardError = true
+        };
+        foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
+        foreach (var variable in environment)
+        {
+            if (variable.Value is null) startInfo.Environment.Remove(variable.Key);
+            else startInfo.Environment[variable.Key] = variable.Value;
+        }
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("The database transfer could not be started.");
+        var error = process.StandardError.ReadToEndAsync(cancellationToken);
+        var transfer = inputPath is not null
+            ? CopyInputAsync(process, inputPath, cancellationToken)
+            : CopyOutputAsync(process, outputPath!, cancellationToken);
+        try
+        {
+            await Task.WhenAll(process.WaitForExitAsync(cancellationToken), transfer);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync(CancellationToken.None);
+            if (outputPath is not null && File.Exists(outputPath)) File.Delete(outputPath);
+            throw;
+        }
+        var errorText = await error;
+        if (process.ExitCode != 0)
+        {
+            if (outputPath is not null && File.Exists(outputPath)) File.Delete(outputPath);
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(errorText)
+                    ? "The database transfer failed."
+                    : errorText.Trim()
+            );
+        }
+    }
+
+    private static async Task CopyInputAsync(
+        Process process,
+        string path,
+        CancellationToken cancellationToken
+    )
+    {
+        await using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        await source.CopyToAsync(process.StandardInput.BaseStream, cancellationToken);
+        process.StandardInput.Close();
+    }
+
+    private static async Task CopyOutputAsync(
+        Process process,
+        string path,
+        CancellationToken cancellationToken
+    )
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        await using var destination = new FileStream(
+            path,
+            FileMode.Create,
+            FileAccess.Write,
+            FileShare.None
+        );
+        await process.StandardOutput.BaseStream.CopyToAsync(destination, cancellationToken);
     }
 
     private sealed record CommandResult(int ExitCode, string Output);

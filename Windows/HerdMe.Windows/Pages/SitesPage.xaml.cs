@@ -37,6 +37,8 @@ public sealed partial class SitesPage : Page
     private readonly NodeRuntimeInstaller nodeInstaller;
     private readonly ComposerToolManager composerTools;
     private readonly WindowsServiceManager serviceManager;
+    private readonly SiteProcessManager siteProcesses;
+    private readonly WindowsCertificateManager certificates;
     private readonly SiteScanGeneration siteScanGeneration = new();
     private bool loaded;
     private bool suppressPreviewToggle = true;
@@ -46,6 +48,7 @@ public sealed partial class SitesPage : Page
     private CancellationTokenSource? siteDetailsCancellation;
     private CancellationTokenSource? gitInspectionCancellation;
     private CancellationTokenSource? databaseCancellation;
+    private CancellationTokenSource? siteOperationCancellation;
 
     public ObservableCollection<string> Roots { get; } = [];
     public ObservableCollection<SiteRecord> Sites { get; } = [];
@@ -61,7 +64,9 @@ public sealed partial class SitesPage : Page
         PhpRuntimePolicy runtimePolicy,
         NodeRuntimeInstaller nodeInstaller,
         ComposerToolManager composerTools,
-        WindowsServiceManager serviceManager
+        WindowsServiceManager serviceManager,
+        SiteProcessManager siteProcesses,
+        WindowsCertificateManager certificates
     )
     {
         this.coreClient = coreClient;
@@ -74,6 +79,8 @@ public sealed partial class SitesPage : Page
         this.nodeInstaller = nodeInstaller;
         this.composerTools = composerTools;
         this.serviceManager = serviceManager;
+        this.siteProcesses = siteProcesses;
+        this.certificates = certificates;
         InitializeComponent();
         var settings = settingsStore.Load();
         foreach (var root in settings.Roots) Roots.Add(root);
@@ -89,6 +96,7 @@ public sealed partial class SitesPage : Page
     {
         if (loaded) return;
         loaded = true;
+        siteProcesses.Changed += SiteProcesses_Changed;
         await ScanAsync();
     }
 
@@ -102,6 +110,8 @@ public sealed partial class SitesPage : Page
         npmCancellation?.Cancel();
         siteDetailsCancellation?.Cancel();
         databaseCancellation?.Cancel();
+        siteOperationCancellation?.Cancel();
+        siteProcesses.Changed -= SiteProcesses_Changed;
     }
 
     private void UpdateEnvironmentState()
@@ -750,6 +760,13 @@ public sealed partial class SitesPage : Page
         ApplyFilter(selectedSite?.Path);
     }
 
+    private void SearchBox_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+    {
+        if (e.Key != global::Windows.System.VirtualKey.Enter || selectedSite is null) return;
+        e.Handled = true;
+        OpenSite_Click(sender, e);
+    }
+
     private void ApplyFilter(string? preferredPath)
     {
         var query = SearchBox.Text.Trim();
@@ -799,6 +816,16 @@ public sealed partial class SitesPage : Page
         ArtisanButton.IsEnabled = site.Framework == "Laravel"
             && File.Exists(Path.Combine(site.Path, "artisan"));
         NpmButton.IsEnabled = File.Exists(Path.Combine(site.Path, "package.json"));
+        ComposerButton.IsEnabled = File.Exists(Path.Combine(site.Path, "composer.json"));
+        if (TryCurrentSiteDatabase(site, out var databaseService, out var database, out _))
+        {
+            DatabaseDetailsText.Text = $"{databaseService.Name}: {database.DatabaseName} ({database.Username})";
+        }
+        else
+        {
+            DatabaseDetailsText.Text = AppLocalization.Get("SitesDatabaseNotConfigured");
+        }
+        HealthDetailsText.Text = AppLocalization.Get("SitesHealthCheckAvailable");
         UrlButton.Content = SitePresentation.DisplayAddress(
             site,
             environment.IsRunning,
@@ -806,7 +833,32 @@ public sealed partial class SitesPage : Page
             environment.HttpsPort
         );
         _ = RefreshSiteDetailsAsync(site);
+        UpdateBackgroundProcessState();
         _ = RefreshPreviewAsync();
+    }
+
+    private void SiteProcesses_Changed(object? sender, EventArgs e)
+    {
+        DispatcherQueue.TryEnqueue(UpdateBackgroundProcessState);
+    }
+
+    private void UpdateBackgroundProcessState()
+    {
+        if (selectedSite is not { } site) return;
+        var queue = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Queue);
+        var scheduler = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Scheduler);
+        QueueWorkerButton.Content = AppLocalization.Get(
+            queue.Running ? "SitesStopQueueWorker" : "SitesStartQueueWorker"
+        );
+        SchedulerButton.Content = AppLocalization.Get(
+            scheduler.Running ? "SitesStopScheduler" : "SitesStartScheduler"
+        );
+        BackgroundProcessesText.Text = AppLocalization.Format(
+            "SitesBackgroundProcessStatus",
+            queue.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped"),
+            scheduler.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped")
+        );
+        ProcessesDetailsText.Text = BackgroundProcessesText.Text;
     }
 
     private async Task RefreshSiteDetailsAsync(SiteRecord site)
@@ -1546,6 +1598,290 @@ public sealed partial class SitesPage : Page
         if (environmentUpdated && IsSelected(site)) await RefreshSiteDetailsAsync(site);
     }
 
+    private async void ManageDatabase_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not { } site) return;
+        if (!TryCurrentSiteDatabase(site, out var instance, out var provisioning, out var error))
+        {
+            await ShowErrorAsync(error);
+            return;
+        }
+        var actions = new[]
+        {
+            new DisplayOption("backup", AppLocalization.Get("SitesDatabaseBackup")),
+            new DisplayOption("restore", AppLocalization.Get("SitesDatabaseRestore")),
+            new DisplayOption("reset", AppLocalization.Get("SitesDatabaseResetPassword")),
+            new DisplayOption("open", AppLocalization.Get("SitesDatabaseOpenTablePlus")),
+            new DisplayOption("copy", AppLocalization.Get("SitesDatabaseCopySettings")),
+            new DisplayOption("delete", AppLocalization.Get("SitesDatabaseDelete"))
+        };
+        var actionBox = new ComboBox
+        {
+            Header = AppLocalization.Get("SitesDatabaseActionField"),
+            ItemsSource = actions,
+            SelectedIndex = 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var revealPassword = new CheckBox
+        {
+            Content = AppLocalization.Get("SitesDatabaseRevealPassword"),
+            Visibility = Visibility.Collapsed
+        };
+        actionBox.SelectionChanged += (_, _) =>
+        {
+            revealPassword.Visibility = actionBox.SelectedItem is DisplayOption { Value: "copy" }
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        };
+        var content = new StackPanel { Width = 430, Spacing = 10 };
+        content.Children.Add(new TextBlock
+        {
+            Text = $"{instance.Name} / {provisioning.DatabaseName}\n{provisioning.Username}@127.0.0.1:{instance.Port}",
+            TextWrapping = TextWrapping.Wrap
+        });
+        content.Children.Add(actionBox);
+        content.Children.Add(revealPassword);
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Format("SitesDatabaseManageTitle", site.Name),
+            Content = content,
+            PrimaryButtonText = AppLocalization.Get("SitesContinue"),
+            CloseButtonText = AppLocalization.Get("SitesCancel"),
+            DefaultButton = ContentDialogButton.Primary
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary
+            || actionBox.SelectedItem is not DisplayOption selectedAction) return;
+
+        switch (selectedAction.Value)
+        {
+            case "backup":
+                await BackupDatabaseAsync(site, instance, provisioning);
+                break;
+            case "restore":
+                await RestoreDatabaseAsync(site, instance, provisioning);
+                break;
+            case "reset":
+                await ResetDatabasePasswordAsync(site, instance, provisioning);
+                break;
+            case "open":
+                try
+                {
+                    TablePlusConnection.Open(
+                        TablePlusConnection.UriForDatabase(instance, provisioning)
+                            ?? throw new NotSupportedException(
+                                AppLocalization.Get("SitesDatabaseTablePlusUnavailable")
+                            )
+                    );
+                }
+                catch (Exception openError) when (openError is IOException
+                    or InvalidOperationException or NotSupportedException)
+                {
+                    await ShowErrorAsync(openError.Message);
+                }
+                break;
+            case "copy":
+                var password = revealPassword.IsChecked == true
+                    ? provisioning.Password
+                    : "********";
+                CopyText(string.Join(Environment.NewLine,
+                [
+                    $"DB_CONNECTION={(instance.DefinitionId == "postgresql" ? "pgsql" : "mysql")}",
+                    "DB_HOST=127.0.0.1",
+                    $"DB_PORT={instance.Port}",
+                    $"DB_DATABASE={provisioning.DatabaseName}",
+                    $"DB_USERNAME={provisioning.Username}",
+                    $"DB_PASSWORD={password}"
+                ]));
+                break;
+            case "delete":
+                await DeleteDatabaseAsync(site, instance, provisioning);
+                break;
+        }
+    }
+
+    private bool TryCurrentSiteDatabase(
+        SiteRecord site,
+        out ManagedServiceInstance instance,
+        out SiteDatabaseProvisioning provisioning,
+        out string error
+    )
+    {
+        instance = null!;
+        provisioning = null!;
+        error = AppLocalization.Get("SitesDatabaseEnvironmentMissing");
+        var path = Path.Combine(site.Path, ".env");
+        if (!File.Exists(path)) return false;
+        IReadOnlyDictionary<string, string> values;
+        try
+        {
+            values = ParseEnvironment(File.ReadAllText(path, new UTF8Encoding(false, true)));
+        }
+        catch (Exception readError) when (readError is IOException
+            or UnauthorizedAccessException or DecoderFallbackException)
+        {
+            error = readError.Message;
+            return false;
+        }
+        if (!values.TryGetValue("DB_DATABASE", out var database)
+            || !values.TryGetValue("DB_USERNAME", out var username)
+            || !values.TryGetValue("DB_PASSWORD", out var password)
+            || !values.TryGetValue("DB_PORT", out var portText)
+            || !int.TryParse(portText, out var port)
+            || !SiteDatabaseProvisioner.IsValidDatabaseName(database)) return false;
+        instance = serviceManager.LoadInstances().FirstOrDefault(service =>
+            service.Port == port && SiteDatabaseProvisioner.SupportedDefinitions.Contains(
+                service.DefinitionId
+            )
+        )!;
+        if (instance is null)
+        {
+            error = AppLocalization.Get("SitesDatabaseServiceMissing");
+            return false;
+        }
+        provisioning = new SiteDatabaseProvisioning(database, username, password);
+        return true;
+    }
+
+    private async Task BackupDatabaseAsync(
+        SiteRecord site,
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning
+    )
+    {
+        var picker = new FileSavePicker
+        {
+            SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+            SuggestedFileName = $"{provisioning.DatabaseName}-{DateTime.Now:yyyyMMdd-HHmmss}"
+        };
+        picker.FileTypeChoices.Add("SQL", [".sql"]);
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
+        var file = await picker.PickSaveFileAsync();
+        if (file is null) return;
+        await RunSiteOperationAsync(
+            AppLocalization.Get("SitesDatabaseBackingUp"),
+            async (_, token) => await serviceManager.BackupSiteDatabaseAsync(
+                instance,
+                provisioning,
+                file.Path,
+                token
+            )
+        );
+    }
+
+    private async Task RestoreDatabaseAsync(
+        SiteRecord site,
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning
+    )
+    {
+        var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
+        picker.FileTypeFilter.Add(".sql");
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
+        var file = await picker.PickSingleFileAsync();
+        if (file is null) return;
+        var confirmation = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Get("SitesDatabaseRestoreConfirmTitle"),
+            Content = AppLocalization.Format("SitesDatabaseRestoreConfirm", provisioning.DatabaseName),
+            PrimaryButtonText = AppLocalization.Get("SitesDatabaseRestore"),
+            CloseButtonText = AppLocalization.Get("SitesCancel"),
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await confirmation.ShowAsync() != ContentDialogResult.Primary) return;
+        await RunSiteOperationAsync(
+            AppLocalization.Get("SitesDatabaseRestoring"),
+            async (_, token) => await serviceManager.RestoreSiteDatabaseAsync(
+                instance,
+                provisioning,
+                file.Path,
+                token
+            )
+        );
+    }
+
+    private async Task ResetDatabasePasswordAsync(
+        SiteRecord site,
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning
+    )
+    {
+        var updated = provisioning with
+        {
+            Password = SiteDatabaseProvisioner.Generate(provisioning.DatabaseName).Password
+        };
+        var succeeded = await RunSiteOperationAsync(
+            AppLocalization.Get("SitesDatabaseResettingPassword"),
+            async (progress, token) =>
+            {
+                await serviceManager.ResetSiteDatabasePasswordAsync(
+                    instance,
+                    provisioning,
+                    updated.Password,
+                    token
+                );
+                try
+                {
+                    _ = ServiceEnvironmentFile.Update(
+                        site.Path,
+                        [new ServiceEnvironmentVariable("DB_PASSWORD", updated.Password)],
+                        instance.Name
+                    );
+                }
+                catch
+                {
+                    await serviceManager.ResetSiteDatabasePasswordAsync(
+                        instance,
+                        updated,
+                        provisioning.Password,
+                        CancellationToken.None
+                    );
+                    throw;
+                }
+            }
+        );
+        if (succeeded) CopyText(updated.Password);
+    }
+
+    private async Task DeleteDatabaseAsync(
+        SiteRecord site,
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning
+    )
+    {
+        var confirmation = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Get("SitesDatabaseDeleteConfirmTitle"),
+            Content = AppLocalization.Format("SitesDatabaseDeleteConfirm", provisioning.DatabaseName),
+            PrimaryButtonText = AppLocalization.Get("SitesDatabaseDelete"),
+            CloseButtonText = AppLocalization.Get("SitesCancel"),
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await confirmation.ShowAsync() != ContentDialogResult.Primary) return;
+        var succeeded = await RunSiteOperationAsync(
+            AppLocalization.Get("SitesDatabaseDeleting"),
+            async (progress, token) =>
+            {
+                await serviceManager.DeleteSiteDatabaseAsync(instance, provisioning, token);
+                _ = ServiceEnvironmentFile.Update(
+                    site.Path,
+                    [
+                        new ServiceEnvironmentVariable("DB_DATABASE", string.Empty),
+                        new ServiceEnvironmentVariable("DB_USERNAME", string.Empty),
+                        new ServiceEnvironmentVariable("DB_PASSWORD", string.Empty)
+                    ],
+                    instance.Name
+                );
+            }
+        );
+        if (succeeded)
+        {
+            await RefreshSiteDetailsAsync(site);
+        }
+    }
+
     private static string EnvironmentDocumentStatus(ProjectEnvironmentDocument document)
     {
         if (document.LoadedFromExample)
@@ -1592,6 +1928,294 @@ public sealed partial class SitesPage : Page
                 await ShowErrorAsync(fallbackError.Message);
             }
         }
+    }
+
+    private async void QueueWorker_Click(object sender, RoutedEventArgs e)
+    {
+        await ToggleBackgroundProcessAsync(SiteBackgroundProcessKind.Queue);
+    }
+
+    private async void Scheduler_Click(object sender, RoutedEventArgs e)
+    {
+        await ToggleBackgroundProcessAsync(SiteBackgroundProcessKind.Scheduler);
+    }
+
+    private async void BackgroundOutput_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not { } site) return;
+        var queue = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Queue);
+        var scheduler = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Scheduler);
+        var output = $"=== Queue ==={Environment.NewLine}{queue.Output}{Environment.NewLine}"
+            + $"=== Scheduler ==={Environment.NewLine}{scheduler.Output}";
+        await ShowCommandResultAsync(
+            AppLocalization.Get("SitesBackgroundOutputTitle"),
+            output,
+            true
+        );
+    }
+
+    private async Task ToggleBackgroundProcessAsync(SiteBackgroundProcessKind kind)
+    {
+        if (selectedSite is not { } site) return;
+        var state = siteProcesses.State(site.Path, kind);
+        if (state.Running)
+        {
+            await siteProcesses.StopAsync(site.Path, kind);
+            UpdateBackgroundProcessState();
+            return;
+        }
+        try
+        {
+            var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
+            await phpInstaller.EnsureManagedConfigurationAsync(cycle);
+            siteProcesses.Start(
+                site.Path,
+                kind,
+                phpInstaller.PhpExecutable(cycle),
+                composerTools.ManagedEnvironment(cycle)
+            );
+            UpdateBackgroundProcessState();
+        }
+        catch (Exception error) when (error is IOException or InvalidDataException
+            or InvalidOperationException or ArgumentException)
+        {
+            await ShowErrorAsync(error.Message);
+        }
+    }
+
+    private async void Composer_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not { } site) return;
+        var options = ComposerCommandRunner.Presets.Select(preset => new DisplayOption(
+            preset.Id,
+            AppLocalization.Get("SitesComposerPreset" + preset.Id.Replace("-", string.Empty))
+        )).Append(new DisplayOption("require", AppLocalization.Get("SitesComposerPresetrequire")))
+            .ToArray();
+        var commandBox = new ComboBox
+        {
+            Header = AppLocalization.Get("SitesComposerCommandField"),
+            ItemsSource = options,
+            SelectedIndex = 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var packageBox = new TextBox
+        {
+            Header = AppLocalization.Get("SitesComposerPackageField"),
+            PlaceholderText = "vendor/package",
+            Visibility = Visibility.Collapsed
+        };
+        commandBox.SelectionChanged += (_, _) =>
+        {
+            packageBox.Visibility = commandBox.SelectedItem is DisplayOption { Value: "require" }
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        };
+        var content = new StackPanel { Width = 430, Spacing = 10 };
+        content.Children.Add(commandBox);
+        content.Children.Add(packageBox);
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Format("SitesComposerDialogTitle", site.Name),
+            Content = content,
+            PrimaryButtonText = AppLocalization.Get("SitesRun"),
+            CloseButtonText = AppLocalization.Get("SitesCancel"),
+            DefaultButton = ContentDialogButton.Primary
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary
+            || commandBox.SelectedItem is not DisplayOption selection) return;
+
+        IReadOnlyList<string> arguments;
+        try
+        {
+            arguments = selection.Value == "require"
+                ? ComposerCommandRunner.RequireArguments(packageBox.Text)
+                : ComposerCommandRunner.Presets.Single(item => item.Id == selection.Value).Arguments;
+        }
+        catch (ArgumentException error)
+        {
+            await ShowErrorAsync(error.Message);
+            return;
+        }
+        await RunSiteOperationAsync(
+            AppLocalization.Get("SitesComposerRunning"),
+            async (progress, cancellationToken) =>
+            {
+                var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
+                await phpInstaller.EnsureManagedConfigurationAsync(cycle, cancellationToken);
+                var result = await ComposerCommandRunner.RunAsync(
+                    phpInstaller.PhpExecutable(cycle),
+                    composerTools.ComposerPath,
+                    site.Path,
+                    arguments,
+                    composerTools.ManagedEnvironment(cycle),
+                    progress,
+                    cancellationToken
+                );
+                await ShowCommandResultAsync(
+                    AppLocalization.Get("SitesComposerResultTitle"),
+                    result.Output,
+                    result.ExitCode == 0
+                );
+            }
+        );
+    }
+
+    private async void SiteDoctor_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not { } site) return;
+        var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
+        var checks = await SiteHealthInspector.InspectAsync(
+            site.Path,
+            site.Domain,
+            cycle,
+            phpInstaller,
+            composerTools,
+            certificates
+        );
+        var report = string.Join(Environment.NewLine, checks.Select(check =>
+            $"{(check.Healthy ? "[OK]" : "[!] ")} {check.Name}: {check.Detail}"
+        ));
+        HealthDetailsText.Text = AppLocalization.Format(
+            "SitesHealthSummary",
+            checks.Count(check => check.Healthy),
+            checks.Count
+        );
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Format("SitesDoctorTitle", site.Name),
+            Content = new TextBox
+            {
+                Text = report,
+                IsReadOnly = true,
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                Height = 300
+            },
+            PrimaryButtonText = AppLocalization.Get("SitesRepair"),
+            CloseButtonText = AppLocalization.Get("SitesDone")
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        await RunSiteOperationAsync(
+            AppLocalization.Get("SitesRepairing"),
+            async (progress, cancellationToken) =>
+            {
+                var document = await Task.Run(() => ProjectEnvironmentFile.Load(site.Path), cancellationToken);
+                if (!document.Exists && document.LoadedFromExample)
+                {
+                    _ = await Task.Run(() => ProjectEnvironmentFile.Save(
+                        site.Path,
+                        document.Contents,
+                        document.Revision
+                    ), cancellationToken);
+                }
+                if (!certificates.IsAuthorityTrusted()) certificates.TrustAuthority();
+                await phpInstaller.EnsureManagedConfigurationAsync(cycle, cancellationToken);
+                await environment.StartConfiguredAsync(settingsStore, cancellationToken);
+                await RefreshSiteDetailsAsync(site);
+            }
+        );
+    }
+
+    private async void PhpExtensions_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not { } site) return;
+        var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
+        await RunSiteOperationAsync(
+            AppLocalization.Get("SitesPhpExtensionsRepairing"),
+            async (_, cancellationToken) =>
+            {
+                await phpInstaller.EnsureManagedConfigurationAsync(cycle, cancellationToken);
+                var report = await coreClient.ValidatePhpAsync(
+                    phpInstaller.PhpExecutable(cycle),
+                    cancellationToken
+                );
+                await ShowCommandResultAsync(
+                    AppLocalization.Format("SitesPhpExtensionsTitle", cycle),
+                    string.Join(Environment.NewLine, report.Loaded.Order(StringComparer.OrdinalIgnoreCase)),
+                    report.Compatible
+                );
+            }
+        );
+    }
+
+    private void CancelSiteOperation_Click(object sender, RoutedEventArgs e)
+    {
+        siteOperationCancellation?.Cancel();
+    }
+
+    private async Task<bool> RunSiteOperationAsync(
+        string title,
+        Func<IProgress<string>, CancellationToken, Task> operation
+    )
+    {
+        siteOperationCancellation?.Cancel();
+        siteOperationCancellation?.Dispose();
+        var cancellation = new CancellationTokenSource();
+        siteOperationCancellation = cancellation;
+        SiteOperationBar.Title = title;
+        SiteOperationBar.Message = string.Empty;
+        SiteOperationBar.Severity = InfoBarSeverity.Informational;
+        SiteOperationBar.IsOpen = true;
+        SiteOperationProgress.Visibility = Visibility.Visible;
+        var progress = new Progress<string>(text =>
+        {
+            var value = (SiteOperationBar.Message + text).Trim();
+            SiteOperationBar.Message = value.Length > 2_000 ? value[^2_000..] : value;
+        });
+        try
+        {
+            await operation(progress, cancellation.Token);
+            SiteOperationBar.Severity = InfoBarSeverity.Success;
+            SiteOperationBar.Title = AppLocalization.Get("SitesOperationCompleted");
+            return true;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            SiteOperationBar.Severity = InfoBarSeverity.Warning;
+            SiteOperationBar.Title = AppLocalization.Get("SitesOperationCancelled");
+            return false;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException
+            or InvalidDataException or InvalidOperationException or ArgumentException)
+        {
+            SiteOperationBar.Severity = InfoBarSeverity.Error;
+            SiteOperationBar.Title = AppLocalization.Get("SitesOperationFailed");
+            SiteOperationBar.Message = error.Message;
+            return false;
+        }
+        finally
+        {
+            if (ReferenceEquals(siteOperationCancellation, cancellation))
+            {
+                siteOperationCancellation = null;
+            }
+            cancellation.Dispose();
+            SiteOperationProgress.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private async Task ShowCommandResultAsync(string title, string output, bool success)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = title,
+            Content = new TextBox
+            {
+                Text = string.IsNullOrWhiteSpace(output)
+                    ? AppLocalization.Get("SitesNoCommandOutput")
+                    : output,
+                IsReadOnly = true,
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.NoWrap,
+                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"),
+                Height = 320
+            },
+            CloseButtonText = AppLocalization.Get("SitesDone")
+        };
+        await dialog.ShowAsync();
     }
 
     private async void Artisan_Click(object sender, RoutedEventArgs e)

@@ -167,7 +167,9 @@ public sealed partial class MainWindow : Window
                     services.RuntimePolicy,
                     services.NodeInstaller,
                     services.ComposerTools,
-                    services.Services
+                    services.Services,
+                    services.SiteProcesses,
+                    services.Certificates
                 );
                 break;
             case "php":

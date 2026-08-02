@@ -295,6 +295,7 @@ public partial class App : Application
         trayIcon = null;
         await services.Dumps.StopAsync();
         await services.Mail.StopAsync();
+        await services.SiteProcesses.StopAllAsync();
         await services.Environment.StopAsync();
         await services.Services.StopAllAsync();
         MainWindow.Close();

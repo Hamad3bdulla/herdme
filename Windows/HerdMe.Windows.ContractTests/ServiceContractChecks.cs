@@ -16,6 +16,33 @@ internal static partial class ContractChecks
     internal static async Task VerifyServiceContractsAsync(string supportRoot)
     {
         Check(
+            ComposerCommandRunner.Presets.Select(preset => preset.Id).SequenceEqual(
+                new[] { "install", "update", "validate", "audit", "dump-autoload" }
+            ),
+            "site Composer commands expose a bounded, predictable preset list"
+        );
+        Check(
+            ComposerCommandRunner.RequireArguments("vendor/package").SequenceEqual(
+                new[] { "require", "vendor/package", "--no-interaction" }
+            ),
+            "site Composer package installation uses a structured argument list"
+        );
+        Throws<ArgumentException>(
+            () => ComposerCommandRunner.RequireArguments("--working-dir elsewhere"),
+            "site Composer package input cannot inject command options"
+        );
+        await using (var siteProcesses = new SiteProcessManager())
+        {
+            var processState = siteProcesses.State(
+                Path.Combine(supportRoot, "not-running"),
+                SiteBackgroundProcessKind.Queue
+            );
+            Check(
+                !processState.Running && processState.ExitCode is null,
+                "site background processes begin in an explicit stopped state"
+            );
+        }
+        Check(
             new ManagedServiceInstance().StartAutomatically,
             "new managed service instances start automatically"
         );
@@ -24,6 +51,22 @@ internal static partial class ContractChecks
         Check(ManagedServiceCatalog.Get("postgresql").DefaultPort == 5_432, "Windows service catalog includes PostgreSQL");
         Check(ManagedServiceCatalog.Get("redis").DefaultPort == 6_379, "Windows service catalog includes Redis");
         Check(ManagedServiceCatalog.Get("rustfs").DefaultPort == 9_000, "Windows service catalog includes RustFS");
+        var tablePlusSite = TablePlusConnection.UriForDatabase(
+            new ManagedServiceInstance
+            {
+                DefinitionId = "postgresql",
+                Name = "PostgreSQL",
+                Port = 5_432
+            },
+            new SiteDatabaseProvisioning("example", "herdme_example", "secret123")
+        );
+        Check(
+            tablePlusSite is not null
+                && tablePlusSite.Scheme == "postgresql"
+                && tablePlusSite.AbsolutePath == "/example"
+                && tablePlusSite.UserInfo.StartsWith("herdme_example:", StringComparison.Ordinal),
+            "site databases open TablePlus with their dedicated database and credentials"
+        );
         var valkeyDefinition = ManagedServiceCatalog.Get("valkey");
         Check(valkeyDefinition.DefaultPort == 6_379, "Windows service catalog includes Valkey");
         Check(!valkeyDefinition.IsInstallable, "Valkey is disabled without an official native Windows package");

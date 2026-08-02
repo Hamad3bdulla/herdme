@@ -50,6 +50,7 @@ public sealed class AppServices
             Services
         );
         SiteRuntimes = new SiteRuntimeStore();
+        SiteProcesses = new SiteProcessManager();
         InitialSetup = new InitialSetupManager(
             SiteSettings,
             Hosts,
@@ -103,6 +104,8 @@ public sealed class AppServices
     public ManagedComponentUpdateManager ComponentUpdates { get; }
 
     public SiteRuntimeStore SiteRuntimes { get; }
+
+    public SiteProcessManager SiteProcesses { get; }
 
     public InitialSetupManager InitialSetup { get; }
 }
