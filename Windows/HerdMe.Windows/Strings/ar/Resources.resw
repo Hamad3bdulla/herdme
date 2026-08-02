@@ -608,10 +608,30 @@
   <data name="SitesDatabaseEnvironmentUpdated" xml:space="preserve"><value>تمت إضافة {0} متغيرات وتحديث {1} متغيرات في .env.</value></data>
   <data name="SitesComposerCommand.Label" xml:space="preserve"><value>تشغيل أمر Composer</value></data>
   <data name="SitesDoctorCommand.Label" xml:space="preserve"><value>فحص وإصلاح الموقع</value></data>
+  <data name="SitesPerformanceCommand.Label" xml:space="preserve"><value>الأداء</value></data>
+  <data name="SitesPerformanceDetailsLabel.Text" xml:space="preserve"><value>الأداء</value></data>
+  <data name="SitesPerformanceSummary" xml:space="preserve"><value>{0} طلب، متوسط {1:0.0} مللي ثانية، {2} أخطاء خادم</value></data>
+  <data name="SitesPerformanceReport" xml:space="preserve"><value>الطلبات: {0}&#xA;النشطة: {1}&#xA;أخطاء الخادم: {2}&#xA;المتوسط: {3:0.0} مللي ثانية&#xA;الأبطأ: {4:0.0} مللي ثانية&#xA;آخر طلب: {5}</value></data>
+  <data name="SitesPerformanceTitle" xml:space="preserve"><value>أداء {0}</value></data>
+  <data name="SitesPerformanceReset" xml:space="preserve"><value>تصفير العدادات</value></data>
+  <data name="SitesPerformanceNever" xml:space="preserve"><value>لا يوجد</value></data>
+  <data name="SitesPerformanceNoRequests" xml:space="preserve"><value>لم تُسجّل طلبات بعد.</value></data>
+  <data name="SitesManageScheduler" xml:space="preserve"><value>إدارة المجدول</value></data>
+  <data name="SitesSchedulerTitle" xml:space="preserve"><value>مجدول {0}</value></data>
+  <data name="SitesSchedulerRefresh" xml:space="preserve"><value>تحديث قائمة المهام</value></data>
+  <data name="SitesSchedulerTasks" xml:space="preserve"><value>المهام المجدولة</value></data>
+  <data name="SitesSchedulerOutput" xml:space="preserve"><value>مخرجات المجدول</value></data>
+  <data name="SitesSchedulerRunningSince" xml:space="preserve"><value>المجدول يعمل منذ {0}</value></data>
+  <data name="SitesSchedulerStopped" xml:space="preserve"><value>المجدول متوقف</value></data>
+  <data name="SitesRepairEnvironment" xml:space="preserve"><value>جارٍ إصلاح البيئة</value></data>
+  <data name="SitesRepairRuntime" xml:space="preserve"><value>جارٍ إصلاح PHP وComposer</value></data>
+  <data name="SitesRepairDependencies" xml:space="preserve"><value>جارٍ تثبيت اعتماديات المشروع</value></data>
+  <data name="SitesRepairLaravel" xml:space="preserve"><value>جارٍ إصلاح ملفات Laravel وذاكرته المؤقتة</value></data>
+  <data name="SitesRepairLocalServer" xml:space="preserve"><value>جارٍ إصلاح HTTPS والخادم المحلي</value></data>
   <data name="SitesPhpExtensionsCommand.Label" xml:space="preserve"><value>إضافات PHP</value></data>
   <data name="SitesCancelOperationButton.Content" xml:space="preserve"><value>إلغاء</value></data>
   <data name="SitesQueueWorkerButton.Content" xml:space="preserve"><value>تشغيل قائمة الانتظار</value></data>
-  <data name="SitesSchedulerButton.Content" xml:space="preserve"><value>تشغيل المجدول</value></data>
+  <data name="SitesSchedulerButton.Content" xml:space="preserve"><value>إدارة المجدول</value></data>
   <data name="SitesStartQueueWorker" xml:space="preserve"><value>تشغيل قائمة الانتظار</value></data>
   <data name="SitesStopQueueWorker" xml:space="preserve"><value>إيقاف قائمة الانتظار</value></data>
   <data name="SitesStartScheduler" xml:space="preserve"><value>تشغيل المجدول</value></data>

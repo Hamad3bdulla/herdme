@@ -826,6 +826,7 @@ public sealed partial class SitesPage : Page
             DatabaseDetailsText.Text = AppLocalization.Get("SitesDatabaseNotConfigured");
         }
         HealthDetailsText.Text = AppLocalization.Get("SitesHealthCheckAvailable");
+        UpdatePerformanceDetails(site);
         UrlButton.Content = SitePresentation.DisplayAddress(
             site,
             environment.IsRunning,
@@ -850,15 +851,24 @@ public sealed partial class SitesPage : Page
         QueueWorkerButton.Content = AppLocalization.Get(
             queue.Running ? "SitesStopQueueWorker" : "SitesStartQueueWorker"
         );
-        SchedulerButton.Content = AppLocalization.Get(
-            scheduler.Running ? "SitesStopScheduler" : "SitesStartScheduler"
-        );
+        SchedulerButton.Content = AppLocalization.Get("SitesManageScheduler");
         BackgroundProcessesText.Text = AppLocalization.Format(
             "SitesBackgroundProcessStatus",
             queue.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped"),
             scheduler.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped")
         );
         ProcessesDetailsText.Text = BackgroundProcessesText.Text;
+    }
+
+    private void UpdatePerformanceDetails(SiteRecord site)
+    {
+        var snapshot = environment.Performance(site.Domain);
+        PerformanceDetailsText.Text = AppLocalization.Format(
+            "SitesPerformanceSummary",
+            snapshot.RequestCount,
+            snapshot.AverageDuration.TotalMilliseconds,
+            snapshot.ServerErrorCount
+        );
     }
 
     private async Task RefreshSiteDetailsAsync(SiteRecord site)
@@ -1949,7 +1959,184 @@ public sealed partial class SitesPage : Page
 
     private async void Scheduler_Click(object sender, RoutedEventArgs e)
     {
-        await ToggleBackgroundProcessAsync(SiteBackgroundProcessKind.Scheduler);
+        if (selectedSite is not { } site) return;
+        await ShowSchedulerManagerAsync(site);
+    }
+
+    private async Task ShowSchedulerManagerAsync(SiteRecord site)
+    {
+        var stateText = new TextBlock { FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
+        var tasksBox = new TextBox
+        {
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.NoWrap,
+            Height = 230,
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
+        };
+        var outputBox = new TextBox
+        {
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.NoWrap,
+            Height = 150,
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
+        };
+        var progress = new ProgressRing { Width = 18, Height = 18 };
+        var startStopButton = new Button();
+        var refreshButton = new Button { Content = AppLocalization.Get("SitesSchedulerRefresh") };
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8
+        };
+        buttons.Children.Add(startStopButton);
+        buttons.Children.Add(refreshButton);
+        buttons.Children.Add(progress);
+        var content = new StackPanel { Spacing = 10, Width = 620 };
+        content.Children.Add(stateText);
+        content.Children.Add(buttons);
+        content.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.Get("SitesSchedulerTasks"),
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+        });
+        content.Children.Add(tasksBox);
+        content.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.Get("SitesSchedulerOutput"),
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+        });
+        content.Children.Add(outputBox);
+        using var cancellation = new CancellationTokenSource();
+        var loading = false;
+        var schedulerActionRunning = false;
+        var loadTask = Task.CompletedTask;
+
+        void RefreshProcessState()
+        {
+            var state = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Scheduler);
+            startStopButton.Content = AppLocalization.Get(
+                state.Running ? "SitesStopScheduler" : "SitesStartScheduler"
+            );
+            stateText.Text = state.Running
+                ? AppLocalization.Format(
+                    "SitesSchedulerRunningSince",
+                    state.StartedAt?.ToLocalTime().ToString("g") ?? string.Empty
+                )
+                : AppLocalization.Get("SitesSchedulerStopped");
+            outputBox.Text = string.IsNullOrWhiteSpace(state.Output)
+                ? AppLocalization.Get("SitesNoCommandOutput")
+                : state.Output;
+        }
+
+        async Task LoadTasksAsync()
+        {
+            if (loading) return;
+            loading = true;
+            refreshButton.IsEnabled = false;
+            progress.IsActive = true;
+            try
+            {
+                var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
+                var php = phpInstaller.PhpExecutable(cycle);
+                await runtimePolicy.PrepareLaunchAsync(php, cycle, cancellation.Token);
+                var result = await ArtisanCommandRunner.RunAsync(
+                    php,
+                    site.Path,
+                    ["schedule:list", "--no-ansi", "--no-interaction"],
+                    composerTools.ManagedEnvironment(cycle),
+                    TimeSpan.FromMinutes(2),
+                    cancellationToken: cancellation.Token
+                );
+                tasksBox.Text = string.IsNullOrWhiteSpace(result.Output)
+                    ? AppLocalization.Get("SitesNoCommandOutput")
+                    : result.Output;
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+            }
+            catch (Exception error) when (error is IOException or InvalidDataException
+                or InvalidOperationException or ArgumentException or TimeoutException)
+            {
+                tasksBox.Text = error.Message;
+            }
+            finally
+            {
+                loading = false;
+                refreshButton.IsEnabled = true;
+                progress.IsActive = false;
+            }
+        }
+
+        startStopButton.Click += async (_, _) =>
+        {
+            schedulerActionRunning = true;
+            startStopButton.IsEnabled = false;
+            try
+            {
+                var state = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Scheduler);
+                if (state.Running)
+                {
+                    await siteProcesses.StopAsync(site.Path, SiteBackgroundProcessKind.Scheduler);
+                }
+                else
+                {
+                    var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
+                    await phpInstaller.EnsureManagedConfigurationAsync(cycle, cancellation.Token);
+                    siteProcesses.Start(
+                        site.Path,
+                        SiteBackgroundProcessKind.Scheduler,
+                        phpInstaller.PhpExecutable(cycle),
+                        composerTools.ManagedEnvironment(cycle)
+                    );
+                }
+            }
+            catch (Exception error) when (error is IOException or InvalidDataException
+                or InvalidOperationException or ArgumentException)
+            {
+                outputBox.Text = error.Message;
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+            }
+            finally
+            {
+                schedulerActionRunning = false;
+                startStopButton.IsEnabled = true;
+                RefreshProcessState();
+            }
+        };
+        refreshButton.Click += async (_, _) =>
+        {
+            loadTask = LoadTasksAsync();
+            await loadTask;
+        };
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) => RefreshProcessState();
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Format("SitesSchedulerTitle", site.Name),
+            Content = content,
+            CloseButtonText = AppLocalization.Get("SitesClose")
+        };
+        dialog.Closing += (_, args) =>
+        {
+            if (schedulerActionRunning) args.Cancel = true;
+        };
+        dialog.Opened += async (_, _) =>
+        {
+            RefreshProcessState();
+            timer.Start();
+            loadTask = LoadTasksAsync();
+            await loadTask;
+        };
+        await dialog.ShowAsync();
+        timer.Stop();
+        cancellation.Cancel();
+        await loadTask;
+        UpdateBackgroundProcessState();
     }
 
     private async void BackgroundOutput_Click(object sender, RoutedEventArgs e)
@@ -2073,6 +2260,70 @@ public sealed partial class SitesPage : Page
         );
     }
 
+    private async void Performance_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not { } site) return;
+        var summary = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        var recent = new TextBox
+        {
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.NoWrap,
+            Height = 340,
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
+        };
+        var resetButton = new Button { Content = AppLocalization.Get("SitesPerformanceReset") };
+        var content = new StackPanel { Spacing = 12, Width = 650 };
+        content.Children.Add(summary);
+        content.Children.Add(resetButton);
+        content.Children.Add(recent);
+
+        void RefreshPerformance()
+        {
+            var snapshot = environment.Performance(site.Domain);
+            var lastRequest = snapshot.LastRequestAt?.ToLocalTime().ToString("g")
+                ?? AppLocalization.Get("SitesPerformanceNever");
+            summary.Text = AppLocalization.Format(
+                "SitesPerformanceReport",
+                snapshot.RequestCount,
+                snapshot.ActiveRequests,
+                snapshot.ServerErrorCount,
+                snapshot.AverageDuration.TotalMilliseconds,
+                snapshot.SlowestDuration.TotalMilliseconds,
+                lastRequest
+            );
+            recent.Text = snapshot.RecentRequests.Count == 0
+                ? AppLocalization.Get("SitesPerformanceNoRequests")
+                : string.Join(Environment.NewLine, snapshot.RecentRequests.Select(request =>
+                    $"{request.Timestamp.ToLocalTime():HH:mm:ss}  {request.StatusCode}  "
+                    + $"{request.Duration.TotalMilliseconds,8:0.0} ms  {request.Method} {request.Target}"
+                ));
+            UpdatePerformanceDetails(site);
+        }
+
+        resetButton.Click += (_, _) =>
+        {
+            environment.ResetPerformance(site.Domain);
+            RefreshPerformance();
+        };
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) => RefreshPerformance();
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Format("SitesPerformanceTitle", site.Name),
+            Content = content,
+            CloseButtonText = AppLocalization.Get("SitesClose")
+        };
+        dialog.Opened += (_, _) =>
+        {
+            RefreshPerformance();
+            timer.Start();
+        };
+        await dialog.ShowAsync();
+        timer.Stop();
+    }
+
     private async void SiteDoctor_Click(object sender, RoutedEventArgs e)
     {
         if (selectedSite is not { } site) return;
@@ -2113,21 +2364,148 @@ public sealed partial class SitesPage : Page
             AppLocalization.Get("SitesRepairing"),
             async (progress, cancellationToken) =>
             {
+                progress.Report(AppLocalization.Get("SitesRepairEnvironment") + Environment.NewLine);
                 var document = await Task.Run(() => ProjectEnvironmentFile.Load(site.Path), cancellationToken);
-                if (!document.Exists && document.LoadedFromExample)
+                if (!document.Exists)
                 {
-                    _ = await Task.Run(() => ProjectEnvironmentFile.Save(
+                    document = await Task.Run(() => ProjectEnvironmentFile.Save(
                         site.Path,
                         document.Contents,
                         document.Revision
                     ), cancellationToken);
                 }
-                if (!certificates.IsAuthorityTrusted()) certificates.TrustAuthority();
+                if (SiteHealthInspector.EnvironmentValue(document.Contents, "APP_KEY") is null
+                    && File.Exists(Path.Combine(site.Path, "artisan")))
+                {
+                    _ = ServiceEnvironmentFile.Update(
+                        site.Path,
+                        [new ServiceEnvironmentVariable("APP_KEY", string.Empty)],
+                        "Laravel application key"
+                    );
+                    document = await Task.Run(
+                        () => ProjectEnvironmentFile.Load(site.Path),
+                        cancellationToken
+                    );
+                }
+
+                progress.Report(AppLocalization.Get("SitesRepairRuntime") + Environment.NewLine);
                 await phpInstaller.EnsureManagedConfigurationAsync(cycle, cancellationToken);
+                if (!File.Exists(composerTools.ComposerPath))
+                {
+                    await composerTools.InstallOrUpdateAsync(cycle, cancellationToken);
+                }
+                var php = phpInstaller.PhpExecutable(cycle);
+                var managedEnvironment = composerTools.ManagedEnvironment(cycle);
+                if (File.Exists(Path.Combine(site.Path, "composer.json"))
+                    && !File.Exists(Path.Combine(site.Path, "vendor", "autoload.php")))
+                {
+                    progress.Report(AppLocalization.Get("SitesRepairDependencies") + Environment.NewLine);
+                    var composerResult = await ComposerCommandRunner.RunAsync(
+                        php,
+                        composerTools.ComposerPath,
+                        site.Path,
+                        ["install", "--no-interaction"],
+                        managedEnvironment,
+                        progress,
+                        cancellationToken
+                    );
+                    if (composerResult.ExitCode != 0)
+                    {
+                        throw new InvalidOperationException(composerResult.Output);
+                    }
+                }
+
+                if (File.Exists(Path.Combine(site.Path, "artisan")))
+                {
+                    progress.Report(AppLocalization.Get("SitesRepairLaravel") + Environment.NewLine);
+                    foreach (var directory in LaravelWritableDirectories(site.Path))
+                    {
+                        Directory.CreateDirectory(directory);
+                    }
+                    if (string.IsNullOrWhiteSpace(
+                        SiteHealthInspector.EnvironmentValue(document.Contents, "APP_KEY")
+                    ))
+                    {
+                        await RunRepairArtisanAsync(
+                            site,
+                            php,
+                            managedEnvironment,
+                            ["key:generate", "--force", "--no-interaction"],
+                            progress,
+                            cancellationToken
+                        );
+                    }
+                    if (!Directory.Exists(Path.Combine(site.Path, "public", "storage")))
+                    {
+                        await RunRepairArtisanAsync(
+                            site,
+                            php,
+                            managedEnvironment,
+                            ["storage:link", "--no-interaction"],
+                            progress,
+                            cancellationToken
+                        );
+                    }
+                    await RunRepairArtisanAsync(
+                        site,
+                        php,
+                        managedEnvironment,
+                        ["optimize:clear", "--no-interaction"],
+                        progress,
+                        cancellationToken
+                    );
+                }
+
+                progress.Report(AppLocalization.Get("SitesRepairLocalServer") + Environment.NewLine);
+                if (!certificates.IsAuthorityTrusted()) certificates.TrustAuthority();
                 await environment.StartConfiguredAsync(settingsStore, cancellationToken);
+                var repairedChecks = await SiteHealthInspector.InspectAsync(
+                    site.Path,
+                    site.Domain,
+                    cycle,
+                    phpInstaller,
+                    composerTools,
+                    certificates,
+                    cancellationToken
+                );
+                HealthDetailsText.Text = AppLocalization.Format(
+                    "SitesHealthSummary",
+                    repairedChecks.Count(check => check.Healthy),
+                    repairedChecks.Count
+                );
                 await RefreshSiteDetailsAsync(site);
             }
         );
+    }
+
+    private static IReadOnlyList<string> LaravelWritableDirectories(string sitePath) =>
+    [
+        Path.Combine(sitePath, "storage", "framework", "cache"),
+        Path.Combine(sitePath, "storage", "framework", "sessions"),
+        Path.Combine(sitePath, "storage", "framework", "views"),
+        Path.Combine(sitePath, "storage", "logs"),
+        Path.Combine(sitePath, "bootstrap", "cache")
+    ];
+
+    private static async Task RunRepairArtisanAsync(
+        SiteRecord site,
+        string php,
+        IReadOnlyDictionary<string, string> environment,
+        IReadOnlyList<string> arguments,
+        IProgress<string> progress,
+        CancellationToken cancellationToken
+    )
+    {
+        var result = await ArtisanCommandRunner.RunAsync(
+            php,
+            site.Path,
+            arguments,
+            environment,
+            TimeSpan.FromMinutes(10),
+            progress,
+            cancellationToken
+        );
+        if (result.ExitCode != 0) throw new InvalidOperationException(result.Output);
     }
 
     private async void PhpExtensions_Click(object sender, RoutedEventArgs e)

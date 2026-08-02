@@ -608,10 +608,30 @@
   <data name="SitesDatabaseEnvironmentUpdated" xml:space="preserve"><value>Added {0} and updated {1} variables in .env.</value></data>
   <data name="SitesComposerCommand.Label" xml:space="preserve"><value>Run Composer command</value></data>
   <data name="SitesDoctorCommand.Label" xml:space="preserve"><value>Check and repair site</value></data>
+  <data name="SitesPerformanceCommand.Label" xml:space="preserve"><value>Performance</value></data>
+  <data name="SitesPerformanceDetailsLabel.Text" xml:space="preserve"><value>Performance</value></data>
+  <data name="SitesPerformanceSummary" xml:space="preserve"><value>{0} requests, average {1:0.0} ms, {2} server errors</value></data>
+  <data name="SitesPerformanceReport" xml:space="preserve"><value>Requests: {0}&#xA;Active: {1}&#xA;Server errors: {2}&#xA;Average: {3:0.0} ms&#xA;Slowest: {4:0.0} ms&#xA;Last request: {5}</value></data>
+  <data name="SitesPerformanceTitle" xml:space="preserve"><value>Performance: {0}</value></data>
+  <data name="SitesPerformanceReset" xml:space="preserve"><value>Reset counters</value></data>
+  <data name="SitesPerformanceNever" xml:space="preserve"><value>Never</value></data>
+  <data name="SitesPerformanceNoRequests" xml:space="preserve"><value>No requests recorded yet.</value></data>
+  <data name="SitesManageScheduler" xml:space="preserve"><value>Manage scheduler</value></data>
+  <data name="SitesSchedulerTitle" xml:space="preserve"><value>Scheduler: {0}</value></data>
+  <data name="SitesSchedulerRefresh" xml:space="preserve"><value>Refresh task list</value></data>
+  <data name="SitesSchedulerTasks" xml:space="preserve"><value>Scheduled tasks</value></data>
+  <data name="SitesSchedulerOutput" xml:space="preserve"><value>Scheduler output</value></data>
+  <data name="SitesSchedulerRunningSince" xml:space="preserve"><value>Scheduler running since {0}</value></data>
+  <data name="SitesSchedulerStopped" xml:space="preserve"><value>Scheduler stopped</value></data>
+  <data name="SitesRepairEnvironment" xml:space="preserve"><value>Repairing environment</value></data>
+  <data name="SitesRepairRuntime" xml:space="preserve"><value>Repairing PHP and Composer</value></data>
+  <data name="SitesRepairDependencies" xml:space="preserve"><value>Installing project dependencies</value></data>
+  <data name="SitesRepairLaravel" xml:space="preserve"><value>Repairing Laravel files and caches</value></data>
+  <data name="SitesRepairLocalServer" xml:space="preserve"><value>Repairing local HTTPS and server</value></data>
   <data name="SitesPhpExtensionsCommand.Label" xml:space="preserve"><value>PHP extensions</value></data>
   <data name="SitesCancelOperationButton.Content" xml:space="preserve"><value>Cancel</value></data>
   <data name="SitesQueueWorkerButton.Content" xml:space="preserve"><value>Start queue</value></data>
-  <data name="SitesSchedulerButton.Content" xml:space="preserve"><value>Start scheduler</value></data>
+  <data name="SitesSchedulerButton.Content" xml:space="preserve"><value>Manage scheduler</value></data>
   <data name="SitesStartQueueWorker" xml:space="preserve"><value>Start queue</value></data>
   <data name="SitesStopQueueWorker" xml:space="preserve"><value>Stop queue</value></data>
   <data name="SitesStartScheduler" xml:space="preserve"><value>Start scheduler</value></data>

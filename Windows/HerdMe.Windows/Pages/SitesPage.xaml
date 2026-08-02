@@ -325,6 +325,9 @@
                                 <AppBarButton x:Uid="SitesDoctorCommand" Label="Check and repair site" Click="SiteDoctor_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Repair" /></AppBarButton.Icon>
                                 </AppBarButton>
+                                <AppBarButton x:Uid="SitesPerformanceCommand" Label="Performance" Click="Performance_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Clock" /></AppBarButton.Icon>
+                                </AppBarButton>
                                 <AppBarButton x:Uid="SitesPhpExtensionsCommand" Label="PHP extensions" Click="PhpExtensions_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Bullets" /></AppBarButton.Icon>
                                 </AppBarButton>
@@ -417,6 +420,7 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <TextBlock x:Uid="SitesFrameworkLabel" Text="Framework" Padding="0,10" FontWeight="SemiBold" />
                                 <TextBlock x:Name="FrameworkText" Grid.Column="1" Padding="0,10" />
@@ -444,6 +448,8 @@
                                 <TextBlock x:Name="ProcessesDetailsText" Grid.Row="11" Grid.Column="1" Padding="0,10" TextWrapping="Wrap" />
                                 <TextBlock x:Uid="SitesHealthDetailsLabel" Grid.Row="12" Text="Site health" Padding="0,10" FontWeight="SemiBold" />
                                 <TextBlock x:Name="HealthDetailsText" Grid.Row="12" Grid.Column="1" Padding="0,10" TextWrapping="Wrap" />
+                                <TextBlock x:Uid="SitesPerformanceDetailsLabel" Grid.Row="13" Text="Performance" Padding="0,10" FontWeight="SemiBold" />
+                                <TextBlock x:Name="PerformanceDetailsText" Grid.Row="13" Grid.Column="1" Padding="0,10" TextWrapping="Wrap" />
                                 </Grid>
                             </StackPanel>
                         </ScrollViewer>

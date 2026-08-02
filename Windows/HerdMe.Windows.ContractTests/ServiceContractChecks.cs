@@ -37,6 +37,20 @@ internal static partial class ContractChecks
                 && !SiteDatabaseProvisioner.IsSupportedImportFile("site.dump"),
             "site database imports accept plain or gzip-compressed SQL only"
         );
+        var mergedPerformance = WindowsLocalEnvironment.MergePerformance(
+            new SitePerformanceSnapshot(2, 1, 1, TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(20), DateTimeOffset.UtcNow, []),
+            new SitePerformanceSnapshot(1, 0, 0, TimeSpan.FromMilliseconds(40), TimeSpan.FromMilliseconds(40), DateTimeOffset.UtcNow.AddSeconds(-1), [])
+        );
+        Check(
+            mergedPerformance.RequestCount == 3
+                && mergedPerformance.ServerErrorCount == 1
+                && mergedPerformance.AverageDuration == TimeSpan.FromMilliseconds(20),
+            "site performance snapshots merge HTTP and HTTPS counters correctly"
+        );
+        Check(
+            SiteHealthInspector.EnvironmentValue("APP_KEY=base64:test\nDB_DATABASE=herdme", "APP_KEY") == "base64:test",
+            "site health reads Laravel environment values safely"
+        );
         await using (var siteProcesses = new SiteProcessManager())
         {
             var processState = siteProcesses.State(

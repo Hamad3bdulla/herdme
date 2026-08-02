@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Security;
@@ -13,6 +14,24 @@ namespace HerdMe.Windows.Services;
 
 public sealed record LocalSiteDefinition(string Domain, string Path, int? PhpFastCgiPort = null);
 
+public sealed record SiteRequestMetric(
+    DateTimeOffset Timestamp,
+    string Method,
+    string Target,
+    int StatusCode,
+    TimeSpan Duration
+);
+
+public sealed record SitePerformanceSnapshot(
+    long RequestCount,
+    long ServerErrorCount,
+    int ActiveRequests,
+    TimeSpan AverageDuration,
+    TimeSpan SlowestDuration,
+    DateTimeOffset? LastRequestAt,
+    IReadOnlyList<SiteRequestMetric> RecentRequests
+);
+
 public sealed class LocalHttpSiteServer : IAsyncDisposable
 {
     private const int MaximumHeaderSize = 1 * 1_024 * 1_024;
@@ -21,6 +40,8 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     private static readonly TimeSpan PersistentIdleTimeout = TimeSpan.FromSeconds(5);
     private readonly FastCgiClient fastCgiClient = new();
     private readonly ConcurrentDictionary<int, Task> sessions = new();
+    private readonly ConcurrentDictionary<string, SitePerformanceBucket> performance =
+        new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? cancellation;
     private TcpListener? listener;
     private Task? acceptTask;
@@ -32,6 +53,18 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     public int? Port { get; private set; }
 
     public bool IsRunning => listener is not null && acceptTask is { IsCompleted: false };
+
+    public SitePerformanceSnapshot Performance(string domain)
+    {
+        return performance.TryGetValue(NormalizeHost(domain), out var bucket)
+            ? bucket.Snapshot()
+            : EmptyPerformance();
+    }
+
+    public void ResetPerformance(string domain)
+    {
+        performance.TryRemove(NormalizeHost(domain), out _);
+    }
 
     public Task<int> StartAsync(
         IEnumerable<LocalSiteDefinition> sites,
@@ -163,20 +196,44 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                     if (request is null) return;
 
                     var host = request.Header("Host")?.Split(':', 2)[0];
-                    if (host is null || !routes.TryGetValue(NormalizeHost(host), out var route))
+                    var normalizedHost = host is null ? null : NormalizeHost(host);
+                    if (normalizedHost is null || !routes.TryGetValue(normalizedHost, out var route))
                     {
                         await WriteErrorAsync(stream, "404 Not Found", cancellationToken);
                         return;
                     }
                     var keepAlive = request.AllowsPersistentConnection
                         && requestCount + 1 < MaximumPersistentRequests;
-                    if (!await WriteResponseAsync(
-                        stream,
-                        request,
-                        route,
-                        keepAlive,
-                        cancellationToken
-                    )) return;
+                    var bucket = performance.GetOrAdd(normalizedHost, _ => new SitePerformanceBucket());
+                    var startedAt = Stopwatch.GetTimestamp();
+                    bucket.Begin();
+                    try
+                    {
+                        var response = await WriteResponseAsync(
+                            stream,
+                            request,
+                            route,
+                            keepAlive,
+                            cancellationToken
+                        );
+                        bucket.Complete(
+                            request.Method,
+                            request.Target,
+                            response.StatusCode,
+                            Stopwatch.GetElapsedTime(startedAt)
+                        );
+                        if (!response.KeepAlive) return;
+                    }
+                    catch
+                    {
+                        bucket.Complete(
+                            request.Method,
+                            request.Target,
+                            502,
+                            Stopwatch.GetElapsedTime(startedAt)
+                        );
+                        throw;
+                    }
                 }
             }
             catch (HttpRequestException error)
@@ -218,7 +275,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         }
     }
 
-    private async Task<bool> WriteResponseAsync(
+    private async Task<LocalResponseResult> WriteResponseAsync(
         Stream destination,
         HttpRequestData request,
         SiteRoute route,
@@ -233,7 +290,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             if (request.Method is not ("GET" or "HEAD"))
             {
                 await destination.WriteAsync(ErrorResponse("405 Method Not Allowed"), cancellationToken);
-                return false;
+                return new LocalResponseResult(false, 405);
             }
             return await WriteStaticFileAsync(
                 destination,
@@ -268,7 +325,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             );
             await writer.CompleteAsync();
             if (result.StandardError.Length > 0) WritePhpLog(result.StandardError);
-            return writer.KeepsConnectionAlive;
+            return new LocalResponseResult(writer.KeepsConnectionAlive, writer.StatusCode);
         }
         catch (Exception error) when (writer.HasStarted && error is not OperationCanceledException)
         {
@@ -276,7 +333,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         }
     }
 
-    private static async Task<bool> WriteStaticFileAsync(
+    private static async Task<LocalResponseResult> WriteStaticFileAsync(
         Stream destination,
         string documentRoot,
         string path,
@@ -313,7 +370,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 ),
                 cancellationToken
             );
-            return keepAlive;
+            return new LocalResponseResult(keepAlive, 416);
         }
 
         var headers = new List<(string, string)>
@@ -338,7 +395,11 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             MakeResponseHead(selectedRange.IsPartial ? "206 Partial Content" : "200 OK", headers),
             cancellationToken
         );
-        if (request.Method == "HEAD" || selectedRange.Length == 0) return keepAlive;
+        var statusCode = selectedRange.IsPartial ? 206 : 200;
+        if (request.Method == "HEAD" || selectedRange.Length == 0)
+        {
+            return new LocalResponseResult(keepAlive, statusCode);
+        }
 
         file.Seek(selectedRange.Offset, SeekOrigin.Begin);
         var buffer = new byte[64 * 1_024];
@@ -353,7 +414,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             await destination.WriteAsync(buffer.AsMemory(0, count), cancellationToken);
             remaining -= count;
         }
-        return keepAlive;
+        return new LocalResponseResult(keepAlive, statusCode);
     }
 
     private static bool TrySelectByteRange(string? value, long fileSize, out ByteRange selectedRange)
@@ -681,7 +742,8 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             MakeResponseHead(status, headers),
             contentLength,
             bodyForbidden,
-            keepAlive
+            keepAlive,
+            statusCode
         );
     }
 
@@ -841,6 +903,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
 
         public bool HasStarted { get; private set; }
         public bool KeepsConnectionAlive { get; private set; }
+        public int StatusCode { get; private set; } = 200;
 
         public async ValueTask WriteAsync(
             ReadOnlyMemory<byte> content,
@@ -878,6 +941,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             declaredContentLength = parsed.ContentLength;
             bodyForbidden = parsed.BodyForbidden;
             KeepsConnectionAlive = parsed.KeepAlive;
+            StatusCode = parsed.StatusCode;
             var bodyOffset = delimiter.Index + delimiter.Length;
             var bufferedBody = buffered.AsSpan(bodyOffset).ToArray();
             headerBuffer.SetLength(0);
@@ -937,7 +1001,8 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         byte[] ResponseHead,
         long? ContentLength,
         bool BodyForbidden,
-        bool KeepAlive
+        bool KeepAlive,
+        int StatusCode
     );
 
     private sealed class HttpResponseStartedException : Exception
@@ -1292,7 +1357,80 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
 
     private sealed record SiteRoute(string DocumentRoot, int PhpFastCgiPort);
 
+    private readonly record struct LocalResponseResult(bool KeepAlive, int StatusCode);
+
     private readonly record struct ByteRange(long Offset, long Length, bool IsPartial);
+
+    private sealed class SitePerformanceBucket
+    {
+        private const int MaximumRecentRequests = 50;
+        private readonly object sync = new();
+        private readonly Queue<SiteRequestMetric> recent = new();
+        private long requestCount;
+        private long serverErrorCount;
+        private long totalDurationTicks;
+        private long slowestDurationTicks;
+        private int activeRequests;
+        private DateTimeOffset? lastRequestAt;
+
+        public void Begin() => Interlocked.Increment(ref activeRequests);
+
+        public void Complete(string method, string target, int statusCode, TimeSpan duration)
+        {
+            lock (sync)
+            {
+                requestCount++;
+                if (statusCode >= 500) serverErrorCount++;
+                totalDurationTicks += duration.Ticks;
+                slowestDurationTicks = Math.Max(slowestDurationTicks, duration.Ticks);
+                lastRequestAt = DateTimeOffset.UtcNow;
+                recent.Enqueue(new SiteRequestMetric(
+                    lastRequestAt.Value,
+                    method,
+                    DisplayTarget(target),
+                    statusCode,
+                    duration
+                ));
+                while (recent.Count > MaximumRecentRequests) recent.Dequeue();
+            }
+            Interlocked.Decrement(ref activeRequests);
+        }
+
+        public SitePerformanceSnapshot Snapshot()
+        {
+            lock (sync)
+            {
+                return new SitePerformanceSnapshot(
+                    requestCount,
+                    serverErrorCount,
+                    Volatile.Read(ref activeRequests),
+                    requestCount == 0
+                        ? TimeSpan.Zero
+                        : TimeSpan.FromTicks(totalDurationTicks / requestCount),
+                    TimeSpan.FromTicks(slowestDurationTicks),
+                    lastRequestAt,
+                    recent.Reverse().ToArray()
+                );
+            }
+        }
+
+        private static string DisplayTarget(string target)
+        {
+            var query = target.IndexOf('?');
+            var path = query < 0 ? target : target[..query];
+            return path.Length <= 256 ? path : path[..256] + "...";
+        }
+    }
+
+    private static SitePerformanceSnapshot EmptyPerformance() => new(
+        0,
+        0,
+        0,
+        TimeSpan.Zero,
+        TimeSpan.Zero,
+        null,
+        []
+    );
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern uint GetFinalPathNameByHandle(

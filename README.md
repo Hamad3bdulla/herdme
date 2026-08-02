@@ -42,8 +42,12 @@ C++20 core for shared contracts.
   before saving.
 - Run Composer commands and keep Laravel queue workers and schedulers running
   per site, with live status, captured output, cancellation, and clean shutdown.
-- Inspect and repair site health across `.env`, PHP extensions, Composer,
-  dependencies, HTTPS, and the local environment.
+- Inspect scheduled Laravel tasks and their next run, then start, stop, and
+  monitor the scheduler from the site page.
+- Monitor per-site request counts, active requests, server errors, response
+  times, and recent request paths without retaining query-string secrets.
+- Inspect and repair site health across `.env`, `APP_KEY`, Laravel storage,
+  PHP extensions, Composer dependencies, HTTPS, and the local environment.
 - Create, inspect, back up, import plain or gzip-compressed SQL, reset, open,
   and delete dedicated MySQL, MariaDB, and PostgreSQL databases for each site.
 - Safely remove projects created by HerdMe while protecting linked projects and

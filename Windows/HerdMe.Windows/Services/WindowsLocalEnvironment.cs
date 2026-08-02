@@ -54,6 +54,17 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
 
     public int? HttpsPort => httpsServer.Port;
 
+    public SitePerformanceSnapshot Performance(string domain)
+    {
+        return MergePerformance(httpServer.Performance(domain), httpsServer.Performance(domain));
+    }
+
+    public void ResetPerformance(string domain)
+    {
+        httpServer.ResetPerformance(domain);
+        httpsServer.ResetPerformance(domain);
+    }
+
     public async Task StartConfiguredAsync(
         SiteConfigurationStore store,
         CancellationToken cancellationToken = default
@@ -73,6 +84,42 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         );
         if (sites.Count == 0) return;
         await StartAsync(sites, cancellationToken);
+    }
+
+    internal static SitePerformanceSnapshot MergePerformance(
+        SitePerformanceSnapshot http,
+        SitePerformanceSnapshot https
+    )
+    {
+        var requestCount = http.RequestCount + https.RequestCount;
+        var averageTicks = requestCount == 0
+            ? 0
+            : (long)(
+                ((decimal)http.AverageDuration.Ticks * http.RequestCount
+                    + (decimal)https.AverageDuration.Ticks * https.RequestCount)
+                / requestCount
+            );
+        return new SitePerformanceSnapshot(
+            requestCount,
+            http.ServerErrorCount + https.ServerErrorCount,
+            http.ActiveRequests + https.ActiveRequests,
+            TimeSpan.FromTicks(averageTicks),
+            http.SlowestDuration >= https.SlowestDuration
+                ? http.SlowestDuration
+                : https.SlowestDuration,
+            LatestRequest(http.LastRequestAt, https.LastRequestAt),
+            http.RecentRequests.Concat(https.RecentRequests)
+                .OrderByDescending(request => request.Timestamp)
+                .Take(50)
+                .ToArray()
+        );
+    }
+
+    private static DateTimeOffset? LatestRequest(DateTimeOffset? left, DateTimeOffset? right)
+    {
+        if (left is null) return right;
+        if (right is null) return left;
+        return left >= right ? left : right;
     }
 
     public async Task<int> StartAsync(

@@ -349,6 +349,15 @@ internal static partial class ContractChecks
         );
         Check(get.StartsWith("HTTP/1.1 200 OK\r\n", StringComparison.Ordinal), "local HTTP serves static GET requests");
         Check(get.EndsWith("HerdMe static site", StringComparison.Ordinal), "local HTTP returns static file contents");
+        var performance = server.Performance("demo.local-test");
+        Check(
+            performance.RequestCount == 1
+                && performance.ServerErrorCount == 0
+                && performance.RecentRequests.Count == 1
+                && performance.RecentRequests[0].StatusCode == 200
+                && performance.RecentRequests[0].Target == "/",
+            "local HTTP records per-site request performance without query values"
+        );
 
         using (var sequentialClient = new TcpClient())
         {
