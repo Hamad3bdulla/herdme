@@ -792,7 +792,8 @@
   <data name="SitesDatabaseImportTargetTitle" xml:space="preserve"><value>اختر وجهة الاستيراد</value></data>
   <data name="SitesDatabaseImportTargetDescription" xml:space="preserve"><value>اختر الخدمة المشغلة وقاعدة البيانات المستهدفة، وسيكتشف HerdMe إن كانت موجودة.</value></data>
   <data name="SitesDatabaseImportExistingTitle" xml:space="preserve"><value>الاستيراد إلى قاعدة موجودة؟</value></data>
-  <data name="SitesDatabaseImportExistingWarning" xml:space="preserve"><value>قاعدة {0} موجودة. سيستورد HerdMe بيانات SQL بدون إعادة إنشاء القاعدة أو تغيير ملف .env للموقع. قد تتعارض الجداول أو الصفوف الموجودة.</value></data>
+  <data name="SitesDatabaseImportExistingWarning" xml:space="preserve"><value>قاعدة {0} موجودة. سيحافظ HerdMe على الجداول والصفوف الحالية، ويتجاهل المفاتيح الأساسية أو الفريدة الموجودة، ويستورد البيانات الناقصة فقط. لن يغيّر ملف .env للموقع.</value></data>
+  <data name="SitesDatabaseImportExistingPostgreSqlWarning" xml:space="preserve"><value>قاعدة {0} موجودة. سيستورد HerdMe دون إعادة إنشاء القاعدة أو تغيير ملف .env للموقع. قد تُظهر ملفات PostgreSQL تعارضات للجداول أو الصفوف الموجودة.</value></data>
   <data name="SitesDatabaseImportCreateTitle" xml:space="preserve"><value>إنشاء القاعدة والاستيراد؟</value></data>
   <data name="SitesDatabaseImportCreateMessage" xml:space="preserve"><value>قاعدة {0} غير موجودة. سينشئها HerdMe ويستورد بيانات SQL ويضيف بيانات الاتصال المولدة إلى ملف .env للموقع.</value></data>
   <data name="SitesDatabaseImport" xml:space="preserve"><value>استيراد</value></data>

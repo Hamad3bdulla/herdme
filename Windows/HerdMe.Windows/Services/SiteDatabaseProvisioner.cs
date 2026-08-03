@@ -179,6 +179,7 @@ public static class SiteDatabaseProvisioner
             progress: null,
             normalizeSql: false,
             mysql: false,
+            mergeExisting: false,
             cancellationToken
         );
     }
@@ -190,7 +191,8 @@ public static class SiteDatabaseProvisioner
         SiteDatabaseProvisioning provisioning,
         string source,
         CancellationToken cancellationToken = default,
-        IProgress<DatabaseTransferProgress>? progress = null
+        IProgress<DatabaseTransferProgress>? progress = null,
+        bool mergeExisting = false
     )
     {
         RequireConnectionProvisioning(provisioning);
@@ -239,6 +241,7 @@ public static class SiteDatabaseProvisioner
             progress,
             normalizeSql: true,
             mysql,
+            mergeExisting,
             cancellationToken
         );
     }
@@ -675,6 +678,7 @@ public static class SiteDatabaseProvisioner
         IProgress<DatabaseTransferProgress>? progress,
         bool normalizeSql,
         bool mysql,
+        bool mergeExisting,
         CancellationToken cancellationToken
     )
     {
@@ -701,7 +705,15 @@ public static class SiteDatabaseProvisioner
             ?? throw new InvalidOperationException("The database transfer could not be started.");
         var error = process.StandardError.ReadToEndAsync(cancellationToken);
         var transfer = inputPath is not null
-            ? CopyInputAsync(process, inputPath, normalizeSql, mysql, progress, cancellationToken)
+            ? CopyInputAsync(
+                process,
+                inputPath,
+                normalizeSql,
+                mysql,
+                mergeExisting,
+                progress,
+                cancellationToken
+            )
             : CopyOutputAsync(process, outputPath!, cancellationToken);
         Exception? transferFailure = null;
         try
@@ -759,6 +771,7 @@ public static class SiteDatabaseProvisioner
         string path,
         bool normalizeSql,
         bool mysql,
+        bool mergeExisting,
         IProgress<DatabaseTransferProgress>? progress,
         CancellationToken cancellationToken
     )
@@ -812,6 +825,9 @@ public static class SiteDatabaseProvisioner
                 );
                 var buffer = new char[64 * 1_024];
                 var pending = string.Empty;
+                var mysqlNormalizer = mysql
+                    ? new MySqlStreamNormalizer(mergeExisting)
+                    : null;
                 while (true)
                 {
                     var count = await reader.ReadAsync(buffer.AsMemory(), cancellationToken);
@@ -824,11 +840,21 @@ public static class SiteDatabaseProvisioner
                     var safeLength = Math.Max(0, combined.Length - 256);
                     var ready = combined[..safeLength];
                     pending = combined[safeLength..];
-                    if (mysql) ready = NormalizeMySql(ready, ref compatibilityFixes);
+                    if (mysql)
+                    {
+                        var previousFixes = mysqlNormalizer!.Fixes;
+                        ready = mysqlNormalizer.Rewrite(ready);
+                        compatibilityFixes += mysqlNormalizer.Fixes - previousFixes;
+                    }
                     await writer.WriteAsync(ready.AsMemory(), cancellationToken);
                     Report(source.Position);
                 }
-                if (mysql) pending = NormalizeMySql(pending, ref compatibilityFixes);
+                if (mysql)
+                {
+                    var previousFixes = mysqlNormalizer!.Fixes;
+                    pending = mysqlNormalizer.Rewrite(pending);
+                    compatibilityFixes += mysqlNormalizer.Fixes - previousFixes;
+                }
                 await writer.WriteAsync(pending.AsMemory(), cancellationToken);
                 await writer.FlushAsync(cancellationToken);
             }
@@ -848,16 +874,291 @@ public static class SiteDatabaseProvisioner
         }
     }
 
-    internal static string NormalizeMySql(string sql, ref int fixes)
+    internal static string NormalizeMySql(
+        string sql,
+        ref int fixes,
+        bool mergeExisting = false
+    )
     {
-        var replacements = 0;
-        var normalized = UnsupportedMySqlCollation.Replace(sql, match =>
-        {
-            replacements++;
-            return match.Groups[1].Value + "utf8mb4_unicode_ci";
-        });
-        fixes += replacements;
+        var normalizer = new MySqlStreamNormalizer(mergeExisting);
+        var normalized = normalizer.Rewrite(sql);
+        fixes += normalizer.Fixes;
         return normalized;
+    }
+
+    internal sealed class MySqlStreamNormalizer(bool mergeExisting)
+    {
+        private bool skippingDestructiveStatement;
+        private bool atLineStart = true;
+        private bool escaped;
+        private bool inBlockComment;
+        private bool inLineComment;
+        private char quote;
+
+        public int Fixes { get; private set; }
+
+        public string Rewrite(string sql)
+        {
+            var normalized = UnsupportedMySqlCollation.Replace(sql, match =>
+            {
+                Fixes++;
+                return match.Groups[1].Value + "utf8mb4_unicode_ci";
+            });
+            if (!mergeExisting) return normalized;
+
+            return RewriteMergeStatements(normalized);
+        }
+
+        private string RewriteMergeStatements(string sql)
+        {
+            var output = new StringBuilder(sql.Length);
+            var index = 0;
+            while (index < sql.Length)
+            {
+                if (skippingDestructiveStatement)
+                {
+                    SkipDestructiveCharacter(sql, output, ref index);
+                    continue;
+                }
+
+                if (quote == '\0' && !inBlockComment && !inLineComment && atLineStart)
+                {
+                    var token = index;
+                    while (token < sql.Length && sql[token] is ' ' or '\t') token++;
+                    if (token > index)
+                    {
+                        output.Append(sql.AsSpan(index, token - index));
+                        index = token;
+                        continue;
+                    }
+                    if (TryConsumePhrase(sql, token, "DROP", "TABLE", out _)
+                        || TryConsumePhrase(sql, token, "DROP", "DATABASE", out _)
+                        || TryConsumePhrase(sql, token, "TRUNCATE", "TABLE", out _)
+                        || TryConsumePhrase(sql, token, "DELETE", "FROM", out _)
+                        || TryConsumePhrase(sql, token, "ALTER", "TABLE", out _)
+                        || TryConsumePhrase(sql, token, "CREATE", "DATABASE", out _)
+                        || TryConsumeKeyword(sql, token, "UPDATE", out _)
+                        || TryConsumeKeyword(sql, token, "USE", out _))
+                    {
+                        skippingDestructiveStatement = true;
+                        Fixes++;
+                        continue;
+                    }
+                    if (TryConsumePhrase(sql, token, "CREATE", "TABLE", out var createEnd)
+                        && !TryConsumePhrase(sql, createEnd, "IF", "NOT", "EXISTS", out _))
+                    {
+                        output.Append("CREATE TABLE IF NOT EXISTS");
+                        index = createEnd;
+                        atLineStart = false;
+                        Fixes++;
+                        continue;
+                    }
+                    if (TryConsumePhrase(sql, token, "INSERT", "INTO", out var insertEnd)
+                        || TryConsumePhrase(sql, token, "REPLACE", "INTO", out insertEnd))
+                    {
+                        output.Append("INSERT IGNORE INTO");
+                        index = insertEnd;
+                        atLineStart = false;
+                        Fixes++;
+                        continue;
+                    }
+                }
+
+                AppendCharacter(sql, output, ref index);
+            }
+            return output.ToString();
+        }
+
+        private void SkipDestructiveCharacter(
+            string sql,
+            StringBuilder output,
+            ref int index
+        )
+        {
+            var character = sql[index];
+            if (quote != '\0')
+            {
+                if (escaped)
+                {
+                    escaped = false;
+                }
+                else if (character == '\\')
+                {
+                    escaped = true;
+                }
+                else if (character == quote)
+                {
+                    if (index + 1 < sql.Length && sql[index + 1] == quote)
+                    {
+                        index++;
+                    }
+                    else
+                    {
+                        quote = '\0';
+                    }
+                }
+            }
+            else if (character is '\'' or '"' or '`')
+            {
+                quote = character;
+            }
+            else if (character == ';')
+            {
+                skippingDestructiveStatement = false;
+                atLineStart = false;
+            }
+            if (character == '\n')
+            {
+                output.Append(character);
+                atLineStart = true;
+            }
+            index++;
+        }
+
+        private void AppendCharacter(string sql, StringBuilder output, ref int index)
+        {
+            var character = sql[index];
+            output.Append(character);
+            if (inLineComment)
+            {
+                if (character == '\n')
+                {
+                    inLineComment = false;
+                    atLineStart = true;
+                }
+                index++;
+                return;
+            }
+            if (inBlockComment)
+            {
+                if (character == '*' && index + 1 < sql.Length && sql[index + 1] == '/')
+                {
+                    output.Append('/');
+                    index += 2;
+                    inBlockComment = false;
+                    return;
+                }
+                if (character == '\n') atLineStart = true;
+                else if (character is not ' ' and not '\t' and not '\r') atLineStart = false;
+                index++;
+                return;
+            }
+            if (quote != '\0')
+            {
+                if (escaped)
+                {
+                    escaped = false;
+                }
+                else if (character == '\\')
+                {
+                    escaped = true;
+                }
+                else if (character == quote)
+                {
+                    if (index + 1 < sql.Length && sql[index + 1] == quote)
+                    {
+                        output.Append(quote);
+                        index++;
+                    }
+                    else
+                    {
+                        quote = '\0';
+                    }
+                }
+                if (character == '\n') atLineStart = true;
+                else if (character is not ' ' and not '\t' and not '\r') atLineStart = false;
+                index++;
+                return;
+            }
+            if (character is '\'' or '"' or '`')
+            {
+                quote = character;
+            }
+            else if (character == '#')
+            {
+                inLineComment = true;
+            }
+            else if (character == '-' && index + 2 < sql.Length
+                && sql[index + 1] == '-' && char.IsWhiteSpace(sql[index + 2]))
+            {
+                output.Append('-');
+                index++;
+                inLineComment = true;
+            }
+            else if (character == '/' && index + 1 < sql.Length && sql[index + 1] == '*')
+            {
+                output.Append('*');
+                index++;
+                inBlockComment = true;
+            }
+            if (character == '\n') atLineStart = true;
+            else if (character is not ' ' and not '\t' and not '\r') atLineStart = false;
+            index++;
+        }
+
+        private static bool TryConsumePhrase(
+            string sql,
+            int start,
+            string first,
+            string second,
+            out int end
+        )
+        {
+            end = start;
+            return ConsumeKeyword(sql, ref end, first)
+                && ConsumeRequiredWhitespace(sql, ref end)
+                && ConsumeKeyword(sql, ref end, second);
+        }
+
+        private static bool TryConsumeKeyword(
+            string sql,
+            int start,
+            string keyword,
+            out int end
+        )
+        {
+            end = start;
+            return ConsumeKeyword(sql, ref end, keyword);
+        }
+
+        private static bool TryConsumePhrase(
+            string sql,
+            int start,
+            string first,
+            string second,
+            string third,
+            out int end
+        )
+        {
+            end = start;
+            return ConsumeKeyword(sql, ref end, first)
+                && ConsumeRequiredWhitespace(sql, ref end)
+                && ConsumeKeyword(sql, ref end, second)
+                && ConsumeRequiredWhitespace(sql, ref end)
+                && ConsumeKeyword(sql, ref end, third);
+        }
+
+        private static bool ConsumeKeyword(string sql, ref int index, string keyword)
+        {
+            if (!sql.AsSpan(index).StartsWith(keyword, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+            var end = index + keyword.Length;
+            if (end < sql.Length && (char.IsAsciiLetterOrDigit(sql[end]) || sql[end] == '_'))
+            {
+                return false;
+            }
+            index = end;
+            return true;
+        }
+
+        private static bool ConsumeRequiredWhitespace(string sql, ref int index)
+        {
+            if (index >= sql.Length || !char.IsWhiteSpace(sql[index])) return false;
+            while (index < sql.Length && char.IsWhiteSpace(sql[index])) index++;
+            return true;
+        }
     }
 
     private static async Task CopyOutputAsync(

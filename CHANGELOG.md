@@ -18,6 +18,8 @@ Semantic Versioning for public releases.
 
 - Preserve the database client's diagnostic when it closes the import pipe, instead
   of replacing the useful SQL error with `The pipe has been ended`.
+- Merge imports into existing MySQL and MariaDB tables without dropping tables or
+  replacing rows, inserting only records whose primary or unique keys are missing.
 - Hide the operation cancel action after a site operation finishes or fails.
 
 ## [0.1.8] - 2026-08-03

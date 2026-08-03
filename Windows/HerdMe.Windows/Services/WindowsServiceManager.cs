@@ -664,7 +664,8 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         SiteDatabaseProvisioning provisioning,
         string source,
         CancellationToken cancellationToken = default,
-        IProgress<DatabaseTransferProgress>? progress = null
+        IProgress<DatabaseTransferProgress>? progress = null,
+        bool mergeExisting = false
     ) => await SiteDatabaseProvisioner.RestoreAsync(
         instance,
         installer.ExecutablePath(instance.DefinitionId),
@@ -672,7 +673,8 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         provisioning,
         source,
         cancellationToken,
-        progress
+        progress,
+        mergeExisting
     );
 
     public async Task<bool> SiteDatabaseExistsAsync(
@@ -697,7 +699,8 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         string databaseName,
         string source,
         CancellationToken cancellationToken = default,
-        IProgress<DatabaseTransferProgress>? progress = null
+        IProgress<DatabaseTransferProgress>? progress = null,
+        bool mergeExisting = false
     )
     {
         var configured = RequireRunningDatabaseService(instance);
@@ -713,7 +716,8 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             ),
             source,
             cancellationToken,
-            progress
+            progress,
+            mergeExisting
         );
     }
 

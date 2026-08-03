@@ -126,6 +126,35 @@ internal static partial class ContractChecks
                 && compatibleSql.Contains("SELECT 'utf8mb4_0900_ai_ci'", StringComparison.Ordinal),
             "database imports repair unsupported MySQL collations without changing data values"
         );
+        var mergeNormalizer = new SiteDatabaseProvisioner.MySqlStreamNormalizer(
+            mergeExisting: true
+        );
+        var mergedSql = mergeNormalizer.Rewrite("DROP TABLE IF EXISTS `abs")
+            + mergeNormalizer.Rewrite(
+                "ences`;\nCREATE TABLE `absences` (`id` bigint);\n"
+                    + "INSERT INTO `absences` VALUES (1),(2);\n"
+                    + "REPLACE INTO `absences` VALUES (3);\n"
+                    + "DELETE FROM `absences` WHERE `id` = 1;\n"
+                    + "UPDATE `absences` SET `id` = 5 WHERE `id` = 2;\n"
+                    + "ALTER TABLE `absences` DROP COLUMN `notes`;\n"
+                    + "INSERT INTO `notes` VALUES (4,'first line\n"
+                    + "DROP TABLE should stay;');\n"
+                    + "SELECT 'DROP TABLE existing text';"
+            );
+        Check(
+            !mergedSql.Contains("DROP TABLE IF EXISTS", StringComparison.OrdinalIgnoreCase)
+                && mergedSql.Contains(
+                    "CREATE TABLE IF NOT EXISTS `absences`",
+                    StringComparison.Ordinal
+                )
+                && mergedSql.Split("INSERT IGNORE INTO", StringSplitOptions.None).Length == 4
+                && mergedSql.Contains("DROP TABLE should stay;", StringComparison.Ordinal)
+                && !mergedSql.Contains("DELETE FROM `absences`", StringComparison.Ordinal)
+                && !mergedSql.Contains("UPDATE `absences`", StringComparison.Ordinal)
+                && !mergedSql.Contains("ALTER TABLE `absences`", StringComparison.Ordinal)
+                && mergedSql.Contains("SELECT 'DROP TABLE existing text'", StringComparison.Ordinal),
+            "existing MySQL imports preserve tables and merge only rows with missing keys"
+        );
         var databaseProgress = new DatabaseTransferProgress(
             512,
             1_024,

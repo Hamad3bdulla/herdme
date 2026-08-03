@@ -1863,7 +1863,8 @@ public sealed partial class SitesPage : Page
                 provisioning,
                 file.Path,
                 token,
-                transferProgress
+                transferProgress,
+                mergeExisting: true
             )
         );
     }
@@ -1998,7 +1999,9 @@ public sealed partial class SitesPage : Page
                 : AppLocalization.Get("SitesDatabaseImportCreateTitle"),
             Content = AppLocalization.Format(
                 databaseExists
-                    ? "SitesDatabaseImportExistingWarning"
+                    ? selectedService.Instance.DefinitionId is "mysql" or "mariadb"
+                        ? "SitesDatabaseImportExistingWarning"
+                        : "SitesDatabaseImportExistingPostgreSqlWarning"
                     : "SitesDatabaseImportCreateMessage",
                 databaseName
             ),
@@ -2020,7 +2023,8 @@ public sealed partial class SitesPage : Page
                         databaseName,
                         file.Path,
                         token,
-                        transferProgress
+                        transferProgress,
+                        mergeExisting: true
                     );
                     return;
                 }
