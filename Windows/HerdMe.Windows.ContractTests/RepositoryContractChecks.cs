@@ -223,6 +223,82 @@ internal static partial class ContractChecks
         );
     }
 
+    internal static void VerifySiteWorkflowContracts(string repositoryRoot)
+    {
+        var projectRoot = Path.Combine(repositoryRoot, "Windows", "HerdMe.Windows");
+        var xaml = File.ReadAllText(Path.Combine(projectRoot, "Pages", "SitesPage.xaml"));
+        var source = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "Pages",
+            "SitesPage.Workflows.cs"
+        ));
+        Check(
+            xaml.Contains("x:Uid=\"SitesAutomationResetProject\"", StringComparison.Ordinal)
+                && xaml.Contains("Click=\"ResetProjectWorkflow_Click\"", StringComparison.Ordinal),
+            "the Sites automation menu exposes the local project reset workflow"
+        );
+        var pageSource = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "Pages",
+            "SitesPage.xaml.cs"
+        ));
+        Check(
+            xaml.Contains("x:Name=\"SiteOperationLogText\"", StringComparison.Ordinal)
+                && xaml.Contains("TextWrapping=\"NoWrap\"", StringComparison.Ordinal)
+                && pageSource.Contains("AppendSiteOperationOutput(text)", StringComparison.Ordinal)
+                && !pageSource.Contains(
+                    "(SiteOperationBar.Message + text).Trim()",
+                    StringComparison.Ordinal
+                ),
+            "site workflow output retains command line breaks in a bounded scrollable log"
+        );
+
+        var resetStart = source.IndexOf(
+            "private async void ResetProjectWorkflow_Click",
+            StringComparison.Ordinal
+        );
+        var resetEnd = source.IndexOf(
+            "private async void ExportProjectWorkflow_Click",
+            Math.Max(resetStart, 0),
+            StringComparison.Ordinal
+        );
+        Check(
+            resetStart >= 0 && resetEnd > resetStart,
+            "the local project reset workflow has a bounded implementation"
+        );
+        var resetSource = source[resetStart..resetEnd];
+        var backup = resetSource.IndexOf("CreateWorkflowBackupAsync", StringComparison.Ordinal);
+        var destructiveReset = resetSource.IndexOf(
+            "[\"migrate:fresh\", \"--seed\", \"--force\", \"--no-interaction\"]",
+            StringComparison.Ordinal
+        );
+        Check(
+            backup >= 0 && destructiveReset > backup,
+            "the local project reset creates a recovery backup before rebuilding the database"
+        );
+        Check(
+            resetSource.Contains("HasSupportedLocalResetDatabase", StringComparison.Ordinal)
+                && resetSource.Contains("EnsureResetDatabaseMatchesBackup", StringComparison.Ordinal)
+                && resetSource.Contains("if (databaseResetStarted)", StringComparison.Ordinal)
+                && source.Contains("ResolveSqliteDatabasePath", StringComparison.Ordinal),
+            "the local project reset permits only recognized local databases and rechecks the target after backup"
+        );
+        Check(
+            resetSource.Contains("TryRestoreResetDatabaseAsync", StringComparison.Ordinal)
+                && source.Contains(
+                    "[\"db:wipe\", \"--force\", \"--no-interaction\"]",
+                    StringComparison.Ordinal
+                )
+                && source.Contains("RestoreSiteDatabaseAsync", StringComparison.Ordinal),
+            "the local project reset attempts a clean database restore after failure"
+        );
+        Check(
+            resetSource.Contains("ClearLaravelGeneratedFiles", StringComparison.Ordinal)
+                && resetSource.Contains("ClearLaravelLogs", StringComparison.Ordinal),
+            "the successful local project reset clears Laravel caches, sessions, views, and logs"
+        );
+    }
+
     internal static T PrivateDependency<T>(object owner, string fieldName) where T : class
     {
         return owner.GetType().GetField(

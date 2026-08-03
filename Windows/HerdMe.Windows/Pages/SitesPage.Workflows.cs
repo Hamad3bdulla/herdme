@@ -20,7 +20,9 @@ public sealed partial class SitesPage
         string ArchivePath,
         string? DatabasePath,
         ManagedServiceInstance? DatabaseInstance,
-        SiteDatabaseProvisioning? DatabaseProvisioning
+        SiteDatabaseProvisioning? DatabaseProvisioning,
+        string? SqliteDatabasePath,
+        string? SqliteBackupPath
     );
 
     private async void UpdateLaravelWorkflow_Click(object sender, RoutedEventArgs e)
@@ -199,6 +201,88 @@ public sealed partial class SitesPage
                 await RefreshSiteDetailsAsync(site);
                 await ShowCommandResultAsync(
                     AppLocalization.Get("SitesWorkflowCleanResult"),
+                    AppLocalization.Format("SitesWorkflowBackupCreated", backup.ArchivePath),
+                    true
+                );
+            }
+        );
+    }
+
+    private async void ResetProjectWorkflow_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not { } site) return;
+        if (!File.Exists(Path.Combine(site.Path, "artisan")))
+        {
+            await ShowCommandResultAsync(
+                AppLocalization.Get("SitesWorkflowResetTitle"),
+                AppLocalization.Get("SitesWorkflowResetUnavailable"),
+                false
+            );
+            return;
+        }
+        if (!HasSupportedLocalResetDatabase(site))
+        {
+            await ShowCommandResultAsync(
+                AppLocalization.Get("SitesWorkflowResetTitle"),
+                AppLocalization.Get("SitesWorkflowResetDatabaseUnavailable"),
+                false
+            );
+            return;
+        }
+        if (!await ConfirmWorkflowAsync(
+            "SitesWorkflowResetTitle",
+            "SitesWorkflowResetDescription"
+        )) return;
+
+        await RunSiteOperationAsync(
+            AppLocalization.Get("SitesWorkflowResetRunning"),
+            async (progress, cancellationToken) =>
+            {
+                var backup = await CreateWorkflowBackupAsync(site, progress, cancellationToken);
+                var tools = await PrepareWorkflowToolsAsync(site, progress, cancellationToken);
+                var databaseResetStarted = false;
+                try
+                {
+                    EnsureResetDatabaseMatchesBackup(site, backup);
+                    await RunArtisanWorkflowAsync(
+                        site,
+                        tools,
+                        ["optimize:clear", "--no-interaction"],
+                        TimeSpan.FromMinutes(10),
+                        progress,
+                        cancellationToken
+                    );
+                    databaseResetStarted = true;
+                    await RunArtisanWorkflowAsync(
+                        site,
+                        tools,
+                        ["migrate:fresh", "--seed", "--force", "--no-interaction"],
+                        TimeSpan.FromMinutes(30),
+                        progress,
+                        cancellationToken
+                    );
+                    ClearLaravelGeneratedFiles(site.Path);
+                    ClearLaravelLogs(site.Path);
+                }
+                catch (Exception error)
+                {
+                    if (databaseResetStarted)
+                    {
+                        progress.Report(AppLocalization.Get("SitesWorkflowResetRollingBack") + "\n");
+                        await TryRestoreResetDatabaseAsync(site, tools, backup, progress);
+                    }
+                    throw new InvalidOperationException(
+                        AppLocalization.Format(
+                            "SitesWorkflowFailedWithBackup",
+                            error.Message,
+                            backup.ArchivePath
+                        ),
+                        error
+                    );
+                }
+                await RefreshSiteDetailsAsync(site);
+                await ShowCommandResultAsync(
+                    AppLocalization.Get("SitesWorkflowResetResult"),
                     AppLocalization.Format("SitesWorkflowBackupCreated", backup.ArchivePath),
                     true
                 );
@@ -522,6 +606,8 @@ public sealed partial class SitesPage
         string? databasePath = null;
         ManagedServiceInstance? instance = null;
         SiteDatabaseProvisioning? provisioning = null;
+        string? sqliteDatabasePath = null;
+        string? sqliteBackupPath = null;
         if (TryCurrentSiteDatabase(site, out var configured, out var database, out _))
         {
             instance = configured;
@@ -534,6 +620,20 @@ public sealed partial class SitesPage
                 cancellationToken
             );
         }
+        else if (ResolveSqliteDatabasePath(site.Path) is { } sqlite)
+        {
+            sqliteDatabasePath = sqlite;
+            if (File.Exists(sqliteDatabasePath))
+            {
+                sqliteBackupPath = Path.Combine(directory, "database.sqlite");
+                await CopyRegularFileAsync(
+                    sqliteDatabasePath,
+                    sqliteBackupPath,
+                    overwrite: false,
+                    cancellationToken
+                );
+            }
+        }
         var archivePath = Path.Combine(directory, "project.zip");
         await SiteWorkflowArchive.CreateAsync(
             site.Path,
@@ -543,7 +643,14 @@ public sealed partial class SitesPage
             progress,
             cancellationToken
         );
-        return new WorkflowBackup(archivePath, databasePath, instance, provisioning);
+        return new WorkflowBackup(
+            archivePath,
+            databasePath,
+            instance,
+            provisioning,
+            sqliteDatabasePath,
+            sqliteBackupPath
+        );
     }
 
     private async Task<string?> CreateTemporaryDatabaseDumpAsync(
@@ -571,6 +678,7 @@ public sealed partial class SitesPage
         IProgress<string> progress
     )
     {
+        if (await TryRestoreSqliteDatabaseAsync(backup, progress)) return;
         if (backup.DatabasePath is null || backup.DatabaseInstance is null
             || backup.DatabaseProvisioning is null
             || backup.DatabaseInstance.DefinitionId is not ("mysql" or "mariadb")) return;
@@ -589,6 +697,146 @@ public sealed partial class SitesPage
         {
             progress.Report(error.Message + "\n");
         }
+    }
+
+    private async Task TryRestoreResetDatabaseAsync(
+        SiteRecord site,
+        WorkflowTools tools,
+        WorkflowBackup backup,
+        IProgress<string> progress
+    )
+    {
+        if (await TryRestoreSqliteDatabaseAsync(backup, progress)) return;
+        if (backup.DatabasePath is null || backup.DatabaseInstance is null
+            || backup.DatabaseProvisioning is null) return;
+        try
+        {
+            await RunArtisanWorkflowAsync(
+                site,
+                tools,
+                ["db:wipe", "--force", "--no-interaction"],
+                TimeSpan.FromMinutes(10),
+                progress,
+                CancellationToken.None
+            );
+            progress.Report(AppLocalization.Get("SitesWorkflowRestoringDatabase") + "\n");
+            await serviceManager.RestoreSiteDatabaseAsync(
+                backup.DatabaseInstance,
+                backup.DatabaseProvisioning,
+                backup.DatabasePath,
+                CancellationToken.None,
+                mergeExisting: false
+            );
+        }
+        catch (Exception error)
+        {
+            progress.Report(error.Message + "\n");
+        }
+    }
+
+    private static async Task<bool> TryRestoreSqliteDatabaseAsync(
+        WorkflowBackup backup,
+        IProgress<string> progress
+    )
+    {
+        if (backup.SqliteDatabasePath is null || backup.SqliteBackupPath is null) return false;
+        try
+        {
+            progress.Report(AppLocalization.Get("SitesWorkflowRestoringDatabase") + "\n");
+            await CopyRegularFileAsync(
+                backup.SqliteBackupPath,
+                backup.SqliteDatabasePath,
+                overwrite: true,
+                CancellationToken.None
+            );
+        }
+        catch (Exception error)
+        {
+            progress.Report(error.Message + "\n");
+        }
+        return true;
+    }
+
+    private static string? ResolveSqliteDatabasePath(string sitePath)
+    {
+        var environment = ProjectEnvironmentFile.Load(sitePath);
+        if (!environment.Exists) return null;
+        var connection = SiteHealthInspector.EnvironmentValue(
+            environment.Contents,
+            "DB_CONNECTION"
+        );
+        if (!string.Equals(connection, "sqlite", StringComparison.OrdinalIgnoreCase)) return null;
+        var configured = SiteHealthInspector.EnvironmentValue(environment.Contents, "DB_DATABASE");
+        if (configured?.Equals(":memory:", StringComparison.OrdinalIgnoreCase) == true) return null;
+        var database = string.IsNullOrWhiteSpace(configured)
+            ? Path.Combine("database", "database.sqlite")
+            : configured;
+        return Path.GetFullPath(database, Path.GetFullPath(sitePath));
+    }
+
+    private bool HasSupportedLocalResetDatabase(SiteRecord site)
+    {
+        return TryCurrentSiteDatabase(site, out _, out _, out _)
+            || ResolveSqliteDatabasePath(site.Path) is not null;
+    }
+
+    private void EnsureResetDatabaseMatchesBackup(SiteRecord site, WorkflowBackup backup)
+    {
+        var managedMatches = backup.DatabaseInstance is not null
+            && backup.DatabaseProvisioning is not null
+            && backup.DatabasePath is not null
+            && TryCurrentSiteDatabase(site, out var instance, out var provisioning, out _)
+            && instance.Id == backup.DatabaseInstance.Id
+            && provisioning == backup.DatabaseProvisioning;
+        var sqliteMatches = backup.SqliteDatabasePath is not null
+            && string.Equals(
+                ResolveSqliteDatabasePath(site.Path),
+                backup.SqliteDatabasePath,
+                StringComparison.OrdinalIgnoreCase
+            );
+        if (!managedMatches && !sqliteMatches)
+        {
+            throw new InvalidOperationException(
+                AppLocalization.Get("SitesWorkflowResetDatabaseChanged")
+            );
+        }
+    }
+
+    private static async Task CopyRegularFileAsync(
+        string source,
+        string destination,
+        bool overwrite,
+        CancellationToken cancellationToken
+    )
+    {
+        if ((File.GetAttributes(source) & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new InvalidOperationException("HerdMe will not back up a symbolic database file.");
+        }
+        if ((File.Exists(destination) || Directory.Exists(destination))
+            && (File.GetAttributes(destination) & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new InvalidOperationException("HerdMe will not replace a symbolic database file.");
+        }
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        await using var input = new FileStream(
+            source,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete,
+            128 * 1_024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan
+        );
+        await using var output = new FileStream(
+            destination,
+            overwrite ? FileMode.Create : FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None,
+            128 * 1_024,
+            FileOptions.Asynchronous | FileOptions.WriteThrough
+        );
+        await input.CopyToAsync(output, cancellationToken);
+        await output.FlushAsync(cancellationToken);
     }
 
     private async Task TryRestoreDependenciesAsync(SiteRecord site, IProgress<string> progress)
@@ -673,6 +921,16 @@ public sealed partial class SitesPage
         var bootstrap = Path.Combine(sitePath, "bootstrap", "cache");
         if (!Directory.Exists(bootstrap)) return;
         foreach (var file in Directory.EnumerateFiles(bootstrap, "*.php")) File.Delete(file);
+    }
+
+    private static void ClearLaravelLogs(string sitePath)
+    {
+        var logs = Path.Combine(sitePath, "storage", "logs");
+        if (!Directory.Exists(logs)) return;
+        foreach (var file in Directory.EnumerateFiles(logs))
+        {
+            if ((File.GetAttributes(file) & FileAttributes.ReparsePoint) == 0) File.Delete(file);
+        }
     }
 
     private static void DeleteDirectorySafely(string path)

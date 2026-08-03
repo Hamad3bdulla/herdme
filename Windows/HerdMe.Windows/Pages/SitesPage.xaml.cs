@@ -3191,13 +3191,15 @@ public sealed partial class SitesPage : Page
         SiteOperationBar.Message = string.Empty;
         SiteOperationBar.Severity = InfoBarSeverity.Informational;
         SiteOperationBar.IsOpen = true;
+        SiteOperationLogText.Text = string.Empty;
+        SiteOperationLogPanel.Visibility = Visibility.Visible;
         SiteOperationCancelButton.Visibility = Visibility.Visible;
         SiteOperationProgress.IsIndeterminate = true;
         SiteOperationProgress.Visibility = Visibility.Visible;
         var progress = new Progress<string>(text =>
         {
-            var value = (SiteOperationBar.Message + text).Trim();
-            SiteOperationBar.Message = value.Length > 2_000 ? value[^2_000..] : value;
+            AppendSiteOperationOutput(text);
+            SiteOperationBar.Message = LatestOperationStatus(text);
         });
         try
         {
@@ -3217,7 +3219,8 @@ public sealed partial class SitesPage : Page
         {
             SiteOperationBar.Severity = InfoBarSeverity.Error;
             SiteOperationBar.Title = AppLocalization.Get("SitesOperationFailed");
-            SiteOperationBar.Message = error.Message;
+            SiteOperationBar.Message = LatestOperationStatus(error.Message);
+            AppendSiteOperationOutput(error.Message + Environment.NewLine);
             return false;
         }
         finally
@@ -3230,6 +3233,31 @@ public sealed partial class SitesPage : Page
             SiteOperationCancelButton.Visibility = Visibility.Collapsed;
             SiteOperationProgress.Visibility = Visibility.Collapsed;
         }
+    }
+
+    private void AppendSiteOperationOutput(string value)
+    {
+        const int maximumCharacters = 128 * 1_024;
+        if (string.IsNullOrEmpty(value)) return;
+        var normalized = value.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+        var combined = SiteOperationLogText.Text + normalized;
+        SiteOperationLogText.Text = combined.Length > maximumCharacters
+            ? combined[^maximumCharacters..]
+            : combined;
+        SiteOperationLogText.Select(SiteOperationLogText.Text.Length, 0);
+    }
+
+    private static string LatestOperationStatus(string value)
+    {
+        const int maximumCharacters = 240;
+        var latest = value.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .LastOrDefault() ?? string.Empty;
+        return latest.Length > maximumCharacters
+            ? latest[..maximumCharacters] + "..."
+            : latest;
     }
 
     private async Task ShowCommandResultAsync(string title, string output, bool success)

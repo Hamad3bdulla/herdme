@@ -5,6 +5,24 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-08-03
+
+### Added
+
+- Add a one-click local Laravel reset that backs up the project and database,
+  rebuilds migrations with seed data, clears generated files and logs, and restores
+  the database automatically when a destructive reset fails.
+
+### Changed
+
+- Show long site workflow output in a bounded, scrollable monospace operation log
+  while the status bar remains compact and displays only the latest activity.
+
+### Fixed
+
+- Preserve command output line breaks so backup, Composer, Artisan, and npm progress
+  no longer runs together into unreadable text.
+
 ## [0.1.10] - 2026-08-03
 
 ### Added

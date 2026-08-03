@@ -659,6 +659,7 @@
   <data name="SitesOperationCompleted" xml:space="preserve"><value>اكتملت العملية</value></data>
   <data name="SitesOperationCancelled" xml:space="preserve"><value>أُلغيت العملية</value></data>
   <data name="SitesOperationFailed" xml:space="preserve"><value>فشلت العملية</value></data>
+  <data name="SitesOperationLogLabel.Text" xml:space="preserve"><value>سجل العملية</value></data>
   <data name="SitesNoCommandOutput" xml:space="preserve"><value>اكتمل الأمر دون مخرجات.</value></data>
   <data name="SitesManageDatabaseCommand.Label" xml:space="preserve"><value>إدارة قاعدة البيانات</value></data>
   <data name="SitesDatabaseManageTitle" xml:space="preserve"><value>قاعدة بيانات الموقع {0}</value></data>
@@ -800,6 +801,7 @@
   <data name="SitesAutomationCommand.Label" xml:space="preserve"><value>الإجراءات التلقائية</value></data>
   <data name="SitesAutomationUpdateLaravel.Text" xml:space="preserve"><value>تحديث مشروع Laravel</value></data>
   <data name="SitesAutomationCleanProject.Text" xml:space="preserve"><value>تنظيف المشروع وإعادة بنائه</value></data>
+  <data name="SitesAutomationResetProject.Text" xml:space="preserve"><value>إعادة ضبط المشروع المحلي</value></data>
   <data name="SitesAutomationExportProject.Text" xml:space="preserve"><value>تصدير حزمة قابلة للنقل</value></data>
   <data name="SitesAutomationSetupMail.Text" xml:space="preserve"><value>إعداد البريد المحلي</value></data>
   <data name="SitesAutomationHandoffAudit.Text" xml:space="preserve"><value>تشغيل فحص التسليم</value></data>
@@ -812,6 +814,14 @@
   <data name="SitesWorkflowCleanDescription" xml:space="preserve"><value>سينشئ HerdMe نسخة احتياطية، ويستبدل vendor وnode_modules بأمان، وينظف الملفات المولدة، ويعيد تثبيت الاعتمادات وبناء الواجهة. إذا فشل البناء يعيد مجلدات الاعتمادات السابقة.</value></data>
   <data name="SitesWorkflowCleanRunning" xml:space="preserve"><value>جارٍ تنظيف المشروع وإعادة بنائه</value></data>
   <data name="SitesWorkflowCleanResult" xml:space="preserve"><value>اكتملت إعادة بناء المشروع</value></data>
+  <data name="SitesWorkflowResetTitle" xml:space="preserve"><value>إعادة ضبط هذا المشروع المحلي؟</value></data>
+  <data name="SitesWorkflowResetDescription" xml:space="preserve"><value>سينشئ HerdMe نسخة استرجاع، ثم يحذف نهائياً كل بيانات قاعدة البيانات المحلية المضبوطة، ويعيد بناءها من migrations وseeders، وينظف كاش Laravel والجلسات والواجهات والسجلات. لا يمكن التراجع دون النسخة الاحتياطية.</value></data>
+  <data name="SitesWorkflowResetRunning" xml:space="preserve"><value>جارٍ إعادة ضبط مشروع Laravel المحلي</value></data>
+  <data name="SitesWorkflowResetResult" xml:space="preserve"><value>اكتملت إعادة ضبط المشروع المحلي</value></data>
+  <data name="SitesWorkflowResetUnavailable" xml:space="preserve"><value>يتطلب هذا الإجراء مشروع Laravel يحتوي على ملف artisan.</value></data>
+  <data name="SitesWorkflowResetDatabaseUnavailable" xml:space="preserve"><value>للأمان، تعمل إعادة الضبط فقط مع قاعدة MySQL أو MariaDB أو PostgreSQL يديرها HerdMe، أو قاعدة SQLite مضبوطة في ملف .env لهذا المشروع. لن يعيد HerdMe ضبط قاعدة بعيدة أو غير معروفة.</value></data>
+  <data name="SitesWorkflowResetDatabaseChanged" xml:space="preserve"><value>تغيرت قاعدة البيانات المضبوطة بعد النسخ الاحتياطي، لذلك توقف HerdMe قبل حذف أي بيانات.</value></data>
+  <data name="SitesWorkflowResetRollingBack" xml:space="preserve"><value>فشلت إعادة الضبط. جارٍ محاولة استرجاع نسخة قاعدة البيانات</value></data>
   <data name="SitesWorkflowExportTitle" xml:space="preserve"><value>تصدير حزمة مشروع قابلة للنقل؟</value></data>
   <data name="SitesWorkflowExportDescription" xml:space="preserve"><value>يتضمن ملف ZIP كود المشروع وأسرار .env وقاعدة البيانات المضبوطة، ويستبعد الاعتمادات المولدة وسجل Git واللوق والكاش. احفظ الحزمة في مكان آمن.</value></data>
   <data name="SitesWorkflowExportRunning" xml:space="preserve"><value>جارٍ تصدير حزمة المشروع</value></data>
@@ -830,7 +840,7 @@
   <data name="SitesWorkflowBackingUpDatabase" xml:space="preserve"><value>جارٍ تصدير قاعدة البيانات المضبوطة</value></data>
   <data name="SitesWorkflowBackupCreated" xml:space="preserve"><value>نسخة الاسترجاع: {0}</value></data>
   <data name="SitesWorkflowRollingBack" xml:space="preserve"><value>فشلت خطوة. جارٍ استرجاع ملفات القفل والاعتمادات</value></data>
-  <data name="SitesWorkflowRestoringDatabase" xml:space="preserve"><value>جارٍ استرجاع نسخة MySQL أو MariaDB</value></data>
+  <data name="SitesWorkflowRestoringDatabase" xml:space="preserve"><value>جارٍ استرجاع نسخة قاعدة البيانات</value></data>
   <data name="SitesWorkflowFailedWithBackup" xml:space="preserve"><value>{0}
 
 نسخة الاسترجاع: {1}</value></data>

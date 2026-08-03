@@ -659,6 +659,7 @@
   <data name="SitesOperationCompleted" xml:space="preserve"><value>Operation completed</value></data>
   <data name="SitesOperationCancelled" xml:space="preserve"><value>Operation cancelled</value></data>
   <data name="SitesOperationFailed" xml:space="preserve"><value>Operation failed</value></data>
+  <data name="SitesOperationLogLabel.Text" xml:space="preserve"><value>Operation log</value></data>
   <data name="SitesNoCommandOutput" xml:space="preserve"><value>The command completed without output.</value></data>
   <data name="SitesManageDatabaseCommand.Label" xml:space="preserve"><value>Manage database</value></data>
   <data name="SitesDatabaseManageTitle" xml:space="preserve"><value>Database for {0}</value></data>
@@ -800,6 +801,7 @@
   <data name="SitesAutomationCommand.Label" xml:space="preserve"><value>Automations</value></data>
   <data name="SitesAutomationUpdateLaravel.Text" xml:space="preserve"><value>Update Laravel project</value></data>
   <data name="SitesAutomationCleanProject.Text" xml:space="preserve"><value>Clean and rebuild project</value></data>
+  <data name="SitesAutomationResetProject.Text" xml:space="preserve"><value>Reset local project</value></data>
   <data name="SitesAutomationExportProject.Text" xml:space="preserve"><value>Export transferable package</value></data>
   <data name="SitesAutomationSetupMail.Text" xml:space="preserve"><value>Configure local mail</value></data>
   <data name="SitesAutomationHandoffAudit.Text" xml:space="preserve"><value>Run handoff audit</value></data>
@@ -812,6 +814,14 @@
   <data name="SitesWorkflowCleanDescription" xml:space="preserve"><value>HerdMe will back up the project, safely replace vendor and node_modules, clear generated Laravel files, reinstall dependencies, and rebuild frontend assets. Existing dependency folders are restored if rebuilding fails.</value></data>
   <data name="SitesWorkflowCleanRunning" xml:space="preserve"><value>Cleaning and rebuilding project</value></data>
   <data name="SitesWorkflowCleanResult" xml:space="preserve"><value>Project rebuild completed</value></data>
+  <data name="SitesWorkflowResetTitle" xml:space="preserve"><value>Reset this local project?</value></data>
+  <data name="SitesWorkflowResetDescription" xml:space="preserve"><value>HerdMe will create a recovery backup, permanently remove all data from the configured local database, rebuild it with fresh migrations and seeders, then clear Laravel caches, sessions, views, and logs. This cannot be undone without the backup.</value></data>
+  <data name="SitesWorkflowResetRunning" xml:space="preserve"><value>Resetting local Laravel project</value></data>
+  <data name="SitesWorkflowResetResult" xml:space="preserve"><value>Local project reset completed</value></data>
+  <data name="SitesWorkflowResetUnavailable" xml:space="preserve"><value>This workflow requires a Laravel project with an artisan file.</value></data>
+  <data name="SitesWorkflowResetDatabaseUnavailable" xml:space="preserve"><value>For safety, local reset only works with a MySQL, MariaDB, or PostgreSQL database managed by HerdMe, or a SQLite database configured in this project's .env file. Remote and unrecognized databases are never reset.</value></data>
+  <data name="SitesWorkflowResetDatabaseChanged" xml:space="preserve"><value>The configured database changed after the backup. HerdMe stopped before deleting any data.</value></data>
+  <data name="SitesWorkflowResetRollingBack" xml:space="preserve"><value>The reset failed. Attempting to restore the database backup</value></data>
   <data name="SitesWorkflowExportTitle" xml:space="preserve"><value>Export a transferable project package?</value></data>
   <data name="SitesWorkflowExportDescription" xml:space="preserve"><value>The ZIP includes project source, .env secrets, and the configured database. Generated dependencies, Git history, logs, and caches are excluded. Store the package securely.</value></data>
   <data name="SitesWorkflowExportRunning" xml:space="preserve"><value>Exporting transferable project package</value></data>
@@ -830,7 +840,7 @@
   <data name="SitesWorkflowBackingUpDatabase" xml:space="preserve"><value>Exporting the configured database</value></data>
   <data name="SitesWorkflowBackupCreated" xml:space="preserve"><value>Recovery backup: {0}</value></data>
   <data name="SitesWorkflowRollingBack" xml:space="preserve"><value>A step failed. Restoring lock files and dependencies</value></data>
-  <data name="SitesWorkflowRestoringDatabase" xml:space="preserve"><value>Restoring the MySQL/MariaDB backup</value></data>
+  <data name="SitesWorkflowRestoringDatabase" xml:space="preserve"><value>Restoring the database backup</value></data>
   <data name="SitesWorkflowFailedWithBackup" xml:space="preserve"><value>{0}
 
 Recovery backup: {1}</value></data>

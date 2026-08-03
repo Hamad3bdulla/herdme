@@ -300,6 +300,7 @@
                                         <MenuFlyout>
                                             <MenuFlyoutItem x:Uid="SitesAutomationUpdateLaravel" Text="Update Laravel project" Click="UpdateLaravelWorkflow_Click" />
                                             <MenuFlyoutItem x:Uid="SitesAutomationCleanProject" Text="Clean and rebuild project" Click="CleanProjectWorkflow_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesAutomationResetProject" Text="Reset local project" Click="ResetProjectWorkflow_Click" />
                                             <MenuFlyoutItem x:Uid="SitesAutomationExportProject" Text="Export transferable package" Click="ExportProjectWorkflow_Click" />
                                             <MenuFlyoutItem x:Uid="SitesAutomationSetupMail" Text="Configure local mail" Click="SetupMailWorkflow_Click" />
                                             <MenuFlyoutItem x:Uid="SitesAutomationHandoffAudit" Text="Run handoff audit" Click="HandoffAuditWorkflow_Click" />
@@ -388,6 +389,31 @@
                                     </InfoBar.ActionButton>
                                 </InfoBar>
                                 <ProgressBar x:Name="SiteOperationProgress" IsIndeterminate="True" Visibility="Collapsed" />
+                                <Border
+                                    x:Name="SiteOperationLogPanel"
+                                    Visibility="Collapsed"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="12">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock
+                                            x:Uid="SitesOperationLogLabel"
+                                            Text="Operation log"
+                                            FontWeight="SemiBold" />
+                                        <TextBox
+                                            x:Name="SiteOperationLogText"
+                                            Height="170"
+                                            Padding="10,8"
+                                            AcceptsReturn="True"
+                                            IsReadOnly="True"
+                                            TextWrapping="NoWrap"
+                                            FontFamily="Consolas"
+                                            FontSize="12"
+                                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                            ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                                    </StackPanel>
+                                </Border>
                                 <Grid ColumnSpacing="10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />

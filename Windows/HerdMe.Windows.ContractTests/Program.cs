@@ -87,6 +87,7 @@ var repositoryRoot = FindRepositoryRoot();
 VerifyReleaseAndInstallerContracts(repositoryRoot);
 VerifyXamlContracts(repositoryRoot);
 VerifyCompositionContracts(repositoryRoot);
+VerifySiteWorkflowContracts(repositoryRoot);
 VerifyLocalizationContracts(repositoryRoot);
 VerifyArtisanCommandContracts(repositoryRoot);
 await VerifyNpmScriptContractsAsync(repositoryRoot);
