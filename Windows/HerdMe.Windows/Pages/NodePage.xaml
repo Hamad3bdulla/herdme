@@ -16,7 +16,7 @@
                 <TextBlock x:Uid="NodePageDescription" Text="Official Windows runtimes managed by HerdMe" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
             <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
-                <ProgressRing x:Name="OperationProgress" Width="18" Height="18" />
+                <ProgressRing x:Name="OperationProgress" Width="18" Height="18" IsActive="False" Visibility="Collapsed" />
                 <TextBlock x:Name="OperationStatusText" VerticalAlignment="Center" />
                 <Button Click="Refresh_Click">
                     <ToolTipService.ToolTip>

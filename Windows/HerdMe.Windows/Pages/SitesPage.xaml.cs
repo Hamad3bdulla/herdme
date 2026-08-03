@@ -1870,12 +1870,199 @@ public sealed partial class SitesPage : Page
     private async void ImportDatabase_Click(object sender, RoutedEventArgs e)
     {
         if (selectedSite is not { } site) return;
-        if (!TryCurrentSiteDatabase(site, out var instance, out var provisioning, out var error))
+        var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
+        picker.FileTypeFilter.Add(".sql");
+        picker.FileTypeFilter.Add(".gz");
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
+        var file = await picker.PickSingleFileAsync();
+        if (file is null) return;
+
+        var services = serviceManager.LoadInstances()
+            .Where(instance => SiteDatabaseProvisioner.SupportedDefinitions.Contains(
+                instance.DefinitionId
+            ))
+            .Where(instance => serviceManager.State(instance.Id, instance.DefinitionId)
+                == ManagedServiceState.Running)
+            .Select(instance => new DatabaseServiceOption(instance))
+            .ToArray();
+        if (services.Length == 0)
         {
-            await ShowErrorAsync(error);
+            await ShowErrorAsync(AppLocalization.Get("SitesDatabaseNoRunningService"));
             return;
         }
-        await RestoreDatabaseAsync(site, instance, provisioning);
+
+        string? configuredDatabase = null;
+        int? configuredPort = null;
+        try
+        {
+            var environmentPath = Path.Combine(site.Path, ".env");
+            if (File.Exists(environmentPath))
+            {
+                var values = ParseEnvironment(File.ReadAllText(
+                    environmentPath,
+                    new UTF8Encoding(false, true)
+                ));
+                if (values.TryGetValue("DB_DATABASE", out var database)
+                    && SiteDatabaseProvisioner.IsValidDatabaseName(database))
+                {
+                    configuredDatabase = database;
+                }
+                if (values.TryGetValue("DB_PORT", out var portText)
+                    && int.TryParse(portText, out var port)) configuredPort = port;
+            }
+        }
+        catch (Exception error) when (error is IOException
+            or UnauthorizedAccessException or DecoderFallbackException)
+        {
+            await ShowErrorAsync(error.Message);
+            return;
+        }
+
+        var serviceBox = new ComboBox
+        {
+            Header = AppLocalization.Get("SitesDatabaseServiceField"),
+            ItemsSource = services,
+            SelectedIndex = Math.Max(0, Array.FindIndex(services, option =>
+                option.Instance.Port == configuredPort)),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var nameBox = new TextBox
+        {
+            Header = AppLocalization.Get("SitesDatabaseNameField"),
+            Text = configuredDatabase ?? SiteDatabaseProvisioner.SuggestedDatabaseName(site.Name),
+            MaxLength = 63,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var validationText = new TextBlock
+        {
+            Text = AppLocalization.Get("SitesDatabaseNameValidation"),
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                "SystemFillColorCriticalBrush"
+            ]
+        };
+        var targetContent = new StackPanel { Width = 430, Spacing = 10 };
+        targetContent.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.Get("SitesDatabaseImportTargetDescription"),
+            TextWrapping = TextWrapping.Wrap
+        });
+        targetContent.Children.Add(serviceBox);
+        targetContent.Children.Add(nameBox);
+        targetContent.Children.Add(validationText);
+        var targetDialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Get("SitesDatabaseImportTargetTitle"),
+            Content = targetContent,
+            PrimaryButtonText = AppLocalization.Get("SitesContinue"),
+            CloseButtonText = AppLocalization.Get("SitesCancel"),
+            DefaultButton = ContentDialogButton.Primary
+        };
+        nameBox.TextChanged += (_, _) =>
+        {
+            var valid = SiteDatabaseProvisioner.IsValidDatabaseName(nameBox.Text.Trim());
+            targetDialog.IsPrimaryButtonEnabled = valid;
+            validationText.Visibility = valid ? Visibility.Collapsed : Visibility.Visible;
+        };
+        if (await targetDialog.ShowAsync() != ContentDialogResult.Primary
+            || serviceBox.SelectedItem is not DatabaseServiceOption selectedService) return;
+
+        var databaseName = nameBox.Text.Trim();
+        bool databaseExists;
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            databaseExists = await serviceManager.SiteDatabaseExistsAsync(
+                selectedService.Instance,
+                databaseName,
+                timeout.Token
+            );
+        }
+        catch (Exception error) when (error is IOException or InvalidOperationException
+            or ArgumentException or OperationCanceledException or NotSupportedException)
+        {
+            await ShowErrorAsync(error is OperationCanceledException
+                ? AppLocalization.Get("SitesDatabaseInspectionTimedOut")
+                : error.Message);
+            return;
+        }
+
+        var confirmation = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = databaseExists
+                ? AppLocalization.Get("SitesDatabaseImportExistingTitle")
+                : AppLocalization.Get("SitesDatabaseImportCreateTitle"),
+            Content = AppLocalization.Format(
+                databaseExists
+                    ? "SitesDatabaseImportExistingWarning"
+                    : "SitesDatabaseImportCreateMessage",
+                databaseName
+            ),
+            PrimaryButtonText = AppLocalization.Get("SitesDatabaseImport"),
+            CloseButtonText = AppLocalization.Get("SitesCancel"),
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await confirmation.ShowAsync() != ContentDialogResult.Primary) return;
+
+        SiteDatabaseProvisioning? created = null;
+        var succeeded = await RunSiteOperationAsync(
+            AppLocalization.Get("SitesDatabaseRestoring"),
+            async (_, token) =>
+            {
+                if (databaseExists)
+                {
+                    await serviceManager.RestoreSiteDatabaseAsAdministratorAsync(
+                        selectedService.Instance,
+                        databaseName,
+                        file.Path,
+                        token
+                    );
+                    return;
+                }
+
+                created = await serviceManager.CreateSiteDatabaseAsync(
+                    selectedService.Instance,
+                    databaseName,
+                    token
+                );
+                try
+                {
+                    await serviceManager.RestoreSiteDatabaseAsync(
+                        selectedService.Instance,
+                        created,
+                        file.Path,
+                        token
+                    );
+                    serviceManager.AddSiteDatabaseToEnvironment(
+                        site.Path,
+                        selectedService.Instance,
+                        created
+                    );
+                }
+                catch
+                {
+                    try
+                    {
+                        await serviceManager.DeleteSiteDatabaseAsync(
+                            selectedService.Instance,
+                            created,
+                            CancellationToken.None
+                        );
+                    }
+                    catch (Exception)
+                    {
+                    }
+                    throw;
+                }
+            }
+        );
+        if (succeeded && created is not null && IsSelected(site))
+        {
+            await RefreshSiteDetailsAsync(site);
+        }
     }
 
     private async Task ResetDatabasePasswordAsync(

@@ -782,4 +782,14 @@
   <data name="PhpUpdatesAvailable" xml:space="preserve"><value>Updates are available</value></data>
   <data name="PhpUpdatesCheckedInBackground" xml:space="preserve"><value>PHP and tools are current · Checked in the background</value></data>
   <data name="PhpBackgroundCheckUnavailable" xml:space="preserve"><value>Update service unavailable · Installed versions remain ready</value></data>
+  <data name="NodeCheckingUpdatesInBackground" xml:space="preserve"><value>Checking for updates in the background…</value></data>
+  <data name="NodeUpdatesCheckedInBackground" xml:space="preserve"><value>Installed versions are ready · Updates checked in the background</value></data>
+  <data name="NodeBackgroundCheckUnavailable" xml:space="preserve"><value>Update service unavailable · Installed versions remain ready</value></data>
+  <data name="SitesDatabaseImportTargetTitle" xml:space="preserve"><value>Choose import target</value></data>
+  <data name="SitesDatabaseImportTargetDescription" xml:space="preserve"><value>Choose the running service and target database. HerdMe will detect whether it already exists.</value></data>
+  <data name="SitesDatabaseImportExistingTitle" xml:space="preserve"><value>Import into existing database?</value></data>
+  <data name="SitesDatabaseImportExistingWarning" xml:space="preserve"><value>{0} already exists. HerdMe will import the SQL data without recreating the database or changing the site's .env file. Existing tables or rows may conflict.</value></data>
+  <data name="SitesDatabaseImportCreateTitle" xml:space="preserve"><value>Create database and import?</value></data>
+  <data name="SitesDatabaseImportCreateMessage" xml:space="preserve"><value>{0} does not exist. HerdMe will create it, import the SQL data, and add the generated connection settings to the site's .env file.</value></data>
+  <data name="SitesDatabaseImport" xml:space="preserve"><value>Import</value></data>
 </root>

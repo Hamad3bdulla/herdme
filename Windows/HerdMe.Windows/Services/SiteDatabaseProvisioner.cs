@@ -104,7 +104,7 @@ public static class SiteDatabaseProvisioner
         CancellationToken cancellationToken = default
     )
     {
-        RequireValidProvisioning(provisioning);
+        RequireConnectionProvisioning(provisioning);
         var environment = instance.DefinitionId is "mysql" or "mariadb"
             ? new Dictionary<string, string?> { ["MYSQL_PWD"] = provisioning.Password }
             : PostgreSqlEnvironment(provisioning.Password, dataDirectory);
@@ -170,7 +170,7 @@ public static class SiteDatabaseProvisioner
         CancellationToken cancellationToken = default
     )
     {
-        RequireValidProvisioning(provisioning);
+        RequireConnectionProvisioning(provisioning);
         if (!File.Exists(source)) throw new FileNotFoundException("The SQL backup was not found.", source);
         if (!IsSupportedImportFile(source))
         {
@@ -205,6 +205,47 @@ public static class SiteDatabaseProvisioner
         var fileName = Path.GetFileName(path);
         return fileName.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)
             || fileName.EndsWith(".sql.gz", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static async Task<bool> ExistsAsync(
+        ManagedServiceInstance instance,
+        string serverExecutable,
+        string dataDirectory,
+        ServiceCredentials administrator,
+        string databaseName,
+        CancellationToken cancellationToken = default
+    )
+    {
+        ArgumentNullException.ThrowIfNull(instance);
+        ArgumentNullException.ThrowIfNull(administrator);
+        if (!SupportedDefinitions.Contains(instance.DefinitionId))
+        {
+            throw new NotSupportedException($"{instance.Name} cannot inspect site databases.");
+        }
+        if (!IsValidDatabaseName(databaseName))
+        {
+            throw new ArgumentException("The database name is invalid.", nameof(databaseName));
+        }
+        var mysql = instance.DefinitionId is "mysql" or "mariadb";
+        var executable = mysql
+            ? FindClient(
+                serverExecutable,
+                instance.DefinitionId == "mariadb" ? ["mariadb.exe", "mysql.exe"] : ["mysql.exe"],
+                instance.Name
+            )
+            : FindClient(serverExecutable, ["psql.exe"], instance.Name);
+        var arguments = mysql
+            ? MySqlArguments(instance, administrator.Username)
+            : PostgreSqlArguments(instance, administrator.Username, "postgres");
+        var environment = mysql
+            ? new Dictionary<string, string?> { ["MYSQL_PWD"] = administrator.Secret }
+            : PostgreSqlEnvironment(administrator.Secret, dataDirectory);
+        var sql = mysql
+            ? $"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '{databaseName}';\n"
+            : $"SELECT datname FROM pg_database WHERE datname = '{databaseName}';\n";
+        var result = await RunAsync(executable, arguments, environment, sql, cancellationToken);
+        RequireSuccess(result, instance.Name, "check whether the database exists");
+        return !string.IsNullOrWhiteSpace(result.Output);
     }
 
     public static async Task ResetPasswordAsync(
@@ -503,6 +544,17 @@ public static class SiteDatabaseProvisioner
             || !IsValidGeneratedValue(provisioning.Password, 128))
         {
             throw new ArgumentException("The generated database credentials are invalid.", nameof(provisioning));
+        }
+    }
+
+    private static void RequireConnectionProvisioning(SiteDatabaseProvisioning provisioning)
+    {
+        ArgumentNullException.ThrowIfNull(provisioning);
+        if (!IsValidDatabaseName(provisioning.DatabaseName)
+            || !IsValidGeneratedValue(provisioning.Username, 128)
+            || provisioning.Password.Length > 512)
+        {
+            throw new ArgumentException("The database connection settings are invalid.", nameof(provisioning));
         }
     }
 

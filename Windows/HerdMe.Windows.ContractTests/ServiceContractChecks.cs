@@ -289,6 +289,21 @@ internal static partial class ContractChecks
                 && generatedDatabase.Password.All(char.IsAsciiHexDigit),
             "site database credentials are generated in a portable restricted alphabet"
         );
+        await ThrowsAsync<FileNotFoundException>(
+            async () => await SiteDatabaseProvisioner.RestoreAsync(
+                new ManagedServiceInstance
+                {
+                    DefinitionId = "mysql",
+                    Name = "Local MySQL",
+                    Port = 3_306
+                },
+                Path.Combine(supportRoot, "missing-mysql.exe"),
+                supportRoot,
+                new SiteDatabaseProvisioning("demo_store", "root", "symbols-are-ok!"),
+                Path.Combine(supportRoot, "missing-import.sql")
+            ),
+            "database imports accept existing connection passwords outside the generated alphabet"
+        );
         var siteDatabase = new SiteDatabaseProvisioning(
             "demo_store",
             "herdme_0123456789abcdef",

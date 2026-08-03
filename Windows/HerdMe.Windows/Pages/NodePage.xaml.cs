@@ -13,6 +13,7 @@ public sealed partial class NodePage : Page
     private readonly ComposerToolManager toolManager;
     private readonly PhpRuntimePolicy runtimePolicy;
     private readonly WindowsUserPathManager userPathManager;
+    private int refreshGeneration;
 
     public ObservableCollection<NodeRuntimeRow> Rows { get; } = [];
 
@@ -28,6 +29,7 @@ public sealed partial class NodePage : Page
         this.runtimePolicy = runtimePolicy;
         this.userPathManager = userPathManager;
         InitializeComponent();
+        RenderRows(new Dictionary<string, string>());
     }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
@@ -112,16 +114,38 @@ public sealed partial class NodePage : Page
 
     private async Task RefreshRowsAsync()
     {
-        var active = installer.LoadSettings().ActiveVersion;
-        IReadOnlyDictionary<string, string> latestVersions;
+        var generation = Interlocked.Increment(ref refreshGeneration);
+        RenderRows(new Dictionary<string, string>());
+        OperationStatusText.Text = AppLocalization.Get("NodeCheckingUpdatesInBackground");
+        await Task.Yield();
+        _ = RefreshAvailableVersionsAsync(generation);
+    }
+
+    private async Task RefreshAvailableVersionsAsync(int generation)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         try
         {
-            latestVersions = await installer.ResolveLatestVersionsAsync(SupportedMajors);
+            var latestVersions = await installer.ResolveLatestVersionsAsync(
+                SupportedMajors,
+                timeout.Token
+            );
+            if (generation != refreshGeneration) return;
+            RenderRows(latestVersions);
+            OperationStatusText.Text = AppLocalization.Get("NodeUpdatesCheckedInBackground");
         }
         catch (Exception)
         {
-            latestVersions = new Dictionary<string, string>();
+            if (generation == refreshGeneration)
+            {
+                OperationStatusText.Text = AppLocalization.Get("NodeBackgroundCheckUnavailable");
+            }
         }
+    }
+
+    private void RenderRows(IReadOnlyDictionary<string, string> latestVersions)
+    {
+        var active = installer.LoadSettings().ActiveVersion;
         Rows.Clear();
         foreach (var major in SupportedMajors)
         {
@@ -146,6 +170,7 @@ public sealed partial class NodePage : Page
     private void SetWorking(bool working, string status)
     {
         OperationProgress.IsActive = working;
+        OperationProgress.Visibility = working ? Visibility.Visible : Visibility.Collapsed;
         OperationStatusText.Text = status;
         IsEnabled = !working;
     }

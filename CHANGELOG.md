@@ -22,6 +22,9 @@ Semantic Versioning for public releases.
 
 - Preserve deliberate PHP extension choices while repairing managed PHP
   configuration, including disabled Laravel-required extensions.
+- Keep the Node.js page responsive while release checks run in the background.
+- Import SQL into an existing database after confirmation, or create the database
+  and update the site's `.env` automatically when it does not exist.
 
 ## [0.1.7] - 2026-08-01
 

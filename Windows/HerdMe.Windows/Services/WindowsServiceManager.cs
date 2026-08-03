@@ -673,6 +673,64 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         cancellationToken
     );
 
+    public async Task<bool> SiteDatabaseExistsAsync(
+        ManagedServiceInstance instance,
+        string databaseName,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var configured = RequireRunningDatabaseService(instance);
+        return await SiteDatabaseProvisioner.ExistsAsync(
+            configured,
+            installer.ExecutablePath(configured.DefinitionId),
+            DataDirectory(configured.Id),
+            credentialStore.GetOrCreate(configured.Id),
+            databaseName,
+            cancellationToken
+        );
+    }
+
+    public async Task RestoreSiteDatabaseAsAdministratorAsync(
+        ManagedServiceInstance instance,
+        string databaseName,
+        string source,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var configured = RequireRunningDatabaseService(instance);
+        var administrator = credentialStore.GetOrCreate(configured.Id);
+        await SiteDatabaseProvisioner.RestoreAsync(
+            configured,
+            installer.ExecutablePath(configured.DefinitionId),
+            DataDirectory(configured.Id),
+            new SiteDatabaseProvisioning(
+                databaseName,
+                administrator.Username,
+                administrator.Secret
+            ),
+            source,
+            cancellationToken
+        );
+    }
+
+    private ManagedServiceInstance RequireRunningDatabaseService(
+        ManagedServiceInstance instance
+    )
+    {
+        ArgumentNullException.ThrowIfNull(instance);
+        var configured = LoadInstances().FirstOrDefault(candidate => candidate.Id == instance.Id)
+            ?? throw new InvalidOperationException("The database service no longer exists.");
+        if (!SiteDatabaseProvisioner.SupportedDefinitions.Contains(configured.DefinitionId))
+        {
+            throw new NotSupportedException($"{configured.Name} cannot manage site databases.");
+        }
+        if (State(configured.Id, configured.DefinitionId) != ManagedServiceState.Running)
+        {
+            throw new InvalidOperationException($"Start {configured.Name} before importing a database.");
+        }
+        return configured;
+    }
+
     public async Task<DatabaseConnectionInspection> InspectSiteDatabaseAsync(
         ManagedServiceInstance instance,
         SiteDatabaseProvisioning provisioning,
