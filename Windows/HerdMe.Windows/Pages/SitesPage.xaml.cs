@@ -1856,13 +1856,14 @@ public sealed partial class SitesPage : Page
             DefaultButton = ContentDialogButton.Close
         };
         if (await confirmation.ShowAsync() != ContentDialogResult.Primary) return;
-        await RunSiteOperationAsync(
+        await RunDatabaseImportOperationAsync(
             AppLocalization.Get("SitesDatabaseRestoring"),
-            async (_, token) => await serviceManager.RestoreSiteDatabaseAsync(
+            async (transferProgress, token) => await serviceManager.RestoreSiteDatabaseAsync(
                 instance,
                 provisioning,
                 file.Path,
-                token
+                token,
+                transferProgress
             )
         );
     }
@@ -2008,9 +2009,9 @@ public sealed partial class SitesPage : Page
         if (await confirmation.ShowAsync() != ContentDialogResult.Primary) return;
 
         SiteDatabaseProvisioning? created = null;
-        var succeeded = await RunSiteOperationAsync(
+        var succeeded = await RunDatabaseImportOperationAsync(
             AppLocalization.Get("SitesDatabaseRestoring"),
-            async (_, token) =>
+            async (transferProgress, token) =>
             {
                 if (databaseExists)
                 {
@@ -2018,7 +2019,8 @@ public sealed partial class SitesPage : Page
                         selectedService.Instance,
                         databaseName,
                         file.Path,
-                        token
+                        token,
+                        transferProgress
                     );
                     return;
                 }
@@ -2034,7 +2036,8 @@ public sealed partial class SitesPage : Page
                         selectedService.Instance,
                         created,
                         file.Path,
-                        token
+                        token,
+                        transferProgress
                     );
                     serviceManager.AddSiteDatabaseToEnvironment(
                         site.Path,
@@ -3079,6 +3082,95 @@ public sealed partial class SitesPage : Page
         siteOperationCancellation?.Cancel();
     }
 
+    private async Task<bool> RunDatabaseImportOperationAsync(
+        string title,
+        Func<IProgress<DatabaseTransferProgress>, CancellationToken, Task> operation
+    )
+    {
+        siteOperationCancellation?.Cancel();
+        siteOperationCancellation?.Dispose();
+        var cancellation = new CancellationTokenSource();
+        siteOperationCancellation = cancellation;
+        SiteOperationBar.Title = title;
+        SiteOperationBar.Message = AppLocalization.Get("SitesDatabaseProgressStarting");
+        SiteOperationBar.Severity = InfoBarSeverity.Informational;
+        SiteOperationBar.IsOpen = true;
+        SiteOperationCancelButton.Visibility = Visibility.Visible;
+        SiteOperationProgress.IsIndeterminate = false;
+        SiteOperationProgress.Value = 0;
+        SiteOperationProgress.Visibility = Visibility.Visible;
+        var progress = new Progress<DatabaseTransferProgress>(value =>
+        {
+            SiteOperationProgress.Value = value.Percentage;
+            var remaining = value.EstimatedRemaining is { } estimate
+                ? FormatDuration(estimate)
+                : AppLocalization.Get("SitesDatabaseProgressCalculating");
+            SiteOperationBar.Message = AppLocalization.Format(
+                "SitesDatabaseProgress",
+                value.Percentage,
+                FormatTransferSize(value.BytesTransferred),
+                FormatTransferSize(value.TotalBytes),
+                remaining
+            );
+            if (value.CompatibilityFixes > 0)
+            {
+                SiteOperationBar.Message += Environment.NewLine + AppLocalization.Format(
+                    "SitesDatabaseCompatibilityFixes",
+                    value.CompatibilityFixes
+                );
+            }
+        });
+        try
+        {
+            await operation(progress, cancellation.Token);
+            SiteOperationProgress.Value = 100;
+            SiteOperationBar.Severity = InfoBarSeverity.Success;
+            SiteOperationBar.Title = AppLocalization.Get("SitesOperationCompleted");
+            return true;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            SiteOperationBar.Severity = InfoBarSeverity.Warning;
+            SiteOperationBar.Title = AppLocalization.Get("SitesOperationCancelled");
+            return false;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException
+            or InvalidDataException or InvalidOperationException or ArgumentException)
+        {
+            SiteOperationBar.Severity = InfoBarSeverity.Error;
+            SiteOperationBar.Title = AppLocalization.Get("SitesOperationFailed");
+            SiteOperationBar.Message = error.Message;
+            return false;
+        }
+        finally
+        {
+            if (ReferenceEquals(siteOperationCancellation, cancellation))
+            {
+                siteOperationCancellation = null;
+            }
+            cancellation.Dispose();
+            SiteOperationCancelButton.Visibility = Visibility.Collapsed;
+            SiteOperationProgress.Visibility = Visibility.Collapsed;
+            SiteOperationProgress.IsIndeterminate = true;
+        }
+    }
+
+    private static string FormatTransferSize(long bytes) => bytes switch
+    {
+        < 1_024 => $"{bytes} B",
+        < 1_048_576 => $"{bytes / 1_024d:F1} KB",
+        < 1_073_741_824 => $"{bytes / 1_048_576d:F1} MB",
+        _ => $"{bytes / 1_073_741_824d:F1} GB"
+    };
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        if (duration < TimeSpan.Zero) duration = TimeSpan.Zero;
+        return duration.TotalHours >= 1
+            ? $"{(int)duration.TotalHours}:{duration.Minutes:00}:{duration.Seconds:00}"
+            : $"{duration.Minutes}:{duration.Seconds:00}";
+    }
+
     private async Task<bool> RunSiteOperationAsync(
         string title,
         Func<IProgress<string>, CancellationToken, Task> operation
@@ -3092,6 +3184,8 @@ public sealed partial class SitesPage : Page
         SiteOperationBar.Message = string.Empty;
         SiteOperationBar.Severity = InfoBarSeverity.Informational;
         SiteOperationBar.IsOpen = true;
+        SiteOperationCancelButton.Visibility = Visibility.Visible;
+        SiteOperationProgress.IsIndeterminate = true;
         SiteOperationProgress.Visibility = Visibility.Visible;
         var progress = new Progress<string>(text =>
         {
@@ -3126,6 +3220,7 @@ public sealed partial class SitesPage : Page
                 siteOperationCancellation = null;
             }
             cancellation.Dispose();
+            SiteOperationCancelButton.Visibility = Visibility.Collapsed;
             SiteOperationProgress.Visibility = Visibility.Collapsed;
         }
     }

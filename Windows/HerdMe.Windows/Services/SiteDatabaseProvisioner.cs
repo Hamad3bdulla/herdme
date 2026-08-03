@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
 using HerdMe.Windows.Models;
 
 namespace HerdMe.Windows.Services;
@@ -11,8 +13,25 @@ public sealed record SiteDatabaseProvisioning(
     string Password
 );
 
+public sealed record DatabaseTransferProgress(
+    long BytesTransferred,
+    long TotalBytes,
+    TimeSpan Elapsed,
+    TimeSpan? EstimatedRemaining,
+    int CompatibilityFixes
+)
+{
+    public double Percentage => TotalBytes <= 0
+        ? 0
+        : Math.Clamp(BytesTransferred * 100d / TotalBytes, 0, 100);
+}
+
 public static class SiteDatabaseProvisioner
 {
+    private static readonly Regex UnsupportedMySqlCollation = new(
+        @"\b(COLLATE\s*=?\s*)utf8mb4_(?:(?:0900)|(?:uca\d+))[a-z0-9_]*\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled
+    );
     public static readonly IReadOnlySet<string> SupportedDefinitions = new HashSet<string>(
         ["mysql", "mariadb", "postgresql"],
         StringComparer.OrdinalIgnoreCase
@@ -157,6 +176,9 @@ public static class SiteDatabaseProvisioner
             environment,
             inputPath: null,
             outputPath: destination,
+            progress: null,
+            normalizeSql: false,
+            mysql: false,
             cancellationToken
         );
     }
@@ -167,7 +189,8 @@ public static class SiteDatabaseProvisioner
         string dataDirectory,
         SiteDatabaseProvisioning provisioning,
         string source,
-        CancellationToken cancellationToken = default
+        CancellationToken cancellationToken = default,
+        IProgress<DatabaseTransferProgress>? progress = null
     )
     {
         RequireConnectionProvisioning(provisioning);
@@ -184,9 +207,26 @@ public static class SiteDatabaseProvisioner
                 instance.Name
             )
             : FindClient(serverExecutable, ["psql.exe"], instance.Name);
-        var arguments = mysql
-            ? [.. MySqlArguments(instance, provisioning.Username), $"--database={provisioning.DatabaseName}"]
-            : PostgreSqlArguments(instance, provisioning.Username, provisioning.DatabaseName);
+        IReadOnlyList<string> arguments;
+        if (mysql)
+        {
+            arguments =
+            [
+                .. MySqlArguments(instance, provisioning.Username),
+                "--default-character-set=utf8mb4",
+                "--max-allowed-packet=1G",
+                "--binary-mode=1",
+                $"--database={provisioning.DatabaseName}"
+            ];
+        }
+        else
+        {
+            arguments =
+            [
+                .. PostgreSqlArguments(instance, provisioning.Username, provisioning.DatabaseName),
+                "--set=ON_ERROR_STOP=on"
+            ];
+        }
         var environment = mysql
             ? new Dictionary<string, string?> { ["MYSQL_PWD"] = provisioning.Password }
             : PostgreSqlEnvironment(provisioning.Password, dataDirectory);
@@ -196,6 +236,9 @@ public static class SiteDatabaseProvisioner
             environment,
             source,
             outputPath: null,
+            progress,
+            normalizeSql: true,
+            mysql,
             cancellationToken
         );
     }
@@ -629,6 +672,9 @@ public static class SiteDatabaseProvisioner
         IReadOnlyDictionary<string, string?> environment,
         string? inputPath,
         string? outputPath,
+        IProgress<DatabaseTransferProgress>? progress,
+        bool normalizeSql,
+        bool mysql,
         CancellationToken cancellationToken
     )
     {
@@ -655,8 +701,9 @@ public static class SiteDatabaseProvisioner
             ?? throw new InvalidOperationException("The database transfer could not be started.");
         var error = process.StandardError.ReadToEndAsync(cancellationToken);
         var transfer = inputPath is not null
-            ? CopyInputAsync(process, inputPath, cancellationToken)
+            ? CopyInputAsync(process, inputPath, normalizeSql, mysql, progress, cancellationToken)
             : CopyOutputAsync(process, outputPath!, cancellationToken);
+        Exception? transferFailure = null;
         try
         {
             await Task.WhenAll(process.WaitForExitAsync(cancellationToken), transfer);
@@ -668,45 +715,149 @@ public static class SiteDatabaseProvisioner
             if (outputPath is not null && File.Exists(outputPath)) File.Delete(outputPath);
             throw;
         }
+        catch (Exception caught) when (caught is IOException or ObjectDisposedException)
+        {
+            transferFailure = caught;
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync(CancellationToken.None);
+            }
+        }
         var errorText = await error;
-        if (process.ExitCode != 0)
+        var failureMessage = TransferFailureMessage(
+            process.ExitCode,
+            errorText,
+            transferFailure is not null
+        );
+        if (failureMessage is not null)
         {
             if (outputPath is not null && File.Exists(outputPath)) File.Delete(outputPath);
-            throw new InvalidOperationException(
-                string.IsNullOrWhiteSpace(errorText)
-                    ? "The database transfer failed."
-                    : errorText.Trim()
-            );
+            throw new InvalidOperationException(failureMessage, transferFailure);
         }
+    }
+
+    internal static string? TransferFailureMessage(
+        int exitCode,
+        string standardError,
+        bool inputPipeFailed
+    )
+    {
+        if (exitCode != 0)
+        {
+            return string.IsNullOrWhiteSpace(standardError)
+                ? "The database transfer failed."
+                : standardError.Trim();
+        }
+        return inputPipeFailed
+            ? "The database client stopped before the SQL file was fully imported."
+            : null;
     }
 
     private static async Task CopyInputAsync(
         Process process,
         string path,
+        bool normalizeSql,
+        bool mysql,
+        IProgress<DatabaseTransferProgress>? progress,
         CancellationToken cancellationToken
     )
     {
+        var timer = Stopwatch.StartNew();
+        var totalBytes = new FileInfo(path).Length;
+        var lastReport = TimeSpan.MinValue;
+        var compatibilityFixes = 0;
+
+        void Report(long bytes, bool force = false)
+        {
+            if (!force && timer.Elapsed - lastReport < TimeSpan.FromMilliseconds(200)) return;
+            lastReport = timer.Elapsed;
+            var transferred = Math.Min(bytes, totalBytes);
+            var bytesPerSecond = timer.Elapsed.TotalSeconds > 0
+                ? transferred / timer.Elapsed.TotalSeconds
+                : 0;
+            TimeSpan? remaining = bytesPerSecond > 0
+                ? TimeSpan.FromSeconds((totalBytes - transferred) / bytesPerSecond)
+                : null;
+            progress?.Report(new DatabaseTransferProgress(
+                transferred,
+                totalBytes,
+                timer.Elapsed,
+                remaining,
+                compatibilityFixes
+            ));
+        }
+
         try
         {
             await using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-            if (path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase))
+            await using Stream sqlSource = path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)
+                ? new GZipStream(source, CompressionMode.Decompress, leaveOpen: true)
+                : source;
+            Report(0, force: true);
+            if (normalizeSql)
             {
-                await using var decompressed = new GZipStream(
-                    source,
-                    CompressionMode.Decompress,
-                    leaveOpen: false
+                using var reader = new StreamReader(
+                    sqlSource,
+                    new UTF8Encoding(false, false),
+                    detectEncodingFromByteOrderMarks: true,
+                    bufferSize: 64 * 1_024,
+                    leaveOpen: true
                 );
-                await decompressed.CopyToAsync(process.StandardInput.BaseStream, cancellationToken);
+                await using var writer = new StreamWriter(
+                    process.StandardInput.BaseStream,
+                    new UTF8Encoding(false),
+                    bufferSize: 64 * 1_024,
+                    leaveOpen: true
+                );
+                var buffer = new char[64 * 1_024];
+                var pending = string.Empty;
+                while (true)
+                {
+                    var count = await reader.ReadAsync(buffer.AsMemory(), cancellationToken);
+                    if (count == 0) break;
+                    for (var index = 0; index < count; index++)
+                    {
+                        if (buffer[index] == '\uFFFD') compatibilityFixes++;
+                    }
+                    var combined = pending + new string(buffer, 0, count);
+                    var safeLength = Math.Max(0, combined.Length - 256);
+                    var ready = combined[..safeLength];
+                    pending = combined[safeLength..];
+                    if (mysql) ready = NormalizeMySql(ready, ref compatibilityFixes);
+                    await writer.WriteAsync(ready.AsMemory(), cancellationToken);
+                    Report(source.Position);
+                }
+                if (mysql) pending = NormalizeMySql(pending, ref compatibilityFixes);
+                await writer.WriteAsync(pending.AsMemory(), cancellationToken);
+                await writer.FlushAsync(cancellationToken);
             }
             else
             {
-                await source.CopyToAsync(process.StandardInput.BaseStream, cancellationToken);
+                await sqlSource.CopyToAsync(
+                    process.StandardInput.BaseStream,
+                    64 * 1_024,
+                    cancellationToken
+                );
             }
+            Report(totalBytes, force: true);
         }
         finally
         {
             process.StandardInput.Close();
         }
+    }
+
+    internal static string NormalizeMySql(string sql, ref int fixes)
+    {
+        var replacements = 0;
+        var normalized = UnsupportedMySqlCollation.Replace(sql, match =>
+        {
+            replacements++;
+            return match.Groups[1].Value + "utf8mb4_unicode_ci";
+        });
+        fixes += replacements;
+        return normalized;
     }
 
     private static async Task CopyOutputAsync(

@@ -1,6 +1,16 @@
 {
   "releases": [
     {
+      "version": "0.1.9",
+      "build": 1,
+      "channel": "stable",
+      "notes": "Adds determinate SQL import progress with size and time remaining, automatically repairs common collation, encoding, and packet compatibility problems, and shows the real database error instead of a closed-pipe message.",
+      "downloadURLs": {
+        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.9/HerdMe-0.1.9-macOS.zip",
+        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.9/HerdMe-0.1.9-win-x64-setup.exe"
+      }
+    },
+    {
       "version": "0.1.8",
       "build": 1,
       "channel": "stable",

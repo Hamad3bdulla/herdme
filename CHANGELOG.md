@@ -5,6 +5,21 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-08-03
+
+### Added
+
+- Show determinate SQL import progress with transferred size, percentage, estimated
+  time remaining, and the number of automatic compatibility repairs.
+- Normalize unsupported MySQL and MariaDB collations, UTF encoding problems, and
+  client packet limits while streaming `.sql` and `.sql.gz` imports.
+
+### Fixed
+
+- Preserve the database client's diagnostic when it closes the import pipe, instead
+  of replacing the useful SQL error with `The pipe has been ended`.
+- Hide the operation cancel action after a site operation finishes or fails.
+
 ## [0.1.8] - 2026-08-03
 
 ### Added

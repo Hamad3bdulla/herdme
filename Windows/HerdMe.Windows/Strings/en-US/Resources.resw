@@ -676,6 +676,10 @@
   <data name="SitesDatabaseTablePlusUnavailable" xml:space="preserve"><value>This database cannot be opened in TablePlus.</value></data>
   <data name="SitesDatabaseBackingUp" xml:space="preserve"><value>Backing up database</value></data>
   <data name="SitesDatabaseRestoring" xml:space="preserve"><value>Importing database</value></data>
+  <data name="SitesDatabaseProgressStarting" xml:space="preserve"><value>Preparing the database import...</value></data>
+  <data name="SitesDatabaseProgressCalculating" xml:space="preserve"><value>calculating</value></data>
+  <data name="SitesDatabaseProgress" xml:space="preserve"><value>{0:F0}% · {1} of {2} · {3} remaining</value></data>
+  <data name="SitesDatabaseCompatibilityFixes" xml:space="preserve"><value>Automatic SQL compatibility fixes: {0}</value></data>
   <data name="SitesDatabaseRestoreConfirmTitle" xml:space="preserve"><value>Import database?</value></data>
   <data name="SitesDatabaseRestoreConfirm" xml:space="preserve"><value>The SQL or SQL.GZ file will be imported into {0}. Existing data may be changed.</value></data>
   <data name="SitesDatabaseResettingPassword" xml:space="preserve"><value>Resetting database password</value></data>

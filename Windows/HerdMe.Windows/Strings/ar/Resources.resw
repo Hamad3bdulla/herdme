@@ -676,6 +676,10 @@
   <data name="SitesDatabaseTablePlusUnavailable" xml:space="preserve"><value>لا يمكن فتح قاعدة البيانات هذه في TablePlus.</value></data>
   <data name="SitesDatabaseBackingUp" xml:space="preserve"><value>جارٍ نسخ قاعدة البيانات احتياطياً</value></data>
   <data name="SitesDatabaseRestoring" xml:space="preserve"><value>جارٍ استيراد قاعدة البيانات</value></data>
+  <data name="SitesDatabaseProgressStarting" xml:space="preserve"><value>جارٍ تجهيز استيراد قاعدة البيانات...</value></data>
+  <data name="SitesDatabaseProgressCalculating" xml:space="preserve"><value>جارٍ الحساب</value></data>
+  <data name="SitesDatabaseProgress" xml:space="preserve"><value>{0:F0}% · {1} من {2} · متبقي {3}</value></data>
+  <data name="SitesDatabaseCompatibilityFixes" xml:space="preserve"><value>إصلاحات توافق SQL التلقائية: {0}</value></data>
   <data name="SitesDatabaseRestoreConfirmTitle" xml:space="preserve"><value>استيراد قاعدة البيانات؟</value></data>
   <data name="SitesDatabaseRestoreConfirm" xml:space="preserve"><value>سيتم استيراد ملف SQL أو SQL.GZ إلى {0} وقد تتغير البيانات الحالية.</value></data>
   <data name="SitesDatabaseResettingPassword" xml:space="preserve"><value>جارٍ إعادة تعيين كلمة مرور قاعدة البيانات</value></data>

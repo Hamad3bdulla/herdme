@@ -110,6 +110,41 @@ internal static partial class ContractChecks
                 && !SiteDatabaseProvisioner.IsSupportedImportFile("site.dump"),
             "site database imports accept plain or gzip-compressed SQL only"
         );
+        var sqlCompatibilityFixes = 0;
+        var compatibleSql = SiteDatabaseProvisioner.NormalizeMySql(
+            "CREATE TABLE demo (name TEXT) COLLATE=utf8mb4_0900_ai_ci;\n"
+                + "SELECT 'utf8mb4_0900_ai_ci';\n"
+                + "ALTER TABLE demo COLLATE utf8mb4_uca1400_ai_ci;",
+            ref sqlCompatibilityFixes
+        );
+        Check(
+            sqlCompatibilityFixes == 2
+                && compatibleSql.Split(
+                    "utf8mb4_unicode_ci",
+                    StringSplitOptions.None
+                ).Length == 3
+                && compatibleSql.Contains("SELECT 'utf8mb4_0900_ai_ci'", StringComparison.Ordinal),
+            "database imports repair unsupported MySQL collations without changing data values"
+        );
+        var databaseProgress = new DatabaseTransferProgress(
+            512,
+            1_024,
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(1),
+            2
+        );
+        Check(
+            databaseProgress.Percentage == 50 && databaseProgress.CompatibilityFixes == 2,
+            "database imports expose determinate byte and compatibility progress"
+        );
+        Check(
+            SiteDatabaseProvisioner.TransferFailureMessage(
+                1,
+                "ERROR 1273: Unknown collation: utf8mb4_0900_ai_ci",
+                inputPipeFailed: true
+            ) == "ERROR 1273: Unknown collation: utf8mb4_0900_ai_ci",
+            "database import errors prefer the database diagnostic over a closed-pipe error"
+        );
         var mergedPerformance = WindowsLocalEnvironment.MergePerformance(
             new SitePerformanceSnapshot(2, 1, 1, TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(20), DateTimeOffset.UtcNow, []),
             new SitePerformanceSnapshot(1, 0, 0, TimeSpan.FromMilliseconds(40), TimeSpan.FromMilliseconds(40), DateTimeOffset.UtcNow.AddSeconds(-1), [])

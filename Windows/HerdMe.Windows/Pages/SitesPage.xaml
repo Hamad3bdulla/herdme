@@ -372,7 +372,7 @@
                                     IsClosable="True"
                                     Severity="Informational">
                                     <InfoBar.ActionButton>
-                                        <Button x:Uid="SitesCancelOperationButton" Content="Cancel" Click="CancelSiteOperation_Click" />
+                                        <Button x:Uid="SitesCancelOperationButton" x:Name="SiteOperationCancelButton" Content="Cancel" Click="CancelSiteOperation_Click" />
                                     </InfoBar.ActionButton>
                                 </InfoBar>
                                 <ProgressBar x:Name="SiteOperationProgress" IsIndeterminate="True" Visibility="Collapsed" />
