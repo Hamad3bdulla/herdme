@@ -53,6 +53,9 @@ public sealed class AppUpdateManager
     private readonly byte[]? verificationKey;
     private readonly string? fallbackFeedLocation;
     private readonly HttpClient httpClient;
+    private readonly object checkSync = new();
+    private Task<AppUpdateCheck>? activeCheck;
+    private string? activeChannel;
 
     public AppUpdateManager(
         string feedLocation,
@@ -117,16 +120,42 @@ public sealed class AppUpdateManager
         );
     }
 
-    public async Task<AppUpdateCheck> CheckAsync(
+    public string CurrentVersion => currentVersion;
+
+    public int CurrentBuild => currentBuild;
+
+    public AppUpdateCheck? LatestResult { get; private set; }
+
+    public event Action<AppUpdateCheck>? CheckCompleted;
+
+    public Task<AppUpdateCheck> CheckAsync(
         string channel,
         CancellationToken cancellationToken = default
     )
     {
-        var feed = await ReadFeedAsync(cancellationToken);
-        var manifest = DecodeManifest(feed.Data, feed.RequireSignature);
         var normalizedChannel = channel.Equals("Beta", StringComparison.OrdinalIgnoreCase)
             ? "beta"
             : "stable";
+        Task<AppUpdateCheck> check;
+        lock (checkSync)
+        {
+            if (activeCheck is null || activeCheck.IsCompleted
+                || !string.Equals(activeChannel, normalizedChannel, StringComparison.Ordinal))
+            {
+                activeChannel = normalizedChannel;
+                activeCheck = CheckCoreAsync(normalizedChannel);
+            }
+            check = activeCheck;
+        }
+        return cancellationToken.CanBeCanceled
+            ? check.WaitAsync(cancellationToken)
+            : check;
+    }
+
+    private async Task<AppUpdateCheck> CheckCoreAsync(string normalizedChannel)
+    {
+        var feed = await ReadFeedAsync(CancellationToken.None);
+        var manifest = DecodeManifest(feed.Data, feed.RequireSignature);
         var acceptedChannels = normalizedChannel == "beta"
             ? new HashSet<string>(["stable", "beta"], StringComparer.OrdinalIgnoreCase)
             : new HashSet<string>(["stable"], StringComparer.OrdinalIgnoreCase);
@@ -138,12 +167,22 @@ public sealed class AppUpdateManager
                 $"No {normalizedChannel} release is available in the update feed."
             );
         var available = IsNewer(latest) ? latest : null;
-        return new AppUpdateCheck(
+        var result = new AppUpdateCheck(
             currentVersion,
             currentBuild,
             available,
             feed.UsedBundledFallback
         );
+        LatestResult = result;
+        try
+        {
+            CheckCompleted?.Invoke(result);
+        }
+        catch (Exception)
+        {
+            // A closed page must not fail the shared background update check.
+        }
+        return result;
     }
 
     private async Task<FeedPayload> ReadFeedAsync(CancellationToken cancellationToken)

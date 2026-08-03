@@ -25,6 +25,7 @@ public sealed partial class GeneralPage : Page
     private bool loadingStartup;
     private bool loadingUpdateSettings;
     private bool loadingCompactMode;
+    private bool updateEventSubscribed;
 
     public ObservableCollection<RuntimeCheck> Runtimes { get; } = [];
 
@@ -78,7 +79,13 @@ public sealed partial class GeneralPage : Page
             "GeneralChannelStatus",
             UpdateChannelDisplayName(settings.UpdateChannel)
         );
+        CurrentVersionText.Text = AppLocalization.Format(
+            "GeneralCurrentVersion",
+            updateManager.CurrentVersion,
+            updateManager.CurrentBuild
+        );
         loadingUpdateSettings = false;
+        PopulateLocalSnapshot();
     }
 
     private void CompactModeToggle_Toggled(object sender, RoutedEventArgs e)
@@ -112,7 +119,31 @@ public sealed partial class GeneralPage : Page
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
+        if (!updateEventSubscribed)
+        {
+            updateManager.CheckCompleted += UpdateManager_CheckCompleted;
+            updateEventSubscribed = true;
+        }
+        RenderLatestUpdateResult();
         await RefreshAsync();
+    }
+
+    private void Page_Unloaded(object sender, RoutedEventArgs e)
+    {
+        if (!updateEventSubscribed) return;
+        updateManager.CheckCompleted -= UpdateManager_CheckCompleted;
+        updateEventSubscribed = false;
+    }
+
+    private void PopulateLocalSnapshot()
+    {
+        CoreStatusText.Text = File.Exists(coreClient.ExecutablePath)
+            ? AppLocalization.Get("GeneralReady")
+            : AppLocalization.Get("GeneralUnavailable");
+        SupportPathText.Text = settingsStore.SupportRoot;
+        OpenDataButton.IsEnabled = Directory.Exists(settingsStore.SupportRoot);
+        Runtimes.Clear();
+        foreach (var runtime in ManagedRuntimeChecks()) Runtimes.Add(runtime);
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e)
@@ -128,7 +159,6 @@ public sealed partial class GeneralPage : Page
         PhpExtensionDetailText.Text = string.Empty;
         PhpExtensionProgress.IsActive = true;
         OpenDataButton.IsEnabled = false;
-        Runtimes.Clear();
         try
         {
             var report = await coreClient.DoctorAsync();
@@ -138,10 +168,8 @@ public sealed partial class GeneralPage : Page
             SupportPathText.Text = report.SupportPath;
             Directory.CreateDirectory(report.SupportPath);
             OpenDataButton.IsEnabled = true;
-            foreach (var runtime in ManagedRuntimeChecks())
-            {
-                Runtimes.Add(runtime);
-            }
+            Runtimes.Clear();
+            foreach (var runtime in ManagedRuntimeChecks()) Runtimes.Add(runtime);
             var phpSettings = runtimePolicy.Load();
             var phpPath = runtimeInstaller.IsInstalled(phpSettings.PhpCycle)
                 ? runtimeInstaller.PhpExecutable(phpSettings.PhpCycle)
@@ -353,27 +381,19 @@ public sealed partial class GeneralPage : Page
         }
     }
 
-    private async void AutomaticUpdatesToggle_Toggled(object sender, RoutedEventArgs e)
+    private void AutomaticUpdatesToggle_Toggled(object sender, RoutedEventArgs e)
     {
         if (loadingUpdateSettings) return;
-        if (!SaveUpdateSettings()) return;
-        if (AutomaticUpdatesToggle.IsOn)
-        {
-            await CheckForUpdatesAsync(userInitiated: false);
-        }
+        SaveUpdateSettings();
     }
 
-    private async void UpdateChannelBox_SelectionChanged(
+    private void UpdateChannelBox_SelectionChanged(
         object sender,
         SelectionChangedEventArgs e
     )
     {
         if (loadingUpdateSettings) return;
-        if (!SaveUpdateSettings()) return;
-        if (AutomaticUpdatesToggle.IsOn)
-        {
-            await CheckForUpdatesAsync(userInitiated: false);
-        }
+        SaveUpdateSettings();
     }
 
     private async void CheckNow_Click(object sender, RoutedEventArgs e)
@@ -388,8 +408,9 @@ public sealed partial class GeneralPage : Page
             var updateChannel = SelectedUpdateChannel();
             settingsStore.UpdateUpdatePreferences(AutomaticUpdatesToggle.IsOn, updateChannel);
             UpdateStatusText.Text = AppLocalization.Format(
-                "GeneralChannelStatus",
-                UpdateChannelDisplayName(updateChannel)
+                "GeneralUpdateReadyToCheck",
+                UpdateChannelDisplayName(updateChannel),
+                updateManager.CurrentVersion
             );
             return true;
         }
@@ -410,6 +431,7 @@ public sealed partial class GeneralPage : Page
 
     private async Task CheckForUpdatesAsync(bool userInitiated)
     {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         UpdateProgress.IsActive = true;
         CheckNowButton.IsEnabled = false;
         AppUpdateCheck? applicationResult = null;
@@ -422,8 +444,8 @@ public sealed partial class GeneralPage : Page
                 "GeneralCheckingReleases",
                 channelName
             );
-            var applicationTask = updateManager.CheckAsync(channel);
-            var componentsTask = componentUpdateManager.CheckAsync();
+            var applicationTask = updateManager.CheckAsync(channel, timeout.Token);
+            var componentsTask = componentUpdateManager.CheckAsync(timeout.Token);
             try
             {
                 applicationResult = await applicationTask;
@@ -511,6 +533,35 @@ public sealed partial class GeneralPage : Page
             UpdateProgress.IsActive = false;
             CheckNowButton.IsEnabled = true;
         }
+    }
+
+    private void UpdateManager_CheckCompleted(AppUpdateCheck result)
+    {
+        DispatcherQueue.TryEnqueue(() => RenderUpdateResult(result));
+    }
+
+    private void RenderLatestUpdateResult()
+    {
+        if (updateManager.LatestResult is { } result)
+        {
+            RenderUpdateResult(result);
+            return;
+        }
+        UpdateStatusText.Text = AppLocalization.Format(
+            "GeneralUpdateReadyToCheck",
+            UpdateChannelDisplayName(SelectedUpdateChannel()),
+            updateManager.CurrentVersion
+        );
+    }
+
+    private void RenderUpdateResult(AppUpdateCheck result)
+    {
+        UpdateStatusText.Text = result.AvailableRelease is { } release
+            ? AppLocalization.Format("GeneralVersionAvailable", release.Version)
+            : result.UsedBundledFallback
+                ? AppLocalization.Get("UpdateServiceUnavailableStatus")
+                : AppLocalization.Format("GeneralLastBackgroundCheck", result.CurrentVersion);
+        ApplyManagedUpdateState();
     }
 
     private void ApplyManagedUpdateState()

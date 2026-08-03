@@ -4,7 +4,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:HerdMe.Windows.Models"
     AutomationProperties.AutomationId="GeneralPageRoot"
-    Loaded="Page_Loaded">
+    Loaded="Page_Loaded"
+    Unloaded="Page_Unloaded">
     <ScrollViewer>
         <StackPanel Padding="32" Spacing="16">
             <Grid>
@@ -101,9 +102,10 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock x:Uid="GeneralApplicationUpdatesTitle" Text="Application updates" Style="{StaticResource SubtitleTextBlockStyle}" />
+                            <TextBlock x:Name="CurrentVersionText" FontWeight="SemiBold" />
                             <TextBlock x:Name="UpdateStatusText" x:Uid="GeneralStableChannel" Text="Stable channel" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
-                        <ProgressRing x:Name="UpdateProgress" Grid.Column="1" Width="18" Height="18" />
+                        <ProgressRing x:Name="UpdateProgress" Grid.Column="1" Width="18" Height="18" IsActive="False" />
                     </Grid>
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>

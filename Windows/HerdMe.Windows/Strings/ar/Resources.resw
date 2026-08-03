@@ -771,4 +771,15 @@
   <data name="SitesActionLogsTooltip.Text" xml:space="preserve"><value>فتح سجلات الموقع</value></data>
   <data name="SitesActionHealthTooltip.Text" xml:space="preserve"><value>فحص الموقع وإصلاحه</value></data>
   <data name="PhpTimezoneInput.PlaceholderText" xml:space="preserve"><value>مثال: Asia/Bahrain</value></data>
+  <data name="GeneralCurrentVersion" xml:space="preserve"><value>HerdMe {0} (البنية {1})</value></data>
+  <data name="GeneralUpdateReadyToCheck" xml:space="preserve"><value>قناة {0} · الإصدار {1} · الفحص يعمل في الخلفية</value></data>
+  <data name="GeneralLastBackgroundCheck" xml:space="preserve"><value>الإصدار {0} محدّث · تم الفحص في الخلفية</value></data>
+  <data name="PhpVersionNotInstalled" xml:space="preserve"><value>غير مثبتة</value></data>
+  <data name="PhpInstalledVersion" xml:space="preserve"><value>النسخة المثبتة: PHP {0}</value></data>
+  <data name="PhpInspectingLocalRuntime" xml:space="preserve"><value>مثبتة · جارٍ التحقق من الإعدادات المحلية</value></data>
+  <data name="PhpMissingRequiredExtensions" xml:space="preserve"><value>إضافات مطلوبة معطّلة أو مفقودة: {0}</value></data>
+  <data name="PhpCheckingUpdatesInBackground" xml:space="preserve"><value>جارٍ فحص تحديثات PHP والأدوات في الخلفية…</value></data>
+  <data name="PhpUpdatesAvailable" xml:space="preserve"><value>توجد تحديثات متاحة</value></data>
+  <data name="PhpUpdatesCheckedInBackground" xml:space="preserve"><value>PHP والأدوات محدّثة · تم الفحص في الخلفية</value></data>
+  <data name="PhpBackgroundCheckUnavailable" xml:space="preserve"><value>خدمة التحديث غير متاحة · النسخ المثبتة ما زالت جاهزة</value></data>
 </root>

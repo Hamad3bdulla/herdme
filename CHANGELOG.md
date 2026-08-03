@@ -15,6 +15,8 @@ Semantic Versioning for public releases.
   time, input time and variables, file uploads, error display, OPcache, and timezone.
 - Add a compact interface preference, a vertical site action rail with localized
   icon tooltips, and dashboard health issues with direct repair actions.
+- Show installed application and runtime versions immediately while update checks
+  continue in the background.
 
 ### Fixed
 

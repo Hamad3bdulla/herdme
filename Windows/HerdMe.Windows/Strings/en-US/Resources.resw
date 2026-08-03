@@ -771,4 +771,15 @@
   <data name="SitesActionLogsTooltip.Text" xml:space="preserve"><value>Open site logs</value></data>
   <data name="SitesActionHealthTooltip.Text" xml:space="preserve"><value>Check and repair site</value></data>
   <data name="PhpTimezoneInput.PlaceholderText" xml:space="preserve"><value>UTC</value></data>
+  <data name="GeneralCurrentVersion" xml:space="preserve"><value>HerdMe {0} (build {1})</value></data>
+  <data name="GeneralUpdateReadyToCheck" xml:space="preserve"><value>{0} channel · Version {1} · Background checks enabled</value></data>
+  <data name="GeneralLastBackgroundCheck" xml:space="preserve"><value>Version {0} is current · Checked in the background</value></data>
+  <data name="PhpVersionNotInstalled" xml:space="preserve"><value>Not installed</value></data>
+  <data name="PhpInstalledVersion" xml:space="preserve"><value>Installed version: PHP {0}</value></data>
+  <data name="PhpInspectingLocalRuntime" xml:space="preserve"><value>Installed · Verifying local configuration</value></data>
+  <data name="PhpMissingRequiredExtensions" xml:space="preserve"><value>Required extensions disabled or missing: {0}</value></data>
+  <data name="PhpCheckingUpdatesInBackground" xml:space="preserve"><value>Checking for PHP and tool updates in the background…</value></data>
+  <data name="PhpUpdatesAvailable" xml:space="preserve"><value>Updates are available</value></data>
+  <data name="PhpUpdatesCheckedInBackground" xml:space="preserve"><value>PHP and tools are current · Checked in the background</value></data>
+  <data name="PhpBackgroundCheckUnavailable" xml:space="preserve"><value>Update service unavailable · Installed versions remain ready</value></data>
 </root>

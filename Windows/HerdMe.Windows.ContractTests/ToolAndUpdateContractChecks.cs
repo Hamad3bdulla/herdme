@@ -547,6 +547,12 @@ internal static partial class ContractChecks
             stableUpdate.AvailableRelease?.Build == 11 && !stableUpdate.UsedBundledFallback,
             "equal versions compare release builds without marking local feeds as fallback data"
         );
+        Check(
+            updateManager.CurrentVersion == "1.0.0"
+                && updateManager.CurrentBuild == 10
+                && updateManager.LatestResult == stableUpdate,
+            "application update state exposes the installed version and latest background result"
+        );
         var betaUpdate = await updateManager.CheckAsync("Beta");
         Check(betaUpdate.AvailableRelease?.Version == "1.0.1", "beta channel includes beta releases");
         Check(

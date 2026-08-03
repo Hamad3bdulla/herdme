@@ -17,6 +17,7 @@ public sealed partial class PhpPage : Page
     private IReadOnlyList<PhpExtensionState> extensions = [];
     private bool loadingExtensions;
     private bool loaded;
+    private int refreshGeneration;
 
     public PhpPage(
         CoreClient coreClient,
@@ -68,11 +69,13 @@ public sealed partial class PhpPage : Page
 
     private async Task RefreshAsync()
     {
+        var generation = Interlocked.Increment(ref refreshGeneration);
         RuntimeProgress.IsActive = true;
         RuntimeStatusText.Text = AppLocalization.Get("PhpCheckingStatus");
         ExtensionDetailText.Text = string.Empty;
         InstallPhpButton.Visibility = Visibility.Collapsed;
         InstallToolsButton.Visibility = Visibility.Visible;
+        BackgroundUpdateStatusText.Text = string.Empty;
         ExtensionsPanel.Children.Clear();
         ExtensionsProgress.IsActive = true;
         try
@@ -81,26 +84,12 @@ public sealed partial class PhpPage : Page
             var managedPhp = runtimeInstaller.PhpExecutable(selectedCycle);
             var isInstalled = runtimeInstaller.IsInstalled(selectedCycle);
             string? phpPath = isInstalled && File.Exists(managedPhp) ? managedPhp : null;
-            string? latestVersion = null;
-            if (isInstalled)
-            {
-                try
-                {
-                    latestVersion = (await runtimeInstaller.ResolveReleaseAsync(selectedCycle)).Version;
-                }
-                catch (Exception)
-                {
-                }
-            }
-            var action = RuntimeVersionComparison.InstallAction(
-                isInstalled,
-                runtimeInstaller.InstalledVersion(selectedCycle),
-                latestVersion
-            );
-            InstallPhpButtonText.Text = action.IsUpdateAvailable
-                ? AppLocalization.Get("CommonUpdate")
-                : AppLocalization.Get("CommonInstall");
-            InstallPhpButton.Visibility = action.IsVisible ? Visibility.Visible : Visibility.Collapsed;
+            var installedVersion = runtimeInstaller.InstalledVersion(selectedCycle);
+            PhpInstalledVersionText.Text = installedVersion is null
+                ? AppLocalization.Get("PhpVersionNotInstalled")
+                : AppLocalization.Format("PhpInstalledVersion", installedVersion);
+            InstallPhpButtonText.Text = AppLocalization.Get("CommonInstall");
+            InstallPhpButton.Visibility = isInstalled ? Visibility.Collapsed : Visibility.Visible;
             if (phpPath is null)
             {
                 PhpPathText.Text = AppLocalization.Get("PhpNoUsableExecutable");
@@ -120,13 +109,23 @@ public sealed partial class PhpPage : Page
             }
 
             PhpPathText.Text = phpPath;
+            RuntimeStatusText.Text = AppLocalization.Get("PhpInspectingLocalRuntime");
+            await Task.Yield();
             extensions = await extensionManager.InspectAsync(selectedCycle);
             RenderExtensions();
-            var contract = await runtimePolicy.PrepareLaunchAsync(phpPath, selectedCycle);
-            RuntimeStatusText.Text = PhpRuntimeInstaller.IsSupportedCycle(selectedCycle)
-                ? AppLocalization.Get("PhpReadyForLaravel")
-                : AppLocalization.Get("PhpLegacyRuntime");
-            ExtensionDetailText.Text = string.Join(", ", contract.Extensions.Required);
+            var missingRequired = extensions
+                .Where(extension => extension.Required && !extension.Loaded)
+                .Select(extension => extension.Name)
+                .ToArray();
+            RuntimeStatusText.Text = missingRequired.Length == 0
+                ? PhpRuntimeInstaller.IsSupportedCycle(selectedCycle)
+                    ? AppLocalization.Get("PhpReadyForLaravel")
+                    : AppLocalization.Get("PhpLegacyRuntime")
+                : AppLocalization.Get("PhpBlocked");
+            ExtensionDetailText.Text = missingRequired.Length == 0
+                ? string.Join(", ", extensions.Where(extension => extension.Required)
+                    .Select(extension => extension.Name))
+                : AppLocalization.Format("PhpMissingRequiredExtensions", string.Join(", ", missingRequired));
             var toolVersions = await toolManager.InstalledVersionsAsync(selectedCycle);
             ComposerVersionText.Text = AppLocalization.Format(
                 "PhpComposerVersion",
@@ -140,34 +139,18 @@ public sealed partial class PhpPage : Page
                     ? AppLocalization.Get("CommonNotInstalled")
                     : $"v{toolVersions.Laravel}"
             );
-            InstallToolsButtonText.Text = toolVersions.Laravel is null
+            InstallToolsButtonText.Text = toolVersions.Composer is null || toolVersions.Laravel is null
                 ? AppLocalization.Get("CommonInstall")
                 : AppLocalization.Get("CommonUpdate");
             var updateAvailable = toolVersions.Composer is null || toolVersions.Laravel is null;
-            if (!updateAvailable)
-            {
-                try
-                {
-                    var composerReleaseTask = toolManager.ResolveComposerReleaseAsync();
-                    var laravelReleaseTask = toolManager.LatestLaravelInstallerVersionAsync();
-                    await Task.WhenAll(composerReleaseTask, laravelReleaseTask);
-                    var composerRelease = await composerReleaseTask;
-                    var laravelRelease = await laravelReleaseTask;
-                    updateAvailable = RuntimeVersionComparison.IsNewer(
-                        composerRelease.Version,
-                        toolVersions.Composer!
-                    ) || RuntimeVersionComparison.IsNewer(
-                        laravelRelease,
-                        toolVersions.Laravel!
-                    );
-                }
-                catch (Exception)
-                {
-                    updateAvailable = false;
-                }
-            }
             InstallToolsButton.Visibility = updateAvailable ? Visibility.Visible : Visibility.Collapsed;
             InstallToolsButton.IsEnabled = updateAvailable;
+            _ = CheckAvailableUpdatesAsync(
+                selectedCycle,
+                installedVersion,
+                toolVersions,
+                generation
+            );
         }
         catch (Exception error)
         {
@@ -185,6 +168,56 @@ public sealed partial class PhpPage : Page
         {
             RuntimeProgress.IsActive = false;
             ExtensionsProgress.IsActive = false;
+        }
+    }
+
+    private async Task CheckAvailableUpdatesAsync(
+        string cycle,
+        string? installedVersion,
+        (string? Composer, string? Laravel) toolVersions,
+        int generation
+    )
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        BackgroundUpdateStatusText.Text = AppLocalization.Get("PhpCheckingUpdatesInBackground");
+        try
+        {
+            var phpReleaseTask = runtimeInstaller.ResolveReleaseAsync(cycle, timeout.Token);
+            var composerReleaseTask = toolManager.ResolveComposerReleaseAsync(timeout.Token);
+            var laravelReleaseTask = toolManager.LatestLaravelInstallerVersionAsync(timeout.Token);
+            await Task.WhenAll(phpReleaseTask, composerReleaseTask, laravelReleaseTask);
+            if (generation != refreshGeneration) return;
+
+            var phpRelease = await phpReleaseTask;
+            var phpUpdate = RuntimeVersionComparison.IsNewer(
+                phpRelease.Version,
+                installedVersion ?? string.Empty
+            );
+            InstallPhpButtonText.Text = phpUpdate
+                ? AppLocalization.Get("CommonUpdate")
+                : AppLocalization.Get("CommonInstall");
+            InstallPhpButton.Visibility = phpUpdate ? Visibility.Visible : Visibility.Collapsed;
+
+            var composerRelease = await composerReleaseTask;
+            var laravelRelease = await laravelReleaseTask;
+            var toolsUpdate = toolVersions.Composer is null || toolVersions.Laravel is null
+                || RuntimeVersionComparison.IsNewer(composerRelease.Version, toolVersions.Composer)
+                || RuntimeVersionComparison.IsNewer(laravelRelease, toolVersions.Laravel);
+            InstallToolsButtonText.Text = toolVersions.Composer is null || toolVersions.Laravel is null
+                ? AppLocalization.Get("CommonInstall")
+                : AppLocalization.Get("CommonUpdate");
+            InstallToolsButton.Visibility = toolsUpdate ? Visibility.Visible : Visibility.Collapsed;
+            InstallToolsButton.IsEnabled = toolsUpdate;
+            BackgroundUpdateStatusText.Text = phpUpdate || toolsUpdate
+                ? AppLocalization.Get("PhpUpdatesAvailable")
+                : AppLocalization.Get("PhpUpdatesCheckedInBackground");
+        }
+        catch (Exception)
+        {
+            if (generation == refreshGeneration)
+            {
+                BackgroundUpdateStatusText.Text = AppLocalization.Get("PhpBackgroundCheckUnavailable");
+            }
         }
     }
 
