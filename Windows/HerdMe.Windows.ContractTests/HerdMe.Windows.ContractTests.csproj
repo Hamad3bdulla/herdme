@@ -44,6 +44,8 @@
     <Compile Include="../HerdMe.Windows/Services/ProjectEnvironmentFile.cs" Link="Services/ProjectEnvironmentFile.cs" />
     <Compile Include="../HerdMe.Windows/Services/DatabaseServiceAuthenticator.cs" Link="Services/DatabaseServiceAuthenticator.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteDatabaseProvisioner.cs" Link="Services/SiteDatabaseProvisioner.cs" />
+    <Compile Include="../HerdMe.Windows/Services/DatabaseConnectionInspector.cs" Link="Services/DatabaseConnectionInspector.cs" />
+    <Compile Include="../HerdMe.Windows/Services/QueueManagementService.cs" Link="Services/QueueManagementService.cs" />
     <Compile Include="../HerdMe.Windows/Services/SafeZipExtractor.cs" Link="Services/SafeZipExtractor.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsJobObject.cs" Link="Services/WindowsJobObject.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsServiceManager.cs" Link="Services/WindowsServiceManager.cs" />

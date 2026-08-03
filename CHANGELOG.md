@@ -7,6 +7,14 @@ Semantic Versioning for public releases.
 
 ## [0.1.7] - 2026-08-01
 
+### Added
+
+- Manage Laravel queue workers with configurable connection, queues, attempts,
+  timeout, sleep, job/time limits, failed-job retry and deletion, and restart
+  controls.
+- Inspect per-site database connectivity using read-only queries that report
+  the server version, table count, database size, endpoint, and response time.
+
 ### Fixed
 
 - Keep all local sites available while changing one site's PHP runtime, and

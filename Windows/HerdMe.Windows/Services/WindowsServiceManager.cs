@@ -673,6 +673,18 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         cancellationToken
     );
 
+    public async Task<DatabaseConnectionInspection> InspectSiteDatabaseAsync(
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning,
+        CancellationToken cancellationToken = default
+    ) => await DatabaseConnectionInspector.InspectAsync(
+        instance,
+        installer.ExecutablePath(instance.DefinitionId),
+        DataDirectory(instance.Id),
+        provisioning,
+        cancellationToken
+    );
+
     public async Task ResetSiteDatabasePasswordAsync(
         ManagedServiceInstance instance,
         SiteDatabaseProvisioning provisioning,

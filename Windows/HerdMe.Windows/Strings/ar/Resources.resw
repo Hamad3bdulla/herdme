@@ -630,7 +630,7 @@
   <data name="SitesRepairLocalServer" xml:space="preserve"><value>جارٍ إصلاح HTTPS والخادم المحلي</value></data>
   <data name="SitesPhpExtensionsCommand.Label" xml:space="preserve"><value>إضافات PHP</value></data>
   <data name="SitesCancelOperationButton.Content" xml:space="preserve"><value>إلغاء</value></data>
-  <data name="SitesQueueWorkerButton.Content" xml:space="preserve"><value>تشغيل قائمة الانتظار</value></data>
+  <data name="SitesQueueWorkerButton.Content" xml:space="preserve"><value>إدارة قائمة الانتظار</value></data>
   <data name="SitesSchedulerButton.Content" xml:space="preserve"><value>إدارة المجدول</value></data>
   <data name="SitesStartQueueWorker" xml:space="preserve"><value>تشغيل قائمة الانتظار</value></data>
   <data name="SitesStopQueueWorker" xml:space="preserve"><value>إيقاف قائمة الانتظار</value></data>
@@ -691,4 +691,38 @@
   <data name="SitesHealthSummary" xml:space="preserve"><value>{0} من {1} فحوصات سليمة</value></data>
   <data name="SitesBackgroundOutputButton.Content" xml:space="preserve"><value>المخرجات</value></data>
   <data name="SitesBackgroundOutputTitle" xml:space="preserve"><value>مخرجات قائمة الانتظار والمجدول</value></data>
+  <data name="SitesDatabaseInspect" xml:space="preserve"><value>فحص الاتصال</value></data>
+  <data name="SitesDatabaseInspectionTitle" xml:space="preserve"><value>اتصال قاعدة البيانات</value></data>
+  <data name="SitesDatabaseInspectionSuccess" xml:space="preserve"><value>تم الاتصال بنجاح</value></data>
+  <data name="SitesDatabaseInspectionFailed" xml:space="preserve"><value>فشل الاتصال</value></data>
+  <data name="SitesDatabaseInspectionTimedOut" xml:space="preserve"><value>انتهت مهلة فحص اتصال قاعدة البيانات.</value></data>
+  <data name="SitesDatabaseInspectionEngine" xml:space="preserve"><value>الخدمة</value></data>
+  <data name="SitesDatabaseInspectionVersion" xml:space="preserve"><value>إصدار الخادم</value></data>
+  <data name="SitesDatabaseInspectionTables" xml:space="preserve"><value>الجداول</value></data>
+  <data name="SitesDatabaseInspectionSize" xml:space="preserve"><value>حجم قاعدة البيانات</value></data>
+  <data name="SitesDatabaseInspectionLatency" xml:space="preserve"><value>زمن الاستجابة</value></data>
+  <data name="SitesDatabaseInspectionEndpoint" xml:space="preserve"><value>عنوان الاتصال</value></data>
+  <data name="SitesQueueTitle" xml:space="preserve"><value>قائمة انتظار {0}</value></data>
+  <data name="SitesManageQueueWorker" xml:space="preserve"><value>إدارة قائمة الانتظار</value></data>
+  <data name="SitesQueueConnection" xml:space="preserve"><value>الاتصال</value></data>
+  <data name="SitesQueueNames" xml:space="preserve"><value>قوائم الانتظار (افصل بفاصلة)</value></data>
+  <data name="SitesQueueDefault" xml:space="preserve"><value>إعدادات التطبيق الافتراضية</value></data>
+  <data name="SitesQueueTries" xml:space="preserve"><value>محاولات كل مهمة</value></data>
+  <data name="SitesQueueTimeout" xml:space="preserve"><value>مهلة المهمة بالثواني</value></data>
+  <data name="SitesQueueSleep" xml:space="preserve"><value>انتظار الخمول بالثواني</value></data>
+  <data name="SitesQueueMaxJobs" xml:space="preserve"><value>إعادة التشغيل بعد عدد مهام (0 = غير محدود)</value></data>
+  <data name="SitesQueueMaxTime" xml:space="preserve"><value>إعادة التشغيل بعد ثوانٍ (0 = غير محدود)</value></data>
+  <data name="SitesQueueFailedJobId" xml:space="preserve"><value>معرّف المهمة الفاشلة</value></data>
+  <data name="SitesQueueFailedJobIdPlaceholder" xml:space="preserve"><value>ألصق معرّفاً من قائمة المهام الفاشلة</value></data>
+  <data name="SitesQueueRetryJob" xml:space="preserve"><value>إعادة محاولة المهمة</value></data>
+  <data name="SitesQueueForgetJob" xml:space="preserve"><value>حذف سجل المهمة</value></data>
+  <data name="SitesQueueFailedRefresh" xml:space="preserve"><value>المهام الفاشلة</value></data>
+  <data name="SitesQueueRetryAll" xml:space="preserve"><value>إعادة محاولة الكل</value></data>
+  <data name="SitesQueueFlushFailed" xml:space="preserve"><value>حذف المهام الفاشلة</value></data>
+  <data name="SitesQueueRestart" xml:space="preserve"><value>إعادة تشغيل العمال</value></data>
+  <data name="SitesQueueOutput" xml:space="preserve"><value>حالة ومخرجات قائمة الانتظار</value></data>
+  <data name="SitesQueueActionCompleted" xml:space="preserve"><value>اكتمل إجراء قائمة الانتظار.</value></data>
+  <data name="SitesQueueRunningSince" xml:space="preserve"><value>عامل قائمة الانتظار يعمل منذ {0}</value></data>
+  <data name="SitesQueueStopped" xml:space="preserve"><value>عامل قائمة الانتظار متوقف</value></data>
+  <data name="SitesQueueFlushConfirm" xml:space="preserve"><value>تأكيد إجراءات الحذف النهائي لسجلات المهام الفاشلة.</value></data>
 </root>

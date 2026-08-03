@@ -8,6 +8,45 @@ public enum SiteBackgroundProcessKind
     Scheduler
 }
 
+public sealed record SiteQueueWorkerOptions(
+    string Connection = "",
+    string Queue = "",
+    int Tries = 1,
+    int TimeoutSeconds = 60,
+    int SleepSeconds = 3,
+    int MaximumJobs = 0,
+    int MaximumSeconds = 0
+)
+{
+    public IReadOnlyList<string> Arguments()
+    {
+        if (Tries is < 1 or > 100 || TimeoutSeconds is < 0 or > 86_400
+            || SleepSeconds is < 0 or > 3_600 || MaximumJobs is < 0 or > 1_000_000
+            || MaximumSeconds is < 0 or > 2_592_000)
+        {
+            throw new ArgumentOutOfRangeException(nameof(Tries), "Queue worker settings are outside the supported range.");
+        }
+        if (!SafeName(Connection) || !SafeName(Queue))
+        {
+            throw new ArgumentException("Queue connection and name may contain only letters, numbers, dashes, underscores, commas, and dots.");
+        }
+        var arguments = new List<string> { "queue:work" };
+        if (!string.IsNullOrWhiteSpace(Connection)) arguments.Add(Connection.Trim());
+        arguments.Add("--no-interaction");
+        if (!string.IsNullOrWhiteSpace(Queue)) arguments.Add($"--queue={Queue.Trim()}");
+        arguments.Add($"--tries={Tries}");
+        arguments.Add($"--timeout={TimeoutSeconds}");
+        arguments.Add($"--sleep={SleepSeconds}");
+        if (MaximumJobs > 0) arguments.Add($"--max-jobs={MaximumJobs}");
+        if (MaximumSeconds > 0) arguments.Add($"--max-time={MaximumSeconds}");
+        return arguments;
+    }
+
+    private static bool SafeName(string value) => value.Length <= 128
+        && value.All(character => char.IsAsciiLetterOrDigit(character)
+            || character is '-' or '_' or ',' or '.');
+}
+
 public sealed record SiteBackgroundProcessState(
     string SitePath,
     SiteBackgroundProcessKind Kind,
@@ -48,7 +87,8 @@ public sealed class SiteProcessManager : IAsyncDisposable
         string sitePath,
         SiteBackgroundProcessKind kind,
         string phpExecutable,
-        IReadOnlyDictionary<string, string> environment
+        IReadOnlyDictionary<string, string> environment,
+        SiteQueueWorkerOptions? queueOptions = null
     )
     {
         var path = Path.GetFullPath(sitePath);
@@ -69,7 +109,7 @@ public sealed class SiteProcessManager : IAsyncDisposable
             cancellation.Dispose();
             return;
         }
-        process.Task = RunAsync(key, path, kind, phpExecutable, environment, cancellation.Token);
+        process.Task = RunAsync(key, path, kind, phpExecutable, environment, queueOptions, cancellation.Token);
         RaiseChanged();
     }
 
@@ -106,12 +146,13 @@ public sealed class SiteProcessManager : IAsyncDisposable
         SiteBackgroundProcessKind kind,
         string phpExecutable,
         IReadOnlyDictionary<string, string> environment,
+        SiteQueueWorkerOptions? queueOptions,
         CancellationToken cancellationToken
     )
     {
         var command = kind == SiteBackgroundProcessKind.Queue
             ? new ArtisanCommandSpec(
-                ["queue:work", "--no-interaction", "--tries=1"],
+                (queueOptions ?? new SiteQueueWorkerOptions()).Arguments(),
                 TimeSpan.FromDays(30)
             )
             : new ArtisanCommandSpec(

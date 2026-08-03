@@ -15,6 +15,43 @@ internal static partial class ContractChecks
 {
     internal static async Task VerifyServiceContractsAsync(string supportRoot)
     {
+        var queueArguments = new SiteQueueWorkerOptions(
+            "redis", "high,default", 3, 120, 2, 500, 3_600
+        ).Arguments();
+        Check(
+            queueArguments.SequenceEqual([
+                "queue:work",
+                "redis",
+                "--no-interaction",
+                "--queue=high,default",
+                "--tries=3",
+                "--timeout=120",
+                "--sleep=2",
+                "--max-jobs=500",
+                "--max-time=3600"
+            ]),
+            "advanced queue settings produce bounded Artisan arguments"
+        );
+        Throws<ArgumentException>(
+            () => new SiteQueueWorkerOptions("redis --force").Arguments(),
+            "queue connection names cannot inject command arguments"
+        );
+        Check(
+            QueueManagementService.ValidJobId("550e8400-e29b-41d4-a716-446655440000")
+                && QueueManagementService.ValidJobId("42")
+                && !QueueManagementService.ValidJobId("42 --force"),
+            "failed queue job identifiers are validated before Artisan execution"
+        );
+        var databaseInspection = DatabaseConnectionInspector.ParseSuccessful(
+            "mariadb", ["11.8.2-MariaDB", "17", "1048576", "1"],
+            TimeSpan.FromMilliseconds(24)
+        );
+        Check(
+            databaseInspection.Connected && databaseInspection.TableCount == 17
+                && databaseInspection.SizeBytes == 1_048_576
+                && databaseInspection.ServerVersion == "11.8.2-MariaDB",
+            "database connection inspection parses read-only server metrics"
+        );
         Check(
             ComposerCommandRunner.Presets.Select(preset => preset.Id).SequenceEqual(
                 new[] { "install", "update", "validate", "audit", "dump-autoload" }

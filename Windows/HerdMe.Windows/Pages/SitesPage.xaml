@@ -367,7 +367,7 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <Button x:Uid="SitesQueueWorkerButton" x:Name="QueueWorkerButton" Content="Start queue" Click="QueueWorker_Click" />
+                                    <Button x:Uid="SitesQueueWorkerButton" x:Name="QueueWorkerButton" Content="Manage queue" Click="QueueWorker_Click" />
                                     <Button x:Uid="SitesSchedulerButton" x:Name="SchedulerButton" Grid.Column="1" Content="Start scheduler" Click="Scheduler_Click" />
                                     <Button x:Uid="SitesBackgroundOutputButton" Grid.Column="2" Content="Output" Click="BackgroundOutput_Click" />
                                     <TextBlock x:Name="BackgroundProcessesText" Grid.Column="3" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />

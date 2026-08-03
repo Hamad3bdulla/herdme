@@ -848,9 +848,7 @@ public sealed partial class SitesPage : Page
         if (selectedSite is not { } site) return;
         var queue = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Queue);
         var scheduler = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Scheduler);
-        QueueWorkerButton.Content = AppLocalization.Get(
-            queue.Running ? "SitesStopQueueWorker" : "SitesStartQueueWorker"
-        );
+        QueueWorkerButton.Content = AppLocalization.Get("SitesManageQueueWorker");
         SchedulerButton.Content = AppLocalization.Get("SitesManageScheduler");
         BackgroundProcessesText.Text = AppLocalization.Format(
             "SitesBackgroundProcessStatus",
@@ -1618,6 +1616,7 @@ public sealed partial class SitesPage : Page
         }
         var actions = new[]
         {
+            new DisplayOption("inspect", AppLocalization.Get("SitesDatabaseInspect")),
             new DisplayOption("backup", AppLocalization.Get("SitesDatabaseBackup")),
             new DisplayOption("restore", AppLocalization.Get("SitesDatabaseRestore")),
             new DisplayOption("reset", AppLocalization.Get("SitesDatabaseResetPassword")),
@@ -1665,6 +1664,9 @@ public sealed partial class SitesPage : Page
 
         switch (selectedAction.Value)
         {
+            case "inspect":
+                await InspectDatabaseAsync(instance, provisioning);
+                break;
             case "backup":
                 await BackupDatabaseAsync(site, instance, provisioning);
                 break;
@@ -1708,6 +1710,51 @@ public sealed partial class SitesPage : Page
                 await DeleteDatabaseAsync(site, instance, provisioning);
                 break;
         }
+    }
+
+    private async Task InspectDatabaseAsync(
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning
+    )
+    {
+        DatabaseConnectionInspection inspection;
+        try
+        {
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            inspection = await serviceManager.InspectSiteDatabaseAsync(
+                instance, provisioning, cancellation.Token
+            );
+        }
+        catch (Exception error) when (error is IOException or InvalidOperationException
+            or UnauthorizedAccessException or TimeoutException or OperationCanceledException)
+        {
+            await ShowErrorAsync(error is OperationCanceledException
+                ? AppLocalization.Get("SitesDatabaseInspectionTimedOut")
+                : error.Message);
+            return;
+        }
+        var size = inspection.SizeBytes < 1_024
+            ? $"{inspection.SizeBytes} B"
+            : inspection.SizeBytes < 1_048_576
+                ? $"{inspection.SizeBytes / 1_024d:F1} KB"
+                : inspection.SizeBytes < 1_073_741_824
+                    ? $"{inspection.SizeBytes / 1_048_576d:F1} MB"
+                    : $"{inspection.SizeBytes / 1_073_741_824d:F1} GB";
+        var text = inspection.Connected
+            ? string.Join(Environment.NewLine,
+            [
+                AppLocalization.Get("SitesDatabaseInspectionSuccess"),
+                $"{AppLocalization.Get("SitesDatabaseInspectionEngine")}: {instance.Name}",
+                $"{AppLocalization.Get("SitesDatabaseInspectionVersion")}: {inspection.ServerVersion}",
+                $"{AppLocalization.Get("SitesDatabaseInspectionTables")}: {inspection.TableCount}",
+                $"{AppLocalization.Get("SitesDatabaseInspectionSize")}: {size}",
+                $"{AppLocalization.Get("SitesDatabaseInspectionLatency")}: {inspection.ResponseTime.TotalMilliseconds:F0} ms",
+                $"{AppLocalization.Get("SitesDatabaseInspectionEndpoint")}: 127.0.0.1:{instance.Port}"
+            ])
+            : $"{AppLocalization.Get("SitesDatabaseInspectionFailed")}\n{inspection.Message}";
+        await ShowCommandResultAsync(
+            AppLocalization.Get("SitesDatabaseInspectionTitle"), text, true
+        );
     }
 
     private bool TryCurrentSiteDatabase(
@@ -1954,7 +2001,216 @@ public sealed partial class SitesPage : Page
 
     private async void QueueWorker_Click(object sender, RoutedEventArgs e)
     {
-        await ToggleBackgroundProcessAsync(SiteBackgroundProcessKind.Queue);
+        if (selectedSite is not { } site) return;
+        await ShowQueueManagerAsync(site);
+    }
+
+    private async Task ShowQueueManagerAsync(SiteRecord site)
+    {
+        var stateText = new TextBlock { FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
+        var connectionBox = new TextBox
+        {
+            Header = AppLocalization.Get("SitesQueueConnection"),
+            PlaceholderText = AppLocalization.Get("SitesQueueDefault"),
+            MaxLength = 128
+        };
+        var queueBox = new TextBox
+        {
+            Header = AppLocalization.Get("SitesQueueNames"),
+            PlaceholderText = AppLocalization.Get("SitesQueueDefault"),
+            MaxLength = 128
+        };
+        static NumberBox Number(string header, double value, double minimum, double maximum) => new()
+        {
+            Header = header, Value = value, Minimum = minimum, Maximum = maximum,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact
+        };
+        var triesBox = Number(AppLocalization.Get("SitesQueueTries"), 1, 1, 100);
+        var timeoutBox = Number(AppLocalization.Get("SitesQueueTimeout"), 60, 0, 86_400);
+        var sleepBox = Number(AppLocalization.Get("SitesQueueSleep"), 3, 0, 3_600);
+        var maxJobsBox = Number(AppLocalization.Get("SitesQueueMaxJobs"), 0, 0, 1_000_000);
+        var maxTimeBox = Number(AppLocalization.Get("SitesQueueMaxTime"), 0, 0, 2_592_000);
+        var settingsGrid = new Grid { ColumnSpacing = 8, RowSpacing = 8 };
+        settingsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        settingsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        settingsGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        settingsGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        settingsGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        settingsGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        settingsGrid.Children.Add(connectionBox);
+        Grid.SetColumn(queueBox, 1); settingsGrid.Children.Add(queueBox);
+        Grid.SetRow(triesBox, 1); settingsGrid.Children.Add(triesBox);
+        Grid.SetRow(timeoutBox, 1); Grid.SetColumn(timeoutBox, 1); settingsGrid.Children.Add(timeoutBox);
+        Grid.SetRow(sleepBox, 2); settingsGrid.Children.Add(sleepBox);
+        Grid.SetRow(maxJobsBox, 2); Grid.SetColumn(maxJobsBox, 1); settingsGrid.Children.Add(maxJobsBox);
+        Grid.SetRow(maxTimeBox, 3); settingsGrid.Children.Add(maxTimeBox);
+        var outputBox = new TextBox
+        {
+            IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap,
+            Height = 210, FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
+        };
+        var startStopButton = new Button();
+        var failedButton = new Button { Content = AppLocalization.Get("SitesQueueFailedRefresh") };
+        var retryButton = new Button { Content = AppLocalization.Get("SitesQueueRetryAll") };
+        var flushButton = new Button { Content = AppLocalization.Get("SitesQueueFlushFailed") };
+        var confirmFlush = new CheckBox { Content = AppLocalization.Get("SitesQueueFlushConfirm") };
+        flushButton.IsEnabled = false;
+        var restartButton = new Button { Content = AppLocalization.Get("SitesQueueRestart") };
+        var jobIdBox = new TextBox
+        {
+            Header = AppLocalization.Get("SitesQueueFailedJobId"),
+            PlaceholderText = AppLocalization.Get("SitesQueueFailedJobIdPlaceholder"),
+            MaxLength = 255
+        };
+        var retryJobButton = new Button { Content = AppLocalization.Get("SitesQueueRetryJob"), IsEnabled = false };
+        var forgetJobButton = new Button { Content = AppLocalization.Get("SitesQueueForgetJob"), IsEnabled = false };
+        var progress = new ProgressRing { Width = 18, Height = 18 };
+        var workerButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        foreach (var control in new Control[] { startStopButton, failedButton, progress })
+        {
+            workerButtons.Children.Add(control);
+        }
+        var maintenanceButtons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8
+        };
+        foreach (var control in new Control[] { retryButton, restartButton, flushButton })
+        {
+            maintenanceButtons.Children.Add(control);
+        }
+        var content = new StackPanel { Spacing = 10, Width = 660 };
+        content.Children.Add(stateText);
+        content.Children.Add(settingsGrid);
+        content.Children.Add(workerButtons);
+        content.Children.Add(maintenanceButtons);
+        var jobButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        jobButtons.Children.Add(retryJobButton);
+        jobButtons.Children.Add(forgetJobButton);
+        content.Children.Add(jobIdBox);
+        content.Children.Add(jobButtons);
+        content.Children.Add(confirmFlush);
+        content.Children.Add(new TextBlock { Text = AppLocalization.Get("SitesQueueOutput"), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        content.Children.Add(outputBox);
+        using var cancellation = new CancellationTokenSource();
+        var busy = false;
+        var managementOutput = string.Empty;
+
+        void RefreshState()
+        {
+            var state = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Queue);
+            startStopButton.Content = AppLocalization.Get(state.Running ? "SitesStopQueueWorker" : "SitesStartQueueWorker");
+            stateText.Text = state.Running
+                ? AppLocalization.Format("SitesQueueRunningSince", state.StartedAt?.ToLocalTime().ToString("g") ?? string.Empty)
+                : AppLocalization.Get("SitesQueueStopped");
+            foreach (var control in new Control[] { connectionBox, queueBox, triesBox, timeoutBox, sleepBox, maxJobsBox, maxTimeBox }) control.IsEnabled = !state.Running && !busy;
+            var output = string.IsNullOrWhiteSpace(managementOutput) ? state.Output : managementOutput;
+            outputBox.Text = string.IsNullOrWhiteSpace(output) ? AppLocalization.Get("SitesNoCommandOutput") : output;
+        }
+
+        async Task RunActionAsync(string action, string? jobId = null)
+        {
+            if (busy) return;
+            busy = true; progress.IsActive = true;
+            foreach (var button in new[] { startStopButton, failedButton, retryButton, flushButton, restartButton, retryJobButton, forgetJobButton }) button.IsEnabled = false;
+            try
+            {
+                var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
+                await runtimePolicy.PrepareLaunchAsync(phpInstaller.PhpExecutable(cycle), cycle, cancellation.Token);
+                var result = await QueueManagementService.RunAsync(
+                    phpInstaller.PhpExecutable(cycle), site.Path, action, jobId,
+                    composerTools.ManagedEnvironment(cycle), cancellation.Token
+                );
+                managementOutput = string.IsNullOrWhiteSpace(result.Output)
+                    ? AppLocalization.Get("SitesQueueActionCompleted") : result.Output;
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+            catch (Exception error) when (error is IOException or InvalidDataException
+                or InvalidOperationException or ArgumentException or TimeoutException)
+            {
+                managementOutput = error.Message;
+            }
+            finally
+            {
+                busy = false; progress.IsActive = false;
+                foreach (var button in new[] { startStopButton, failedButton, retryButton, restartButton }) button.IsEnabled = true;
+                flushButton.IsEnabled = confirmFlush.IsChecked == true;
+                retryJobButton.IsEnabled = QueueManagementService.ValidJobId(jobIdBox.Text.Trim());
+                forgetJobButton.IsEnabled = retryJobButton.IsEnabled && confirmFlush.IsChecked == true;
+                RefreshState();
+            }
+        }
+
+        startStopButton.Click += async (_, _) =>
+        {
+            if (busy) return;
+            busy = true; startStopButton.IsEnabled = false;
+            try
+            {
+                var state = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Queue);
+                managementOutput = string.Empty;
+                if (state.Running) await siteProcesses.StopAsync(site.Path, SiteBackgroundProcessKind.Queue);
+                else
+                {
+                    var options = new SiteQueueWorkerOptions(
+                        connectionBox.Text.Trim(), queueBox.Text.Trim(), (int)triesBox.Value,
+                        (int)timeoutBox.Value, (int)sleepBox.Value, (int)maxJobsBox.Value,
+                        (int)maxTimeBox.Value
+                    );
+                    _ = options.Arguments();
+                    var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
+                    await phpInstaller.EnsureManagedConfigurationAsync(cycle, cancellation.Token);
+                    siteProcesses.Start(site.Path, SiteBackgroundProcessKind.Queue,
+                        phpInstaller.PhpExecutable(cycle), composerTools.ManagedEnvironment(cycle), options);
+                }
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+            catch (Exception error) when (error is IOException or InvalidDataException or InvalidOperationException or ArgumentException)
+            {
+                managementOutput = error.Message;
+            }
+            finally { busy = false; startStopButton.IsEnabled = true; RefreshState(); }
+        };
+        failedButton.Click += async (_, _) => await RunActionAsync("failed");
+        retryButton.Click += async (_, _) => await RunActionAsync("retry-all");
+        restartButton.Click += async (_, _) => await RunActionAsync("restart");
+        jobIdBox.TextChanged += (_, _) =>
+        {
+            retryJobButton.IsEnabled = !busy && QueueManagementService.ValidJobId(jobIdBox.Text.Trim());
+            forgetJobButton.IsEnabled = retryJobButton.IsEnabled && confirmFlush.IsChecked == true;
+        };
+        retryJobButton.Click += async (_, _) => await RunActionAsync("retry", jobIdBox.Text.Trim());
+        forgetJobButton.Click += async (_, _) =>
+        {
+            if (confirmFlush.IsChecked == true) await RunActionAsync("forget", jobIdBox.Text.Trim());
+        };
+        confirmFlush.Checked += (_, _) =>
+        {
+            flushButton.IsEnabled = !busy;
+            forgetJobButton.IsEnabled = !busy && QueueManagementService.ValidJobId(jobIdBox.Text.Trim());
+        };
+        confirmFlush.Unchecked += (_, _) =>
+        {
+            flushButton.IsEnabled = false;
+            forgetJobButton.IsEnabled = false;
+        };
+        flushButton.Click += async (_, _) =>
+        {
+            if (confirmFlush.IsChecked != true) return;
+            await RunActionAsync("flush");
+            confirmFlush.IsChecked = false;
+        };
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) => RefreshState();
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot, Title = AppLocalization.Format("SitesQueueTitle", site.Name),
+            Content = content, CloseButtonText = AppLocalization.Get("SitesClose")
+        };
+        dialog.Opened += async (_, _) => { RefreshState(); timer.Start(); await RunActionAsync("failed"); };
+        dialog.Closing += (_, args) => { if (busy) args.Cancel = true; };
+        await dialog.ShowAsync();
+        timer.Stop(); cancellation.Cancel(); UpdateBackgroundProcessState();
     }
 
     private async void Scheduler_Click(object sender, RoutedEventArgs e)
@@ -2151,35 +2407,6 @@ public sealed partial class SitesPage : Page
             output,
             true
         );
-    }
-
-    private async Task ToggleBackgroundProcessAsync(SiteBackgroundProcessKind kind)
-    {
-        if (selectedSite is not { } site) return;
-        var state = siteProcesses.State(site.Path, kind);
-        if (state.Running)
-        {
-            await siteProcesses.StopAsync(site.Path, kind);
-            UpdateBackgroundProcessState();
-            return;
-        }
-        try
-        {
-            var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
-            await phpInstaller.EnsureManagedConfigurationAsync(cycle);
-            siteProcesses.Start(
-                site.Path,
-                kind,
-                phpInstaller.PhpExecutable(cycle),
-                composerTools.ManagedEnvironment(cycle)
-            );
-            UpdateBackgroundProcessState();
-        }
-        catch (Exception error) when (error is IOException or InvalidDataException
-            or InvalidOperationException or ArgumentException)
-        {
-            await ShowErrorAsync(error.Message);
-        }
     }
 
     private async void Composer_Click(object sender, RoutedEventArgs e)

@@ -630,7 +630,7 @@
   <data name="SitesRepairLocalServer" xml:space="preserve"><value>Repairing local HTTPS and server</value></data>
   <data name="SitesPhpExtensionsCommand.Label" xml:space="preserve"><value>PHP extensions</value></data>
   <data name="SitesCancelOperationButton.Content" xml:space="preserve"><value>Cancel</value></data>
-  <data name="SitesQueueWorkerButton.Content" xml:space="preserve"><value>Start queue</value></data>
+  <data name="SitesQueueWorkerButton.Content" xml:space="preserve"><value>Manage queue</value></data>
   <data name="SitesSchedulerButton.Content" xml:space="preserve"><value>Manage scheduler</value></data>
   <data name="SitesStartQueueWorker" xml:space="preserve"><value>Start queue</value></data>
   <data name="SitesStopQueueWorker" xml:space="preserve"><value>Stop queue</value></data>
@@ -691,4 +691,38 @@
   <data name="SitesHealthSummary" xml:space="preserve"><value>{0} of {1} checks are healthy</value></data>
   <data name="SitesBackgroundOutputButton.Content" xml:space="preserve"><value>Output</value></data>
   <data name="SitesBackgroundOutputTitle" xml:space="preserve"><value>Queue and scheduler output</value></data>
+  <data name="SitesDatabaseInspect" xml:space="preserve"><value>Inspect connection</value></data>
+  <data name="SitesDatabaseInspectionTitle" xml:space="preserve"><value>Database connection</value></data>
+  <data name="SitesDatabaseInspectionSuccess" xml:space="preserve"><value>Connection successful</value></data>
+  <data name="SitesDatabaseInspectionFailed" xml:space="preserve"><value>Connection failed</value></data>
+  <data name="SitesDatabaseInspectionTimedOut" xml:space="preserve"><value>The database connection test timed out.</value></data>
+  <data name="SitesDatabaseInspectionEngine" xml:space="preserve"><value>Service</value></data>
+  <data name="SitesDatabaseInspectionVersion" xml:space="preserve"><value>Server version</value></data>
+  <data name="SitesDatabaseInspectionTables" xml:space="preserve"><value>Tables</value></data>
+  <data name="SitesDatabaseInspectionSize" xml:space="preserve"><value>Database size</value></data>
+  <data name="SitesDatabaseInspectionLatency" xml:space="preserve"><value>Response time</value></data>
+  <data name="SitesDatabaseInspectionEndpoint" xml:space="preserve"><value>Endpoint</value></data>
+  <data name="SitesQueueTitle" xml:space="preserve"><value>Queue: {0}</value></data>
+  <data name="SitesManageQueueWorker" xml:space="preserve"><value>Manage queue</value></data>
+  <data name="SitesQueueConnection" xml:space="preserve"><value>Connection</value></data>
+  <data name="SitesQueueNames" xml:space="preserve"><value>Queues (comma separated)</value></data>
+  <data name="SitesQueueDefault" xml:space="preserve"><value>Application default</value></data>
+  <data name="SitesQueueTries" xml:space="preserve"><value>Attempts per job</value></data>
+  <data name="SitesQueueTimeout" xml:space="preserve"><value>Job timeout (seconds)</value></data>
+  <data name="SitesQueueSleep" xml:space="preserve"><value>Idle sleep (seconds)</value></data>
+  <data name="SitesQueueMaxJobs" xml:space="preserve"><value>Restart after jobs (0 = unlimited)</value></data>
+  <data name="SitesQueueMaxTime" xml:space="preserve"><value>Restart after seconds (0 = unlimited)</value></data>
+  <data name="SitesQueueFailedJobId" xml:space="preserve"><value>Failed job ID</value></data>
+  <data name="SitesQueueFailedJobIdPlaceholder" xml:space="preserve"><value>Paste an ID from the failed-jobs list</value></data>
+  <data name="SitesQueueRetryJob" xml:space="preserve"><value>Retry job</value></data>
+  <data name="SitesQueueForgetJob" xml:space="preserve"><value>Delete job record</value></data>
+  <data name="SitesQueueFailedRefresh" xml:space="preserve"><value>Failed jobs</value></data>
+  <data name="SitesQueueRetryAll" xml:space="preserve"><value>Retry all</value></data>
+  <data name="SitesQueueFlushFailed" xml:space="preserve"><value>Delete failed jobs</value></data>
+  <data name="SitesQueueRestart" xml:space="preserve"><value>Restart workers</value></data>
+  <data name="SitesQueueOutput" xml:space="preserve"><value>Queue status and output</value></data>
+  <data name="SitesQueueActionCompleted" xml:space="preserve"><value>Queue action completed.</value></data>
+  <data name="SitesQueueRunningSince" xml:space="preserve"><value>Queue worker running since {0}</value></data>
+  <data name="SitesQueueStopped" xml:space="preserve"><value>Queue worker stopped</value></data>
+  <data name="SitesQueueFlushConfirm" xml:space="preserve"><value>Confirm permanent deletion actions for failed-job records.</value></data>
 </root>

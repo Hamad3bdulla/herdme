@@ -121,9 +121,15 @@ public static class SiteDatabaseProvisioner
             );
             arguments =
             [
-                "--no-defaults", "--protocol=TCP", "--host=127.0.0.1",
-                $"--port={instance.Port}", $"--user={provisioning.Username}",
-                "--single-transaction", "--routines", "--events", provisioning.DatabaseName
+                "--no-defaults",
+                "--protocol=TCP",
+                "--host=127.0.0.1",
+                $"--port={instance.Port}",
+                $"--user={provisioning.Username}",
+                "--single-transaction",
+                "--routines",
+                "--events",
+                provisioning.DatabaseName
             ];
         }
         else if (instance.DefinitionId == "postgresql")
@@ -131,9 +137,14 @@ public static class SiteDatabaseProvisioner
             executable = FindClient(serverExecutable, ["pg_dump.exe"], instance.Name);
             arguments =
             [
-                "--host=127.0.0.1", $"--port={instance.Port}",
-                $"--username={provisioning.Username}", "--no-password", "--format=plain",
-                "--no-owner", "--no-privileges", provisioning.DatabaseName
+                "--host=127.0.0.1",
+                $"--port={instance.Port}",
+                $"--username={provisioning.Username}",
+                "--no-password",
+                "--format=plain",
+                "--no-owner",
+                "--no-privileges",
+                provisioning.DatabaseName
             ];
         }
         else
@@ -434,9 +445,14 @@ public static class SiteDatabaseProvisioner
         string username
     ) =>
     [
-        "--no-defaults", "--protocol=TCP", "--host=127.0.0.1",
-        $"--port={instance.Port}", $"--user={username}", "--connect-timeout=2",
-        "--batch", "--skip-column-names"
+        "--no-defaults",
+        "--protocol=TCP",
+        "--host=127.0.0.1",
+        $"--port={instance.Port}",
+        $"--user={username}",
+        "--connect-timeout=2",
+        "--batch",
+        "--skip-column-names"
     ];
 
     private static IReadOnlyList<string> PostgreSqlArguments(
@@ -445,8 +461,13 @@ public static class SiteDatabaseProvisioner
         string databaseName
     ) =>
     [
-        "--host=127.0.0.1", $"--port={instance.Port}", $"--username={username}",
-        $"--dbname={databaseName}", "--no-password", "--tuples-only", "--no-align",
+        "--host=127.0.0.1",
+        $"--port={instance.Port}",
+        $"--username={username}",
+        $"--dbname={databaseName}",
+        "--no-password",
+        "--tuples-only",
+        "--no-align",
         "--set=ON_ERROR_STOP=1"
     ];
 
