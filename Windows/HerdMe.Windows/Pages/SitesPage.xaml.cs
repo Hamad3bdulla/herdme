@@ -40,6 +40,7 @@ public sealed partial class SitesPage : Page
     private readonly WindowsServiceManager serviceManager;
     private readonly SiteProcessManager siteProcesses;
     private readonly WindowsCertificateManager certificates;
+    private readonly MailCaptureService mail;
     private readonly SiteScanGeneration siteScanGeneration = new();
     private bool loaded;
     private bool suppressPreviewToggle = true;
@@ -68,7 +69,8 @@ public sealed partial class SitesPage : Page
         ComposerToolManager composerTools,
         WindowsServiceManager serviceManager,
         SiteProcessManager siteProcesses,
-        WindowsCertificateManager certificates
+        WindowsCertificateManager certificates,
+        MailCaptureService mail
     )
     {
         this.coreClient = coreClient;
@@ -84,6 +86,7 @@ public sealed partial class SitesPage : Page
         this.serviceManager = serviceManager;
         this.siteProcesses = siteProcesses;
         this.certificates = certificates;
+        this.mail = mail;
         InitializeComponent();
         var settings = settingsStore.Load();
         foreach (var root in settings.Roots) Roots.Add(root);

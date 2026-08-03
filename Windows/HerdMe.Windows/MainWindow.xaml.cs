@@ -173,7 +173,8 @@ public sealed partial class MainWindow : Window
                     services.ComposerTools,
                     services.Services,
                     services.SiteProcesses,
-                    services.Certificates
+                    services.Certificates,
+                    services.Mail
                 );
                 break;
             case "php":

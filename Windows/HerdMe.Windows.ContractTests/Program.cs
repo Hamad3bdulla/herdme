@@ -90,6 +90,7 @@ VerifyCompositionContracts(repositoryRoot);
 VerifyLocalizationContracts(repositoryRoot);
 VerifyArtisanCommandContracts(repositoryRoot);
 await VerifyNpmScriptContractsAsync(repositoryRoot);
+await VerifySiteWorkflowArchiveContractsAsync();
 VerifyRuntimeCatalogContracts(repositoryRoot);
 
 var supportRoot = Path.Combine(

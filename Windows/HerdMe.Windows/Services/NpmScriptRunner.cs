@@ -16,6 +16,15 @@ public sealed record NpmScriptInvocation(
     TimeSpan Timeout
 );
 
+public sealed record NpmToolInvocation(
+    string NodeExecutable,
+    string NpmCli,
+    string ProjectDirectory,
+    IReadOnlyList<string> Arguments,
+    IReadOnlyDictionary<string, string> Environment,
+    TimeSpan Timeout
+);
+
 public sealed record NpmScriptResult(int ExitCode, string Output);
 
 public sealed class NpmScriptException : Exception
@@ -257,6 +266,106 @@ public static class NpmScriptRunner
             ManagedEnvironment(installer.SupportRoot, runtimeDirectory),
             NpmScriptCatalog.TimeoutFor(scriptName)
         );
+    }
+
+    public static NpmToolInvocation CreateToolInvocation(
+        NodeRuntimeInstaller installer,
+        string projectDirectory,
+        string? requestedVersion,
+        IReadOnlyList<string> arguments,
+        TimeSpan timeout
+    )
+    {
+        var supported = new[] { "install", "update", "audit" };
+        if (arguments.Count is 0 or > 16
+            || !supported.Contains(arguments[0], StringComparer.Ordinal)
+            || arguments.Any(argument => string.IsNullOrWhiteSpace(argument)
+                || argument.Length > 256 || argument.Any(char.IsControl))
+            || timeout <= TimeSpan.Zero || timeout > TimeSpan.FromHours(2))
+        {
+            throw new ArgumentException("The npm workflow command is invalid.", nameof(arguments));
+        }
+        var version = ResolveInstalledVersion(installer, requestedVersion);
+        var runtimeDirectory = Path.Combine(installer.RuntimeRoot, version);
+        var node = Path.Combine(runtimeDirectory, "node.exe");
+        var npmCli = Path.Combine(runtimeDirectory, "node_modules", "npm", "bin", "npm-cli.js");
+        if (!File.Exists(node) || !File.Exists(npmCli))
+        {
+            throw new NpmScriptException(
+                "SitesNpmErrorNpmUnavailable",
+                "The selected managed Node.js runtime does not contain npm."
+            );
+        }
+        return new NpmToolInvocation(
+            node,
+            npmCli,
+            Path.GetFullPath(projectDirectory),
+            arguments.ToArray(),
+            ManagedEnvironment(installer.SupportRoot, runtimeDirectory),
+            timeout
+        );
+    }
+
+    public static async Task<NpmScriptResult> RunToolAsync(
+        NpmToolInvocation invocation,
+        IProgress<string>? outputProgress = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = invocation.NodeExecutable,
+            WorkingDirectory = invocation.ProjectDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
+        };
+        startInfo.ArgumentList.Add(invocation.NpmCli);
+        startInfo.ArgumentList.Add("--no-update-notifier");
+        foreach (var argument in invocation.Arguments) startInfo.ArgumentList.Add(argument);
+        foreach (var variable in invocation.Environment)
+        {
+            startInfo.Environment[variable.Key] = variable.Value;
+        }
+        using var process = Process.Start(startInfo)
+            ?? throw new NpmScriptException(
+                "SitesNpmErrorStartFailed",
+                "The selected Node.js runtime could not start npm."
+            );
+        var capture = new BoundedOutputCapture(MaximumCapturedCharacters);
+        var standardOutput = PumpAsync(process.StandardOutput, capture, outputProgress);
+        var standardError = PumpAsync(process.StandardError, capture, outputProgress);
+        using var timeoutCancellation = new CancellationTokenSource(invocation.Timeout);
+        using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            timeoutCancellation.Token
+        );
+        try
+        {
+            await process.WaitForExitAsync(linkedCancellation.Token);
+        }
+        catch (OperationCanceledException) when (linkedCancellation.IsCancellationRequested)
+        {
+            try
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            await process.WaitForExitAsync(CancellationToken.None);
+            await Task.WhenAll(standardOutput, standardError);
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new NpmScriptException(
+                "SitesNpmErrorTimedOut",
+                $"The npm command did not finish within {invocation.Timeout.TotalMinutes:0} minutes."
+            );
+        }
+        await Task.WhenAll(standardOutput, standardError);
+        return new NpmScriptResult(process.ExitCode, capture.Value);
     }
 
     public static async Task<NpmScriptResult> RunAsync(

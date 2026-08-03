@@ -797,4 +797,41 @@
   <data name="SitesDatabaseImportCreateTitle" xml:space="preserve"><value>Create database and import?</value></data>
   <data name="SitesDatabaseImportCreateMessage" xml:space="preserve"><value>{0} does not exist. HerdMe will create it, import the SQL data, and add the generated connection settings to the site's .env file.</value></data>
   <data name="SitesDatabaseImport" xml:space="preserve"><value>Import</value></data>
+  <data name="SitesAutomationCommand.Label" xml:space="preserve"><value>Automations</value></data>
+  <data name="SitesAutomationUpdateLaravel.Text" xml:space="preserve"><value>Update Laravel project</value></data>
+  <data name="SitesAutomationCleanProject.Text" xml:space="preserve"><value>Clean and rebuild project</value></data>
+  <data name="SitesAutomationExportProject.Text" xml:space="preserve"><value>Export transferable package</value></data>
+  <data name="SitesAutomationSetupMail.Text" xml:space="preserve"><value>Configure local mail</value></data>
+  <data name="SitesAutomationHandoffAudit.Text" xml:space="preserve"><value>Run handoff audit</value></data>
+  <data name="SitesWorkflowRun" xml:space="preserve"><value>Run workflow</value></data>
+  <data name="SitesWorkflowUpdateTitle" xml:space="preserve"><value>Update the complete Laravel project?</value></data>
+  <data name="SitesWorkflowUpdateDescription" xml:space="preserve"><value>HerdMe will create a project and database backup, update Composer and npm dependencies, build frontend assets, run database migrations, and clear Laravel caches. Lock files, dependencies, and MySQL/MariaDB data are restored when a later step fails.</value></data>
+  <data name="SitesWorkflowUpdateRunning" xml:space="preserve"><value>Updating Laravel project</value></data>
+  <data name="SitesWorkflowUpdateResult" xml:space="preserve"><value>Laravel update report</value></data>
+  <data name="SitesWorkflowCleanTitle" xml:space="preserve"><value>Clean and rebuild this project?</value></data>
+  <data name="SitesWorkflowCleanDescription" xml:space="preserve"><value>HerdMe will back up the project, safely replace vendor and node_modules, clear generated Laravel files, reinstall dependencies, and rebuild frontend assets. Existing dependency folders are restored if rebuilding fails.</value></data>
+  <data name="SitesWorkflowCleanRunning" xml:space="preserve"><value>Cleaning and rebuilding project</value></data>
+  <data name="SitesWorkflowCleanResult" xml:space="preserve"><value>Project rebuild completed</value></data>
+  <data name="SitesWorkflowExportTitle" xml:space="preserve"><value>Export a transferable project package?</value></data>
+  <data name="SitesWorkflowExportDescription" xml:space="preserve"><value>The ZIP includes project source, .env secrets, and the configured database. Generated dependencies, Git history, logs, and caches are excluded. Store the package securely.</value></data>
+  <data name="SitesWorkflowExportRunning" xml:space="preserve"><value>Exporting transferable project package</value></data>
+  <data name="SitesWorkflowExportResult" xml:space="preserve"><value>Project package created</value></data>
+  <data name="SitesWorkflowMailTitle" xml:space="preserve"><value>Configure local mail?</value></data>
+  <data name="SitesWorkflowMailDescription" xml:space="preserve"><value>HerdMe will start its local SMTP inbox, write the connection to .env, and clear Laravel's configuration cache.</value></data>
+  <data name="SitesWorkflowMailRunning" xml:space="preserve"><value>Configuring local mail</value></data>
+  <data name="SitesWorkflowMailResult" xml:space="preserve"><value>Local mail configured</value></data>
+  <data name="SitesWorkflowMailConfigured" xml:space="preserve"><value>SMTP is available at 127.0.0.1:{0}. Updated {1} .env values.</value></data>
+  <data name="SitesWorkflowAuditTitle" xml:space="preserve"><value>Run the handoff audit?</value></data>
+  <data name="SitesWorkflowAuditDescription" xml:space="preserve"><value>HerdMe will inspect Git and .env protection, validate and audit Composer, audit npm, run Laravel tests, and save one Markdown report.</value></data>
+  <data name="SitesWorkflowAuditRunning" xml:space="preserve"><value>Running project handoff audit</value></data>
+  <data name="SitesWorkflowAuditResult" xml:space="preserve"><value>Handoff audit report</value></data>
+  <data name="SitesWorkflowPreparingTools" xml:space="preserve"><value>Preparing managed PHP, Composer, and Node.js tools</value></data>
+  <data name="SitesWorkflowCreatingBackup" xml:space="preserve"><value>Creating project and database backup</value></data>
+  <data name="SitesWorkflowBackingUpDatabase" xml:space="preserve"><value>Exporting the configured database</value></data>
+  <data name="SitesWorkflowBackupCreated" xml:space="preserve"><value>Recovery backup: {0}</value></data>
+  <data name="SitesWorkflowRollingBack" xml:space="preserve"><value>A step failed. Restoring lock files and dependencies</value></data>
+  <data name="SitesWorkflowRestoringDatabase" xml:space="preserve"><value>Restoring the MySQL/MariaDB backup</value></data>
+  <data name="SitesWorkflowFailedWithBackup" xml:space="preserve"><value>{0}
+
+Recovery backup: {1}</value></data>
 </root>

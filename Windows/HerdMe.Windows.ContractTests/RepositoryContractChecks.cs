@@ -610,6 +610,14 @@ internal static partial class ContractChecks
                 $"{Path.GetRelativePath(repositoryRoot, xamlPath)} has code-behind"
             );
             var codeBehind = File.ReadAllText(codeBehindPath);
+            var partialClassSource = string.Join(
+                Environment.NewLine,
+                Directory.EnumerateFiles(
+                    Path.GetDirectoryName(xamlPath)!,
+                    Path.GetFileNameWithoutExtension(xamlPath) + "*.cs",
+                    SearchOption.TopDirectoryOnly
+                ).Select(File.ReadAllText)
+            );
             var namespaceName = xClass[..classSeparator];
             var className = xClass[(classSeparator + 1)..];
             Check(
@@ -669,7 +677,7 @@ internal static partial class ContractChecks
             {
                 Check(
                     Regex.IsMatch(
-                        codeBehind,
+                        partialClassSource,
                         @"\b(?:async\s+)?void\s+" + Regex.Escape(handler) + @"\s*\(",
                         RegexOptions.CultureInvariant
                     ),
@@ -1764,6 +1772,16 @@ internal static partial class ContractChecks
                     && resolved.Environment["PATH"].StartsWith(runtime, StringComparison.Ordinal),
                 "npm resolves the requested HerdMe-managed Node major and npm CLI"
             );
+            Throws<ArgumentException>(
+                () => NpmScriptRunner.CreateToolInvocation(
+                    installer,
+                    root,
+                    "22",
+                    ["run", "arbitrary-command"],
+                    TimeSpan.FromMinutes(5)
+                ),
+                "npm workflow tools reject commands outside the install, update, and audit whitelist"
+            );
 
             var source = File.ReadAllText(Path.Combine(
                 repositoryRoot,
@@ -1779,6 +1797,97 @@ internal static partial class ContractChecks
                     && !source.Contains("powershell.exe", StringComparison.OrdinalIgnoreCase)
                     && !source.Contains("cmd.exe", StringComparison.OrdinalIgnoreCase),
                 "npm runs without a visible console or command shell"
+            );
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    internal static async Task VerifySiteWorkflowArchiveContractsAsync()
+    {
+        Check(
+            !SiteWorkflowArchive.ShouldInclude("storage/framework/CACHE/data", directory: true)
+                && !SiteWorkflowArchive.ShouldInclude("Storage/Framework/Views/page.php", directory: false)
+                && !SiteWorkflowArchive.ShouldInclude("vendor/package/file.php", directory: false)
+                && SiteWorkflowArchive.ShouldInclude("app/Models/User.php", directory: false),
+            "portable project exports apply case-insensitive cache and dependency exclusions"
+        );
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "herdme-export-contract-" + Guid.NewGuid().ToString("N")
+        );
+        var project = Path.Combine(root, "project");
+        Directory.CreateDirectory(Path.Combine(project, "app"));
+        Directory.CreateDirectory(Path.Combine(project, ".git"));
+        Directory.CreateDirectory(Path.Combine(project, "vendor", "package"));
+        Directory.CreateDirectory(Path.Combine(project, "node_modules", "package"));
+        Directory.CreateDirectory(Path.Combine(project, "storage", "logs"));
+        Directory.CreateDirectory(Path.Combine(project, "storage", "framework", "CACHE"));
+        File.WriteAllText(Path.Combine(project, "app", "index.php"), "<?php echo 'ok';");
+        File.WriteAllText(Path.Combine(project, ".env"), "APP_ENV=local");
+        File.WriteAllText(Path.Combine(project, ".git", "config"), "excluded");
+        File.WriteAllText(Path.Combine(project, "vendor", "package", "file.php"), "excluded");
+        File.WriteAllText(Path.Combine(project, "node_modules", "package", "index.js"), "excluded");
+        File.WriteAllText(Path.Combine(project, "storage", "logs", "laravel.log"), "excluded");
+        File.WriteAllText(Path.Combine(project, "storage", "framework", "CACHE", "item"), "excluded");
+        var linkedDirectory = Path.Combine(project, "linked-external");
+        var reparsePointCreated = false;
+        try
+        {
+            Directory.CreateSymbolicLink(linkedDirectory, Path.Combine(project, "app"));
+            reparsePointCreated = true;
+        }
+        catch (Exception error) when (error is UnauthorizedAccessException
+            or IOException
+            or PlatformNotSupportedException)
+        {
+        }
+        var dump = Path.Combine(root, "database.sql");
+        File.WriteAllText(dump, "CREATE TABLE example (id INT);");
+        var output = Path.Combine(root, "portable.zip");
+
+        try
+        {
+            await ThrowsAsync<InvalidOperationException>(
+                () => SiteWorkflowArchive.CreateAsync(
+                    project,
+                    Path.Combine(project, "inside.zip"),
+                    "Contract Site"
+                ),
+                "portable project exports reject destinations inside the project"
+            );
+
+            await SiteWorkflowArchive.CreateAsync(project, output, "Contract Site", dump);
+            using var archive = ZipFile.OpenRead(output);
+            var entries = archive.Entries.Select(entry => entry.FullName)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            Check(
+                entries.Contains("app/index.php")
+                    && entries.Contains(".env")
+                    && entries.Contains("database/database.sql")
+                    && entries.Contains("herdme-export.json"),
+                "portable project exports include source, environment, database, and manifest files"
+            );
+            Check(
+                !entries.Any(entry => entry.StartsWith(".git/", StringComparison.OrdinalIgnoreCase)
+                    || entry.StartsWith("vendor/", StringComparison.OrdinalIgnoreCase)
+                    || entry.StartsWith("node_modules/", StringComparison.OrdinalIgnoreCase)
+                    || entry.StartsWith("storage/logs/", StringComparison.OrdinalIgnoreCase)
+                    || entry.StartsWith("storage/framework/cache/", StringComparison.OrdinalIgnoreCase)
+                    || reparsePointCreated
+                        && entry.StartsWith("linked-external/", StringComparison.OrdinalIgnoreCase)),
+                "portable project exports omit repositories, dependencies, logs, and generated caches"
+            );
+            using var manifest = JsonDocument.Parse(
+                archive.GetEntry("herdme-export.json")!.Open()
+            );
+            Check(
+                manifest.RootElement.GetProperty("site").GetString() == "Contract Site"
+                    && manifest.RootElement.GetProperty("databaseIncluded").GetBoolean(),
+                "portable project export manifests describe the site and bundled database"
             );
         }
         finally

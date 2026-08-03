@@ -62,6 +62,7 @@
     <Compile Include="../HerdMe.Windows/Services/PhpFastCgiProcess.cs" Link="Services/PhpFastCgiProcess.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteConfigurationStore.cs" Link="Services/SiteConfigurationStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteHealthInspector.cs" Link="Services/SiteHealthInspector.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SiteWorkflowArchive.cs" Link="Services/SiteWorkflowArchive.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteProcessManager.cs" Link="Services/SiteProcessManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteCommandFavoritesStore.cs" Link="Services/SiteCommandFavoritesStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/PortConflictInspector.cs" Link="Services/PortConflictInspector.cs" />

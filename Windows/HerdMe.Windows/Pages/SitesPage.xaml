@@ -294,6 +294,18 @@
                             DefaultLabelPosition="Collapsed"
                             IsDynamicOverflowEnabled="True">
                             <CommandBar.PrimaryCommands>
+                                <AppBarButton x:Uid="SitesAutomationCommand" Label="Automations">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="AllApps" /></AppBarButton.Icon>
+                                    <AppBarButton.Flyout>
+                                        <MenuFlyout>
+                                            <MenuFlyoutItem x:Uid="SitesAutomationUpdateLaravel" Text="Update Laravel project" Click="UpdateLaravelWorkflow_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesAutomationCleanProject" Text="Clean and rebuild project" Click="CleanProjectWorkflow_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesAutomationExportProject" Text="Export transferable package" Click="ExportProjectWorkflow_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesAutomationSetupMail" Text="Configure local mail" Click="SetupMailWorkflow_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesAutomationHandoffAudit" Text="Run handoff audit" Click="HandoffAuditWorkflow_Click" />
+                                        </MenuFlyout>
+                                    </AppBarButton.Flyout>
+                                </AppBarButton>
                                 <AppBarButton x:Uid="SitesOpenBrowserCommand" Label="Open in browser" Click="OpenSite_Click" Visibility="Collapsed">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Globe" /></AppBarButton.Icon>
                                 </AppBarButton>

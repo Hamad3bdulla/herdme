@@ -797,4 +797,41 @@
   <data name="SitesDatabaseImportCreateTitle" xml:space="preserve"><value>إنشاء القاعدة والاستيراد؟</value></data>
   <data name="SitesDatabaseImportCreateMessage" xml:space="preserve"><value>قاعدة {0} غير موجودة. سينشئها HerdMe ويستورد بيانات SQL ويضيف بيانات الاتصال المولدة إلى ملف .env للموقع.</value></data>
   <data name="SitesDatabaseImport" xml:space="preserve"><value>استيراد</value></data>
+  <data name="SitesAutomationCommand.Label" xml:space="preserve"><value>الإجراءات التلقائية</value></data>
+  <data name="SitesAutomationUpdateLaravel.Text" xml:space="preserve"><value>تحديث مشروع Laravel</value></data>
+  <data name="SitesAutomationCleanProject.Text" xml:space="preserve"><value>تنظيف المشروع وإعادة بنائه</value></data>
+  <data name="SitesAutomationExportProject.Text" xml:space="preserve"><value>تصدير حزمة قابلة للنقل</value></data>
+  <data name="SitesAutomationSetupMail.Text" xml:space="preserve"><value>إعداد البريد المحلي</value></data>
+  <data name="SitesAutomationHandoffAudit.Text" xml:space="preserve"><value>تشغيل فحص التسليم</value></data>
+  <data name="SitesWorkflowRun" xml:space="preserve"><value>تشغيل الإجراء</value></data>
+  <data name="SitesWorkflowUpdateTitle" xml:space="preserve"><value>تحديث مشروع Laravel بالكامل؟</value></data>
+  <data name="SitesWorkflowUpdateDescription" xml:space="preserve"><value>سينشئ HerdMe نسخة احتياطية للمشروع وقاعدة البيانات، ويحدث Composer وnpm، ويبني ملفات الواجهة، ويشغل migrations، وينظف كاش Laravel. عند فشل خطوة لاحقة يعيد ملفات القفل والاعتمادات وبيانات MySQL أو MariaDB.</value></data>
+  <data name="SitesWorkflowUpdateRunning" xml:space="preserve"><value>جارٍ تحديث مشروع Laravel</value></data>
+  <data name="SitesWorkflowUpdateResult" xml:space="preserve"><value>تقرير تحديث Laravel</value></data>
+  <data name="SitesWorkflowCleanTitle" xml:space="preserve"><value>تنظيف المشروع وإعادة بنائه؟</value></data>
+  <data name="SitesWorkflowCleanDescription" xml:space="preserve"><value>سينشئ HerdMe نسخة احتياطية، ويستبدل vendor وnode_modules بأمان، وينظف الملفات المولدة، ويعيد تثبيت الاعتمادات وبناء الواجهة. إذا فشل البناء يعيد مجلدات الاعتمادات السابقة.</value></data>
+  <data name="SitesWorkflowCleanRunning" xml:space="preserve"><value>جارٍ تنظيف المشروع وإعادة بنائه</value></data>
+  <data name="SitesWorkflowCleanResult" xml:space="preserve"><value>اكتملت إعادة بناء المشروع</value></data>
+  <data name="SitesWorkflowExportTitle" xml:space="preserve"><value>تصدير حزمة مشروع قابلة للنقل؟</value></data>
+  <data name="SitesWorkflowExportDescription" xml:space="preserve"><value>يتضمن ملف ZIP كود المشروع وأسرار .env وقاعدة البيانات المضبوطة، ويستبعد الاعتمادات المولدة وسجل Git واللوق والكاش. احفظ الحزمة في مكان آمن.</value></data>
+  <data name="SitesWorkflowExportRunning" xml:space="preserve"><value>جارٍ تصدير حزمة المشروع</value></data>
+  <data name="SitesWorkflowExportResult" xml:space="preserve"><value>تم إنشاء حزمة المشروع</value></data>
+  <data name="SitesWorkflowMailTitle" xml:space="preserve"><value>إعداد البريد المحلي؟</value></data>
+  <data name="SitesWorkflowMailDescription" xml:space="preserve"><value>سيشغل HerdMe صندوق SMTP المحلي، ويكتب الاتصال في .env، وينظف كاش إعدادات Laravel.</value></data>
+  <data name="SitesWorkflowMailRunning" xml:space="preserve"><value>جارٍ إعداد البريد المحلي</value></data>
+  <data name="SitesWorkflowMailResult" xml:space="preserve"><value>تم إعداد البريد المحلي</value></data>
+  <data name="SitesWorkflowMailConfigured" xml:space="preserve"><value>SMTP متاح على 127.0.0.1:{0}. تم تحديث {1} قيم في .env.</value></data>
+  <data name="SitesWorkflowAuditTitle" xml:space="preserve"><value>تشغيل فحص تسليم المشروع؟</value></data>
+  <data name="SitesWorkflowAuditDescription" xml:space="preserve"><value>سيفحص HerdMe حالة Git وحماية .env، ويتحقق من Composer وnpm وثغراتهما، ويشغل اختبارات Laravel، ويحفظ تقرير Markdown واحداً.</value></data>
+  <data name="SitesWorkflowAuditRunning" xml:space="preserve"><value>جارٍ فحص المشروع للتسليم</value></data>
+  <data name="SitesWorkflowAuditResult" xml:space="preserve"><value>تقرير فحص التسليم</value></data>
+  <data name="SitesWorkflowPreparingTools" xml:space="preserve"><value>جارٍ تجهيز PHP وComposer وNode.js المدارة</value></data>
+  <data name="SitesWorkflowCreatingBackup" xml:space="preserve"><value>جارٍ إنشاء نسخة احتياطية للمشروع وقاعدة البيانات</value></data>
+  <data name="SitesWorkflowBackingUpDatabase" xml:space="preserve"><value>جارٍ تصدير قاعدة البيانات المضبوطة</value></data>
+  <data name="SitesWorkflowBackupCreated" xml:space="preserve"><value>نسخة الاسترجاع: {0}</value></data>
+  <data name="SitesWorkflowRollingBack" xml:space="preserve"><value>فشلت خطوة. جارٍ استرجاع ملفات القفل والاعتمادات</value></data>
+  <data name="SitesWorkflowRestoringDatabase" xml:space="preserve"><value>جارٍ استرجاع نسخة MySQL أو MariaDB</value></data>
+  <data name="SitesWorkflowFailedWithBackup" xml:space="preserve"><value>{0}
+
+نسخة الاسترجاع: {1}</value></data>
 </root>

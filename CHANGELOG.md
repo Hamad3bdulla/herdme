@@ -5,6 +5,19 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-08-03
+
+### Added
+
+- Add one-click Laravel updates with project and database backups plus automatic
+  rollback when dependency updates, asset builds, migrations, or cache cleanup fail.
+- Add one-click project cleanup and dependency rebuild with recoverable staging.
+- Export a transferable project ZIP containing source, `.env`, an optional database
+  dump, and a manifest while excluding Git data, dependencies, logs, and caches.
+- Configure HerdMe local mail for a site and clear Laravel's cached configuration.
+- Generate a Markdown handoff report covering Git state, `.env` protection,
+  dependency security audits, Composer validation, and Laravel tests.
+
 ## [0.1.9] - 2026-08-03
 
 ### Added
