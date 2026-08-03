@@ -108,9 +108,9 @@ public sealed partial class ServicesPage : Page
                 instances.Select(instance => instance.Port)
             );
             if (suggestion is not null) ServicePortBox.Value = suggestion.Value;
-            var owner = AppLocalization.Get(
-                assignedToHerdMe ? "ServicesPortOwnerHerdMe" : "ServicesPortOwnerApplication"
-            );
+            var owner = assignedToHerdMe
+                ? AppLocalization.Get("ServicesPortOwnerHerdMe")
+                : PortOwner(PortConflictInspector.Inspect(port));
             await ShowErrorAsync(
                 suggestion is null
                     ? AppLocalization.Format("ServicesPortConflictNoAlternative", port, owner)
@@ -196,7 +196,14 @@ public sealed partial class ServicesPage : Page
         try
         {
             if (running) await manager.StopAsync(instance.Id);
-            else await manager.StartAsync(instance.Id);
+            else if (WindowsServiceManager.IsPortAvailable(instance.Port))
+            {
+                await manager.StartAsync(instance.Id);
+            }
+            else
+            {
+                await RepairPortAsync(instance, startAfterRepair: true);
+            }
         }
         catch (Exception error)
         {
@@ -207,6 +214,97 @@ public sealed partial class ServicesPage : Page
             SetWorking(false, string.Empty);
             await RefreshRowsAsync();
         }
+    }
+
+    private async void InspectPort_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetInstance(sender, out var instance)) return;
+        var running = manager.State(instance.Id, instance.DefinitionId)
+            == ManagedServiceState.Running;
+        if (running)
+        {
+            await ShowMessageAsync(
+                AppLocalization.Get("ServicesPortInspectionTitle"),
+                AppLocalization.Format(
+                    "ServicesPortInspectionOwned", instance.Port, instance.Name
+                )
+            );
+            return;
+        }
+        var conflict = PortConflictInspector.Inspect(instance.Port);
+        if (!conflict.InUse)
+        {
+            await ShowMessageAsync(
+                AppLocalization.Get("ServicesPortInspectionTitle"),
+                AppLocalization.Format("ServicesPortInspectionAvailable", instance.Port)
+            );
+            return;
+        }
+        await RepairPortAsync(instance, startAfterRepair: false);
+        await RefreshRowsAsync();
+    }
+
+    private async Task RepairPortAsync(
+        ManagedServiceInstance instance,
+        bool startAfterRepair
+    )
+    {
+        var instances = manager.LoadInstances().ToList();
+        var conflict = PortConflictInspector.Inspect(instance.Port);
+        var suggestion = WindowsServiceManager.AvailablePort(
+            instance.Port == 65_535 ? 1_024 : instance.Port + 1,
+            instances.Where(candidate => candidate.Id != instance.Id)
+                .Select(candidate => candidate.Port)
+        );
+        if (!conflict.InUse || suggestion is null)
+        {
+            await ShowErrorAsync(
+                suggestion is null
+                    ? AppLocalization.Format(
+                        "ServicesPortConflictNoAlternative", instance.Port, PortOwner(conflict)
+                    )
+                    : AppLocalization.Format("ServicesPortInspectionAvailable", instance.Port)
+            );
+            return;
+        }
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Get("ServicesPortRepairTitle"),
+            Content = AppLocalization.Format(
+                "ServicesPortRepairMessage",
+                instance.Port,
+                PortOwner(conflict),
+                suggestion.Value
+            ),
+            PrimaryButtonText = startAfterRepair
+                ? AppLocalization.Get("ServicesPortRepairAndStart")
+                : AppLocalization.Get("ServicesPortRepair"),
+            CloseButtonText = AppLocalization.Get("CommonCancel"),
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        var configured = instances.First(candidate => candidate.Id == instance.Id);
+        configured.Port = suggestion.Value;
+        manager.SaveInstances(instances);
+        instance.Port = suggestion.Value;
+        if (startAfterRepair) await manager.StartAsync(instance.Id);
+        OperationStatusText.Text = AppLocalization.Format(
+            "ServicesPortRepaired", instance.Name, suggestion.Value
+        );
+    }
+
+    private static string PortOwner(PortConflictDetails conflict)
+    {
+        if (!string.IsNullOrWhiteSpace(conflict.ProcessName) && conflict.ProcessId is { } id)
+        {
+            return AppLocalization.Format(
+                "ServicesPortOwnerProcess", conflict.ProcessName, id
+            );
+        }
+        return conflict.ProcessId is { } processId
+            ? AppLocalization.Format("ServicesPortOwnerPid", processId)
+            : AppLocalization.Get("ServicesPortOwnerApplication");
     }
 
     private void AutomaticStart_Toggled(object sender, RoutedEventArgs e)

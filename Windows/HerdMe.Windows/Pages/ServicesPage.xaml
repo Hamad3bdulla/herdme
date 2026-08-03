@@ -145,6 +145,13 @@
                                                     <MenuFlyoutItem.Icon><SymbolIcon Symbol="Folder" /></MenuFlyoutItem.Icon>
                                                 </MenuFlyoutItem>
                                                 <MenuFlyoutItem
+                                                    x:Uid="ServicesInspectPortMenu"
+                                                    Text="Inspect port"
+                                                    Tag="{x:Bind Id}"
+                                                    Click="InspectPort_Click">
+                                                    <MenuFlyoutItem.Icon><SymbolIcon Symbol="Find" /></MenuFlyoutItem.Icon>
+                                                </MenuFlyoutItem>
+                                                <MenuFlyoutItem
                                                     x:Uid="ServicesEnvironmentTooltip"
                                                     Text="Add service connection to a site .env"
                                                     Tag="{x:Bind Id}"

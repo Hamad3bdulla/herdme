@@ -163,6 +163,7 @@ public sealed partial class MainWindow : Window
                     services.SiteSettings,
                     services.ProjectCreator,
                     services.SiteRuntimes,
+                    services.CommandFavorites,
                     services.PhpInstaller,
                     services.RuntimePolicy,
                     services.NodeInstaller,

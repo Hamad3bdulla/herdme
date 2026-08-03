@@ -63,6 +63,8 @@
     <Compile Include="../HerdMe.Windows/Services/SiteConfigurationStore.cs" Link="Services/SiteConfigurationStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteHealthInspector.cs" Link="Services/SiteHealthInspector.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteProcessManager.cs" Link="Services/SiteProcessManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SiteCommandFavoritesStore.cs" Link="Services/SiteCommandFavoritesStore.cs" />
+    <Compile Include="../HerdMe.Windows/Services/PortConflictInspector.cs" Link="Services/PortConflictInspector.cs" />
     <Compile Include="../HerdMe.Windows/Services/SitePresentation.cs" Link="Services/SitePresentation.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteRemovalService.cs" Link="Services/SiteRemovalService.cs" />
     <Compile Include="../HerdMe.Windows/Services/LogPresentation.cs" Link="Services/LogPresentation.cs" />

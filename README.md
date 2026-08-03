@@ -43,6 +43,8 @@ C++20 core for shared contracts.
 - Run Composer commands and manage Laravel queue workers per site with custom
   connections, queue priority, retry/timeout limits, failed-job retry and
   deletion, worker restarts, live output, cancellation, and clean shutdown.
+- Save frequently used Artisan, Composer, and npm commands as per-site
+  favorites without adding configuration files to the project.
 - Inspect scheduled Laravel tasks and their next run, then start, stop, and
   monitor the scheduler from the site page.
 - Monitor per-site request counts, active requests, server errors, response
@@ -94,6 +96,8 @@ automatically. Connection settings can be added to a project's `.env` file, and
 supported databases can be opened in TablePlus while the service is running.
 Passwords are stored in Keychain on macOS or Credential Manager on Windows, and
 managed services listen on loopback only.
+HerdMe identifies the process that owns a conflicting service port, proposes
+an available unreserved port, and can repair the stopped service configuration.
 
 > Valkey and Typesense are visible on Windows but installation is currently
 > disabled because their upstream projects do not publish verifiable native

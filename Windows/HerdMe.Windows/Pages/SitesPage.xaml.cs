@@ -32,6 +32,7 @@ public sealed partial class SitesPage : Page
     private readonly LaravelProjectCreator projectCreator;
     private CancellationTokenSource? projectCreationCancellation;
     private readonly SiteRuntimeStore siteRuntimeStore;
+    private readonly SiteCommandFavoritesStore commandFavorites;
     private readonly PhpRuntimeInstaller phpInstaller;
     private readonly PhpRuntimePolicy runtimePolicy;
     private readonly NodeRuntimeInstaller nodeInstaller;
@@ -60,6 +61,7 @@ public sealed partial class SitesPage : Page
         SiteConfigurationStore settingsStore,
         LaravelProjectCreator projectCreator,
         SiteRuntimeStore siteRuntimeStore,
+        SiteCommandFavoritesStore commandFavorites,
         PhpRuntimeInstaller phpInstaller,
         PhpRuntimePolicy runtimePolicy,
         NodeRuntimeInstaller nodeInstaller,
@@ -74,6 +76,7 @@ public sealed partial class SitesPage : Page
         this.settingsStore = settingsStore;
         this.projectCreator = projectCreator;
         this.siteRuntimeStore = siteRuntimeStore;
+        this.commandFavorites = commandFavorites;
         this.phpInstaller = phpInstaller;
         this.runtimePolicy = runtimePolicy;
         this.nodeInstaller = nodeInstaller;
@@ -2409,6 +2412,108 @@ public sealed partial class SitesPage : Page
         );
     }
 
+    private StackPanel CreateCommandFavoritesRow(
+        SiteRecord site,
+        string tool,
+        Func<string?> currentCommand,
+        Action<string> applyCommand
+    )
+    {
+        var favoriteBox = new ComboBox
+        {
+            Header = AppLocalization.Get("SitesCommandFavorites"),
+            PlaceholderText = AppLocalization.Get("SitesCommandFavoritesEmpty"),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinWidth = 320
+        };
+        var saveButton = new Button
+        {
+            Content = new SymbolIcon(Symbol.Favorite),
+            VerticalAlignment = VerticalAlignment.Bottom
+        };
+        var deleteButton = new Button
+        {
+            Content = new SymbolIcon(Symbol.Delete),
+            VerticalAlignment = VerticalAlignment.Bottom,
+            IsEnabled = false
+        };
+        ToolTipService.SetToolTip(
+            saveButton, AppLocalization.Get("SitesCommandFavoriteSaveTooltip")
+        );
+        ToolTipService.SetToolTip(
+            deleteButton, AppLocalization.Get("SitesCommandFavoriteDeleteTooltip")
+        );
+
+        void Refresh(string? select = null)
+        {
+            var commands = commandFavorites.Load(site.Path, tool)
+                .Select(item => item.Command)
+                .ToArray();
+            favoriteBox.ItemsSource = commands;
+            favoriteBox.SelectedItem = select is null
+                ? null
+                : commands.FirstOrDefault(command => command.Equals(
+                    select, StringComparison.OrdinalIgnoreCase
+                ));
+            deleteButton.IsEnabled = favoriteBox.SelectedItem is string;
+        }
+
+        favoriteBox.SelectionChanged += (_, _) =>
+        {
+            deleteButton.IsEnabled = favoriteBox.SelectedItem is string;
+            if (favoriteBox.SelectedItem is string command) applyCommand(command);
+        };
+        saveButton.Click += async (_, _) =>
+        {
+            var command = currentCommand()?.Trim();
+            if (string.IsNullOrWhiteSpace(command))
+            {
+                await ShowErrorAsync(AppLocalization.Get("SitesCommandFavoriteMissing"));
+                return;
+            }
+            try
+            {
+                commandFavorites.Add(site.Path, tool, command);
+                Refresh(command);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException
+                or InvalidDataException or ArgumentException)
+            {
+                await ShowErrorAsync(error.Message);
+            }
+        };
+        deleteButton.Click += async (_, _) =>
+        {
+            if (favoriteBox.SelectedItem is not string command) return;
+            try
+            {
+                commandFavorites.Remove(site.Path, tool, command);
+                Refresh();
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException
+                or InvalidDataException or ArgumentException)
+            {
+                await ShowErrorAsync(error.Message);
+            }
+        };
+        try
+        {
+            Refresh();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException
+            or InvalidDataException or ArgumentException)
+        {
+            favoriteBox.IsEnabled = false;
+            saveButton.IsEnabled = false;
+            deleteButton.IsEnabled = false;
+        }
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        row.Children.Add(favoriteBox);
+        row.Children.Add(saveButton);
+        row.Children.Add(deleteButton);
+        return row;
+    }
+
     private async void Composer_Click(object sender, RoutedEventArgs e)
     {
         if (selectedSite is not { } site) return;
@@ -2436,7 +2541,27 @@ public sealed partial class SitesPage : Page
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         };
+        var favorites = CreateCommandFavoritesRow(
+            site,
+            "composer",
+            () => commandBox.SelectedItem is not DisplayOption selection
+                ? null
+                : selection.Value == "require"
+                    ? string.IsNullOrWhiteSpace(packageBox.Text)
+                        ? null
+                        : $"require {packageBox.Text.Trim()}"
+                    : selection.Value,
+            command =>
+            {
+                var parts = command.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                var option = options.FirstOrDefault(item => item.Value == parts[0]);
+                if (option is null) return;
+                commandBox.SelectedItem = option;
+                packageBox.Text = parts.Length == 2 ? parts[1] : string.Empty;
+            }
+        );
         var content = new StackPanel { Width = 430, Spacing = 10 };
+        content.Children.Add(favorites);
         content.Children.Add(commandBox);
         content.Children.Add(packageBox);
         var dialog = new ContentDialog
@@ -2878,6 +3003,21 @@ public sealed partial class SitesPage : Page
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         };
+        var favorites = CreateCommandFavoritesRow(
+            site,
+            "artisan",
+            () => presetBox.SelectedItem is not DisplayOption selection
+                ? null
+                : selection.Value == "custom"
+                    ? customBox.Text.Trim()
+                    : string.Join(' ', ArtisanCommandCatalog.Presets
+                        .Single(item => item.Id == selection.Value).Arguments),
+            command =>
+            {
+                presetBox.SelectedItem = presetOptions.Single(item => item.Value == "custom");
+                customBox.Text = command;
+            }
+        );
         var statusText = new TextBlock
         {
             Text = AppLocalization.Get("SitesArtisanReady"),
@@ -2918,6 +3058,7 @@ public sealed partial class SitesPage : Page
         buttons.Children.Add(cancelButton);
         buttons.Children.Add(runButton);
         var content = new StackPanel { Spacing = 12, Width = 500 };
+        content.Children.Add(favorites);
         content.Children.Add(presetBox);
         content.Children.Add(customBox);
         content.Children.Add(buttons);
@@ -3106,6 +3247,12 @@ public sealed partial class SitesPage : Page
         {
             if (args.SelectedItem is string script) scriptBox.Text = script;
         };
+        var favorites = CreateCommandFavoritesRow(
+            site,
+            "npm",
+            () => scriptBox.Text.Trim(),
+            command => scriptBox.Text = command
+        );
         var reloadButton = new Button
         {
             Content = new SymbolIcon(Symbol.Refresh),
@@ -3159,6 +3306,7 @@ public sealed partial class SitesPage : Page
         buttons.Children.Add(cancelButton);
         buttons.Children.Add(runButton);
         var content = new StackPanel { Spacing = 12, Width = 500 };
+        content.Children.Add(favorites);
         content.Children.Add(scriptRow);
         content.Children.Add(buttons);
         content.Children.Add(statusRow);

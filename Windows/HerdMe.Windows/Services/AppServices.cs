@@ -50,6 +50,7 @@ public sealed class AppServices
             Services
         );
         SiteRuntimes = new SiteRuntimeStore();
+        CommandFavorites = new SiteCommandFavoritesStore(SiteSettings.SupportRoot);
         SiteProcesses = new SiteProcessManager();
         InitialSetup = new InitialSetupManager(
             SiteSettings,
@@ -104,6 +105,8 @@ public sealed class AppServices
     public ManagedComponentUpdateManager ComponentUpdates { get; }
 
     public SiteRuntimeStore SiteRuntimes { get; }
+
+    public SiteCommandFavoritesStore CommandFavorites { get; }
 
     public SiteProcessManager SiteProcesses { get; }
 

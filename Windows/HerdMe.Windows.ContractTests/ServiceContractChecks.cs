@@ -15,6 +15,42 @@ internal static partial class ContractChecks
 {
     internal static async Task VerifyServiceContractsAsync(string supportRoot)
     {
+        var favoriteStore = new SiteCommandFavoritesStore(
+            Path.Combine(supportRoot, "command-favorites")
+        );
+        var favoriteSite = Path.Combine(supportRoot, "favorite-site");
+        var otherFavoriteSite = Path.Combine(supportRoot, "other-favorite-site");
+        Directory.CreateDirectory(favoriteSite);
+        Directory.CreateDirectory(otherFavoriteSite);
+        favoriteStore.Add(favoriteSite, "artisan", "route:list --path=api");
+        favoriteStore.Add(favoriteSite, "artisan", "migrate --force");
+        favoriteStore.Add(favoriteSite, "artisan", "route:list --path=api");
+        favoriteStore.Add(favoriteSite, "npm", "dev");
+        favoriteStore.Add(otherFavoriteSite, "artisan", "about");
+        Check(
+            favoriteStore.Load(favoriteSite, "artisan")
+                .Select(item => item.Command)
+                .SequenceEqual(["route:list --path=api", "migrate --force"])
+                && favoriteStore.Load(favoriteSite, "npm").Single().Command == "dev"
+                && favoriteStore.Load(otherFavoriteSite, "artisan").Single().Command == "about",
+            "command favorites remain ordered and isolated by site and tool"
+        );
+        favoriteStore.Remove(favoriteSite, "artisan", "migrate --force");
+        Check(
+            favoriteStore.Load(favoriteSite, "artisan").Single().Command
+                == "route:list --path=api"
+                && !File.Exists(Path.Combine(favoriteSite, ".herdme-command-favorites.json")),
+            "command favorites can be removed without writing into projects"
+        );
+        Throws<ArgumentException>(
+            () => favoriteStore.Add(favoriteSite, "artisan", "route:list\nconfig:clear"),
+            "command favorites reject control characters"
+        );
+        Check(
+            PortConflictInspector.Port(0x0000_5000) == 80
+                && PortConflictInspector.Port(0x0000_BB01) == 443,
+            "Windows listener ports are decoded from network byte order"
+        );
         var queueArguments = new SiteQueueWorkerOptions(
             "redis", "high,default", 3, 120, 2, 500, 3_600
         ).Arguments();
@@ -159,6 +195,13 @@ internal static partial class ContractChecks
         try
         {
             var externalPort = ((IPEndPoint)externalServiceListener.LocalEndpoint).Port;
+            var conflictDetails = PortConflictInspector.Inspect(externalPort);
+            Check(
+                conflictDetails.InUse
+                    && (!OperatingSystem.IsWindows()
+                        || conflictDetails.ProcessId == Environment.ProcessId),
+                "port conflict inspection identifies the process that owns a listener"
+            );
             var suggestedPort = WindowsServiceManager.AvailablePort(externalPort);
             Check(
                 suggestedPort is not null

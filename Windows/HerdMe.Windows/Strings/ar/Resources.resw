@@ -725,4 +725,20 @@
   <data name="SitesQueueRunningSince" xml:space="preserve"><value>عامل قائمة الانتظار يعمل منذ {0}</value></data>
   <data name="SitesQueueStopped" xml:space="preserve"><value>عامل قائمة الانتظار متوقف</value></data>
   <data name="SitesQueueFlushConfirm" xml:space="preserve"><value>تأكيد إجراءات الحذف النهائي لسجلات المهام الفاشلة.</value></data>
+  <data name="ServicesInspectPortMenu.Text" xml:space="preserve"><value>فحص المنفذ</value></data>
+  <data name="ServicesPortInspectionTitle" xml:space="preserve"><value>فحص المنفذ</value></data>
+  <data name="ServicesPortInspectionOwned" xml:space="preserve"><value>المنفذ {0} مستخدم حالياً بواسطة خدمة HerdMe العاملة {1}.</value></data>
+  <data name="ServicesPortInspectionAvailable" xml:space="preserve"><value>المنفذ {0} متاح.</value></data>
+  <data name="ServicesPortOwnerProcess" xml:space="preserve"><value>{0} (معرّف العملية {1})</value></data>
+  <data name="ServicesPortOwnerPid" xml:space="preserve"><value>العملية PID {0}</value></data>
+  <data name="ServicesPortRepairTitle" xml:space="preserve"><value>إصلاح تعارض المنفذ؟</value></data>
+  <data name="ServicesPortRepairMessage" xml:space="preserve"><value>المنفذ {0} مستخدم بواسطة {1}. يستطيع HerdMe تغيير هذه الخدمة إلى المنفذ {2}. لن تتغير اتصالات .env الحالية تلقائياً؛ حدّث قيم المنفذ فيها بعد ذلك.</value></data>
+  <data name="ServicesPortRepair" xml:space="preserve"><value>استخدام المنفذ المقترح</value></data>
+  <data name="ServicesPortRepairAndStart" xml:space="preserve"><value>تغيير المنفذ والتشغيل</value></data>
+  <data name="ServicesPortRepaired" xml:space="preserve"><value>الخدمة {0} تستخدم الآن المنفذ {1}.</value></data>
+  <data name="SitesCommandFavorites" xml:space="preserve"><value>الأوامر المفضلة</value></data>
+  <data name="SitesCommandFavoritesEmpty" xml:space="preserve"><value>لا توجد أوامر محفوظة</value></data>
+  <data name="SitesCommandFavoriteSaveTooltip" xml:space="preserve"><value>حفظ الأمر الحالي في المفضلة</value></data>
+  <data name="SitesCommandFavoriteDeleteTooltip" xml:space="preserve"><value>حذف الأمر المفضل المحدد</value></data>
+  <data name="SitesCommandFavoriteMissing" xml:space="preserve"><value>اختر أمراً أو اكتبه قبل الحفظ.</value></data>
 </root>

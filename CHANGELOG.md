@@ -14,6 +14,10 @@ Semantic Versioning for public releases.
   controls.
 - Inspect per-site database connectivity using read-only queries that report
   the server version, table count, database size, endpoint, and response time.
+- Detect service port conflicts, report the owning process and PID, suggest an
+  available port, and repair a stopped service after confirmation.
+- Save and manage per-site command favorites in the Artisan, Composer, and npm
+  dialogs without writing files into the project.
 
 ### Fixed
 
