@@ -1,0 +1,71 @@
+name: Sign update feed
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sign-feed:
+    name: Sign current stable update feed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate default branch identity
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          default_branch=$(gh api "repos/$GITHUB_REPOSITORY" --jq .default_branch)
+          [[ "$GITHUB_REF" == "refs/heads/$default_branch" ]] || {
+            echo "This workflow must run from the default branch." >&2
+            exit 1
+          }
+          branch_sha=$(gh api "repos/$GITHUB_REPOSITORY/branches/$default_branch" --jq .commit.sha)
+          [[ "$branch_sha" == "$GITHUB_SHA" ]] || {
+            echo "The workflow commit is not the current default-branch head." >&2
+            exit 1
+          }
+          ./scripts/check-version.sh
+
+      - name: Sign and verify update feed
+        shell: bash
+        env:
+          UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.HERDME_UPDATE_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          [[ -n "$UPDATE_SIGNING_PRIVATE_KEY" ]] || {
+            echo "HERDME_UPDATE_SIGNING_PRIVATE_KEY is not configured." >&2
+            exit 1
+          }
+          umask 077
+          private_key="$RUNNER_TEMP/update-signing-private-key.pem"
+          generated_public_key="$RUNNER_TEMP/release-public-key.txt"
+          printf '%s\n' "$UPDATE_SIGNING_PRIVATE_KEY" > "$private_key"
+          mkdir -p release-assets
+          ./scripts/sign-update-manifest.sh \
+            HerdMe/Resources/release-manifest.json \
+            "$private_key" \
+            release-assets/release-manifest.signed.json \
+            "$generated_public_key"
+          cmp HerdMe/Resources/release-public-key.txt "$generated_public_key"
+          ./scripts/verify-signed-update-manifest.sh \
+            release-assets/release-manifest.signed.json \
+            HerdMe/Resources/release-public-key.txt \
+            HerdMe/Resources/release-manifest.json
+
+      - name: Upload signed update feed
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: signed-update-feed
+          path: release-assets/release-manifest.signed.json
+          if-no-files-found: error
+          retention-days: 7
