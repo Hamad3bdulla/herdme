@@ -143,10 +143,20 @@ public sealed class PhpRuntimeInstaller
         }
 
         var configurationPath = Path.Combine(runtimeDirectory, "php.ini");
-        if (!HasRequiredConfiguration(configurationPath))
+        var preferences = PhpRuntimePolicy.ExtensionPreferences(supportRoot, cycle);
+        var explicitlyDisabled = preferences
+            .Where(pair => !pair.Value)
+            .Select(pair => pair.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!File.Exists(configurationPath)
+            || !HasRequiredConfiguration(configurationPath, explicitlyDisabled))
         {
             File.WriteAllText(configurationPath, PhpIni);
         }
+        PhpExtensionManager.ApplyPreferences(
+            configurationPath,
+            preferences
+        );
     }
 
     public async Task EnsureManagedConfigurationAsync(
@@ -164,12 +174,17 @@ public sealed class PhpRuntimeInstaller
         await InstallRedisExtensionAsync(cycle, runtimeDirectory, false, cancellationToken);
         EnsureManagedConfiguration(cycle);
         var report = await ManagedExtensionReportAsync(PhpExecutable(cycle), cancellationToken);
-        if (MissingManagedExtensions(report).Contains("redis", StringComparer.OrdinalIgnoreCase))
+        var disabled = PhpRuntimePolicy.ExtensionPreferences(supportRoot, cycle)
+            .Where(pair => !pair.Value)
+            .Select(pair => pair.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!disabled.Contains("redis")
+            && MissingManagedExtensions(report).Contains("redis", StringComparer.OrdinalIgnoreCase))
         {
             await InstallRedisExtensionAsync(cycle, runtimeDirectory, true, cancellationToken);
             report = await ManagedExtensionReportAsync(PhpExecutable(cycle), cancellationToken);
         }
-        ValidateManagedExtensions(report, cycle);
+        ValidateManagedExtensions(report, cycle, disabled);
     }
 
     public async Task EnsureInstalledConfigurationsAsync(
@@ -184,12 +199,24 @@ public sealed class PhpRuntimeInstaller
 
     internal static bool HasRequiredConfiguration(string configurationPath)
     {
+        return HasRequiredConfiguration(
+            configurationPath,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        );
+    }
+
+    private static bool HasRequiredConfiguration(
+        string configurationPath,
+        IReadOnlySet<string> explicitlyDisabled
+    )
+    {
         if (!File.Exists(configurationPath)) return false;
         try
         {
             var enabled = File.ReadLines(configurationPath)
                 .Select(line => line.Trim())
-                .Where(line => line.Length > 0 && !line.StartsWith(';'))
+                .Where(line => line.Length > 0)
+                .Where(line => !line.StartsWith(';'))
                 .Select(line => line.Split(';', 2)[0].Trim())
                 .Select(line =>
                 {
@@ -207,7 +234,8 @@ public sealed class PhpRuntimeInstaller
                 })
                 .Where(extension => !string.IsNullOrWhiteSpace(extension))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            return ManagedExtensions.All(extension => enabled.Contains(extension));
+            return ManagedExtensions.All(extension => explicitlyDisabled.Contains(extension)
+                || enabled.Contains(extension));
         }
         catch (IOException)
         {
@@ -560,9 +588,15 @@ public sealed class PhpRuntimeInstaller
         ).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
-    private static void ValidateManagedExtensions(PhpExtensionReport report, string cycle)
+    private static void ValidateManagedExtensions(
+        PhpExtensionReport report,
+        string cycle,
+        IReadOnlySet<string>? disabled = null
+    )
     {
-        var missing = MissingManagedExtensions(report);
+        var missing = MissingManagedExtensions(report)
+            .Where(extension => disabled?.Contains(extension) != true)
+            .ToArray();
         if (missing.Length > 0)
         {
             throw new InvalidOperationException(

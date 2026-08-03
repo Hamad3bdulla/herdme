@@ -200,9 +200,11 @@ internal static partial class ContractChecks
         store.UpdateRoots([Path.Combine(supportRoot, "Other Sites")]);
         store.UpdateTld("dev-test");
         store.UpdateShowPreviews(true);
+        store.UpdateCompactMode(true);
         var siteUpdatedSettings = store.Load();
         Check(!siteUpdatedSettings.AutomaticUpdates, "site edits preserve automatic update preferences");
         Check(siteUpdatedSettings.UpdateChannel == "Beta", "site edits preserve the update channel");
+        Check(siteUpdatedSettings.CompactMode, "compact interface preference persists");
         Check(siteUpdatedSettings.StartAutomatically, "site edits preserve automatic environment startup");
         Check(siteUpdatedSettings.ShowPreviews, "site edits apply preview preferences");
         Check(siteUpdatedSettings.Tld == "dev-test", "site edits apply the local TLD");

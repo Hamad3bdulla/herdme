@@ -38,6 +38,8 @@ C++20 core for shared contracts.
   actions for migrations, seeders, optimization, cache clearing, storage links,
   plus custom Artisan and npm commands.
 - Inspect Laravel logs, Git status, route files, and project environment health.
+- Use a compact site action rail for browser, folder, terminal, `.env`, database,
+  queue, log, and health workflows.
 - Edit `.env` safely, create it from `.env.example`, and detect external changes
   before saving.
 - Run Composer commands and manage Laravel queue workers per site with custom
@@ -51,6 +53,10 @@ C++20 core for shared contracts.
   times, and recent request paths without retaining query-string secrets.
 - Inspect and repair site health across `.env`, `APP_KEY`, Laravel storage,
   PHP extensions, Composer dependencies, HTTPS, and the local environment.
+- Manage every detected PHP extension and important `php.ini` setting separately
+  for each installed PHP version.
+- Switch to a compact interface and repair domain, certificate, and environment
+  health issues directly from the dashboard.
 - Create, inspect, back up, import plain or gzip-compressed SQL, reset, open,
   and delete dedicated MySQL, MariaDB, and PostgreSQL databases for each site.
 - Test each site's database connection and inspect its server version, table

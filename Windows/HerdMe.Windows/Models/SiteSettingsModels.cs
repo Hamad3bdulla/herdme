@@ -14,6 +14,8 @@ public sealed class WindowsSiteSettings
 
     public bool ShowPreviews { get; set; } = true;
 
+    public bool CompactMode { get; set; }
+
     public bool AutomaticUpdates { get; set; } = true;
 
     public string UpdateChannel { get; set; } = "Stable";

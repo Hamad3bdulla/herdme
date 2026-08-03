@@ -38,7 +38,7 @@
             <Setter Property="CornerRadius" Value="6" />
         </Style>
     </Page.Resources>
-    <Grid Padding="28,22,28,24" RowSpacing="14">
+    <Grid x:Name="SitesLayout" Padding="28,22,28,24" RowSpacing="14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -244,12 +244,27 @@
                     </StackPanel>
 
                     <Grid x:Name="SiteDetail" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="52" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <Grid Padding="16,14,16,8" ColumnSpacing="12">
+                        <StackPanel x:Name="SiteActionRail" Grid.RowSpan="3" Padding="6,10" Spacing="5" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
+                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="OpenSite_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionOpenBrowserTooltip" Text="Open in browser" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="Globe" /></Button>
+                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="OpenFolder_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionOpenFolderTooltip" Text="Open project folder" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="Folder" /></Button>
+                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="OpenTerminal_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionTerminalTooltip" Text="Open terminal" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="OpenFile" /></Button>
+                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="EditEnvironment_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionEnvironmentTooltip" Text="Edit .env" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="Edit" /></Button>
+                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="ManageDatabase_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionDatabaseTooltip" Text="Manage database" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="Library" /></Button>
+                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="QueueWorker_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionQueueTooltip" Text="Manage queue" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="Sync" /></Button>
+                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="OpenLogs_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionLogsTooltip" Text="Open site logs" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="Document" /></Button>
+                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="SiteDoctor_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionHealthTooltip" Text="Check and repair site" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="Repair" /></Button>
+                        </StackPanel>
+
+                        <Grid Grid.Column="1" Padding="16,14,16,8" ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
@@ -273,12 +288,13 @@
 
                         <CommandBar
                             Grid.Row="1"
+                            Grid.Column="1"
                             Margin="8,0"
                             Background="Transparent"
                             DefaultLabelPosition="Collapsed"
                             IsDynamicOverflowEnabled="True">
                             <CommandBar.PrimaryCommands>
-                                <AppBarButton x:Uid="SitesOpenBrowserCommand" Label="Open in browser" Click="OpenSite_Click">
+                                <AppBarButton x:Uid="SitesOpenBrowserCommand" Label="Open in browser" Click="OpenSite_Click" Visibility="Collapsed">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Globe" /></AppBarButton.Icon>
                                 </AppBarButton>
                                 <AppBarButton x:Uid="SitesCopyCommand" Label="Copy site link or path">
@@ -290,13 +306,13 @@
                                         </MenuFlyout>
                                     </AppBarButton.Flyout>
                                 </AppBarButton>
-                                <AppBarButton x:Uid="SitesOpenFolderCommand" Label="Open project folder" Click="OpenFolder_Click">
+                                <AppBarButton x:Uid="SitesOpenFolderCommand" Label="Open project folder" Click="OpenFolder_Click" Visibility="Collapsed">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Folder" /></AppBarButton.Icon>
                                 </AppBarButton>
-                                <AppBarButton x:Uid="SitesOpenTerminalCommand" Label="Open terminal" Click="OpenTerminal_Click">
+                                <AppBarButton x:Uid="SitesOpenTerminalCommand" Label="Open terminal" Click="OpenTerminal_Click" Visibility="Collapsed">
                                     <AppBarButton.Icon><SymbolIcon Symbol="OpenFile" /></AppBarButton.Icon>
                                 </AppBarButton>
-                                <AppBarButton x:Uid="SitesEditEnvironmentCommand" Label="Edit .env" Click="EditEnvironment_Click">
+                                <AppBarButton x:Uid="SitesEditEnvironmentCommand" Label="Edit .env" Click="EditEnvironment_Click" Visibility="Collapsed">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Edit" /></AppBarButton.Icon>
                                 </AppBarButton>
                                 <AppBarButton x:Uid="SitesCreateDatabaseCommand" x:Name="CreateDatabaseButton" Label="Create database" Click="CreateDatabase_Click">
@@ -305,12 +321,12 @@
                                 <AppBarButton x:Uid="SitesImportDatabaseCommand" Label="Import database" Click="ImportDatabase_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="OpenFile" /></AppBarButton.Icon>
                                 </AppBarButton>
-                                <AppBarButton x:Uid="SitesManageDatabaseCommand" Label="Manage database" Click="ManageDatabase_Click">
+                                <AppBarButton x:Uid="SitesManageDatabaseCommand" Label="Manage database" Click="ManageDatabase_Click" Visibility="Collapsed">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Manage" /></AppBarButton.Icon>
                                 </AppBarButton>
                             </CommandBar.PrimaryCommands>
                             <CommandBar.SecondaryCommands>
-                                <AppBarButton x:Uid="SitesOpenLogsCommand" Label="Open site logs" Click="OpenLogs_Click">
+                                <AppBarButton x:Uid="SitesOpenLogsCommand" Label="Open site logs" Click="OpenLogs_Click" Visibility="Collapsed">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Document" /></AppBarButton.Icon>
                                 </AppBarButton>
                                 <AppBarButton x:Uid="SitesArtisanCommand" x:Name="ArtisanButton" Label="Run Artisan command" Click="Artisan_Click">
@@ -322,7 +338,7 @@
                                 <AppBarButton x:Uid="SitesComposerCommand" x:Name="ComposerButton" Label="Run Composer command" Click="Composer_Click">
                                     <AppBarButton.Icon><FontIcon Glyph="&#xE943;" /></AppBarButton.Icon>
                                 </AppBarButton>
-                                <AppBarButton x:Uid="SitesDoctorCommand" Label="Check and repair site" Click="SiteDoctor_Click">
+                                <AppBarButton x:Uid="SitesDoctorCommand" Label="Check and repair site" Click="SiteDoctor_Click" Visibility="Collapsed">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Repair" /></AppBarButton.Icon>
                                 </AppBarButton>
                                 <AppBarButton x:Uid="SitesPerformanceCommand" Label="Performance" Click="Performance_Click">
@@ -348,7 +364,7 @@
                             </CommandBar.SecondaryCommands>
                         </CommandBar>
 
-                        <ScrollViewer Grid.Row="2" Padding="16,6,16,16" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer Grid.Row="2" Grid.Column="1" Padding="16,6,16,16" VerticalScrollBarVisibility="Auto">
                             <StackPanel Spacing="14">
                                 <InfoBar
                                     x:Name="SiteOperationBar"
@@ -367,7 +383,7 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <Button x:Uid="SitesQueueWorkerButton" x:Name="QueueWorkerButton" Content="Manage queue" Click="QueueWorker_Click" />
+                                    <Button x:Uid="SitesQueueWorkerButton" x:Name="QueueWorkerButton" Content="Manage queue" Click="QueueWorker_Click" Visibility="Collapsed" />
                                     <Button x:Uid="SitesSchedulerButton" x:Name="SchedulerButton" Grid.Column="1" Content="Start scheduler" Click="Scheduler_Click" />
                                     <Button x:Uid="SitesBackgroundOutputButton" Grid.Column="2" Content="Output" Click="BackgroundOutput_Click" />
                                     <TextBlock x:Name="BackgroundProcessesText" Grid.Column="3" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />

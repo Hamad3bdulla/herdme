@@ -295,6 +295,45 @@ internal static partial class ContractChecks
         var phpOptions = PhpRuntimePolicy.BuildPhpOptions(boundedPhpSettings);
         Check(phpOptions["memory_limit"] == "16M", "PHP launch options use normalized memory settings");
         Check(phpOptions["upload_max_filesize"] == "100000M", "PHP launch options use normalized upload settings");
+        Check(
+            phpOptions["max_execution_time"] == "120"
+                && phpOptions["max_input_vars"] == "1000"
+                && phpOptions["opcache.enable"] == "1"
+                && phpOptions["date.timezone"] == "UTC",
+            "PHP launch options include important per-version settings"
+        );
+        var versionedSettings = new PhpRuntimeSettings { PhpCycle = "8.4" };
+        var php83 = PhpRuntimePolicy.ResolveVersion(versionedSettings, "8.3");
+        php83.MemoryLimitMegabytes = 256;
+        php83.MaxExecutionTimeSeconds = 30;
+        PhpRuntimePolicy.SetVersion(versionedSettings, "8.3", php83);
+        var php84 = PhpRuntimePolicy.ResolveVersion(versionedSettings, "8.4");
+        php84.MemoryLimitMegabytes = 1024;
+        PhpRuntimePolicy.SetVersion(versionedSettings, "8.4", php84);
+        Check(
+            PhpRuntimePolicy.ResolveVersion(versionedSettings, "8.3").MemoryLimitMegabytes == 256
+                && PhpRuntimePolicy.ResolveVersion(versionedSettings, "8.4").MemoryLimitMegabytes == 1024,
+            "PHP settings remain isolated by version"
+        );
+
+        var extensionIni = Path.Combine(supportRoot, "extension-parser.ini");
+        await File.WriteAllTextAsync(extensionIni, "extension = curl\n; extension=php_redis.dll\nzend_extension = php_opcache.dll\nmemory_limit=512M\n");
+        var parsedExtensions = PhpExtensionManager.ReadConfiguration(extensionIni);
+        Check(
+            parsedExtensions["curl"] && !parsedExtensions["redis"] && parsedExtensions["opcache"],
+            "PHP extension parser recognizes enabled, disabled, and Zend extensions"
+        );
+        PhpExtensionManager.ApplyPreferences(extensionIni, new Dictionary<string, bool>
+        {
+            ["curl"] = false,
+            ["redis"] = true
+        });
+        var editedExtensions = PhpExtensionManager.ReadConfiguration(extensionIni);
+        Check(
+            !editedExtensions["curl"] && editedExtensions["redis"]
+                && (await File.ReadAllTextAsync(extensionIni)).Contains("memory_limit=512M", StringComparison.Ordinal),
+            "PHP extension toggles preserve unrelated configuration"
+        );
 
         var debuggerSupportRoot = Path.Combine(supportRoot, "php-policy");
         var isolatedDebuggerSettings = new PhpRuntimeSettings

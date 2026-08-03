@@ -32,6 +32,17 @@
             </Border>
 
             <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock x:Uid="GeneralCompactModeTitle" Text="Compact interface" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <TextBlock x:Uid="GeneralCompactModeDescription" Text="Use tighter spacing on sites and dashboard pages." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="CompactModeToggle" Grid.Column="1" Toggled="CompactModeToggle_Toggled" />
+                </Grid>
+            </Border>
+
+            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
                 <StackPanel Spacing="14">
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>

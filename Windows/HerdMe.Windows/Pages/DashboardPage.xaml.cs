@@ -16,6 +16,9 @@ public sealed partial class DashboardPage : Page
     private readonly DumpCaptureService dumpCapture;
     private readonly WindowsHostsManager hostsManager;
     private readonly WindowsCertificateManager certificateManager;
+    private readonly PhpRuntimeInstaller phpInstaller;
+    private readonly PhpRuntimePolicy runtimePolicy;
+    private readonly ComposerToolManager composerTools;
     private CancellationTokenSource? refreshCancellation;
     private bool? usesCompactLayout;
 
@@ -27,7 +30,10 @@ public sealed partial class DashboardPage : Page
         MailCaptureService mailCapture,
         DumpCaptureService dumpCapture,
         WindowsHostsManager hostsManager,
-        WindowsCertificateManager certificateManager
+        WindowsCertificateManager certificateManager,
+        PhpRuntimeInstaller phpInstaller,
+        PhpRuntimePolicy runtimePolicy,
+        ComposerToolManager composerTools
     )
     {
         this.coreClient = coreClient;
@@ -38,6 +44,9 @@ public sealed partial class DashboardPage : Page
         this.dumpCapture = dumpCapture;
         this.hostsManager = hostsManager;
         this.certificateManager = certificateManager;
+        this.phpInstaller = phpInstaller;
+        this.runtimePolicy = runtimePolicy;
+        this.composerTools = composerTools;
         InitializeComponent();
     }
 
@@ -49,12 +58,19 @@ public sealed partial class DashboardPage : Page
     private void Page_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         var compact = e.NewSize.Width < 680;
-        if (usesCompactLayout == compact) return;
+        var compactMode = settingsStore.Load().CompactMode;
+        if (usesCompactLayout == compact && !compactMode) return;
         usesCompactLayout = compact;
 
-        DashboardLayout.Padding = compact
+        DashboardLayout.Padding = compact || compactMode
             ? new Thickness(18, 18, 18, 20)
             : new Thickness(28, 22, 28, 24);
+        DashboardLayout.RowSpacing = compactMode ? 10 : 18;
+        var summaryHeight = compactMode ? 112 : 148;
+        SitesCard.MinHeight = summaryHeight;
+        ServicesCard.MinHeight = summaryHeight;
+        MailCard.MinHeight = summaryHeight;
+        DumpsCard.MinHeight = summaryHeight;
         SummaryCardsGrid.RowSpacing = compact ? 12 : 0;
         SummaryColumn0.Width = new GridLength(1, GridUnitType.Star);
         SummaryColumn1.Width = new GridLength(1, GridUnitType.Star);
@@ -188,6 +204,21 @@ public sealed partial class DashboardPage : Page
             var dumps = await dumpsTask;
             var domainsConfigured = await domainsTask;
             var certificateTrusted = await certificateTask;
+            var defaultPhpCycle = runtimePolicy.Load().PhpCycle;
+            var healthTasks = sites.Select(site => SiteHealthInspector.InspectAsync(
+                site.Path,
+                site.Domain,
+                site.PhpVersion ?? defaultPhpCycle,
+                phpInstaller,
+                composerTools,
+                certificateManager,
+                cancellation.Token
+            ));
+            var siteHealth = (await Task.WhenAll(healthTasks))
+                .SelectMany((checks, index) => checks
+                    .Where(check => !check.Healthy)
+                    .Select(check => $"{sites[index].Name}: {check.Name} - {check.Detail}"))
+                .ToArray();
             var runningSites = environment.IsRunning ? sites.Count : 0;
             var runningServices = instances.Count(instance =>
                 serviceManager.State(instance.Id, instance.DefinitionId) == ManagedServiceState.Running
@@ -219,7 +250,7 @@ public sealed partial class DashboardPage : Page
             DumpsStatusDot.Fill = CaptureStatusBrush(dumpCapture.IsRunning);
 
             UpdateEnvironmentStatus(domainsConfigured, certificateTrusted, settings.Tld);
-            UpdateHealth(domainsConfigured, certificateTrusted, failure: null);
+            UpdateHealth(domainsConfigured, certificateTrusted, failure: null, siteHealth);
             RenderRecentMail(messages);
             RenderRecentDumps(dumps);
         }
@@ -228,7 +259,7 @@ public sealed partial class DashboardPage : Page
         }
         catch (Exception error)
         {
-            UpdateHealth(domainsConfigured: false, certificateTrusted: false, failure: error.Message);
+            UpdateHealth(domainsConfigured: false, certificateTrusted: false, failure: error.Message, []);
         }
         finally
         {
@@ -292,7 +323,8 @@ public sealed partial class DashboardPage : Page
     private void UpdateHealth(
         bool domainsConfigured,
         bool certificateTrusted,
-        string? failure
+        string? failure,
+        IReadOnlyList<string> siteWarnings
     )
     {
         var warnings = new List<string>();
@@ -313,7 +345,7 @@ public sealed partial class DashboardPage : Page
             warnings.Add(AppLocalization.Get("DashboardCertificateWarning"));
         }
 
-        var healthy = warnings.Count == 0;
+        var healthy = warnings.Count == 0 && siteWarnings.Count == 0;
         HealthBanner.Severity = healthy ? InfoBarSeverity.Success : InfoBarSeverity.Warning;
         HealthBanner.Title = AppLocalization.Get(
             healthy ? "DashboardEverythingReady" : "DashboardNeedsAttention"
@@ -325,15 +357,87 @@ public sealed partial class DashboardPage : Page
         WarningList.Visibility = healthy ? Visibility.Collapsed : Visibility.Visible;
         foreach (var warning in warnings)
         {
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 9 };
-            row.Children.Add(new SymbolIcon(Symbol.Important));
-            row.Children.Add(new TextBlock
-            {
-                Text = warning,
-                TextWrapping = TextWrapping.Wrap,
-                VerticalAlignment = VerticalAlignment.Center
-            });
-            WarningList.Children.Add(row);
+            RoutedEventHandler? repair = warning == AppLocalization.Get("DashboardDomainsWarning")
+                ? RepairDomains_Click
+                : warning == AppLocalization.Get("DashboardCertificateWarning")
+                    ? RepairCertificate_Click
+                    : warning == AppLocalization.Get("DashboardEnvironmentRecoveringWarning")
+                        ? RepairEnvironment_Click
+                        : null;
+            WarningList.Children.Add(HealthIssueRow(warning, repair));
+        }
+        foreach (var warning in siteWarnings)
+        {
+            WarningList.Children.Add(HealthIssueRow(warning, OpenSites_Click));
+        }
+    }
+
+    private UIElement HealthIssueRow(string message, RoutedEventHandler? repair)
+    {
+        var row = new Grid { ColumnSpacing = 9 };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.Children.Add(new SymbolIcon(Symbol.Important) { VerticalAlignment = VerticalAlignment.Center });
+        var text = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(text, 1);
+        row.Children.Add(text);
+        if (repair is not null)
+        {
+            var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+            content.Children.Add(new SymbolIcon(Symbol.Repair));
+            content.Children.Add(new TextBlock { Text = AppLocalization.Get("DashboardRepairAction") });
+            var button = new Button { Content = content };
+            button.Click += repair;
+            ToolTipService.SetToolTip(button, AppLocalization.Get("DashboardRepairTooltip"));
+            Grid.SetColumn(button, 2);
+            row.Children.Add(button);
+        }
+        return row;
+    }
+
+    private async void RepairDomains_Click(object sender, RoutedEventArgs e)
+    {
+        await RunHealthRepairAsync(async settings =>
+        {
+            var sites = await coreClient.ScanAsync(settings.Roots, settings.Tld, settings.LinkedSites);
+            await hostsManager.EnsureMappingsAsync(sites.Select(site => site.Domain));
+        });
+    }
+
+    private async void RepairCertificate_Click(object sender, RoutedEventArgs e)
+    {
+        await RunHealthRepairAsync(settings =>
+        {
+            certificateManager.TrustAuthority();
+            return Task.CompletedTask;
+        });
+    }
+
+    private async void RepairEnvironment_Click(object sender, RoutedEventArgs e)
+    {
+        await RunHealthRepairAsync(async settings =>
+        {
+            var sites = await coreClient.ScanAsync(settings.Roots, settings.Tld, settings.LinkedSites);
+            await environment.StartAsync(sites);
+        });
+    }
+
+    private async Task RunHealthRepairAsync(Func<WindowsSiteSettings, Task> repair)
+    {
+        RefreshButton.IsEnabled = false;
+        RefreshProgress.IsActive = true;
+        try
+        {
+            await repair(settingsStore.Load());
+        }
+        catch (Exception error)
+        {
+            UpdateHealth(false, false, error.Message, []);
+        }
+        finally
+        {
+            await RefreshAsync();
         }
     }
 

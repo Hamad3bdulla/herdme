@@ -5,6 +5,22 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-08-03
+
+### Added
+
+- Show every detected PHP extension for each installed PHP version, including
+  loaded, required, built-in, and loadable states, with per-version toggles.
+- Configure important PHP limits independently per version, including execution
+  time, input time and variables, file uploads, error display, OPcache, and timezone.
+- Add a compact interface preference, a vertical site action rail with localized
+  icon tooltips, and dashboard health issues with direct repair actions.
+
+### Fixed
+
+- Preserve deliberate PHP extension choices while repairing managed PHP
+  configuration, including disabled Laravel-required extensions.
+
 ## [0.1.7] - 2026-08-01
 
 ### Added

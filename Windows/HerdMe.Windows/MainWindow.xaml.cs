@@ -136,7 +136,10 @@ public sealed partial class MainWindow : Window
                     services.Mail,
                     services.Dumps,
                     services.Hosts,
-                    services.Certificates
+                    services.Certificates,
+                    services.PhpInstaller,
+                    services.RuntimePolicy,
+                    services.ComposerTools
                 );
                 break;
             case "general":
@@ -179,7 +182,8 @@ public sealed partial class MainWindow : Window
                     services.RuntimePolicy,
                     services.PhpInstaller,
                     services.ComposerTools,
-                    services.UserPath
+                    services.UserPath,
+                    services.PhpExtensions
                 );
                 break;
             case "node":

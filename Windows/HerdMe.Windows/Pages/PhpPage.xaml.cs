@@ -12,7 +12,10 @@ public sealed partial class PhpPage : Page
     private readonly PhpRuntimeInstaller runtimeInstaller;
     private readonly ComposerToolManager toolManager;
     private readonly WindowsUserPathManager userPathManager;
+    private readonly PhpExtensionManager extensionManager;
     private PhpRuntimeSettings settings;
+    private IReadOnlyList<PhpExtensionState> extensions = [];
+    private bool loadingExtensions;
     private bool loaded;
 
     public PhpPage(
@@ -20,7 +23,8 @@ public sealed partial class PhpPage : Page
         PhpRuntimePolicy runtimePolicy,
         PhpRuntimeInstaller runtimeInstaller,
         ComposerToolManager toolManager,
-        WindowsUserPathManager userPathManager
+        WindowsUserPathManager userPathManager,
+        PhpExtensionManager extensionManager
     )
     {
         this.coreClient = coreClient;
@@ -28,6 +32,7 @@ public sealed partial class PhpPage : Page
         this.runtimeInstaller = runtimeInstaller;
         this.toolManager = toolManager;
         this.userPathManager = userPathManager;
+        this.extensionManager = extensionManager;
         InitializeComponent();
         settings = runtimePolicy.Load();
         var availableCycles = PhpRuntimeInstaller.SupportedCycles
@@ -40,8 +45,7 @@ public sealed partial class PhpPage : Page
         PhpCycleBox.SelectedItem = availableCycles.Contains(settings.PhpCycle, StringComparer.Ordinal)
             ? settings.PhpCycle
             : RuntimeCatalog.DefaultPhpCycle;
-        MemoryLimitBox.Value = settings.MemoryLimitMegabytes;
-        UploadLimitBox.Value = settings.MaxUploadMegabytes;
+        LoadVersionSettings(PhpCycleBox.SelectedItem?.ToString() ?? settings.PhpCycle);
     }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
@@ -52,7 +56,9 @@ public sealed partial class PhpPage : Page
 
     private async void PhpCycle_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (loaded) await RefreshAsync();
+        if (!loaded) return;
+        LoadVersionSettings(PhpCycleBox.SelectedItem?.ToString() ?? settings.PhpCycle);
+        await RefreshAsync();
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e)
@@ -67,6 +73,8 @@ public sealed partial class PhpPage : Page
         ExtensionDetailText.Text = string.Empty;
         InstallPhpButton.Visibility = Visibility.Collapsed;
         InstallToolsButton.Visibility = Visibility.Visible;
+        ExtensionsPanel.Children.Clear();
+        ExtensionsProgress.IsActive = true;
         try
         {
             var selectedCycle = PhpCycleBox.SelectedItem?.ToString() ?? settings.PhpCycle;
@@ -106,11 +114,15 @@ public sealed partial class PhpPage : Page
                     AppLocalization.Get("CommonNotInstalled")
                 );
                 InstallToolsButton.IsEnabled = false;
+                extensions = [];
+                RenderExtensions();
                 return;
             }
 
             PhpPathText.Text = phpPath;
-            var contract = await runtimePolicy.PrepareLaunchAsync(phpPath);
+            extensions = await extensionManager.InspectAsync(selectedCycle);
+            RenderExtensions();
+            var contract = await runtimePolicy.PrepareLaunchAsync(phpPath, selectedCycle);
             RuntimeStatusText.Text = PhpRuntimeInstaller.IsSupportedCycle(selectedCycle)
                 ? AppLocalization.Get("PhpReadyForLaravel")
                 : AppLocalization.Get("PhpLegacyRuntime");
@@ -172,6 +184,7 @@ public sealed partial class PhpPage : Page
         finally
         {
             RuntimeProgress.IsActive = false;
+            ExtensionsProgress.IsActive = false;
         }
     }
 
@@ -240,19 +253,126 @@ public sealed partial class PhpPage : Page
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        settings.MemoryLimitMegabytes = double.IsNaN(MemoryLimitBox.Value)
+        var cycle = PhpCycleBox.SelectedItem?.ToString() ?? settings.PhpCycle;
+        var version = PhpRuntimePolicy.ResolveVersion(settings, cycle);
+        version.MemoryLimitMegabytes = double.IsNaN(MemoryLimitBox.Value)
             ? 512
             : (int)MemoryLimitBox.Value;
-        settings.MaxUploadMegabytes = double.IsNaN(UploadLimitBox.Value)
+        version.MaxUploadMegabytes = double.IsNaN(UploadLimitBox.Value)
             ? 100
             : (int)UploadLimitBox.Value;
-        settings.PhpCycle = PhpCycleBox.SelectedItem?.ToString() ?? settings.PhpCycle;
+        version.MaxExecutionTimeSeconds = NumberValue(ExecutionTimeBox, 120);
+        version.MaxInputTimeSeconds = NumberValue(InputTimeBox, 60);
+        version.MaxInputVariables = NumberValue(InputVariablesBox, 1_000);
+        version.MaxFileUploads = NumberValue(FileUploadsBox, 20);
+        version.DisplayErrors = DisplayErrorsToggle.IsOn;
+        version.OpcacheEnabled = OpcacheToggle.IsOn;
+        version.Timezone = TimezoneBox.Text;
+        PhpRuntimePolicy.SetVersion(settings, cycle, version);
+        settings.PhpCycle = cycle;
         runtimePolicy.Save(settings);
         SynchronizeUserPath(settings.PhpCycle);
         settings = runtimePolicy.Load();
-        MemoryLimitBox.Value = settings.MemoryLimitMegabytes;
-        UploadLimitBox.Value = settings.MaxUploadMegabytes;
+        LoadVersionSettings(cycle);
         SaveStatusText.Text = AppLocalization.Get("PhpSavedForNextStart");
+    }
+
+    private void LoadVersionSettings(string cycle)
+    {
+        settings = runtimePolicy.Load();
+        var version = PhpRuntimePolicy.ResolveVersion(settings, cycle);
+        MemoryLimitBox.Value = version.MemoryLimitMegabytes;
+        UploadLimitBox.Value = version.MaxUploadMegabytes;
+        ExecutionTimeBox.Value = version.MaxExecutionTimeSeconds;
+        InputTimeBox.Value = version.MaxInputTimeSeconds;
+        InputVariablesBox.Value = version.MaxInputVariables;
+        FileUploadsBox.Value = version.MaxFileUploads;
+        DisplayErrorsToggle.IsOn = version.DisplayErrors;
+        OpcacheToggle.IsOn = version.OpcacheEnabled;
+        TimezoneBox.Text = version.Timezone;
+        SaveStatusText.Text = string.Empty;
+    }
+
+    private static int NumberValue(NumberBox box, int fallback) =>
+        double.IsNaN(box.Value) ? fallback : (int)box.Value;
+
+    private void ExtensionSearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        RenderExtensions();
+    }
+
+    private void RenderExtensions()
+    {
+        ExtensionsPanel.Children.Clear();
+        var query = ExtensionSearchBox.Text.Trim();
+        foreach (var extension in extensions.Where(item =>
+            query.Length == 0 || item.Name.Contains(query, StringComparison.OrdinalIgnoreCase)))
+        {
+            var row = new Grid { Padding = new Thickness(8, 7, 8, 7), ColumnSpacing = 12 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var details = new StackPanel { Spacing = 2 };
+            details.Children.Add(new TextBlock { Text = extension.Name, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+            details.Children.Add(new TextBlock
+            {
+                Text = ExtensionStatus(extension),
+                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+            });
+            row.Children.Add(details);
+            var toggle = new ToggleSwitch
+            {
+                Tag = extension.Name,
+                IsOn = extension.Enabled,
+                IsEnabled = extension.CanToggle,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            ToolTipService.SetToolTip(toggle, extension.CanToggle
+                ? AppLocalization.Get("PhpExtensionToggleTooltip")
+                : AppLocalization.Get("PhpExtensionBuiltInTooltip"));
+            toggle.Toggled += ExtensionToggle_Toggled;
+            Grid.SetColumn(toggle, 1);
+            row.Children.Add(toggle);
+            ExtensionsPanel.Children.Add(row);
+        }
+    }
+
+    private static string ExtensionStatus(PhpExtensionState extension)
+    {
+        var state = AppLocalization.Get(extension.Loaded
+            ? "PhpExtensionLoaded" : extension.Enabled
+                ? "PhpExtensionEnabled" : "PhpExtensionDisabled");
+        return extension.Required
+            ? AppLocalization.Format("PhpExtensionRequiredStatus", state)
+            : state;
+    }
+
+    private async void ExtensionToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (loadingExtensions || sender is not ToggleSwitch toggle || toggle.Tag is not string name)
+        {
+            return;
+        }
+        var cycle = PhpCycleBox.SelectedItem?.ToString() ?? settings.PhpCycle;
+        try
+        {
+            loadingExtensions = true;
+            extensionManager.SetEnabled(cycle, name, toggle.IsOn);
+            var stored = runtimePolicy.Load();
+            var version = PhpRuntimePolicy.ResolveVersion(stored, cycle);
+            PhpRuntimePolicy.SetVersion(stored, cycle, version);
+            stored.Versions[cycle].Extensions[name] = toggle.IsOn;
+            runtimePolicy.Save(stored);
+            await RefreshAsync();
+        }
+        catch (Exception error)
+        {
+            SaveStatusText.Text = error.Message;
+            toggle.IsOn = !toggle.IsOn;
+        }
+        finally
+        {
+            loadingExtensions = false;
+        }
     }
 
     private void SynchronizeUserPath(string phpCycle)

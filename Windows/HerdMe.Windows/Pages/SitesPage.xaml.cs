@@ -99,6 +99,11 @@ public sealed partial class SitesPage : Page
     {
         if (loaded) return;
         loaded = true;
+        var compactMode = settingsStore.Load().CompactMode;
+        SitesLayout.Padding = compactMode
+            ? new Thickness(16, 14, 16, 16)
+            : new Thickness(28, 22, 28, 24);
+        SitesLayout.RowSpacing = compactMode ? 8 : 14;
         siteProcesses.Changed += SiteProcesses_Changed;
         await ScanAsync();
     }

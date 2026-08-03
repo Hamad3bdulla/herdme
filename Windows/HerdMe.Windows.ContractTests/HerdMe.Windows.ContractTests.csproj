@@ -78,6 +78,7 @@
     <Compile Include="../HerdMe.Windows/Services/AppUpdateManager.cs" Link="Services/AppUpdateManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/CoreClient.cs" Link="Services/CoreClient.cs" />
     <Compile Include="../HerdMe.Windows/Services/PhpRuntimeInstaller.cs" Link="Services/PhpRuntimeInstaller.cs" />
+    <Compile Include="../HerdMe.Windows/Services/PhpExtensionManager.cs" Link="Services/PhpExtensionManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/PhpRuntimePolicy.cs" Link="Services/PhpRuntimePolicy.cs" />
     <Compile Include="../HerdMe.Windows/Services/RuntimeVersionComparison.cs" Link="Services/RuntimeVersionComparison.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsCertificateManager.cs" Link="Services/WindowsCertificateManager.cs" />

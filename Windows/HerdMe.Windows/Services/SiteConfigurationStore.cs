@@ -151,6 +151,11 @@ public sealed class SiteConfigurationStore
         Update(settings => settings.ShowPreviews = showPreviews);
     }
 
+    public void UpdateCompactMode(bool compactMode)
+    {
+        Update(settings => settings.CompactMode = compactMode);
+    }
+
     public void UpdateTld(string tld)
     {
         Update(settings => settings.Tld = tld);
@@ -271,6 +276,7 @@ public sealed class SiteConfigurationStore
             Tld = tld,
             StartAutomatically = settings.StartAutomatically,
             ShowPreviews = settings.ShowPreviews,
+            CompactMode = settings.CompactMode,
             AutomaticUpdates = settings.AutomaticUpdates,
             UpdateChannel = settings.UpdateChannel.Equals("Beta", StringComparison.OrdinalIgnoreCase)
                 ? "Beta"

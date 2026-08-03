@@ -7,18 +7,15 @@ public sealed class PhpRuntimePolicy
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly CoreClient coreClient;
+    private readonly string supportRoot;
 
-    public PhpRuntimePolicy(CoreClient? coreClient = null)
+    public PhpRuntimePolicy(CoreClient? coreClient = null, string? supportRoot = null)
     {
         this.coreClient = coreClient ?? new CoreClient();
+        this.supportRoot = supportRoot ?? SupportPath;
     }
 
-    public string SettingsPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "HerdMe",
-        "Config",
-        "php.json"
-    );
+    public string SettingsPath => Path.Combine(supportRoot, "Config", "php.json");
 
     public PhpRuntimeSettings Load()
     {
@@ -90,16 +87,19 @@ public sealed class PhpRuntimePolicy
             );
         }
 
-        var settings = Normalize(Load());
+        var storedSettings = Normalize(Load());
         var requireDebuggerExtension = RequiresDebuggerExtension(
             phpCycle,
-            settings.PhpCycle
+            storedSettings.PhpCycle
         );
-        if (!string.IsNullOrWhiteSpace(phpCycle)) settings.PhpCycle = phpCycle;
+        var selectedCycle = string.IsNullOrWhiteSpace(phpCycle)
+            ? storedSettings.PhpCycle
+            : phpCycle;
+        var settings = ResolveVersion(storedSettings, selectedCycle);
         return new PhpRuntimeLaunchContract(
             extensions,
             settings,
-            BuildPhpOptions(settings, requireDebuggerExtension, SupportPath)
+            BuildPhpOptions(settings, requireDebuggerExtension, supportRoot)
         );
     }
 
@@ -107,6 +107,7 @@ public sealed class PhpRuntimePolicy
     {
         settings.MemoryLimitMegabytes = Math.Clamp(settings.MemoryLimitMegabytes, 16, 100_000);
         settings.MaxUploadMegabytes = Math.Clamp(settings.MaxUploadMegabytes, 1, 100_000);
+        NormalizeLimits(settings);
         settings.PhpCycle = string.IsNullOrWhiteSpace(settings.PhpCycle)
             ? RuntimeCatalog.DefaultPhpCycle
             : new string(settings.PhpCycle.Trim().Where(character =>
@@ -117,6 +118,15 @@ public sealed class PhpRuntimePolicy
             settings.PhpCycle = RuntimeCatalog.DefaultPhpCycle;
         }
 
+        settings.Versions ??= [];
+        settings.Versions = settings.Versions
+            .Where(pair => ValidCycle(pair.Key) && pair.Value is not null)
+            .ToDictionary(
+                pair => pair.Key,
+                pair => NormalizeVersion(pair.Value),
+                StringComparer.Ordinal
+            );
+
         settings.Debugger ??= new DebuggerSettings();
         settings.Debugger.Port = Math.Clamp(settings.Debugger.Port, 1, 65_535);
         settings.Debugger.IdeKey = new string(
@@ -126,6 +136,59 @@ public sealed class PhpRuntimePolicy
         );
         if (string.IsNullOrEmpty(settings.Debugger.IdeKey)) settings.Debugger.IdeKey = "VSCODE";
         return settings;
+    }
+
+    public static PhpRuntimeSettings ResolveVersion(PhpRuntimeSettings source, string cycle)
+    {
+        var settings = Normalize(source);
+        var version = settings.Versions.TryGetValue(cycle, out var configured)
+            ? configured
+            : VersionFrom(settings);
+        return new PhpRuntimeSettings
+        {
+            PhpCycle = cycle,
+            MemoryLimitMegabytes = version.MemoryLimitMegabytes,
+            MaxUploadMegabytes = version.MaxUploadMegabytes,
+            MaxExecutionTimeSeconds = version.MaxExecutionTimeSeconds,
+            MaxInputTimeSeconds = version.MaxInputTimeSeconds,
+            MaxInputVariables = version.MaxInputVariables,
+            MaxFileUploads = version.MaxFileUploads,
+            DisplayErrors = version.DisplayErrors,
+            OpcacheEnabled = version.OpcacheEnabled,
+            Timezone = version.Timezone,
+            Debugger = settings.Debugger,
+            Versions = settings.Versions
+        };
+    }
+
+    public static void SetVersion(PhpRuntimeSettings settings, string cycle, PhpRuntimeSettings value)
+    {
+        Normalize(settings);
+        if (!ValidCycle(cycle)) throw new ArgumentException("The PHP cycle is invalid.", nameof(cycle));
+        settings.Versions[cycle] = NormalizeVersion(VersionFrom(value));
+    }
+
+    public static IReadOnlyDictionary<string, bool> ExtensionPreferences(
+        string supportRoot,
+        string cycle
+    )
+    {
+        try
+        {
+            var path = Path.Combine(supportRoot, "Config", "php.json");
+            if (!File.Exists(path)) return new Dictionary<string, bool>();
+            var settings = JsonSerializer.Deserialize<PhpRuntimeSettings>(File.ReadAllText(path));
+            return settings?.Versions?.TryGetValue(cycle, out var version) == true
+                ? new Dictionary<string, bool>(
+                    version.Extensions ?? [], StringComparer.OrdinalIgnoreCase
+                )
+                : new Dictionary<string, bool>();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException
+            or JsonException or ArgumentException)
+        {
+            return new Dictionary<string, bool>();
+        }
     }
 
     public static IReadOnlyDictionary<string, string> BuildPhpOptions(PhpRuntimeSettings input)
@@ -144,7 +207,15 @@ public sealed class PhpRuntimePolicy
         {
             ["memory_limit"] = $"{settings.MemoryLimitMegabytes}M",
             ["post_max_size"] = $"{settings.MaxUploadMegabytes}M",
-            ["upload_max_filesize"] = $"{settings.MaxUploadMegabytes}M"
+            ["upload_max_filesize"] = $"{settings.MaxUploadMegabytes}M",
+            ["max_execution_time"] = settings.MaxExecutionTimeSeconds.ToString(),
+            ["max_input_time"] = settings.MaxInputTimeSeconds.ToString(),
+            ["max_input_vars"] = settings.MaxInputVariables.ToString(),
+            ["max_file_uploads"] = settings.MaxFileUploads.ToString(),
+            ["display_errors"] = settings.DisplayErrors ? "1" : "0",
+            ["display_startup_errors"] = settings.DisplayErrors ? "1" : "0",
+            ["opcache.enable"] = settings.OpcacheEnabled ? "1" : "0",
+            ["date.timezone"] = settings.Timezone
         };
         if (!settings.Debugger.Enabled) return options;
 
@@ -192,4 +263,76 @@ public sealed class PhpRuntimePolicy
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "HerdMe"
     );
+
+    private static void NormalizeLimits(PhpRuntimeSettings settings)
+    {
+        settings.MaxExecutionTimeSeconds = Math.Clamp(settings.MaxExecutionTimeSeconds, 0, 86_400);
+        settings.MaxInputTimeSeconds = Math.Clamp(settings.MaxInputTimeSeconds, -1, 86_400);
+        settings.MaxInputVariables = Math.Clamp(settings.MaxInputVariables, 100, 1_000_000);
+        settings.MaxFileUploads = Math.Clamp(settings.MaxFileUploads, 1, 10_000);
+        settings.Timezone = NormalizeTimezone(settings.Timezone);
+    }
+
+    private static PhpVersionConfiguration NormalizeVersion(PhpVersionConfiguration version)
+    {
+        var temporary = new PhpRuntimeSettings
+        {
+            MemoryLimitMegabytes = version.MemoryLimitMegabytes,
+            MaxUploadMegabytes = version.MaxUploadMegabytes,
+            MaxExecutionTimeSeconds = version.MaxExecutionTimeSeconds,
+            MaxInputTimeSeconds = version.MaxInputTimeSeconds,
+            MaxInputVariables = version.MaxInputVariables,
+            MaxFileUploads = version.MaxFileUploads,
+            DisplayErrors = version.DisplayErrors,
+            OpcacheEnabled = version.OpcacheEnabled,
+            Timezone = version.Timezone
+        };
+        temporary.MemoryLimitMegabytes = Math.Clamp(temporary.MemoryLimitMegabytes, 16, 100_000);
+        temporary.MaxUploadMegabytes = Math.Clamp(temporary.MaxUploadMegabytes, 1, 100_000);
+        NormalizeLimits(temporary);
+        version.MemoryLimitMegabytes = temporary.MemoryLimitMegabytes;
+        version.MaxUploadMegabytes = temporary.MaxUploadMegabytes;
+        version.MaxExecutionTimeSeconds = temporary.MaxExecutionTimeSeconds;
+        version.MaxInputTimeSeconds = temporary.MaxInputTimeSeconds;
+        version.MaxInputVariables = temporary.MaxInputVariables;
+        version.MaxFileUploads = temporary.MaxFileUploads;
+        version.Timezone = temporary.Timezone;
+        version.Extensions = (version.Extensions ?? [])
+            .Where(pair => ValidExtensionName(pair.Key))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+        return version;
+    }
+
+    private static PhpVersionConfiguration VersionFrom(PhpRuntimeSettings settings) => new()
+    {
+        MemoryLimitMegabytes = settings.MemoryLimitMegabytes,
+        MaxUploadMegabytes = settings.MaxUploadMegabytes,
+        MaxExecutionTimeSeconds = settings.MaxExecutionTimeSeconds,
+        MaxInputTimeSeconds = settings.MaxInputTimeSeconds,
+        MaxInputVariables = settings.MaxInputVariables,
+        MaxFileUploads = settings.MaxFileUploads,
+        DisplayErrors = settings.DisplayErrors,
+        OpcacheEnabled = settings.OpcacheEnabled,
+        Timezone = settings.Timezone,
+        Extensions = settings.Versions.TryGetValue(settings.PhpCycle, out var configured)
+            ? new Dictionary<string, bool>(configured.Extensions, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
+    };
+
+    private static string NormalizeTimezone(string? value)
+    {
+        var timezone = new string((value ?? "UTC").Trim().Where(character =>
+            char.IsAsciiLetterOrDigit(character) || character is '/' or '_' or '-' or '+'
+        ).ToArray());
+        return string.IsNullOrWhiteSpace(timezone) ? "UTC" : timezone[..Math.Min(64, timezone.Length)];
+    }
+
+    private static bool ValidCycle(string value)
+    {
+        var parts = value.Split('.');
+        return parts.Length == 2 && parts.All(part => part.Length > 0 && part.All(char.IsAsciiDigit));
+    }
+
+    private static bool ValidExtensionName(string value) => value.Length is > 0 and <= 128
+        && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-');
 }

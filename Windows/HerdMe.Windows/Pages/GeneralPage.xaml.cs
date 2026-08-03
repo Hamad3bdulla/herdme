@@ -24,6 +24,7 @@ public sealed partial class GeneralPage : Page
     private readonly WindowsUserPathManager userPathManager;
     private bool loadingStartup;
     private bool loadingUpdateSettings;
+    private bool loadingCompactMode;
 
     public ObservableCollection<RuntimeCheck> Runtimes { get; } = [];
 
@@ -66,6 +67,9 @@ public sealed partial class GeneralPage : Page
         StartupToggle.IsOn = startupManager.IsEnabled;
         loadingStartup = false;
         var settings = settingsStore.Load();
+        loadingCompactMode = true;
+        CompactModeToggle.IsOn = settings.CompactMode;
+        loadingCompactMode = false;
         TldTextBox.Text = settings.Tld;
         loadingUpdateSettings = true;
         AutomaticUpdatesToggle.IsOn = settings.AutomaticUpdates;
@@ -75,6 +79,12 @@ public sealed partial class GeneralPage : Page
             UpdateChannelDisplayName(settings.UpdateChannel)
         );
         loadingUpdateSettings = false;
+    }
+
+    private void CompactModeToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (loadingCompactMode) return;
+        settingsStore.UpdateCompactMode(CompactModeToggle.IsOn);
     }
 
     private async void StartupToggle_Toggled(object sender, RoutedEventArgs e)

@@ -62,22 +62,29 @@
 
             <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
                 <StackPanel Spacing="14">
-                    <TextBlock x:Uid="PhpRequestLimitsTitle" Text="Request limits" Style="{StaticResource SubtitleTextBlockStyle}" />
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="220" />
-                            <ColumnDefinition Width="140" />
-                        </Grid.ColumnDefinitions>
+                    <TextBlock x:Uid="PhpSettingsTitle" Text="PHP settings" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <TextBlock x:Uid="PhpSettingsDescription" Text="These values are saved separately for the selected PHP version." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                    <Grid ColumnSpacing="24" RowSpacing="10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="150" /><ColumnDefinition Width="220" /><ColumnDefinition Width="150" /></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                         <TextBlock x:Uid="PhpMemoryLimitLabel" Text="Memory limit (MB)" VerticalAlignment="Center" />
                         <NumberBox x:Name="MemoryLimitBox" Grid.Column="1" Minimum="16" Maximum="100000" SpinButtonPlacementMode="Compact" />
-                    </Grid>
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="220" />
-                            <ColumnDefinition Width="140" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Uid="PhpUploadLimitLabel" Text="Maximum upload (MB)" VerticalAlignment="Center" />
-                        <NumberBox x:Name="UploadLimitBox" Grid.Column="1" Minimum="1" Maximum="100000" SpinButtonPlacementMode="Compact" />
+                        <TextBlock x:Uid="PhpUploadLimitLabel" Grid.Column="2" Text="Maximum upload (MB)" VerticalAlignment="Center" />
+                        <NumberBox x:Name="UploadLimitBox" Grid.Column="3" Minimum="1" Maximum="100000" SpinButtonPlacementMode="Compact" />
+                        <TextBlock x:Uid="PhpExecutionTimeLabel" Grid.Row="1" Text="Maximum execution time (seconds)" VerticalAlignment="Center" />
+                        <NumberBox x:Name="ExecutionTimeBox" Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="86400" SpinButtonPlacementMode="Compact" />
+                        <TextBlock x:Uid="PhpInputTimeLabel" Grid.Row="1" Grid.Column="2" Text="Maximum input time (seconds)" VerticalAlignment="Center" />
+                        <NumberBox x:Name="InputTimeBox" Grid.Row="1" Grid.Column="3" Minimum="-1" Maximum="86400" SpinButtonPlacementMode="Compact" />
+                        <TextBlock x:Uid="PhpInputVariablesLabel" Grid.Row="2" Text="Maximum input variables" VerticalAlignment="Center" />
+                        <NumberBox x:Name="InputVariablesBox" Grid.Row="2" Grid.Column="1" Minimum="100" Maximum="1000000" SpinButtonPlacementMode="Compact" />
+                        <TextBlock x:Uid="PhpFileUploadsLabel" Grid.Row="2" Grid.Column="2" Text="Maximum uploaded files" VerticalAlignment="Center" />
+                        <NumberBox x:Name="FileUploadsBox" Grid.Row="2" Grid.Column="3" Minimum="1" Maximum="10000" SpinButtonPlacementMode="Compact" />
+                        <TextBlock x:Uid="PhpTimezoneLabel" Grid.Row="3" Text="Timezone" VerticalAlignment="Center" />
+                        <TextBox x:Uid="PhpTimezoneInput" x:Name="TimezoneBox" Grid.Row="3" Grid.Column="1" PlaceholderText="UTC" />
+                        <TextBlock x:Uid="PhpDisplayErrorsLabel" Grid.Row="3" Grid.Column="2" Text="Display errors" VerticalAlignment="Center" />
+                        <ToggleSwitch x:Name="DisplayErrorsToggle" Grid.Row="3" Grid.Column="3" />
+                        <TextBlock x:Uid="PhpOpcacheLabel" Grid.Row="4" Text="OPcache" VerticalAlignment="Center" />
+                        <ToggleSwitch x:Name="OpcacheToggle" Grid.Row="4" Grid.Column="1" />
                     </Grid>
                     <Button x:Name="SaveButton" HorizontalAlignment="Left" Click="Save_Click">
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -86,6 +93,20 @@
                         </StackPanel>
                     </Button>
                     <TextBlock x:Name="SaveStatusText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </Border>
+
+            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+                <StackPanel Spacing="12">
+                    <Grid>
+                        <StackPanel Spacing="4">
+                            <TextBlock x:Uid="PhpExtensionsTitle" Text="PHP extensions" Style="{StaticResource SubtitleTextBlockStyle}" />
+                            <TextBlock x:Uid="PhpExtensionsDescription" Text="Built-in extensions are shown for reference. Loadable extensions can be enabled for this PHP version." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ProgressRing x:Name="ExtensionsProgress" Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    </Grid>
+                    <TextBox x:Name="ExtensionSearchBox" x:Uid="PhpExtensionSearch" PlaceholderText="Search extensions" TextChanged="ExtensionSearch_TextChanged" />
+                    <StackPanel x:Name="ExtensionsPanel" Spacing="2" />
                 </StackPanel>
             </Border>
         </StackPanel>

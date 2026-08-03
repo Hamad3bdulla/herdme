@@ -122,7 +122,6 @@
   <data name="PhpComposerNotInstalled.Text" xml:space="preserve"><value>Composer: غير مثبت</value></data>
   <data name="PhpLaravelInstallerNotInstalled.Text" xml:space="preserve"><value>Laravel Installer: غير مثبت</value></data>
   <data name="PhpInstallToolsButton.Text" xml:space="preserve"><value>تثبيت</value></data>
-  <data name="PhpRequestLimitsTitle.Text" xml:space="preserve"><value>حدود الطلب</value></data>
   <data name="PhpMemoryLimitLabel.Text" xml:space="preserve"><value>حد الذاكرة (MB)</value></data>
   <data name="PhpUploadLimitLabel.Text" xml:space="preserve"><value>الحد الأقصى للرفع (MB)</value></data>
   <data name="PhpSaveButton.Text" xml:space="preserve"><value>حفظ</value></data>
@@ -741,4 +740,35 @@
   <data name="SitesCommandFavoriteSaveTooltip" xml:space="preserve"><value>حفظ الأمر الحالي في المفضلة</value></data>
   <data name="SitesCommandFavoriteDeleteTooltip" xml:space="preserve"><value>حذف الأمر المفضل المحدد</value></data>
   <data name="SitesCommandFavoriteMissing" xml:space="preserve"><value>اختر أمراً أو اكتبه قبل الحفظ.</value></data>
+  <data name="PhpSettingsTitle.Text" xml:space="preserve"><value>إعدادات PHP</value></data>
+  <data name="PhpSettingsDescription.Text" xml:space="preserve"><value>تُحفظ هذه القيم بشكل مستقل لنسخة PHP المحددة.</value></data>
+  <data name="PhpExecutionTimeLabel.Text" xml:space="preserve"><value>أقصى وقت للتنفيذ (ثانية)</value></data>
+  <data name="PhpInputTimeLabel.Text" xml:space="preserve"><value>أقصى وقت للإدخال (ثانية)</value></data>
+  <data name="PhpInputVariablesLabel.Text" xml:space="preserve"><value>أقصى عدد لمتغيرات الإدخال</value></data>
+  <data name="PhpFileUploadsLabel.Text" xml:space="preserve"><value>أقصى عدد للملفات المرفوعة</value></data>
+  <data name="PhpTimezoneLabel.Text" xml:space="preserve"><value>المنطقة الزمنية</value></data>
+  <data name="PhpDisplayErrorsLabel.Text" xml:space="preserve"><value>عرض الأخطاء</value></data>
+  <data name="PhpOpcacheLabel.Text" xml:space="preserve"><value>التخزين المؤقت OPcache</value></data>
+  <data name="PhpExtensionsTitle.Text" xml:space="preserve"><value>إضافات PHP</value></data>
+  <data name="PhpExtensionsDescription.Text" xml:space="preserve"><value>تظهر الإضافات المدمجة للمعرفة، ويمكن تفعيل الإضافات القابلة للتحميل لكل نسخة PHP.</value></data>
+  <data name="PhpExtensionSearch.PlaceholderText" xml:space="preserve"><value>البحث في الإضافات</value></data>
+  <data name="PhpExtensionLoaded" xml:space="preserve"><value>محمّلة</value></data>
+  <data name="PhpExtensionEnabled" xml:space="preserve"><value>مفعّلة، أعد تشغيل المواقع لتحميلها</value></data>
+  <data name="PhpExtensionDisabled" xml:space="preserve"><value>معطّلة</value></data>
+  <data name="PhpExtensionRequiredStatus" xml:space="preserve"><value>{0} · مطلوبة لـ Laravel</value></data>
+  <data name="PhpExtensionToggleTooltip" xml:space="preserve"><value>تفعيل أو تعطيل هذه الإضافة لنسخة PHP المحددة</value></data>
+  <data name="PhpExtensionBuiltInTooltip" xml:space="preserve"><value>هذه الإضافة مدمجة في PHP ولا يمكن تبديلها</value></data>
+  <data name="GeneralCompactModeTitle.Text" xml:space="preserve"><value>واجهة مضغوطة</value></data>
+  <data name="GeneralCompactModeDescription.Text" xml:space="preserve"><value>استخدام مسافات أصغر في صفحتي المواقع ولوحة التحكم.</value></data>
+  <data name="DashboardRepairAction" xml:space="preserve"><value>إصلاح</value></data>
+  <data name="DashboardRepairTooltip" xml:space="preserve"><value>إصلاح مشكلة الصحة هذه</value></data>
+  <data name="SitesActionOpenBrowserTooltip.Text" xml:space="preserve"><value>فتح في المتصفح</value></data>
+  <data name="SitesActionOpenFolderTooltip.Text" xml:space="preserve"><value>فتح مجلد المشروع</value></data>
+  <data name="SitesActionTerminalTooltip.Text" xml:space="preserve"><value>فتح الطرفية</value></data>
+  <data name="SitesActionEnvironmentTooltip.Text" xml:space="preserve"><value>تعديل ملف .env</value></data>
+  <data name="SitesActionDatabaseTooltip.Text" xml:space="preserve"><value>إدارة قاعدة البيانات</value></data>
+  <data name="SitesActionQueueTooltip.Text" xml:space="preserve"><value>إدارة الطابور</value></data>
+  <data name="SitesActionLogsTooltip.Text" xml:space="preserve"><value>فتح سجلات الموقع</value></data>
+  <data name="SitesActionHealthTooltip.Text" xml:space="preserve"><value>فحص الموقع وإصلاحه</value></data>
+  <data name="PhpTimezoneInput.PlaceholderText" xml:space="preserve"><value>مثال: Asia/Bahrain</value></data>
 </root>

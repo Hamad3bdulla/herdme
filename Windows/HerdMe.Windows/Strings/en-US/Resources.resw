@@ -122,7 +122,6 @@
   <data name="PhpComposerNotInstalled.Text" xml:space="preserve"><value>Composer: Not installed</value></data>
   <data name="PhpLaravelInstallerNotInstalled.Text" xml:space="preserve"><value>Laravel Installer: Not installed</value></data>
   <data name="PhpInstallToolsButton.Text" xml:space="preserve"><value>Install</value></data>
-  <data name="PhpRequestLimitsTitle.Text" xml:space="preserve"><value>Request limits</value></data>
   <data name="PhpMemoryLimitLabel.Text" xml:space="preserve"><value>Memory limit (MB)</value></data>
   <data name="PhpUploadLimitLabel.Text" xml:space="preserve"><value>Maximum upload (MB)</value></data>
   <data name="PhpSaveButton.Text" xml:space="preserve"><value>Save</value></data>
@@ -741,4 +740,35 @@
   <data name="SitesCommandFavoriteSaveTooltip" xml:space="preserve"><value>Save current command as a favorite</value></data>
   <data name="SitesCommandFavoriteDeleteTooltip" xml:space="preserve"><value>Delete selected favorite</value></data>
   <data name="SitesCommandFavoriteMissing" xml:space="preserve"><value>Choose or enter a command before saving it.</value></data>
+  <data name="PhpSettingsTitle.Text" xml:space="preserve"><value>PHP settings</value></data>
+  <data name="PhpSettingsDescription.Text" xml:space="preserve"><value>These values are saved separately for the selected PHP version.</value></data>
+  <data name="PhpExecutionTimeLabel.Text" xml:space="preserve"><value>Maximum execution time (seconds)</value></data>
+  <data name="PhpInputTimeLabel.Text" xml:space="preserve"><value>Maximum input time (seconds)</value></data>
+  <data name="PhpInputVariablesLabel.Text" xml:space="preserve"><value>Maximum input variables</value></data>
+  <data name="PhpFileUploadsLabel.Text" xml:space="preserve"><value>Maximum uploaded files</value></data>
+  <data name="PhpTimezoneLabel.Text" xml:space="preserve"><value>Timezone</value></data>
+  <data name="PhpDisplayErrorsLabel.Text" xml:space="preserve"><value>Display errors</value></data>
+  <data name="PhpOpcacheLabel.Text" xml:space="preserve"><value>OPcache</value></data>
+  <data name="PhpExtensionsTitle.Text" xml:space="preserve"><value>PHP extensions</value></data>
+  <data name="PhpExtensionsDescription.Text" xml:space="preserve"><value>Built-in extensions are shown for reference. Loadable extensions can be enabled for this PHP version.</value></data>
+  <data name="PhpExtensionSearch.PlaceholderText" xml:space="preserve"><value>Search extensions</value></data>
+  <data name="PhpExtensionLoaded" xml:space="preserve"><value>Loaded</value></data>
+  <data name="PhpExtensionEnabled" xml:space="preserve"><value>Enabled, restart sites to load</value></data>
+  <data name="PhpExtensionDisabled" xml:space="preserve"><value>Disabled</value></data>
+  <data name="PhpExtensionRequiredStatus" xml:space="preserve"><value>{0} · Required by Laravel</value></data>
+  <data name="PhpExtensionToggleTooltip" xml:space="preserve"><value>Enable or disable this extension for the selected PHP version</value></data>
+  <data name="PhpExtensionBuiltInTooltip" xml:space="preserve"><value>This extension is built into PHP and cannot be toggled</value></data>
+  <data name="GeneralCompactModeTitle.Text" xml:space="preserve"><value>Compact interface</value></data>
+  <data name="GeneralCompactModeDescription.Text" xml:space="preserve"><value>Use tighter spacing on sites and dashboard pages.</value></data>
+  <data name="DashboardRepairAction" xml:space="preserve"><value>Repair</value></data>
+  <data name="DashboardRepairTooltip" xml:space="preserve"><value>Repair this health issue</value></data>
+  <data name="SitesActionOpenBrowserTooltip.Text" xml:space="preserve"><value>Open in browser</value></data>
+  <data name="SitesActionOpenFolderTooltip.Text" xml:space="preserve"><value>Open project folder</value></data>
+  <data name="SitesActionTerminalTooltip.Text" xml:space="preserve"><value>Open terminal</value></data>
+  <data name="SitesActionEnvironmentTooltip.Text" xml:space="preserve"><value>Edit .env</value></data>
+  <data name="SitesActionDatabaseTooltip.Text" xml:space="preserve"><value>Manage database</value></data>
+  <data name="SitesActionQueueTooltip.Text" xml:space="preserve"><value>Manage queue</value></data>
+  <data name="SitesActionLogsTooltip.Text" xml:space="preserve"><value>Open site logs</value></data>
+  <data name="SitesActionHealthTooltip.Text" xml:space="preserve"><value>Check and repair site</value></data>
+  <data name="PhpTimezoneInput.PlaceholderText" xml:space="preserve"><value>UTC</value></data>
 </root>

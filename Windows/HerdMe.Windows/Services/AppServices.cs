@@ -10,6 +10,7 @@ public sealed class AppServices
         Certificates = new WindowsCertificateManager();
         RuntimePolicy = new PhpRuntimePolicy(Core);
         PhpInstaller = new PhpRuntimeInstaller(Core);
+        PhpExtensions = new PhpExtensionManager(PhpInstaller, Core);
         NodeInstaller = new NodeRuntimeInstaller();
         GitInstaller = new GitRuntimeInstaller();
         UserPath = new WindowsUserPathManager();
@@ -77,6 +78,8 @@ public sealed class AppServices
     public PhpRuntimePolicy RuntimePolicy { get; }
 
     public PhpRuntimeInstaller PhpInstaller { get; }
+
+    public PhpExtensionManager PhpExtensions { get; }
 
     public NodeRuntimeInstaller NodeInstaller { get; }
 
