@@ -56,11 +56,13 @@ public partial class App : Application
             "--acceptance-onboarding",
             StringComparer.OrdinalIgnoreCase
         );
+        var onboardingAfterReinstall = services.SiteSettings
+            .ApplyOnboardingAfterReinstallRequest();
         suppressAutomaticUpdateCheck = acceptanceRun || onboardingAcceptance;
         MainWindow = new MainWindow(
             services,
             skipOnboarding: acceptanceRun,
-            forceOnboarding: onboardingAcceptance
+            forceOnboarding: onboardingAcceptance || onboardingAfterReinstall
         );
         MainWindow.InitialSetupCompleted += MainWindow_InitialSetupCompleted;
         MainWindow.Activated += MainWindow_Activated;

@@ -76,3 +76,16 @@ Type: files; Name: "{userstartup}\HerdMe.lnk"
 
 [Run]
 Filename: "{app}\HerdMe.Windows.exe"; Description: "Launch HerdMe"; Flags: nowait postinstall skipifsilent
+
+[Code]
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  MarkerPath: String;
+begin
+  if CurUninstallStep <> usPostUninstall then
+    Exit;
+
+  MarkerPath := ExpandConstant('{localappdata}\HerdMe\Config\onboarding-after-reinstall.flag');
+  if ForceDirectories(ExtractFileDir(MarkerPath)) then
+    SaveStringToFile(MarkerPath, 'show-onboarding', False);
+end;

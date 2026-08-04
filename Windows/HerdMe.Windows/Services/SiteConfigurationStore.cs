@@ -25,6 +25,12 @@ public sealed class SiteConfigurationStore
 
     public string SettingsPath => Path.Combine(SupportRoot, "Config", "sites.json");
 
+    public string OnboardingAfterReinstallPath => Path.Combine(
+        SupportRoot,
+        "Config",
+        "onboarding-after-reinstall.flag"
+    );
+
     public string? LastLoadWarning { get; private set; }
 
     public string? LastBackupPath { get; private set; }
@@ -178,6 +184,32 @@ public sealed class SiteConfigurationStore
     public void UpdateOnboardingCompleted(bool completed)
     {
         Update(settings => settings.OnboardingCompleted = completed);
+        if (completed) DeleteOnboardingAfterReinstallRequest();
+    }
+
+    public bool ApplyOnboardingAfterReinstallRequest()
+    {
+        if (!File.Exists(OnboardingAfterReinstallPath)) return false;
+        try
+        {
+            Update(settings => settings.OnboardingCompleted = false);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // Keep forcing onboarding for this launch; the marker remains for the next attempt.
+        }
+        return true;
+    }
+
+    private void DeleteOnboardingAfterReinstallRequest()
+    {
+        try
+        {
+            File.Delete(OnboardingAfterReinstallPath);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     public bool AddLinkedSite(string path)

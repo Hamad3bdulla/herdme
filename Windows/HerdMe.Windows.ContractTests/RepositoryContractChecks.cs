@@ -379,6 +379,15 @@ internal static partial class ContractChecks
             ),
             "the Windows installer includes the complete validated portable payload"
         );
+        Check(
+            installerText.Contains("CurUninstallStep <> usPostUninstall", StringComparison.Ordinal)
+                && installerText.Contains(
+                    "{localappdata}\\HerdMe\\Config\\onboarding-after-reinstall.flag",
+                    StringComparison.Ordinal
+                )
+                && installerText.Contains("SaveStringToFile", StringComparison.Ordinal),
+            "a completed uninstall requests onboarding after reinstall without deleting user data"
+        );
         var startupRegistryLine = installerText.Split('\n').SingleOrDefault(line =>
             line.Contains("ValueName: \"HerdMe\"", StringComparison.Ordinal)
         );

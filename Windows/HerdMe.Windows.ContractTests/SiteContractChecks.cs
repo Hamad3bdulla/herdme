@@ -129,6 +129,19 @@ internal static partial class ContractChecks
         Check(!settings.AutomaticUpdates, "automatic update preference is persisted");
         Check(settings.UpdateChannel == "Beta", "update channel is normalized");
         Check(settings.OnboardingCompleted, "completed initial setup is persisted");
+        Directory.CreateDirectory(Path.GetDirectoryName(store.OnboardingAfterReinstallPath)!);
+        File.WriteAllText(store.OnboardingAfterReinstallPath, "show-onboarding");
+        Check(
+            store.ApplyOnboardingAfterReinstallRequest()
+                && !store.Load().OnboardingCompleted
+                && File.Exists(store.OnboardingAfterReinstallPath),
+            "a successful uninstall requests onboarding without deleting preserved settings"
+        );
+        store.UpdateOnboardingCompleted(true);
+        Check(
+            !File.Exists(store.OnboardingAfterReinstallPath),
+            "completing setup consumes the reinstall onboarding request"
+        );
         Check(
             settings.SchemaVersion == SiteConfigurationStore.CurrentSchemaVersion,
             "saved Windows site settings use the current schema"
