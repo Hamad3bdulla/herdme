@@ -188,6 +188,44 @@ internal static partial class ContractChecks
             SiteHealthInspector.EnvironmentValue("APP_KEY=base64:test\nDB_DATABASE=herdme", "APP_KEY") == "base64:test",
             "site health reads Laravel environment values safely"
         );
+        var plainSite = Path.Combine(supportRoot, "plain-site");
+        Directory.CreateDirectory(plainSite);
+        Check(
+            !SiteHealthInspector.IsLaravelProject(plainSite),
+            "site health does not classify a plain website as Laravel"
+        );
+        var laravelSite = Path.Combine(supportRoot, "laravel-site");
+        Directory.CreateDirectory(laravelSite);
+        File.WriteAllText(
+            Path.Combine(laravelSite, "composer.json"),
+            "{\"require\":{\"laravel/framework\":\"^12.0\"}}"
+        );
+        Check(
+            SiteHealthInspector.IsLaravelProject(laravelSite),
+            "site health detects Laravel from its Composer dependency"
+        );
+        Check(
+            RuntimeHealthInspector.NodePackageManager(laravelSite) == "npm",
+            "runtime health defaults Node projects to npm"
+        );
+        File.WriteAllText(Path.Combine(laravelSite, "pnpm-lock.yaml"), "lockfileVersion: '9.0'");
+        Check(
+            RuntimeHealthInspector.NodePackageManager(laravelSite) == "pnpm",
+            "runtime health detects pnpm projects without running npm"
+        );
+        var requirements = RuntimeHealthInspector.ComposerPlatformRequirements(
+            Path.Combine(laravelSite, "composer.json")
+        );
+        Check(
+            requirements.Count == 0,
+            "runtime health reads Composer platform requirements safely"
+        );
+        var writableDirectory = Path.Combine(laravelSite, "storage");
+        Directory.CreateDirectory(writableDirectory);
+        Check(
+            SiteHealthInspector.IsLaravelProject(laravelSite),
+            "site health keeps Laravel classification while checking writable paths"
+        );
         await using (var siteProcesses = new SiteProcessManager())
         {
             var processState = siteProcesses.State(

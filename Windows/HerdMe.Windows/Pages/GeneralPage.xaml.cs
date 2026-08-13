@@ -26,6 +26,7 @@ public sealed partial class GeneralPage : Page
     private bool loadingUpdateSettings;
     private bool loadingCompactMode;
     private bool updateEventSubscribed;
+    private bool pageActive;
 
     public ObservableCollection<RuntimeCheck> Runtimes { get; } = [];
 
@@ -119,6 +120,9 @@ public sealed partial class GeneralPage : Page
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
+        pageActive = true;
+        UpdateProgress.IsActive = false;
+        CheckNowButton.IsEnabled = true;
         if (!updateEventSubscribed)
         {
             updateManager.CheckCompleted += UpdateManager_CheckCompleted;
@@ -130,6 +134,7 @@ public sealed partial class GeneralPage : Page
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
+        pageActive = false;
         if (!updateEventSubscribed) return;
         updateManager.CheckCompleted -= UpdateManager_CheckCompleted;
         updateEventSubscribed = false;
@@ -431,7 +436,6 @@ public sealed partial class GeneralPage : Page
 
     private async Task CheckForUpdatesAsync(bool userInitiated)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         UpdateProgress.IsActive = true;
         CheckNowButton.IsEnabled = false;
         AppUpdateCheck? applicationResult = null;
@@ -444,8 +448,8 @@ public sealed partial class GeneralPage : Page
                 "GeneralCheckingReleases",
                 channelName
             );
-            var applicationTask = updateManager.CheckAsync(channel, timeout.Token);
-            var componentsTask = componentUpdateManager.CheckAsync(timeout.Token);
+            var applicationTask = updateManager.CheckAsync(channel);
+            var componentsTask = componentUpdateManager.CheckAsync();
             try
             {
                 applicationResult = await applicationTask;
@@ -455,6 +459,7 @@ public sealed partial class GeneralPage : Page
                 applicationError = error;
             }
             var components = await componentsTask;
+            if (!pageActive) return;
             ApplyManagedUpdateState();
 
             if (applicationResult?.AvailableRelease is { } release)
@@ -488,7 +493,9 @@ public sealed partial class GeneralPage : Page
                 {
                     await ShowMessageAsync(
                         AppLocalization.Get("GeneralUpdateCheckFailed"),
-                        applicationError.Message
+                        applicationError is OperationCanceledException
+                            ? AppLocalization.Get("GeneralUpdateCheckTimedOut")
+                            : applicationError.Message
                     );
                 }
                 else if (applicationResult?.UsedBundledFallback == true)
@@ -519,25 +526,34 @@ public sealed partial class GeneralPage : Page
         }
         catch (Exception error)
         {
+            if (!pageActive) return;
             UpdateStatusText.Text = AppLocalization.Get("GeneralUpdateCheckFailed");
             if (userInitiated)
             {
                 await ShowMessageAsync(
                     AppLocalization.Get("GeneralUpdateCheckFailed"),
-                    error.Message
+                    error is OperationCanceledException
+                        ? AppLocalization.Get("GeneralUpdateCheckTimedOut")
+                        : error.Message
                 );
             }
         }
         finally
         {
-            UpdateProgress.IsActive = false;
-            CheckNowButton.IsEnabled = true;
+            if (pageActive)
+            {
+                UpdateProgress.IsActive = false;
+                CheckNowButton.IsEnabled = true;
+            }
         }
     }
 
     private void UpdateManager_CheckCompleted(AppUpdateCheck result)
     {
-        DispatcherQueue.TryEnqueue(() => RenderUpdateResult(result));
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (pageActive) RenderUpdateResult(result);
+        });
     }
 
     private void RenderLatestUpdateResult()

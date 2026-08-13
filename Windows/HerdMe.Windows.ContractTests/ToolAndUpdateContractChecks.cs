@@ -433,6 +433,10 @@ internal static partial class ContractChecks
             IsUpdateAvailable = false
         };
         Check(!currentNodeRow.CanInstallOrUpdate, "current Node.js releases hide the update action");
+        Check(
+            currentNodeRow.DisplayVersion == "v24.5.0",
+            "Node.js rows show the exact installed version separately from status"
+        );
         var missingNodeRow = new NodeRuntimeRow
         {
             Major = "22",
@@ -528,6 +532,20 @@ internal static partial class ContractChecks
             "one failed component feed does not hide updates from healthy feeds"
         );
 
+        var timedOutManagedUpdates = new ManagedComponentUpdateManager(
+            TimeSpan.FromMilliseconds(50),
+            new ManagedComponentUpdateProbe("Slow feed", async cancellationToken =>
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return [];
+            })
+        );
+        var timedOutManagedResult = await timedOutManagedUpdates.CheckAsync();
+        Check(
+            timedOutManagedResult.Failures is [{ Component: "Slow feed", Error: OperationCanceledException }],
+            "a stalled component feed times out without blocking the shared update check"
+        );
+
         var updateFeed = Path.Combine(supportRoot, "release-manifest.json");
         await File.WriteAllTextAsync(
             updateFeed,
@@ -561,6 +579,21 @@ internal static partial class ContractChecks
         );
         var currentManager = new AppUpdateManager(updateFeed, "1.0.1", 1);
         Check(!(await currentManager.CheckAsync("Beta")).IsAvailable, "current beta release is up to date");
+        var stalledUpdateHandler = new StalledHttpMessageHandler();
+        using (var stalledUpdateClient = new HttpClient(stalledUpdateHandler))
+        {
+            var stalledUpdateManager = new AppUpdateManager(
+                "https://example.test/releases.json",
+                "1.0.1",
+                1,
+                httpClient: stalledUpdateClient,
+                checkTimeout: TimeSpan.FromMilliseconds(50)
+            );
+            await ThrowsAsync<OperationCanceledException>(
+                async () => { _ = await stalledUpdateManager.CheckAsync("Stable"); },
+                "a stalled application update feed is canceled by the manager timeout"
+            );
+        }
         var unpublishedReleaseHandler = new SequenceHttpMessageHandler(
             _ => new HttpResponseMessage(HttpStatusCode.NotFound)
         );
@@ -905,5 +938,17 @@ internal static partial class ContractChecks
             phpInspector.InstalledCycles().Contains("7.4", StringComparer.Ordinal),
             "installed legacy PHP remains visible and selectable"
         );
+    }
+}
+
+file sealed class StalledHttpMessageHandler : HttpMessageHandler
+{
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken
+    )
+    {
+        await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        return new HttpResponseMessage(HttpStatusCode.OK);
     }
 }

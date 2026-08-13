@@ -549,6 +549,37 @@ internal static partial class ContractChecks
                 && dashboardSource.Contains("RecentDumpsPanel", StringComparison.Ordinal),
             "the dashboard keeps polished equal-width cards and switches to a compact layout without clipping"
         );
+        Check(
+            dashboardXaml.Contains("x:Name=\"RepairAllButton\"", StringComparison.Ordinal)
+                && dashboardXaml.Contains("Click=\"RepairAll_Click\"", StringComparison.Ordinal)
+                && dashboardSource.Contains("ProjectEnvironmentFile.Save", StringComparison.Ordinal)
+                && dashboardSource.Contains("ComposerCommandRunner.RunAsync", StringComparison.Ordinal)
+                && dashboardSource.Contains("storage:link", StringComparison.Ordinal)
+                && dashboardSource.Contains("config:clear", StringComparison.Ordinal)
+                && dashboardSource.Contains("NpmScriptRunner.CreateToolInvocation", StringComparison.Ordinal)
+                && dashboardSource.Contains("PortConflictInspector.Inspect", StringComparison.Ordinal)
+                && dashboardSource.Contains("serviceManager.StartAsync", StringComparison.Ordinal)
+                && dashboardSource.Contains("APP_URL=https://", StringComparison.Ordinal)
+                && dashboardSource.Contains(".env", StringComparison.Ordinal)
+                && dashboardSource.Contains("package-lock.json", StringComparison.Ordinal)
+                && dashboardSource.Contains("composer validate", StringComparison.Ordinal)
+                && dashboardSource.Contains("dump-autoload", StringComparison.Ordinal)
+                && dashboardSource.Contains("npm audit", StringComparison.Ordinal)
+                && dashboardSource.Contains("DashboardRemoveMissingSites", StringComparison.Ordinal)
+                && dashboardXaml.Contains("RetryFailed_Click", StringComparison.Ordinal)
+                && dashboardXaml.Contains("ExportDiagnostics_Click", StringComparison.Ordinal)
+                && dashboardSource.Contains("RuntimeHealthInspector.InspectSiteAsync", StringComparison.Ordinal)
+                && dashboardSource.Contains("RuntimeHealthInspector.InspectTcpServiceAsync", StringComparison.Ordinal)
+                && dashboardSource.Contains("warningsBeforeRepair.Count", StringComparison.Ordinal)
+                && dashboardSource.Contains("check-platform-reqs", StringComparison.Ordinal)
+                && dashboardSource.Contains("migrate:status", StringComparison.Ordinal)
+                && dashboardSource.Contains("--dry-run", StringComparison.Ordinal)
+                && dashboardSource.Contains("GitTracksEnvironmentAsync", StringComparison.Ordinal)
+                && dashboardSource.Contains("repairJournal.Append", StringComparison.Ordinal)
+                && dashboardSource.Contains("AvailableFreeSpace", StringComparison.Ordinal)
+                && dashboardSource.Contains("DashboardRepairAllSummary", StringComparison.Ordinal),
+            "the dashboard exposes a conservative repair-all workflow with a localized summary"
+        );
         var environmentSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "Windows",
@@ -556,6 +587,28 @@ internal static partial class ContractChecks
             "Services",
             "WindowsLocalEnvironment.cs"
         ));
+        var phpPolicySource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "Windows",
+            "HerdMe.Windows",
+            "Services",
+            "PhpRuntimePolicy.cs"
+        ));
+        Check(
+            phpPolicySource.Contains("debuggerExtensionAvailable", StringComparison.Ordinal)
+                && phpPolicySource.Contains(
+                    "requireDebuggerExtension && debuggerExtensionAvailable",
+                    StringComparison.Ordinal
+                ),
+            "missing optional Xdebug no longer prevents the local site environment from starting"
+        );
+        Check(
+            environmentSource.Contains("xdebugManager.InstalledAsync", StringComparison.Ordinal)
+                && environmentSource.Contains("xdebugManager.InstallAsync", StringComparison.Ordinal)
+                && environmentSource.Contains("automatic-install", StringComparison.Ordinal)
+                && environmentSource.Contains("Sites will start without the debugger", StringComparison.Ordinal),
+            "enabled missing Xdebug is installed automatically and network failure does not stop sites"
+        );
         var serviceSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "Windows",
@@ -788,6 +841,10 @@ internal static partial class ContractChecks
                     "ContextMenuMode = ContextMenuMode.PopupMenu",
                     StringComparison.Ordinal
                 )
+                && appCodeBehind.Contains(
+                    "MenuActivation = PopupActivationMode.RightClick",
+                    StringComparison.Ordinal
+                )
                 && !appCodeBehind.Contains("ContextMenuMode.SecondWindow", StringComparison.Ordinal)
                 && !appCodeBehind.Contains("new GeneratedIconSource", StringComparison.Ordinal),
             "the Windows tray uses the packaged icon and a work-area-aware popup menu"
@@ -815,6 +872,12 @@ internal static partial class ContractChecks
                     StringComparison.Ordinal
                 ),
             "the Windows tray commands use direct ResourceLoader keys at runtime"
+        );
+        Check(
+            appCodeBehind.Contains("internal async Task RequestExitAsync()", StringComparison.Ordinal)
+                && appCodeBehind.Contains("Interlocked.Exchange(ref shutdownStarted, 1)", StringComparison.Ordinal)
+                && appCodeBehind.Contains("StopAndLogAsync", StringComparison.Ordinal),
+            "application exit is idempotent and attempts to stop every background service"
         );
 
         var projectDocument = XDocument.Load(
@@ -1865,7 +1928,18 @@ internal static partial class ContractChecks
                     ["run", "arbitrary-command"],
                     TimeSpan.FromMinutes(5)
                 ),
-                "npm workflow tools reject commands outside the install, update, and audit whitelist"
+                "npm workflow tools reject commands outside the install, ci, update, and audit whitelist"
+            );
+            var ciInvocation = NpmScriptRunner.CreateToolInvocation(
+                installer,
+                root,
+                "22",
+                ["ci"],
+                TimeSpan.FromMinutes(5)
+            );
+            Check(
+                ciInvocation.Arguments.SequenceEqual(["ci"]),
+                "npm workflow tools support deterministic npm ci installs"
             );
 
             var source = File.ReadAllText(Path.Combine(

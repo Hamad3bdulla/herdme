@@ -66,19 +66,24 @@ enum DatabaseServiceAuthenticator {
     }
 
     static func mysqlProvisioningSQL(credentials: ServiceCredentials) -> String {
-        let username = credentials.username
-        let secret = credentials.secret
+        let username = sqlLiteral(credentials.username)
+        let secret = sqlLiteral(credentials.secret)
         return [
             "CREATE DATABASE IF NOT EXISTS laravel",
             "CREATE USER IF NOT EXISTS '\(username)'@'127.0.0.1' IDENTIFIED BY '\(secret)'",
             "ALTER USER '\(username)'@'127.0.0.1' IDENTIFIED BY '\(secret)'",
-            "GRANT ALL PRIVILEGES ON *.* TO '\(username)'@'127.0.0.1' WITH GRANT OPTION",
+            "GRANT ALL PRIVILEGES ON `laravel`.* TO '\(username)'@'127.0.0.1'",
             "CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED BY '\(secret)'",
             "ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '\(secret)'",
             "ALTER USER 'root'@'localhost' IDENTIFIED BY '\(secret)'",
             "DELETE FROM mysql.user WHERE User = ''",
             "FLUSH PRIVILEGES"
         ].joined(separator: "; ") + ";"
+    }
+
+    private static func sqlLiteral(_ value: String) -> String {
+        value.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "''")
     }
 
     static func securedPostgreSQLHBA(_ contents: String) -> (contents: String, changed: Bool) {

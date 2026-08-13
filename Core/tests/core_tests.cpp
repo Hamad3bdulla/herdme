@@ -168,18 +168,17 @@ int main() {
     std::filesystem::create_directories(framework_fixture / "plain-site");
     std::filesystem::create_directories(framework_fixture / ".hidden-site");
     const auto framework_sites = herdme::scan_sites({framework_fixture});
-    expect(framework_sites.size() == 5, "site scanning must include visible project directories only");
+    expect(framework_sites.size() == 4, "site scanning must exclude empty visible directories");
     const auto *laravel_site = site_named(framework_sites, "laravel");
     const auto *wordpress_site = site_named(framework_sites, "wordpress");
     const auto *php_site = site_named(framework_sites, "php-site");
     const auto *node_site = site_named(framework_sites, "node-site");
-    const auto *plain_site = site_named(framework_sites, "plain-site");
     expect(laravel_site != nullptr && laravel_site->framework == "Laravel", "artisan must identify Laravel");
     expect(wordpress_site != nullptr && wordpress_site->framework == "WordPress",
            "wp-config.php must identify WordPress");
     expect(php_site != nullptr && php_site->framework == "PHP", "public/index.php must identify PHP");
     expect(node_site != nullptr && node_site->framework == "Node.js", "package.json must identify Node.js");
-    expect(plain_site != nullptr && plain_site->framework == "Site", "unknown projects must remain generic sites");
+    expect(site_named(framework_sites, "plain-site") == nullptr, "empty directories must not become sites");
     expect(laravel_site != nullptr && laravel_site->php_version == std::optional<std::string>{"8.3"},
            "site scanning must trim managed PHP overrides");
     expect(laravel_site != nullptr && laravel_site->node_version == std::optional<std::string>{"22"},

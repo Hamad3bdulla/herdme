@@ -140,6 +140,11 @@ public sealed partial class AboutPage : Page
         );
     }
 
+    private async void Exit_Click(object sender, RoutedEventArgs e)
+    {
+        await ((App)Application.Current).RequestExitAsync();
+    }
+
     private async Task ShowDocumentAsync(string title, string fileName)
     {
         var path = Path.Combine(AppContext.BaseDirectory, fileName);

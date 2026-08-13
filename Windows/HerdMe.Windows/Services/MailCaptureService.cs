@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Channels;
 using HerdMe.Windows.Models;
 
 namespace HerdMe.Windows.Services;
@@ -11,14 +12,18 @@ public sealed class MailCaptureService : IAsyncDisposable
 {
     public const int DefaultPort = 2_525;
 
-    private readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
+    private readonly CaptureDatabase database;
     private readonly ConcurrentDictionary<int, Task> sessions = new();
+    private readonly SemaphoreSlim sessionGate = new(32, 32);
+    private static readonly TimeSpan ReadTimeout = TimeSpan.FromSeconds(30);
     private readonly string supportRoot;
     private readonly int retentionLimit;
     private readonly TimeSpan retentionAge;
     private CancellationTokenSource? cancellation;
     private TcpListener? listener;
     private Task? acceptTask;
+    private Task? persistenceTask;
+    private Channel<CapturedMail>? persistenceQueue;
     private int sessionIdentifier;
 
     public event EventHandler<CapturedMail>? MessageCaptured;
@@ -35,6 +40,8 @@ public sealed class MailCaptureService : IAsyncDisposable
         );
         this.retentionLimit = Math.Max(1, retentionLimit);
         this.retentionAge = retentionAge ?? CaptureRetention.DefaultMaximumAge;
+        database = new CaptureDatabase(this.supportRoot);
+        database.MigrateMail(DirectoryPath);
     }
 
     public bool IsRunning => listener is not null;
@@ -49,6 +56,13 @@ public sealed class MailCaptureService : IAsyncDisposable
         if (port is < 0 or > 65_535) throw new ArgumentOutOfRangeException(nameof(port));
         Directory.CreateDirectory(DirectoryPath);
         cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        persistenceQueue = Channel.CreateBounded<CapturedMail>(new BoundedChannelOptions(256)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = false
+        });
+        persistenceTask = PersistMessagesAsync(persistenceQueue.Reader);
         listener = new TcpListener(IPAddress.Loopback, port);
         listener.Start(64);
         Port = ((IPEndPoint)listener.LocalEndpoint).Port;
@@ -58,30 +72,17 @@ public sealed class MailCaptureService : IAsyncDisposable
 
     public IReadOnlyList<CapturedMail> Load()
     {
-        Directory.CreateDirectory(DirectoryPath);
-        CaptureRetention.Prune(DirectoryPath, retentionLimit, retentionAge);
-        return Directory.EnumerateFiles(DirectoryPath, "*.json")
-            .Select(path =>
-            {
-                try { return JsonSerializer.Deserialize<CapturedMail>(File.ReadAllText(path)); }
-                catch (Exception error) when (error is IOException or JsonException) { return null; }
-            })
-            .Where(message => message is not null)
-            .Cast<CapturedMail>()
-            .OrderByDescending(message => message.ReceivedAt)
-            .ToList();
+        return database.LoadMail(retentionLimit, retentionAge);
     }
 
     public void Delete(CapturedMail message)
     {
-        var path = Path.Combine(DirectoryPath, message.Id + ".json");
-        if (File.Exists(path)) File.Delete(path);
+        database.DeleteMail(message.Id);
     }
 
     public void Clear()
     {
-        if (!Directory.Exists(DirectoryPath)) return;
-        foreach (var path in Directory.EnumerateFiles(DirectoryPath, "*.json")) File.Delete(path);
+        database.ClearMail();
     }
 
     public async Task StopAsync()
@@ -104,6 +105,10 @@ public sealed class MailCaptureService : IAsyncDisposable
             catch (Exception error) when (error is OperationCanceledException or TimeoutException) { }
         }
         sessions.Clear();
+        persistenceQueue?.Writer.TryComplete();
+        if (persistenceTask is not null) await persistenceTask;
+        persistenceQueue = null;
+        persistenceTask = null;
         source?.Dispose();
     }
 
@@ -118,8 +123,9 @@ public sealed class MailCaptureService : IAsyncDisposable
         while (!cancellationToken.IsCancellationRequested)
         {
             var client = await activeListener.AcceptTcpClientAsync(cancellationToken);
+            await sessionGate.WaitAsync(cancellationToken);
             var identifier = Interlocked.Increment(ref sessionIdentifier);
-            var task = HandleSessionAsync(client, cancellationToken);
+            var task = RunSessionAsync(client, cancellationToken);
             sessions[identifier] = task;
             _ = task.ContinueWith(
                 completedTask =>
@@ -132,6 +138,12 @@ public sealed class MailCaptureService : IAsyncDisposable
                 TaskScheduler.Default
             );
         }
+    }
+
+    private async Task RunSessionAsync(TcpClient client, CancellationToken cancellationToken)
+    {
+        try { await HandleSessionAsync(client, cancellationToken); }
+        finally { sessionGate.Release(); }
     }
 
     private async Task HandleSessionAsync(TcpClient client, CancellationToken cancellationToken)
@@ -150,7 +162,9 @@ public sealed class MailCaptureService : IAsyncDisposable
             var recipients = new List<string>();
             while (!cancellationToken.IsCancellationRequested)
             {
-                var line = await reader.ReadLineAsync(cancellationToken);
+                using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                readTimeout.CancelAfter(ReadTimeout);
+                var line = await reader.ReadLineAsync(readTimeout.Token);
                 if (line is null) return;
                 if (line.Length > 1_048_576) return;
                 var upper = line.ToUpperInvariant();
@@ -174,8 +188,9 @@ public sealed class MailCaptureService : IAsyncDisposable
                     await writer.WriteLineAsync("354 End data with <CR><LF>.<CR><LF>");
                     var data = await ReadMessageAsync(reader, cancellationToken);
                     var message = CapturedMail.Parse(sender, recipients, data);
-                    Save(message);
-                    MessageCaptured?.Invoke(this, message);
+                    var queue = persistenceQueue
+                        ?? throw new InvalidOperationException("Mail persistence is not running.");
+                    await queue.Writer.WriteAsync(message, cancellationToken);
                     await writer.WriteLineAsync("250 2.0.0 Message accepted");
                 }
                 else if (upper == "RSET")
@@ -201,6 +216,15 @@ public sealed class MailCaptureService : IAsyncDisposable
         }
     }
 
+    private async Task PersistMessagesAsync(ChannelReader<CapturedMail> reader)
+    {
+        await foreach (var message in reader.ReadAllAsync())
+        {
+            Save(message);
+            MessageCaptured?.Invoke(this, message);
+        }
+    }
+
     private static async Task<string> ReadMessageAsync(
         StreamReader reader,
         CancellationToken cancellationToken
@@ -223,12 +247,7 @@ public sealed class MailCaptureService : IAsyncDisposable
 
     private void Save(CapturedMail message)
     {
-        Directory.CreateDirectory(DirectoryPath);
-        var path = Path.Combine(DirectoryPath, message.Id + ".json");
-        var temporary = path + ".tmp";
-        File.WriteAllText(temporary, JsonSerializer.Serialize(message, jsonOptions));
-        File.Move(temporary, path, true);
-        CaptureRetention.Prune(DirectoryPath, retentionLimit, retentionAge);
+        database.Save(message, retentionLimit, retentionAge);
     }
 
     private static string Address(string command)

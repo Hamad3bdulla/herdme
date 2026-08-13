@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
+using System.Text;
 using HerdMe.Windows.Models;
 
 namespace HerdMe.Windows.Services;
@@ -116,8 +117,15 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         {
             var directory = Path.GetDirectoryName(ConfigurationPath)!;
             Directory.CreateDirectory(directory);
-            var temporary = ConfigurationPath + ".tmp";
-            File.WriteAllText(temporary, JsonSerializer.Serialize(normalized, JsonOptions));
+            var temporary = ConfigurationPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                64 * 1_024, FileOptions.WriteThrough))
+            using (var writer = new StreamWriter(file, new UTF8Encoding(false)))
+            {
+                writer.Write(JsonSerializer.Serialize(normalized, JsonOptions));
+                writer.Flush();
+                file.Flush(true);
+            }
             File.Move(temporary, ConfigurationPath, true);
             lastKnownInstances = normalized;
             hasLoadedInstances = true;

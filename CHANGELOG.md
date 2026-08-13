@@ -5,6 +5,36 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-08-13
+
+### Added
+
+- Add dashboard-wide automatic repair and retry actions with exportable diagnostics.
+- Start Vite and Next.js development servers automatically behind local HTTPS,
+  including WebSocket proxying for hot module replacement.
+- Start a detected CAMERA FastAPI backend automatically alongside its frontend.
+- Install a project's requested managed Node.js major version automatically when
+  it is not available, including Node.js 24 projects.
+- Install Xdebug automatically when debugging is enabled but the matching PHP
+  extension is missing.
+- Add an Exit command to the system tray context menu.
+
+### Changed
+
+- Keep update and repair operations running safely when navigating between pages.
+- Report update connection timeouts and failures with clear English messages.
+- Exclude empty folders that do not contain recognizable project files from the
+  local site list.
+
+### Fixed
+
+- Recover missing development servers even when the PHP and HTTPS environment is
+  already running.
+- Retry environment startup immediately after repairing site dependencies.
+- Route non-PHP development sites through the correct managed server instead of
+  returning an HTTPS 404 response.
+- Fall back to the PHP built-in server when application control blocks php-cgi.
+
 ## [0.1.11] - 2026-08-03
 
 ### Added

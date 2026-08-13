@@ -70,7 +70,38 @@
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="18">
-                <InfoBar x:Name="HealthBanner" IsOpen="True" IsClosable="False" />
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <InfoBar x:Name="HealthBanner" IsOpen="True" IsClosable="False" />
+                    <Button
+                        x:Uid="DashboardRepairAllButton"
+                        x:Name="RepairAllButton"
+                        Grid.Column="1"
+                        Click="RepairAll_Click"
+                        VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <SymbolIcon Symbol="Repair" />
+                            <TextBlock x:Uid="DashboardRepairAllButtonText" Text="Repair all" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                    <Button x:Name="RetryFailedButton" Click="RetryFailed_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <SymbolIcon Symbol="Sync" />
+                            <TextBlock x:Uid="DashboardRetryFailedButtonText" Text="Retry failed only" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="ExportDiagnosticsButton" Click="ExportDiagnostics_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <SymbolIcon Symbol="Download" />
+                            <TextBlock x:Uid="DashboardExportDiagnosticsButtonText" Text="Export diagnostics" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
                 <StackPanel x:Name="WarningList" Spacing="8" Visibility="Collapsed" />
 
                 <Grid x:Name="SummaryCardsGrid" ColumnSpacing="12">

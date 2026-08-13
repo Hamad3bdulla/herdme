@@ -12,7 +12,13 @@ using Microsoft.Win32.SafeHandles;
 
 namespace HerdMe.Windows.Services;
 
-public sealed record LocalSiteDefinition(string Domain, string Path, int? PhpFastCgiPort = null);
+public sealed record LocalSiteDefinition(
+    string Domain,
+    string Path,
+    int? PhpFastCgiPort = null,
+    bool PhpUsesHttpFallback = false,
+    int? DevelopmentServerPort = null
+);
 
 public sealed record SiteRequestMetric(
     DateTimeOffset Timestamp,
@@ -39,7 +45,13 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     private const int MaximumPersistentRequests = 100;
     private static readonly TimeSpan PersistentIdleTimeout = TimeSpan.FromSeconds(5);
     private readonly FastCgiClient fastCgiClient = new();
+    private readonly HttpClient phpHttpClient = new(new SocketsHttpHandler
+    {
+        AllowAutoRedirect = false,
+        UseCookies = false
+    });
     private readonly ConcurrentDictionary<int, Task> sessions = new();
+    private readonly SemaphoreSlim sessionGate = new(128, 128);
     private readonly ConcurrentDictionary<string, SitePerformanceBucket> performance =
         new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? cancellation;
@@ -78,7 +90,12 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         if (IsRunning && Port is not null) return Task.FromResult(Port.Value);
         var normalized = sites.ToDictionary(
             site => NormalizeHost(site.Domain),
-            site => new SiteRoute(DocumentRoot(site.Path), site.PhpFastCgiPort ?? phpFastCgiPort),
+            site => new SiteRoute(
+                DocumentRoot(site.Path),
+                site.PhpFastCgiPort ?? phpFastCgiPort,
+                site.PhpUsesHttpFallback,
+                site.DevelopmentServerPort
+            ),
             StringComparer.OrdinalIgnoreCase
         );
         if (normalized.Count == 0) throw new InvalidOperationException("No local sites were provided.");
@@ -131,8 +148,9 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         while (!cancellationToken.IsCancellationRequested)
         {
             var client = await activeListener.AcceptTcpClientAsync(cancellationToken);
+            await sessionGate.WaitAsync(cancellationToken);
             var identifier = Interlocked.Increment(ref sessionIdentifier);
-            var task = HandleClientAsync(client, cancellationToken);
+            var task = RunClientAsync(client, cancellationToken);
             sessions[identifier] = task;
             _ = task.ContinueWith(
                 completedTask =>
@@ -145,6 +163,12 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 TaskScheduler.Default
             );
         }
+    }
+
+    private async Task RunClientAsync(TcpClient client, CancellationToken cancellationToken)
+    {
+        try { await HandleClientAsync(client, cancellationToken); }
+        finally { sessionGate.Release(); }
     }
 
     private async Task HandleClientAsync(TcpClient client, CancellationToken cancellationToken)
@@ -179,7 +203,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                     using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(
                         cancellationToken
                     );
-                    if (requestCount > 0) requestCancellation.CancelAfter(PersistentIdleTimeout);
+                    requestCancellation.CancelAfter(PersistentIdleTimeout);
                     try
                     {
                         request = await reader.ReadAsync(
@@ -209,6 +233,26 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                     bucket.Begin();
                     try
                     {
+                        if (route.DevelopmentServerPort is { } developmentPort
+                            && request.Header("Upgrade")?.Equals(
+                                "websocket",
+                                StringComparison.OrdinalIgnoreCase
+                            ) == true)
+                        {
+                            await ProxyWebSocketAsync(
+                                stream,
+                                request,
+                                developmentPort,
+                                cancellationToken
+                            );
+                            bucket.Complete(
+                                request.Method,
+                                request.Target,
+                                101,
+                                Stopwatch.GetElapsedTime(startedAt)
+                            );
+                            return;
+                        }
                         var response = await WriteResponseAsync(
                             stream,
                             request,
@@ -284,6 +328,16 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     )
     {
         var target = RequestTarget.Parse(request.Target);
+        if (route.DevelopmentServerPort is { } developmentPort)
+        {
+            return await WriteHttpProxyAsync(
+                destination,
+                request,
+                developmentPort,
+                keepAlive,
+                cancellationToken
+            );
+        }
         var resource = Resolve(route.DocumentRoot, target.Path);
         if (resource.StaticFile is not null)
         {
@@ -297,6 +351,17 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 route.DocumentRoot,
                 resource.StaticFile,
                 request,
+                keepAlive,
+                cancellationToken
+            );
+        }
+
+        if (route.PhpUsesHttpFallback)
+        {
+            return await WritePhpHttpFallbackAsync(
+                destination,
+                request,
+                route,
                 keepAlive,
                 cancellationToken
             );
@@ -331,6 +396,167 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         {
             throw new HttpResponseStartedException(error);
         }
+    }
+
+    private async Task<LocalResponseResult> WritePhpHttpFallbackAsync(
+        Stream destination,
+        HttpRequestData request,
+        SiteRoute route,
+        bool keepAlive,
+        CancellationToken cancellationToken
+    )
+    {
+        using var upstream = new HttpRequestMessage(
+            new HttpMethod(request.Method),
+            $"http://127.0.0.1:{route.PhpFastCgiPort}{request.Target}"
+        );
+        var host = request.Header("Host")?.Split(':', 2)[0] ?? "localhost";
+        upstream.Headers.Host = host;
+        upstream.Headers.TryAddWithoutValidation(
+            "X-Forwarded-Proto",
+            certificate is null ? "http" : "https"
+        );
+        upstream.Headers.TryAddWithoutValidation(
+            "X-HerdMe-Original-Scheme",
+            certificate is null ? "http" : "https"
+        );
+        upstream.Headers.TryAddWithoutValidation("X-Forwarded-For", "127.0.0.1");
+        if (request.Body.Length > 0)
+        {
+            upstream.Content = new ByteArrayContent(request.Body);
+        }
+        foreach (var header in request.Headers)
+        {
+            if (header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase)
+                || header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase)
+                || header.Key.Equals("Connection", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!(upstream.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value) ?? false))
+            {
+                upstream.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+        }
+        using var response = await phpHttpClient.SendAsync(
+            upstream,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken
+        );
+        var body = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        if (body.Length > MaximumBodySize)
+        {
+            throw new InvalidDataException("PHP HTTP fallback response exceeded the limit.");
+        }
+        var headers = response.Headers.Concat(response.Content.Headers)
+            .Where(header => !header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase)
+                && !header.Key.Equals("Connection", StringComparison.OrdinalIgnoreCase)
+                && !header.Key.Equals("Keep-Alive", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(header => header.Value.Select(value => (header.Key, value)))
+            .ToList();
+        headers.RemoveAll(header => header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase));
+        headers.Add(("Content-Length", body.Length.ToString(CultureInfo.InvariantCulture)));
+        headers.Add(("Connection", keepAlive ? "keep-alive" : "close"));
+        var reason = response.ReasonPhrase ?? string.Empty;
+        await destination.WriteAsync(
+            MakeResponseHead($"{(int)response.StatusCode} {reason}".TrimEnd(), headers),
+            cancellationToken
+        );
+        if (request.Method != "HEAD" && body.Length > 0)
+        {
+            await destination.WriteAsync(body, cancellationToken);
+        }
+        return new LocalResponseResult(keepAlive, (int)response.StatusCode);
+    }
+
+    private async Task<LocalResponseResult> WriteHttpProxyAsync(
+        Stream destination,
+        HttpRequestData request,
+        int upstreamPort,
+        bool keepAlive,
+        CancellationToken cancellationToken
+    )
+    {
+        using var upstream = new HttpRequestMessage(
+            new HttpMethod(request.Method),
+            $"http://127.0.0.1:{upstreamPort}{request.Target}"
+        );
+        upstream.Headers.Host = $"127.0.0.1:{upstreamPort}";
+        upstream.Headers.TryAddWithoutValidation(
+            "X-Forwarded-Host",
+            request.Header("Host")?.Split(':', 2)[0] ?? "localhost"
+        );
+        upstream.Headers.TryAddWithoutValidation(
+            "X-Forwarded-Proto",
+            certificate is null ? "http" : "https"
+        );
+        if (request.Body.Length > 0) upstream.Content = new ByteArrayContent(request.Body);
+        foreach (var header in request.Headers)
+        {
+            if (header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase)
+                || header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase)
+                || header.Key.Equals("Connection", StringComparison.OrdinalIgnoreCase)
+                || header.Key.Equals("Upgrade", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!(upstream.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value) ?? false))
+                upstream.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        }
+        using var response = await phpHttpClient.SendAsync(
+            upstream,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken
+        );
+        var body = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        if (body.Length > MaximumBodySize)
+            throw new InvalidDataException("Development server response exceeded the limit.");
+        var headers = response.Headers.Concat(response.Content.Headers)
+            .Where(header => !header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase)
+                && !header.Key.Equals("Connection", StringComparison.OrdinalIgnoreCase)
+                && !header.Key.Equals("Keep-Alive", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(header => header.Value.Select(value => (header.Key, value)))
+            .ToList();
+        headers.RemoveAll(header => header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase));
+        headers.Add(("Content-Length", body.Length.ToString(CultureInfo.InvariantCulture)));
+        headers.Add(("Connection", keepAlive ? "keep-alive" : "close"));
+        await destination.WriteAsync(
+            MakeResponseHead(
+                $"{(int)response.StatusCode} {response.ReasonPhrase ?? string.Empty}".TrimEnd(),
+                headers
+            ),
+            cancellationToken
+        );
+        if (request.Method != "HEAD" && body.Length > 0)
+            await destination.WriteAsync(body, cancellationToken);
+        return new LocalResponseResult(keepAlive, (int)response.StatusCode);
+    }
+
+    private static async Task ProxyWebSocketAsync(
+        Stream browserStream,
+        HttpRequestData request,
+        int upstreamPort,
+        CancellationToken cancellationToken
+    )
+    {
+        using var upstreamClient = new TcpClient { NoDelay = true };
+        await upstreamClient.ConnectAsync(IPAddress.Loopback, upstreamPort, cancellationToken);
+        await using var upstream = upstreamClient.GetStream();
+        var head = new StringBuilder()
+            .Append(request.Method).Append(' ')
+            .Append(request.Target).Append(' ')
+            .Append(request.Protocol).Append("\r\n")
+            .Append("Host: 127.0.0.1:").Append(upstreamPort).Append("\r\n");
+        foreach (var header in request.Headers)
+        {
+            if (header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase)) continue;
+            head.Append(header.Key).Append(": ").Append(header.Value).Append("\r\n");
+        }
+        head.Append("\r\n");
+        await upstream.WriteAsync(Encoding.ASCII.GetBytes(head.ToString()), cancellationToken);
+        using var tunnelCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken
+        );
+        var browserToUpstream = browserStream.CopyToAsync(upstream, tunnelCancellation.Token);
+        var upstreamToBrowser = upstream.CopyToAsync(browserStream, tunnelCancellation.Token);
+        await Task.WhenAny(browserToUpstream, upstreamToBrowser);
+        tunnelCancellation.Cancel();
+        try { await Task.WhenAll(browserToUpstream, upstreamToBrowser); }
+        catch (Exception error) when (error is IOException or OperationCanceledException) { }
     }
 
     private static async Task<LocalResponseResult> WriteStaticFileAsync(
@@ -1355,7 +1581,12 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         string? PathInfo
     );
 
-    private sealed record SiteRoute(string DocumentRoot, int PhpFastCgiPort);
+    private sealed record SiteRoute(
+        string DocumentRoot,
+        int PhpFastCgiPort,
+        bool PhpUsesHttpFallback,
+        int? DevelopmentServerPort
+    );
 
     private readonly record struct LocalResponseResult(bool KeepAlive, int StatusCode);
 

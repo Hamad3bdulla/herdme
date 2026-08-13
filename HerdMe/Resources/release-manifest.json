@@ -1,6 +1,16 @@
 {
   "releases": [
     {
+      "version": "0.1.12",
+      "build": 1,
+      "channel": "stable",
+      "notes": "Adds dashboard-wide automatic repair, resilient update checks, automatic Xdebug installation, a tray Exit command, and managed Vite, Next.js, and FastAPI development servers behind local HTTPS. Empty non-project folders are excluded and repaired sites restart immediately without returning stale HTTPS 404 responses.",
+      "downloadURLs": {
+        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.12/HerdMe-0.1.12-macOS.zip",
+        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.12/HerdMe-0.1.12-win-x64-setup.exe"
+      }
+    },
+    {
       "version": "0.1.11",
       "build": 1,
       "channel": "stable",

@@ -54,6 +54,23 @@ internal static partial class ContractChecks
                 "managed downloads retry 429 and 5xx responses before succeeding"
             );
         }
+        var downgradeHandler = new SequenceHttpMessageHandler(
+            _ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                RequestMessage = new HttpRequestMessage(HttpMethod.Get, "http://downloads.example.test/runtime"),
+                Content = new StringContent("unsafe")
+            }
+        );
+        using (var secureClient = ManagedDownloadClient.Create(
+            downgradeHandler,
+            maximumAttempts: 1
+        ))
+        {
+            var rejectedDowngrade = false;
+            try { _ = await secureClient.GetStringAsync("https://downloads.example.test/runtime"); }
+            catch (HttpRequestException) { rejectedDowngrade = true; }
+            Check(rejectedDowngrade, "managed downloads reject HTTPS-to-HTTP redirect downgrades");
+        }
 
         var packageBytes = Encoding.UTF8.GetBytes("verified service package");
         var packageChecksum = Convert.ToHexString(SHA256.HashData(packageBytes));

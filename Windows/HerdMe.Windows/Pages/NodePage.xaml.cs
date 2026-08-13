@@ -132,7 +132,10 @@ public sealed partial class NodePage : Page
             );
             if (generation != refreshGeneration) return;
             RenderRows(latestVersions);
-            OperationStatusText.Text = AppLocalization.Get("NodeUpdatesCheckedInBackground");
+            var updateCount = Rows.Count(row => row.IsUpdateAvailable);
+            OperationStatusText.Text = updateCount == 0
+                ? AppLocalization.Get("NodeUpdatesCheckedInBackground")
+                : AppLocalization.Format("NodeUpdatesAvailable", updateCount);
         }
         catch (Exception)
         {
@@ -162,7 +165,7 @@ public sealed partial class NodePage : Page
                     ? AppLocalization.Get("CommonNotInstalled")
                     : installed == active
                         ? AppLocalization.Get("NodeActive")
-                        : installed
+                        : AppLocalization.Get("NodeInstalled")
             });
         }
     }

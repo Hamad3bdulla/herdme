@@ -5,11 +5,11 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="TrayOpenCommand.Label" xml:space="preserve"><value>Open HerdMe</value></data>
-  <data name="TrayQuitCommand.Label" xml:space="preserve"><value>Quit HerdMe</value></data>
+  <data name="TrayQuitCommand.Label" xml:space="preserve"><value>Exit HerdMe</value></data>
   <data name="TrayStartAllCommand.Label" xml:space="preserve"><value>Start all</value></data>
   <data name="TrayStopAllCommand.Label" xml:space="preserve"><value>Stop all</value></data>
   <data name="TrayOpenCommandLabel" xml:space="preserve"><value>Open HerdMe</value></data>
-  <data name="TrayQuitCommandLabel" xml:space="preserve"><value>Quit HerdMe</value></data>
+  <data name="TrayQuitCommandLabel" xml:space="preserve"><value>Exit HerdMe</value></data>
   <data name="TrayStartAllCommandLabel" xml:space="preserve"><value>Start all</value></data>
   <data name="TrayStopAllCommandLabel" xml:space="preserve"><value>Stop all</value></data>
   <data name="NavGeneral.Content" xml:space="preserve"><value>General</value></data>
@@ -110,6 +110,7 @@
   <data name="GeneralUpToDateTitle" xml:space="preserve"><value>HerdMe is up to date</value></data>
   <data name="GeneralNewestRelease" xml:space="preserve"><value>Version {0} is the newest {1} release.</value></data>
   <data name="GeneralUpdateCheckFailed" xml:space="preserve"><value>Update check failed</value></data>
+  <data name="GeneralUpdateCheckTimedOut" xml:space="preserve"><value>The update service did not respond in time. Check your internet connection and try again.</value></data>
   <data name="GeneralUpdateDialogTitle" xml:space="preserve"><value>HerdMe {0} is available</value></data>
   <data name="GeneralLater" xml:space="preserve"><value>Later</value></data>
   <data name="GeneralDownload" xml:space="preserve"><value>Download</value></data>
@@ -129,6 +130,7 @@
   <data name="NodePageDescription.Text" xml:space="preserve"><value>Official Windows runtimes managed by HerdMe</value></data>
   <data name="NodeRefreshTooltip.Text" xml:space="preserve"><value>Refresh Node.js versions</value></data>
   <data name="NodeMajorColumn.Text" xml:space="preserve"><value>Major</value></data>
+  <data name="NodeVersionColumn.Text" xml:space="preserve"><value>Version</value></data>
   <data name="NodeStatusColumn.Text" xml:space="preserve"><value>Status</value></data>
   <data name="NodeInstallTooltip.Text" xml:space="preserve"><value>Install or update</value></data>
   <data name="NodeUseTooltip.Text" xml:space="preserve"><value>Use this version</value></data>
@@ -160,6 +162,7 @@
   <data name="NodeDeleteVersionTitle" xml:space="preserve"><value>Delete Node.js {0}?</value></data>
   <data name="NodeDeleteVersionMessage" xml:space="preserve"><value>The runtime can be downloaded again later.</value></data>
   <data name="NodeActive" xml:space="preserve"><value>Active</value></data>
+  <data name="NodeInstalled" xml:space="preserve"><value>Installed</value></data>
   <data name="ServicesPageTitle.Text" xml:space="preserve"><value>Services</value></data>
   <data name="ServicesPageDescription.Text" xml:space="preserve"><value>Checksum-verified open-source Windows service runtimes</value></data>
   <data name="ServicesRefreshTooltip.Text" xml:space="preserve"><value>Refresh service status</value></data>
@@ -477,6 +480,7 @@
   <data name="AboutCopyVersionTooltip.Text" xml:space="preserve"><value>Copy the HerdMe version and build number</value></data>
   <data name="AboutCopyVersionButtonText.Text" xml:space="preserve"><value>Copy Version</value></data>
   <data name="AboutCheckUpdatesButtonText.Text" xml:space="preserve"><value>Check for Updates</value></data>
+  <data name="AboutExitButtonText.Text" xml:space="preserve"><value>Exit HerdMe</value></data>
   <data name="AboutLicenseButton.Content" xml:space="preserve"><value>MIT License</value></data>
   <data name="AboutAcknowledgementsButton.Content" xml:space="preserve"><value>Acknowledgements</value></data>
   <data name="AboutVersionSummary" xml:space="preserve"><value>HerdMe {0} (Build {1})</value></data>
@@ -767,6 +771,21 @@
   <data name="GeneralCompactModeDescription.Text" xml:space="preserve"><value>Use tighter spacing on sites and dashboard pages.</value></data>
   <data name="DashboardRepairAction" xml:space="preserve"><value>Repair</value></data>
   <data name="DashboardRepairTooltip" xml:space="preserve"><value>Repair this health issue</value></data>
+  <data name="DashboardRepairAllButtonText.Text" xml:space="preserve"><value>Repair all</value></data>
+  <data name="DashboardRepairAllButton.AutomationProperties.Name" xml:space="preserve"><value>Repair all health issues</value></data>
+  <data name="DashboardRepairAllTitle" xml:space="preserve"><value>Repair all results</value></data>
+  <data name="DashboardRepairAllSummary" xml:space="preserve"><value>Completed {0} automatic repair(s). {1} item(s) still need attention.</value></data>
+  <data name="DashboardRepairAllSkipped" xml:space="preserve"><value>Items requiring manual action:</value></data>
+  <data name="DashboardMissingSitesTitle" xml:space="preserve"><value>Remove missing linked sites?</value></data>
+  <data name="DashboardMissingSitesMessage" xml:space="preserve"><value>These linked site folders no longer exist:&#xA;{0}</value></data>
+  <data name="DashboardRemoveMissingSites" xml:space="preserve"><value>Remove from HerdMe</value></data>
+  <data name="DashboardKeepMissingSites" xml:space="preserve"><value>Keep</value></data>
+  <data name="DashboardMissingSitesKept" xml:space="preserve"><value>{0} missing linked site(s) were kept.</value></data>
+  <data name="DashboardRetryFailedButtonText.Text" xml:space="preserve"><value>Retry failed only</value></data>
+  <data name="DashboardExportDiagnosticsButtonText.Text" xml:space="preserve"><value>Export diagnostics</value></data>
+  <data name="DashboardDiagnosticsExportedTitle" xml:space="preserve"><value>Diagnostics exported</value></data>
+  <data name="DashboardNoFailedRepairs" xml:space="preserve"><value>No failed site repairs are available to retry.</value></data>
+  <data name="CommonClose" xml:space="preserve"><value>Close</value></data>
   <data name="SitesActionOpenBrowserTooltip.Text" xml:space="preserve"><value>Open in browser</value></data>
   <data name="SitesActionOpenFolderTooltip.Text" xml:space="preserve"><value>Open project folder</value></data>
   <data name="SitesActionTerminalTooltip.Text" xml:space="preserve"><value>Open terminal</value></data>
@@ -788,7 +807,8 @@
   <data name="PhpUpdatesCheckedInBackground" xml:space="preserve"><value>PHP and tools are current · Checked in the background</value></data>
   <data name="PhpBackgroundCheckUnavailable" xml:space="preserve"><value>Update service unavailable · Installed versions remain ready</value></data>
   <data name="NodeCheckingUpdatesInBackground" xml:space="preserve"><value>Checking for updates in the background…</value></data>
-  <data name="NodeUpdatesCheckedInBackground" xml:space="preserve"><value>Installed versions are ready · Updates checked in the background</value></data>
+  <data name="NodeUpdatesCheckedInBackground" xml:space="preserve"><value>Up to date</value></data>
+  <data name="NodeUpdatesAvailable" xml:space="preserve"><value>{0} update(s) available</value></data>
   <data name="NodeBackgroundCheckUnavailable" xml:space="preserve"><value>Update service unavailable · Installed versions remain ready</value></data>
   <data name="SitesDatabaseImportTargetTitle" xml:space="preserve"><value>Choose import target</value></data>
   <data name="SitesDatabaseImportTargetDescription" xml:space="preserve"><value>Choose the running service and target database. HerdMe will detect whether it already exists.</value></data>

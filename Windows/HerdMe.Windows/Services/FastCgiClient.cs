@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Collections.Concurrent;
 
 namespace HerdMe.Windows.Services;
 
@@ -10,6 +11,8 @@ public sealed record FastCgiStreamingResult(byte[] StandardError);
 
 public sealed class FastCgiClient
 {
+    private const int MaximumConcurrentRequestsPerPort = 32;
+    private static readonly ConcurrentDictionary<int, SemaphoreSlim> PortGates = new();
     private const byte Version = 1;
     private const byte BeginRequest = 1;
     private const byte EndRequest = 3;
@@ -57,6 +60,25 @@ public sealed class FastCgiClient
     )
     {
         ArgumentNullException.ThrowIfNull(onStandardOutput);
+        var gate = PortGates.GetOrAdd(port, _ => new SemaphoreSlim(
+            MaximumConcurrentRequestsPerPort,
+            MaximumConcurrentRequestsPerPort
+        ));
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            return await PerformStreamingCoreAsync(port, parameters, body, onStandardOutput, cancellationToken);
+        }
+        finally { gate.Release(); }
+    }
+
+    private static async Task<FastCgiStreamingResult> PerformStreamingCoreAsync(
+        int port,
+        IReadOnlyDictionary<string, string> parameters,
+        ReadOnlyMemory<byte> body,
+        Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> onStandardOutput,
+        CancellationToken cancellationToken)
+    {
         using var client = new TcpClient();
         await client.ConnectAsync(IPAddress.Loopback, port, cancellationToken);
         await using var stream = client.GetStream();

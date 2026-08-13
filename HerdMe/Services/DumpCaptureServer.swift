@@ -2,6 +2,7 @@ import Foundation
 import Network
 
 final class DumpCaptureServer: @unchecked Sendable {
+    private static let maximumSessions = 32
     private let queue = DispatchQueue(label: "app.herdme.dumps", qos: .userInitiated)
     private let listenerLock = NSLock()
     private let sessionsLock = NSLock()
@@ -34,6 +35,11 @@ final class DumpCaptureServer: @unchecked Sendable {
                 onStop: { [weak self] in self?.removeSession(identifier) }
             )
             self.sessionsLock.lock()
+            guard self.sessions.count < Self.maximumSessions else {
+                self.sessionsLock.unlock()
+                connection.cancel()
+                return
+            }
             self.sessions[identifier] = session
             self.sessionsLock.unlock()
             session.start()

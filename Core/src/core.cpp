@@ -101,6 +101,17 @@ std::string framework_at(const std::filesystem::path &root) {
     return "Site";
 }
 
+bool looks_like_project(const std::filesystem::path &root) {
+    static const std::array markers = {
+        "artisan", "wp-config.php", "package.json", "composer.json", "pyproject.toml",
+        "requirements.txt", "index.php", "index.html", "public", "src", "frontend", "backend"
+    };
+    return std::any_of(markers.begin(), markers.end(), [&](const char *marker) {
+        std::error_code error;
+        return std::filesystem::exists(root / marker, error) && !error;
+    });
+}
+
 std::vector<std::filesystem::path> split_path() {
     const auto raw_path = environment_value("PATH");
     if (!raw_path) return {};
@@ -318,6 +329,7 @@ std::vector<Site> scan_sites(const std::vector<std::filesystem::path> &roots,
         const auto resolved = std::filesystem::weakly_canonical(path, error);
         if (error) return;
         if (belongs_to_private_application(resolved)) return;
+        if (!looks_like_project(resolved)) return;
         const auto key = path_string(resolved);
         if (!seen.insert(key).second) return;
         const auto name = resolved.filename().string();

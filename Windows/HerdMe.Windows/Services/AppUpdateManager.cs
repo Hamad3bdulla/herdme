@@ -38,6 +38,7 @@ public sealed class AppUpdateManager
 {
     private const string SignatureAlgorithm = "ECDSA_P256_SHA256";
     private const int MaximumFeedSize = 4 * 1024 * 1024;
+    private static readonly TimeSpan DefaultCheckTimeout = TimeSpan.FromSeconds(30);
     private static readonly HttpClient DefaultHttpClient = new()
     {
         Timeout = TimeSpan.FromSeconds(60)
@@ -53,6 +54,7 @@ public sealed class AppUpdateManager
     private readonly byte[]? verificationKey;
     private readonly string? fallbackFeedLocation;
     private readonly HttpClient httpClient;
+    private readonly TimeSpan checkTimeout;
     private readonly object checkSync = new();
     private Task<AppUpdateCheck>? activeCheck;
     private string? activeChannel;
@@ -63,7 +65,8 @@ public sealed class AppUpdateManager
         int currentBuild,
         string? publicKey = null,
         string? fallbackFeedLocation = null,
-        HttpClient? httpClient = null
+        HttpClient? httpClient = null,
+        TimeSpan? checkTimeout = null
     )
     {
         this.feedLocation = feedLocation;
@@ -71,6 +74,7 @@ public sealed class AppUpdateManager
         this.currentBuild = currentBuild;
         this.fallbackFeedLocation = fallbackFeedLocation;
         this.httpClient = httpClient ?? DefaultHttpClient;
+        this.checkTimeout = checkTimeout ?? DefaultCheckTimeout;
         verificationKey = DecodePublicKey(publicKey);
     }
 
@@ -154,7 +158,8 @@ public sealed class AppUpdateManager
 
     private async Task<AppUpdateCheck> CheckCoreAsync(string normalizedChannel)
     {
-        var feed = await ReadFeedAsync(CancellationToken.None);
+        using var timeout = new CancellationTokenSource(checkTimeout);
+        var feed = await ReadFeedAsync(timeout.Token);
         var manifest = DecodeManifest(feed.Data, feed.RequireSignature);
         var acceptedChannels = normalizedChannel == "beta"
             ? new HashSet<string>(["stable", "beta"], StringComparer.OrdinalIgnoreCase)

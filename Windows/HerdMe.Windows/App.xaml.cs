@@ -1,4 +1,5 @@
 using H.NotifyIcon;
+using H.NotifyIcon.Core;
 using HerdMe.Windows.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -19,6 +20,7 @@ public partial class App : Application
     private int automaticUpdateCheckStarted;
     private int automaticUpdatePromptStarted;
     private int reportingUnhandledError;
+    private int shutdownStarted;
     private bool suppressAutomaticUpdateCheck;
     private Task<AutomaticUpdateCheck>? automaticUpdateCheck;
 
@@ -274,6 +276,7 @@ public partial class App : Application
             Visibility = Visibility.Visible,
             ToolTipText = "HerdMe",
             ContextMenuMode = ContextMenuMode.PopupMenu,
+            MenuActivation = PopupActivationMode.RightClick,
             LeftClickCommand = openCommand,
             NoLeftClickDelay = true,
             IconSource = new BitmapImage(new Uri("ms-appx:///Assets/HerdMe.ico")),
@@ -291,17 +294,38 @@ public partial class App : Application
 
     private async void QuitCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)
     {
+        await RequestExitAsync();
+    }
+
+    internal async Task RequestExitAsync()
+    {
+        if (Interlocked.Exchange(ref shutdownStarted, 1) != 0) return;
         exitRequested = true;
         singleInstance.WakeListener();
         trayIcon?.Dispose();
         trayIcon = null;
-        await services.Dumps.StopAsync();
-        await services.Mail.StopAsync();
-        await services.SiteProcesses.StopAllAsync();
-        await services.Environment.StopAsync();
-        await services.Services.StopAllAsync();
+        await StopAndLogAsync("dump capture", services.Dumps.StopAsync);
+        await StopAndLogAsync("mail capture", services.Mail.StopAsync);
+        await StopAndLogAsync("site processes", services.SiteProcesses.StopAllAsync);
+        await StopAndLogAsync("sites environment", services.Environment.StopAsync);
+        await StopAndLogAsync("managed services", services.Services.StopAllAsync);
         MainWindow.Close();
         singleInstance.Dispose();
+    }
+
+    private static async Task StopAndLogAsync(string component, Func<Task> operation)
+    {
+        try
+        {
+            await operation();
+        }
+        catch (Exception error)
+        {
+            await ApplicationDiagnostics.WriteBackgroundServiceStartupFailureAsync(
+                $"shutdown: {component}",
+                error
+            );
+        }
     }
 
     private async void StartCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)

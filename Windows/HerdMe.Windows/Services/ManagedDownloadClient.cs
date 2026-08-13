@@ -69,6 +69,7 @@ internal sealed class RetryingHttpMessageHandler : DelegatingHandler
             try
             {
                 var response = await base.SendAsync(attemptRequest, cancellationToken);
+                EnsureSecureRedirect(request, response);
                 if (attempt == maximumAttempts || !ShouldRetry(response.StatusCode))
                 {
                     response.RequestMessage = request;
@@ -94,6 +95,19 @@ internal sealed class RetryingHttpMessageHandler : DelegatingHandler
         }
 
         throw new InvalidOperationException("The managed download retry loop ended unexpectedly.");
+    }
+
+    private static void EnsureSecureRedirect(HttpRequestMessage original, HttpResponseMessage response)
+    {
+        var source = original.RequestUri;
+        var final = response.RequestMessage?.RequestUri;
+        if (source?.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) == true
+            && final is not null
+            && !final.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            response.Dispose();
+            throw new HttpRequestException("Managed downloads cannot downgrade from HTTPS to HTTP.");
+        }
     }
 
     private static bool IsRetryable(HttpRequestMessage request)

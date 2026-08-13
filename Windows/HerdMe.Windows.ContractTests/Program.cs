@@ -100,6 +100,12 @@ var supportRoot = Path.Combine(
 );
 try
 {
+    var journal = new OperationJournal(supportRoot);
+    journal.Append("contract", "started", "bounded-backend");
+    Check(
+        journal.ReadRecent().FirstOrDefault()?.Detail == "bounded-backend",
+        "operation journal durably records backend transitions"
+    );
     await VerifyDownloadAndStorageContractsAsync(supportRoot);
 
     VerifySiteContracts(supportRoot);

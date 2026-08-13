@@ -13,10 +13,14 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
     private readonly PhpRuntimeInstaller runtimeInstaller;
     private readonly PhpRuntimePolicy runtimePolicy;
     private readonly Dictionary<string, PhpFastCgiProcess> phpProcesses = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, SiteDevelopmentServer> developmentServers =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly LocalHttpSiteServer httpServer = new();
     private readonly LocalHttpSiteServer httpsServer = new();
     private readonly WindowsCertificateManager certificateManager;
     private readonly WindowsHostsManager hostsManager;
+    private readonly XdebugManager xdebugManager;
+    private readonly NodeRuntimeInstaller nodeInstaller;
     private readonly SemaphoreSlim operationLock = new(1, 1);
     private readonly object healthMonitorLock = new();
     private volatile IReadOnlyList<PhpFastCgiProcess> phpProcessSnapshot = [];
@@ -31,7 +35,9 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         PhpRuntimeInstaller? runtimeInstaller = null,
         PhpRuntimePolicy? runtimePolicy = null,
         WindowsCertificateManager? certificateManager = null,
-        WindowsHostsManager? hostsManager = null
+        WindowsHostsManager? hostsManager = null,
+        XdebugManager? xdebugManager = null,
+        NodeRuntimeInstaller? nodeInstaller = null
     )
     {
         this.coreClient = coreClient ?? new CoreClient();
@@ -39,6 +45,8 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         this.runtimePolicy = runtimePolicy ?? new PhpRuntimePolicy(this.coreClient);
         this.certificateManager = certificateManager ?? new WindowsCertificateManager();
         this.hostsManager = hostsManager ?? new WindowsHostsManager();
+        this.xdebugManager = xdebugManager ?? new XdebugManager();
+        this.nodeInstaller = nodeInstaller ?? new NodeRuntimeInstaller();
     }
 
     public bool IsRunning => phpProcessSnapshot.Count > 0
@@ -139,7 +147,8 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
             var configurationKey = ConfigurationKey(siteList, settings.PhpCycle);
             if (IsRunning
                 && HttpPort is not null
-                && activeConfigurationKey == configurationKey)
+                && activeConfigurationKey == configurationKey
+                && DevelopmentSitesHealthy(siteList))
             {
                 return HttpPort.Value;
             }
@@ -183,7 +192,8 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
             EnsureHealthMonitorStarted();
             var settings = runtimePolicy.Load();
             var configurationKey = ConfigurationKey(siteList, settings.PhpCycle);
-            if (IsRunning && activeConfigurationKey == configurationKey)
+            if (IsRunning && activeConfigurationKey == configurationKey
+                && DevelopmentSitesHealthy(siteList))
             {
                 return;
             }
@@ -232,6 +242,8 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         await httpServer.StopAsync();
         foreach (var process in phpProcesses.Values) await process.StopAsync();
         phpProcesses.Clear();
+        foreach (var server in developmentServers.Values) await server.StopAsync();
+        developmentServers.Clear();
     }
 
     private async Task<int> StartCoreAsync(
@@ -247,14 +259,52 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
             foreach (var (cycle, launch) in launches.OrderBy(entry => entry.Key, StringComparer.Ordinal))
             {
                 var process = new PhpFastCgiProcess();
+                var cycleSites = siteList
+                    .Where(site => (site.PhpVersion ?? settings.PhpCycle) == cycle)
+                    .ToDictionary(
+                        site => site.Domain.Trim().TrimEnd('.').ToLowerInvariant(),
+                        site => site.Path,
+                        StringComparer.OrdinalIgnoreCase
+                    );
                 ports[cycle] = await process.StartAsync(
                     launch.PhpCgiExecutable,
                     launch.Contract,
+                    cycleSites,
                     cancellationToken
                 );
                 phpProcesses[cycle] = process;
             }
             phpProcessSnapshot = phpProcesses.Values.ToArray();
+            var developmentPorts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var site in siteList.Where(SiteDevelopmentServer.IsDevelopmentSite))
+            {
+                var server = new SiteDevelopmentServer();
+                try
+                {
+                    developmentPorts[site.Path] = await server.StartAsync(
+                        site,
+                        nodeInstaller,
+                        cancellationToken
+                    );
+                    developmentServers[site.Path] = server;
+                }
+                catch (Exception error) when (error is not OperationCanceledException)
+                {
+                    await server.DisposeAsync();
+                    await DiagnosticLog.WriteFailureAsync(
+                        "development-server",
+                        "automatic-start",
+                        $"The development server for {site.Name} could not start automatically.",
+                        error.ToString(),
+                        deduplicationScope: site.Path,
+                        context: new Dictionary<string, string?>
+                        {
+                            ["site"] = site.Name,
+                            ["path"] = site.Path
+                        }
+                    );
+                }
+            }
             await hostsManager.EnsureMappingsAsync(
                 siteList.Select(site => site.Domain),
                 cancellationToken
@@ -263,7 +313,10 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
                 .Select(site => new LocalSiteDefinition(
                     site.Domain,
                     site.Path,
-                    ports[site.PhpVersion ?? settings.PhpCycle]
+                    ports[site.PhpVersion ?? settings.PhpCycle],
+                    phpProcesses[site.PhpVersion ?? settings.PhpCycle].UsesHttpFallback,
+                    developmentPorts.GetValueOrDefault(site.Path) is var developmentPort
+                        && developmentPort > 0 ? developmentPort : null
                 ))
                 .ToList();
             var httpPort = await httpServer.StartAsync(
@@ -316,6 +369,25 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         {
             await runtimeInstaller.EnsureManagedConfigurationAsync(cycle, cancellationToken);
             var php = runtimeInstaller.PhpExecutable(cycle);
+            if (settings.Debugger.Enabled
+                && await xdebugManager.InstalledAsync(php, cycle, cancellationToken) is null)
+            {
+                try
+                {
+                    await xdebugManager.InstallAsync(php, cancellationToken);
+                }
+                catch (Exception error) when (error is HttpRequestException or IOException
+                    or InvalidDataException or InvalidOperationException)
+                {
+                    await DiagnosticLog.WriteFailureAsync(
+                        "xdebug",
+                        "automatic-install",
+                        $"Xdebug for PHP {cycle} could not be installed automatically. Sites will start without the debugger.",
+                        error.ToString(),
+                        context: new Dictionary<string, string?> { ["phpCycle"] = cycle }
+                    );
+                }
+            }
             var contract = await runtimePolicy.PrepareLaunchAsync(php, cycle, cancellationToken);
             launches[cycle] = new PreparedPhpLaunch(
                 runtimeInstaller.PhpCgiExecutable(cycle),
@@ -334,6 +406,16 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
             healthMonitorCancellation = new CancellationTokenSource();
             healthMonitorTask = MonitorHealthAsync(healthMonitorCancellation.Token);
         }
+    }
+
+    private bool DevelopmentSitesHealthy(IEnumerable<SiteRecord> sites)
+    {
+        var expected = sites.Where(SiteDevelopmentServer.IsDevelopmentSite)
+            .Select(site => Path.GetFullPath(site.Path))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return expected.Count == developmentServers.Count
+            && expected.All(path => developmentServers.TryGetValue(path, out var server)
+                && server.IsRunning);
     }
 
     private async Task CancelHealthMonitorAsync()

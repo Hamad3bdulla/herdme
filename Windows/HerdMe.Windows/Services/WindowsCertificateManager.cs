@@ -114,6 +114,21 @@ public sealed class WindowsCertificateManager
         AddAuthorityToTrustStore(authority);
     }
 
+    public DateTimeOffset? ServerCertificateExpiresAt()
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        try
+        {
+            using var certificate = LoadCachedServerCertificate();
+            return new DateTimeOffset(certificate.NotAfter.ToUniversalTime(), TimeSpan.Zero);
+        }
+        catch (Exception error) when (error is IOException or CryptographicException
+            or InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
     private X509Certificate2 LoadOrCreateAuthority()
     {
         var certificatePath = Path.Combine(certificateDirectory, "authority.pfx");

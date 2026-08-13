@@ -19,8 +19,13 @@ public sealed partial class DashboardPage : Page
     private readonly PhpRuntimeInstaller phpInstaller;
     private readonly PhpRuntimePolicy runtimePolicy;
     private readonly ComposerToolManager composerTools;
+    private readonly NodeRuntimeInstaller nodeInstaller;
+    private readonly GitRuntimeInstaller gitInstaller;
+    private readonly OperationJournal repairJournal;
     private CancellationTokenSource? refreshCancellation;
     private bool? usesCompactLayout;
+    private readonly HashSet<string> failedSiteNames = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<string> lastHealthWarnings = [];
 
     public DashboardPage(
         CoreClient coreClient,
@@ -33,7 +38,9 @@ public sealed partial class DashboardPage : Page
         WindowsCertificateManager certificateManager,
         PhpRuntimeInstaller phpInstaller,
         PhpRuntimePolicy runtimePolicy,
-        ComposerToolManager composerTools
+        ComposerToolManager composerTools,
+        NodeRuntimeInstaller nodeInstaller,
+        GitRuntimeInstaller gitInstaller
     )
     {
         this.coreClient = coreClient;
@@ -47,6 +54,9 @@ public sealed partial class DashboardPage : Page
         this.phpInstaller = phpInstaller;
         this.runtimePolicy = runtimePolicy;
         this.composerTools = composerTools;
+        this.nodeInstaller = nodeInstaller;
+        this.gitInstaller = gitInstaller;
+        repairJournal = new OperationJournal(Path.Combine(settingsStore.SupportRoot, "Repair"));
         InitializeComponent();
     }
 
@@ -212,6 +222,7 @@ public sealed partial class DashboardPage : Page
                 phpInstaller,
                 composerTools,
                 certificateManager,
+                site.NodeVersion,
                 cancellation.Token
             ));
             var siteHealth = (await Task.WhenAll(healthTasks))
@@ -219,6 +230,40 @@ public sealed partial class DashboardPage : Page
                     .Where(check => !check.Healthy)
                     .Select(check => $"{sites[index].Name}: {check.Name} - {check.Detail}"))
                 .ToArray();
+            if (environment.IsRunning)
+            {
+                var endpointResults = await Task.WhenAll(sites.Select(site =>
+                    RuntimeHealthInspector.InspectSiteAsync(
+                        site.Domain,
+                        environment.HttpsPort is not null,
+                        cancellation.Token
+                    )));
+                siteHealth = siteHealth.Concat(endpointResults
+                    .Select((result, index) => (result, index))
+                    .Where(item => !item.result.Healthy)
+                    .Select(item => $"{sites[item.index].Name}: {item.result.Name} - {item.result.Detail}"))
+                    .ToArray();
+            }
+            var certificateExpiry = certificateManager.ServerCertificateExpiresAt();
+            if (certificateExpiry is { } expiry && expiry <= DateTimeOffset.UtcNow.AddDays(30))
+            {
+                siteHealth = siteHealth.Append($"HTTPS certificate expires {expiry:d}").ToArray();
+            }
+            var serviceHealth = await Task.WhenAll(instances
+                .Where(instance => serviceManager.State(instance.Id, instance.DefinitionId)
+                    == ManagedServiceState.Running)
+                .Select(instance => RuntimeHealthInspector.InspectTcpServiceAsync(
+                    instance.Name,
+                    instance.Port,
+                    cancellation.Token)));
+            siteHealth = siteHealth.Concat(serviceHealth
+                .Where(result => !result.Healthy)
+                .Select(result => $"{result.Name}: Service health - {result.Detail}"))
+                .ToArray();
+            var duplicatePorts = instances.GroupBy(instance => instance.Port)
+                .Where(group => group.Count() > 1)
+                .Select(group => $"Services: Duplicate port {group.Key} - {string.Join(", ", group.Select(instance => instance.Name))}");
+            siteHealth = siteHealth.Concat(duplicatePorts).ToArray();
             var runningSites = environment.IsRunning ? sites.Count : 0;
             var runningServices = instances.Count(instance =>
                 serviceManager.State(instance.Id, instance.DefinitionId) == ManagedServiceState.Running
@@ -370,6 +415,13 @@ public sealed partial class DashboardPage : Page
         {
             WarningList.Children.Add(HealthIssueRow(warning, OpenSites_Click));
         }
+        lastHealthWarnings = warnings.Concat(siteWarnings).ToArray();
+        failedSiteNames.Clear();
+        foreach (var warning in siteWarnings)
+        {
+            var separator = warning.IndexOf(':');
+            if (separator > 0) failedSiteNames.Add(warning[..separator]);
+        }
     }
 
     private UIElement HealthIssueRow(string message, RoutedEventHandler? repair)
@@ -421,6 +473,511 @@ public sealed partial class DashboardPage : Page
             var sites = await coreClient.ScanAsync(settings.Roots, settings.Tld, settings.LinkedSites);
             await environment.StartAsync(sites);
         });
+    }
+
+    private async void RepairAll_Click(object sender, RoutedEventArgs e)
+    {
+        await RepairAllAsync(retryFailedOnly: false);
+    }
+
+    private async void RetryFailed_Click(object sender, RoutedEventArgs e)
+    {
+        await RepairAllAsync(retryFailedOnly: true);
+    }
+
+    private async Task RepairAllAsync(bool retryFailedOnly)
+    {
+        RepairAllButton.IsEnabled = false;
+        RefreshButton.IsEnabled = false;
+        RefreshProgress.IsActive = true;
+        var repaired = 0;
+        var skipped = new List<string>();
+        var warningsBeforeRepair = lastHealthWarnings.ToArray();
+        repairJournal.Append("dashboard-repair", "started", retryFailedOnly ? "retry-failed" : "all");
+        try
+        {
+            var settings = settingsStore.Load();
+            var missingLinkedSites = settings.LinkedSites
+                .Where(path => !Directory.Exists(path))
+                .ToArray();
+            if (missingLinkedSites.Length > 0)
+            {
+                var cleanupDialog = new ContentDialog
+                {
+                    Title = AppLocalization.Get("DashboardMissingSitesTitle"),
+                    Content = new TextBlock
+                    {
+                        Text = AppLocalization.Format(
+                            "DashboardMissingSitesMessage",
+                            string.Join(Environment.NewLine, missingLinkedSites.Select(Path.GetFileName))
+                        ),
+                        TextWrapping = TextWrapping.Wrap
+                    },
+                    PrimaryButtonText = AppLocalization.Get("DashboardRemoveMissingSites"),
+                    CloseButtonText = AppLocalization.Get("DashboardKeepMissingSites"),
+                    DefaultButton = ContentDialogButton.Close,
+                    XamlRoot = XamlRoot
+                };
+                if (await cleanupDialog.ShowAsync() == ContentDialogResult.Primary)
+                {
+                    foreach (var path in missingLinkedSites) settingsStore.RemoveLinkedSite(path);
+                    repaired += missingLinkedSites.Length;
+                    settings = settingsStore.Load();
+                }
+                else
+                {
+                    skipped.Add(AppLocalization.Format(
+                        "DashboardMissingSitesKept",
+                        missingLinkedSites.Length
+                    ));
+                }
+            }
+            var allSites = await coreClient.ScanAsync(settings.Roots, settings.Tld, settings.LinkedSites);
+            IReadOnlyList<SiteRecord> sites = allSites;
+            if (retryFailedOnly && failedSiteNames.Count == 0 && lastHealthWarnings.Count == 0)
+            {
+                skipped.Add(AppLocalization.Get("DashboardNoFailedRepairs"));
+                sites = [];
+            }
+            else if (retryFailedOnly)
+            {
+                sites = sites.Where(site => failedSiteNames.Contains(site.Name)).ToArray();
+            }
+
+            try
+            {
+                await hostsManager.EnsureMappingsAsync(allSites.Select(site => site.Domain));
+                repaired++;
+            }
+            catch (Exception error)
+            {
+                skipped.Add($"Local domains: {error.Message}");
+            }
+
+            try
+            {
+                certificateManager.TrustAuthority();
+                repaired++;
+            }
+            catch (Exception error)
+            {
+                skipped.Add($"HTTPS certificate: {error.Message}");
+            }
+
+            try
+            {
+                await environment.StartAsync(allSites);
+                repaired++;
+            }
+            catch (Exception error)
+            {
+                skipped.Add($"Local environment: {error.Message}");
+            }
+
+            foreach (var instance in serviceManager.LoadInstances())
+            {
+                if (serviceManager.State(instance.Id, instance.DefinitionId) != ManagedServiceState.Stopped)
+                    continue;
+                if (!serviceManager.IsInstalled(instance.DefinitionId))
+                {
+                    skipped.Add($"{instance.Name}: service runtime is not installed");
+                    continue;
+                }
+                var conflict = PortConflictInspector.Inspect(instance.Port);
+                if (conflict.InUse)
+                {
+                    var owner = string.IsNullOrWhiteSpace(conflict.ProcessName)
+                        ? $"process {conflict.ProcessId?.ToString() ?? "unknown"}"
+                        : conflict.ProcessName;
+                    skipped.Add($"{instance.Name}: port {instance.Port} is already in use by {owner}");
+                    continue;
+                }
+                try
+                {
+                    await serviceManager.StartAsync(instance.Id);
+                    repaired++;
+                }
+                catch (Exception error)
+                {
+                    skipped.Add($"{instance.Name}: could not start ({error.Message})");
+                }
+            }
+
+            var phpCycle = runtimePolicy.Load().PhpCycle;
+            foreach (var site in sites)
+            {
+                try
+                {
+                    var path = Path.GetFullPath(site.Path);
+                    if (!Directory.Exists(path))
+                    {
+                        skipped.Add($"{site.Name}: project folder is missing");
+                        continue;
+                    }
+
+                    var environmentFile = ProjectEnvironmentFile.Load(path);
+                    var drive = new DriveInfo(Path.GetPathRoot(path)!);
+                    if (drive.AvailableFreeSpace < 1L * 1_024 * 1_024 * 1_024)
+                    {
+                        skipped.Add($"{site.Name}: less than 1 GB free on {drive.Name}");
+                    }
+                    if (!environmentFile.Exists && environmentFile.LoadedFromExample)
+                    {
+                        ProjectEnvironmentFile.Save(path, environmentFile.Contents, environmentFile.Revision);
+                        repaired++;
+                    }
+                    if (SiteHealthInspector.IsLaravelProject(path) && environmentFile.Exists
+                        && string.IsNullOrWhiteSpace(SiteHealthInspector.EnvironmentValue(environmentFile.Contents, "APP_URL")))
+                    {
+                        var updatedEnvironment = environmentFile.Contents.TrimEnd() + Environment.NewLine
+                            + $"APP_URL=https://{site.Domain}" + Environment.NewLine;
+                        ProjectEnvironmentFile.Save(path, updatedEnvironment, environmentFile.Revision);
+                        repaired++;
+                    }
+
+                    if (Directory.Exists(Path.Combine(path, ".git")))
+                    {
+                        var gitIgnorePath = Path.Combine(path, ".gitignore");
+                        var gitIgnore = File.Exists(gitIgnorePath) ? File.ReadAllText(gitIgnorePath) : string.Empty;
+                        var ignoreEntries = new List<string> { ".env" };
+                        if (File.Exists(Path.Combine(path, "composer.json"))) ignoreEntries.Add("/vendor/");
+                        if (File.Exists(Path.Combine(path, "package.json"))) ignoreEntries.Add("/node_modules/");
+                        if (SiteHealthInspector.IsLaravelProject(path))
+                        {
+                            ignoreEntries.Add("/public/storage");
+                            ignoreEntries.Add("/storage/*.key");
+                        }
+                        var existingEntries = gitIgnore.Split(
+                            new[] { '\r', '\n' },
+                            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+                        );
+                        var missingEntries = ignoreEntries
+                            .Where(entry => !existingEntries.Contains(entry, StringComparer.OrdinalIgnoreCase))
+                            .ToArray();
+                        if (missingEntries.Length > 0)
+                        {
+                            var prefix = gitIgnore.Length > 0 && !gitIgnore.EndsWith('\n')
+                                ? Environment.NewLine : string.Empty;
+                            File.AppendAllText(
+                                gitIgnorePath,
+                                prefix + string.Join(Environment.NewLine, missingEntries) + Environment.NewLine
+                            );
+                            repaired++;
+                        }
+                        var git = gitInstaller.InstalledExecutable();
+                        if (git is not null)
+                        {
+                            if (await RuntimeHealthInspector.GitTracksEnvironmentAsync(git, path))
+                                skipped.Add($"{site.Name}: .env is tracked by Git; remove it from the index manually");
+                        }
+                    }
+
+                    var composerJsonPath = Path.Combine(path, "composer.json");
+                    var isLaravel = SiteHealthInspector.IsLaravelProject(path);
+
+                    if (isLaravel)
+                    {
+                        foreach (var directory in new[]
+                        {
+                            Path.Combine(path, "storage", "framework", "cache"),
+                            Path.Combine(path, "storage", "framework", "sessions"),
+                            Path.Combine(path, "storage", "framework", "views"),
+                            Path.Combine(path, "storage", "logs"),
+                            Path.Combine(path, "bootstrap", "cache")
+                        })
+                        {
+                            if (!Directory.Exists(directory))
+                            {
+                                Directory.CreateDirectory(directory);
+                                repaired++;
+                            }
+                        }
+
+                        var storageLink = Path.Combine(path, "public", "storage");
+                        if (!phpInstaller.IsInstalled(phpCycle))
+                        {
+                            skipped.Add($"{site.Name}: PHP {phpCycle} is required for Laravel cache repairs");
+                        }
+                        foreach (var command in new[] { "config:clear", "cache:clear", "route:clear", "view:clear" })
+                        {
+                            if (!phpInstaller.IsInstalled(phpCycle)) break;
+                            var clearResult = await ArtisanCommandRunner.RunAsync(
+                                phpInstaller.PhpExecutable(phpCycle),
+                                path,
+                                [command, "--no-interaction"],
+                                composerTools.ManagedEnvironment(phpCycle),
+                                TimeSpan.FromMinutes(2));
+                            if (clearResult.ExitCode == 0) repaired++;
+                            else skipped.Add($"{site.Name}: {command} failed");
+                        }
+                        if (!Directory.Exists(storageLink))
+                        {
+                            if (!phpInstaller.IsInstalled(phpCycle))
+                            {
+                                skipped.Add($"{site.Name}: PHP {phpCycle} is required to create public/storage");
+                            }
+                            else
+                            {
+                                var linkResult = await ArtisanCommandRunner.RunAsync(
+                                    phpInstaller.PhpExecutable(phpCycle),
+                                    path,
+                                    ["storage:link", "--no-interaction"],
+                                    composerTools.ManagedEnvironment(phpCycle),
+                                    TimeSpan.FromMinutes(2));
+                                if (linkResult.ExitCode == 0) repaired++;
+                                else skipped.Add($"{site.Name}: storage:link failed");
+                            }
+                        }
+
+                        if (File.Exists(composerJsonPath)
+                            && phpInstaller.IsInstalled(phpCycle)
+                            && File.Exists(composerTools.ComposerPath)
+                            && !File.Exists(Path.Combine(path, "vendor", "autoload.php")))
+                        {
+                            var result = await ComposerCommandRunner.RunAsync(
+                                phpInstaller.PhpExecutable(phpCycle),
+                                composerTools.ComposerPath,
+                                path,
+                                ["install", "--no-interaction"],
+                                composerTools.ManagedEnvironment(phpCycle));
+                            if (result.ExitCode == 0) repaired++;
+                            else skipped.Add($"{site.Name}: Composer install failed");
+                        }
+                    }
+                    else if (File.Exists(composerJsonPath)
+                        && phpInstaller.IsInstalled(phpCycle)
+                        && File.Exists(composerTools.ComposerPath)
+                        && !File.Exists(Path.Combine(path, "vendor", "autoload.php")))
+                    {
+                        var result = await ComposerCommandRunner.RunAsync(
+                            phpInstaller.PhpExecutable(phpCycle),
+                            composerTools.ComposerPath,
+                            path,
+                            ["install", "--no-interaction"],
+                            composerTools.ManagedEnvironment(phpCycle));
+                        if (result.ExitCode == 0) repaired++;
+                        else skipped.Add($"{site.Name}: Composer install failed");
+                    }
+
+                    if (File.Exists(composerJsonPath)
+                        && phpInstaller.IsInstalled(phpCycle)
+                        && File.Exists(composerTools.ComposerPath))
+                    {
+                        var composerEnvironment = composerTools.ManagedEnvironment(phpCycle);
+                        var validation = await ComposerCommandRunner.RunAsync(
+                            phpInstaller.PhpExecutable(phpCycle),
+                            composerTools.ComposerPath,
+                            path,
+                            ["validate", "--no-interaction"],
+                            composerEnvironment);
+                        if (validation.ExitCode != 0)
+                            skipped.Add($"{site.Name}: composer validate reported problems");
+
+                        var platform = await ComposerCommandRunner.RunAsync(
+                            phpInstaller.PhpExecutable(phpCycle),
+                            composerTools.ComposerPath,
+                            path,
+                            ["check-platform-reqs", "--no-interaction"],
+                            composerEnvironment);
+                        if (platform.ExitCode != 0)
+                            skipped.Add($"{site.Name}: Composer platform requirements are not satisfied");
+
+                        if (File.Exists(Path.Combine(path, "vendor", "autoload.php")))
+                        {
+                            var autoload = await ComposerCommandRunner.RunAsync(
+                                phpInstaller.PhpExecutable(phpCycle),
+                                composerTools.ComposerPath,
+                                path,
+                                ["dump-autoload", "--optimize", "--no-interaction"],
+                                composerEnvironment);
+                            if (autoload.ExitCode == 0) repaired++;
+                            else skipped.Add($"{site.Name}: composer dump-autoload failed");
+                        }
+                    }
+
+                    var packageJsonPath = Path.Combine(path, "package.json");
+                    var nodeModulesPath = Path.Combine(path, "node_modules");
+                    if (File.Exists(packageJsonPath) && !Directory.Exists(nodeModulesPath))
+                    {
+                        var packageManager = RuntimeHealthInspector.NodePackageManager(path);
+                        if (!packageManager.Equals("npm", StringComparison.Ordinal))
+                        {
+                            skipped.Add($"{site.Name}: uses {packageManager}; install dependencies with that package manager");
+                            continue;
+                        }
+                        IReadOnlyList<string> arguments = File.Exists(Path.Combine(path, "package-lock.json"))
+                            ? new[] { "ci" }
+                            : new[] { "install" };
+                        try
+                        {
+                            var npmInvocation = NpmScriptRunner.CreateToolInvocation(
+                                nodeInstaller,
+                                path,
+                                site.NodeVersion,
+                                arguments,
+                                TimeSpan.FromMinutes(30));
+                            var npmResult = await NpmScriptRunner.RunToolAsync(npmInvocation);
+                            if (npmResult.ExitCode == 0) repaired++;
+                            else skipped.Add($"{site.Name}: npm {arguments[0]} failed");
+                        }
+                        catch (Exception error)
+                        {
+                            skipped.Add($"{site.Name}: npm could not run ({error.Message})");
+                        }
+                    }
+                    if (File.Exists(packageJsonPath) && Directory.Exists(nodeModulesPath))
+                    {
+                        try
+                        {
+                            if (File.Exists(Path.Combine(path, "package-lock.json")))
+                            {
+                                var dryRunInvocation = NpmScriptRunner.CreateToolInvocation(
+                                    nodeInstaller,
+                                    path,
+                                    site.NodeVersion,
+                                    ["ci", "--dry-run", "--ignore-scripts"],
+                                    TimeSpan.FromMinutes(10));
+                                var dryRun = await NpmScriptRunner.RunToolAsync(dryRunInvocation);
+                                if (dryRun.ExitCode != 0)
+                                    skipped.Add($"{site.Name}: package-lock.json is not installable with npm ci");
+                            }
+                            var auditInvocation = NpmScriptRunner.CreateToolInvocation(
+                                nodeInstaller,
+                                path,
+                                site.NodeVersion,
+                                ["audit", "--audit-level=high"],
+                                TimeSpan.FromMinutes(10));
+                            var audit = await NpmScriptRunner.RunToolAsync(auditInvocation);
+                            if (audit.ExitCode != 0)
+                                skipped.Add($"{site.Name}: npm audit found high-severity vulnerabilities");
+                        }
+                        catch (Exception error)
+                        {
+                            skipped.Add($"{site.Name}: npm audit could not run ({error.Message})");
+                        }
+                    }
+
+                    if (isLaravel && phpInstaller.IsInstalled(phpCycle))
+                    {
+                        var migrations = await ArtisanCommandRunner.RunAsync(
+                            phpInstaller.PhpExecutable(phpCycle),
+                            path,
+                            ["migrate:status", "--no-interaction"],
+                            composerTools.ManagedEnvironment(phpCycle),
+                            TimeSpan.FromMinutes(2));
+                        if (migrations.ExitCode != 0)
+                            skipped.Add($"{site.Name}: database or migration status could not be read");
+                    }
+                }
+                catch (Exception error)
+                {
+                    skipped.Add($"{site.Name}: {error.Message}");
+                }
+            }
+
+            // Dependency repair may make a previously unavailable dev server startable.
+            if (sites.Count > 0)
+            {
+                try
+                {
+                    await environment.StartAsync(allSites);
+                }
+                catch (Exception error)
+                {
+                    skipped.Add($"Development servers: {error.Message}");
+                }
+            }
+        }
+        catch (Exception error)
+        {
+            skipped.Add(error.Message);
+        }
+        finally
+        {
+            await RefreshAsync();
+            RepairAllButton.IsEnabled = true;
+            RefreshButton.IsEnabled = true;
+            RefreshProgress.IsActive = false;
+        }
+
+        repaired = warningsBeforeRepair.Count(warning =>
+            !lastHealthWarnings.Contains(warning, StringComparer.Ordinal));
+        repairJournal.Append(
+            "dashboard-repair",
+            skipped.Count == 0 ? "completed" : "completed-with-attention",
+            $"resolved={repaired};attention={skipped.Count}"
+        );
+
+        var summary = AppLocalization.Format("DashboardRepairAllSummary", repaired, skipped.Count);
+        if (skipped.Count > 0)
+        {
+            summary += Environment.NewLine + Environment.NewLine
+                + AppLocalization.Get("DashboardRepairAllSkipped") + Environment.NewLine
+                + string.Join(Environment.NewLine, skipped.Take(8));
+        }
+        var dialog = new ContentDialog
+        {
+            Title = AppLocalization.Get("DashboardRepairAllTitle"),
+            Content = new ScrollViewer { Content = new TextBlock { Text = summary, TextWrapping = TextWrapping.Wrap } },
+            CloseButtonText = AppLocalization.Get("CommonClose"),
+            XamlRoot = XamlRoot
+        };
+        await dialog.ShowAsync();
+    }
+
+    private async void ExportDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        var directory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Downloads"
+        );
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, $"HerdMe-diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.json");
+        var settings = settingsStore.Load();
+        var report = new
+        {
+            generatedAt = DateTimeOffset.Now,
+            environment = new
+            {
+                environment.IsRunning,
+                environment.IsDegraded,
+                environment.HttpPort,
+                environment.HttpsPort
+            },
+            certificateExpiresAt = certificateManager.ServerCertificateExpiresAt(),
+            php = new
+            {
+                activeCycle = runtimePolicy.Load().PhpCycle,
+                installedCycles = phpInstaller.InstalledCycles()
+            },
+            node = new { installedVersions = nodeInstaller.InstalledVersions() },
+            services = serviceManager.LoadInstances().Select(instance => new
+            {
+                instance.Name,
+                instance.DefinitionId,
+                instance.Port,
+                state = serviceManager.State(instance.Id, instance.DefinitionId).ToString()
+            }),
+            siteRoots = settings.Roots,
+            linkedSiteCount = settings.LinkedSites.Count,
+            warnings = lastHealthWarnings,
+            repairHistory = repairJournal.ReadRecent(20)
+        };
+        await File.WriteAllTextAsync(
+            path,
+            System.Text.Json.JsonSerializer.Serialize(
+                report,
+                new System.Text.Json.JsonSerializerOptions { WriteIndented = true }
+            )
+        );
+        var dialog = new ContentDialog
+        {
+            Title = AppLocalization.Get("DashboardDiagnosticsExportedTitle"),
+            Content = path,
+            CloseButtonText = AppLocalization.Get("CommonClose"),
+            XamlRoot = XamlRoot
+        };
+        await dialog.ShowAsync();
     }
 
     private async Task RunHealthRepairAsync(Func<WindowsSiteSettings, Task> repair)

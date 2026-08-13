@@ -25,6 +25,7 @@ internal sealed record ManagedComponentUpdateProbe(
 
 public sealed class ManagedComponentUpdateManager
 {
+    private static readonly TimeSpan DefaultProbeTimeout = TimeSpan.FromSeconds(20);
     private readonly object checkSync = new();
     private readonly IReadOnlyList<ManagedComponentUpdateProbe> probes;
     private readonly PhpRuntimeInstaller? phpInstaller;
@@ -34,6 +35,7 @@ public sealed class ManagedComponentUpdateManager
     private readonly GitRuntimeInstaller? gitInstaller;
     private readonly XdebugManager? xdebugManager;
     private readonly WindowsServiceManager? serviceManager;
+    private readonly TimeSpan probeTimeout;
     private Task<ManagedComponentUpdateCheck>? activeCheck;
 
     public ManagedComponentUpdateManager(
@@ -53,6 +55,7 @@ public sealed class ManagedComponentUpdateManager
         this.gitInstaller = gitInstaller;
         this.xdebugManager = xdebugManager;
         this.serviceManager = serviceManager;
+        probeTimeout = DefaultProbeTimeout;
         List<ManagedComponentUpdateProbe> configuredProbes =
         [
             new("PHP", CheckPhpAsync),
@@ -72,8 +75,17 @@ public sealed class ManagedComponentUpdateManager
     }
 
     internal ManagedComponentUpdateManager(params ManagedComponentUpdateProbe[] probes)
+        : this(DefaultProbeTimeout, probes)
+    {
+    }
+
+    internal ManagedComponentUpdateManager(
+        TimeSpan probeTimeout,
+        params ManagedComponentUpdateProbe[] probes
+    )
     {
         this.probes = probes;
+        this.probeTimeout = probeTimeout;
     }
 
     public ManagedComponentUpdateCheck? LatestResult { get; private set; }
@@ -124,11 +136,15 @@ public sealed class ManagedComponentUpdateManager
         return result;
     }
 
-    private static async Task<ProbeOutcome> RunProbeAsync(ManagedComponentUpdateProbe probe)
+    private async Task<ProbeOutcome> RunProbeAsync(ManagedComponentUpdateProbe probe)
     {
         try
         {
-            return new ProbeOutcome(await probe.Check(CancellationToken.None), null);
+            using var timeout = new CancellationTokenSource(probeTimeout);
+            return new ProbeOutcome(
+                await probe.Check(timeout.Token).WaitAsync(timeout.Token),
+                null
+            );
         }
         catch (Exception error)
         {

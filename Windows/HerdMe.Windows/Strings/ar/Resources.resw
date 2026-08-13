@@ -5,11 +5,11 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="TrayOpenCommand.Label" xml:space="preserve"><value>فتح HerdMe</value></data>
-  <data name="TrayQuitCommand.Label" xml:space="preserve"><value>إنهاء HerdMe</value></data>
+  <data name="TrayQuitCommand.Label" xml:space="preserve"><value>إغلاق HerdMe</value></data>
   <data name="TrayStartAllCommand.Label" xml:space="preserve"><value>تشغيل الكل</value></data>
   <data name="TrayStopAllCommand.Label" xml:space="preserve"><value>إيقاف الكل</value></data>
   <data name="TrayOpenCommandLabel" xml:space="preserve"><value>فتح HerdMe</value></data>
-  <data name="TrayQuitCommandLabel" xml:space="preserve"><value>إنهاء HerdMe</value></data>
+  <data name="TrayQuitCommandLabel" xml:space="preserve"><value>إغلاق HerdMe</value></data>
   <data name="TrayStartAllCommandLabel" xml:space="preserve"><value>تشغيل الكل</value></data>
   <data name="TrayStopAllCommandLabel" xml:space="preserve"><value>إيقاف الكل</value></data>
   <data name="NavGeneral.Content" xml:space="preserve"><value>عام</value></data>
@@ -110,6 +110,7 @@
   <data name="GeneralUpToDateTitle" xml:space="preserve"><value>HerdMe محدّث</value></data>
   <data name="GeneralNewestRelease" xml:space="preserve"><value>الإصدار {0} هو أحدث إصدار في القناة {1}.</value></data>
   <data name="GeneralUpdateCheckFailed" xml:space="preserve"><value>فشل التحقق من التحديث</value></data>
+  <data name="GeneralUpdateCheckTimedOut" xml:space="preserve"><value>لم تستجب خدمة التحديث في الوقت المحدد. تحقق من اتصال الإنترنت ثم حاول مرة أخرى.</value></data>
   <data name="GeneralUpdateDialogTitle" xml:space="preserve"><value>HerdMe {0} متاح</value></data>
   <data name="GeneralLater" xml:space="preserve"><value>لاحقاً</value></data>
   <data name="GeneralDownload" xml:space="preserve"><value>تنزيل</value></data>
@@ -129,6 +130,7 @@
   <data name="NodePageDescription.Text" xml:space="preserve"><value>بيئات Windows الرسمية التي يديرها HerdMe</value></data>
   <data name="NodeRefreshTooltip.Text" xml:space="preserve"><value>تحديث إصدارات Node.js</value></data>
   <data name="NodeMajorColumn.Text" xml:space="preserve"><value>الإصدار الرئيسي</value></data>
+  <data name="NodeVersionColumn.Text" xml:space="preserve"><value>الإصدار</value></data>
   <data name="NodeStatusColumn.Text" xml:space="preserve"><value>الحالة</value></data>
   <data name="NodeInstallTooltip.Text" xml:space="preserve"><value>تثبيت أو تحديث</value></data>
   <data name="NodeUseTooltip.Text" xml:space="preserve"><value>استخدام هذا الإصدار</value></data>
@@ -160,6 +162,7 @@
   <data name="NodeDeleteVersionTitle" xml:space="preserve"><value>حذف Node.js {0}؟</value></data>
   <data name="NodeDeleteVersionMessage" xml:space="preserve"><value>يمكن تنزيل بيئة التشغيل مرة أخرى لاحقاً.</value></data>
   <data name="NodeActive" xml:space="preserve"><value>نشط</value></data>
+  <data name="NodeInstalled" xml:space="preserve"><value>مثبّت</value></data>
   <data name="ServicesPageTitle.Text" xml:space="preserve"><value>الخدمات</value></data>
   <data name="ServicesPageDescription.Text" xml:space="preserve"><value>بيئات تشغيل مفتوحة المصدر لـ Windows مع التحقق من بصماتها</value></data>
   <data name="ServicesRefreshTooltip.Text" xml:space="preserve"><value>تحديث حالة الخدمات</value></data>
@@ -477,6 +480,7 @@
   <data name="AboutCopyVersionTooltip.Text" xml:space="preserve"><value>نسخ إصدار HerdMe ورقم البناء</value></data>
   <data name="AboutCopyVersionButtonText.Text" xml:space="preserve"><value>نسخ الإصدار</value></data>
   <data name="AboutCheckUpdatesButtonText.Text" xml:space="preserve"><value>التحقق من التحديثات</value></data>
+  <data name="AboutExitButtonText.Text" xml:space="preserve"><value>إغلاق HerdMe</value></data>
   <data name="AboutLicenseButton.Content" xml:space="preserve"><value>ترخيص MIT</value></data>
   <data name="AboutAcknowledgementsButton.Content" xml:space="preserve"><value>الإقرارات</value></data>
   <data name="AboutVersionSummary" xml:space="preserve"><value>HerdMe {0} (البناء {1})</value></data>
@@ -767,6 +771,21 @@
   <data name="GeneralCompactModeDescription.Text" xml:space="preserve"><value>استخدام مسافات أصغر في صفحتي المواقع ولوحة التحكم.</value></data>
   <data name="DashboardRepairAction" xml:space="preserve"><value>إصلاح</value></data>
   <data name="DashboardRepairTooltip" xml:space="preserve"><value>إصلاح مشكلة الصحة هذه</value></data>
+  <data name="DashboardRepairAllButtonText.Text" xml:space="preserve"><value>إصلاح الكل</value></data>
+  <data name="DashboardRepairAllButton.AutomationProperties.Name" xml:space="preserve"><value>إصلاح جميع مشكلات الصحة</value></data>
+  <data name="DashboardRepairAllTitle" xml:space="preserve"><value>نتيجة إصلاح الكل</value></data>
+  <data name="DashboardRepairAllSummary" xml:space="preserve"><value>تم تنفيذ {0} إصلاح تلقائي. ما زالت {1} مشكلة تحتاج إلى تدخل يدوي.</value></data>
+  <data name="DashboardRepairAllSkipped" xml:space="preserve"><value>العناصر التي تحتاج إلى إجراء يدوي:</value></data>
+  <data name="DashboardMissingSitesTitle" xml:space="preserve"><value>إزالة المواقع المرتبطة المفقودة؟</value></data>
+  <data name="DashboardMissingSitesMessage" xml:space="preserve"><value>مجلدات المواقع المرتبطة التالية لم تعد موجودة:&#xA;{0}</value></data>
+  <data name="DashboardRemoveMissingSites" xml:space="preserve"><value>إزالة من HerdMe</value></data>
+  <data name="DashboardKeepMissingSites" xml:space="preserve"><value>إبقاء</value></data>
+  <data name="DashboardMissingSitesKept" xml:space="preserve"><value>تم الإبقاء على {0} موقع مرتبط مفقود.</value></data>
+  <data name="DashboardRetryFailedButtonText.Text" xml:space="preserve"><value>إعادة محاولة الفاشل فقط</value></data>
+  <data name="DashboardExportDiagnosticsButtonText.Text" xml:space="preserve"><value>تصدير التشخيصات</value></data>
+  <data name="DashboardDiagnosticsExportedTitle" xml:space="preserve"><value>تم تصدير التشخيصات</value></data>
+  <data name="DashboardNoFailedRepairs" xml:space="preserve"><value>لا توجد إصلاحات مواقع فاشلة لإعادة المحاولة.</value></data>
+  <data name="CommonClose" xml:space="preserve"><value>إغلاق</value></data>
   <data name="SitesActionOpenBrowserTooltip.Text" xml:space="preserve"><value>فتح في المتصفح</value></data>
   <data name="SitesActionOpenFolderTooltip.Text" xml:space="preserve"><value>فتح مجلد المشروع</value></data>
   <data name="SitesActionTerminalTooltip.Text" xml:space="preserve"><value>فتح الطرفية</value></data>
@@ -788,7 +807,8 @@
   <data name="PhpUpdatesCheckedInBackground" xml:space="preserve"><value>PHP والأدوات محدّثة · تم الفحص في الخلفية</value></data>
   <data name="PhpBackgroundCheckUnavailable" xml:space="preserve"><value>خدمة التحديث غير متاحة · النسخ المثبتة ما زالت جاهزة</value></data>
   <data name="NodeCheckingUpdatesInBackground" xml:space="preserve"><value>جارٍ فحص التحديثات في الخلفية…</value></data>
-  <data name="NodeUpdatesCheckedInBackground" xml:space="preserve"><value>النسخ المثبتة جاهزة · تم فحص التحديثات في الخلفية</value></data>
+  <data name="NodeUpdatesCheckedInBackground" xml:space="preserve"><value>محدّث</value></data>
+  <data name="NodeUpdatesAvailable" xml:space="preserve"><value>تتوفر تحديثات: {0}</value></data>
   <data name="NodeBackgroundCheckUnavailable" xml:space="preserve"><value>خدمة التحديث غير متاحة · النسخ المثبتة ما زالت جاهزة</value></data>
   <data name="SitesDatabaseImportTargetTitle" xml:space="preserve"><value>اختر وجهة الاستيراد</value></data>
   <data name="SitesDatabaseImportTargetDescription" xml:space="preserve"><value>اختر الخدمة المشغلة وقاعدة البيانات المستهدفة، وسيكتشف HerdMe إن كانت موجودة.</value></data>

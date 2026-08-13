@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Text;
 using HerdMe.Windows.Models;
 
 namespace HerdMe.Windows.Services;
@@ -141,9 +142,19 @@ public sealed class SiteConfigurationStore
         }
         var normalized = Normalize(settings);
         Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
-        var temporary = SettingsPath + ".tmp";
-        File.WriteAllText(temporary, JsonSerializer.Serialize(normalized, JsonOptions));
+        var temporary = SettingsPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        WriteDurably(temporary, JsonSerializer.Serialize(normalized, JsonOptions));
         File.Move(temporary, SettingsPath, true);
+    }
+
+    private static void WriteDurably(string path, string contents)
+    {
+        using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+            64 * 1_024, FileOptions.WriteThrough);
+        using var writer = new StreamWriter(file, new UTF8Encoding(false));
+        writer.Write(contents);
+        writer.Flush();
+        file.Flush(true);
     }
 
     public void UpdateRoots(IEnumerable<string> roots)

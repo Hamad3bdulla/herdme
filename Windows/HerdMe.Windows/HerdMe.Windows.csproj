@@ -33,6 +33,8 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.260224002" />
     <PackageReference Include="System.Formats.Nrbf" Version="9.0.1" />
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.28" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.6" />
     <PackageDownload Include="System.Security.Permissions" Version="[6.0.0]" />
   </ItemGroup>
 

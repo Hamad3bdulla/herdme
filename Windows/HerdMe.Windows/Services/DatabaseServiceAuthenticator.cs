@@ -41,16 +41,18 @@ public static class DatabaseServiceAuthenticator
         return string.Join("; ", new[]
         {
             "CREATE DATABASE IF NOT EXISTS laravel",
-            $"CREATE USER IF NOT EXISTS '{credentials.Username}'@'127.0.0.1' IDENTIFIED BY '{credentials.Secret}'",
-            $"ALTER USER '{credentials.Username}'@'127.0.0.1' IDENTIFIED BY '{credentials.Secret}'",
-            $"GRANT ALL PRIVILEGES ON *.* TO '{credentials.Username}'@'127.0.0.1' WITH GRANT OPTION",
-            $"CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED BY '{credentials.Secret}'",
-            $"ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '{credentials.Secret}'",
-            $"ALTER USER 'root'@'localhost' IDENTIFIED BY '{credentials.Secret}'",
+            $"CREATE USER IF NOT EXISTS '{SqlLiteral(credentials.Username)}'@'127.0.0.1' IDENTIFIED BY '{SqlLiteral(credentials.Secret)}'",
+            $"ALTER USER '{SqlLiteral(credentials.Username)}'@'127.0.0.1' IDENTIFIED BY '{SqlLiteral(credentials.Secret)}'",
+            $"GRANT ALL PRIVILEGES ON `laravel`.* TO '{SqlLiteral(credentials.Username)}'@'127.0.0.1'",
+            $"CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED BY '{SqlLiteral(credentials.Secret)}'",
+            $"ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '{SqlLiteral(credentials.Secret)}'",
+            $"ALTER USER 'root'@'localhost' IDENTIFIED BY '{SqlLiteral(credentials.Secret)}'",
             "DELETE FROM mysql.user WHERE User = ''",
             "FLUSH PRIVILEGES"
         }) + ";";
     }
+
+    private static string SqlLiteral(string value) => value.Replace("\\", "\\\\").Replace("'", "''");
 
     public static (string Contents, bool Changed) SecurePostgreSqlHba(string contents)
     {

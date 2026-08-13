@@ -2,6 +2,7 @@ import Foundation
 import Network
 
 final class SMTPServer: @unchecked Sendable {
+    private static let maximumSessions = 32
     private let queue = DispatchQueue(label: "app.herdme.smtp", qos: .userInitiated)
     private let sessionsLock = NSLock()
     private var listener: NWListener?
@@ -32,6 +33,11 @@ final class SMTPServer: @unchecked Sendable {
                 onStop: { [weak self] in self?.removeSession(identifier) }
             )
             self.sessionsLock.lock()
+            guard self.sessions.count < Self.maximumSessions else {
+                self.sessionsLock.unlock()
+                connection.cancel()
+                return
+            }
             self.sessions[identifier] = session
             self.sessionsLock.unlock()
             session.start()

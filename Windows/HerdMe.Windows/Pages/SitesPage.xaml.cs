@@ -2888,7 +2888,8 @@ public sealed partial class SitesPage : Page
             cycle,
             phpInstaller,
             composerTools,
-            certificates
+            certificates,
+            site.NodeVersion
         );
         var report = string.Join(Environment.NewLine, checks.Select(check =>
             $"{(check.Healthy ? "[OK]" : "[!] ")} {check.Name}: {check.Detail}"
@@ -3020,6 +3021,7 @@ public sealed partial class SitesPage : Page
                     phpInstaller,
                     composerTools,
                     certificates,
+                    site.NodeVersion,
                     cancellationToken
                 );
                 HealthDetailsText.Text = AppLocalization.Format(

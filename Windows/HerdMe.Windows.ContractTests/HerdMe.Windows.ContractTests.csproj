@@ -9,6 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.28" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.6" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="DownloadAndStorageContractChecks.cs" />
     <Compile Include="SiteContractChecks.cs" />
@@ -52,6 +57,9 @@
     <Compile Include="../HerdMe.Windows/Services/WindowsCredentialStore.cs" Link="Services/WindowsCredentialStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsServiceCredentialStore.cs" Link="Services/WindowsServiceCredentialStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/DumpCaptureService.cs" Link="Services/DumpCaptureService.cs" />
+    <Compile Include="../HerdMe.Windows/Services/OperationJournal.cs" Link="Services/OperationJournal.cs" />
+    <Compile Include="../HerdMe.Windows/Services/BackendSupervisor.cs" Link="Services/BackendSupervisor.cs" />
+    <Compile Include="../HerdMe.Windows/Services/CaptureDatabase.cs" Link="Services/CaptureDatabase.cs" />
     <Compile Include="../HerdMe.Windows/Services/ApplicationDiagnostics.cs" Link="Services/ApplicationDiagnostics.cs" />
     <Compile Include="../HerdMe.Windows/Services/DiagnosticLog.cs" Link="Services/DiagnosticLog.cs" />
     <Compile Include="../HerdMe.Windows/Services/FastCgiClient.cs" Link="Services/FastCgiClient.cs" />
@@ -62,8 +70,10 @@
     <Compile Include="../HerdMe.Windows/Services/PhpFastCgiProcess.cs" Link="Services/PhpFastCgiProcess.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteConfigurationStore.cs" Link="Services/SiteConfigurationStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteHealthInspector.cs" Link="Services/SiteHealthInspector.cs" />
+    <Compile Include="../HerdMe.Windows/Services/RuntimeHealthInspector.cs" Link="Services/RuntimeHealthInspector.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteWorkflowArchive.cs" Link="Services/SiteWorkflowArchive.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteProcessManager.cs" Link="Services/SiteProcessManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SiteDevelopmentServer.cs" Link="Services/SiteDevelopmentServer.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteCommandFavoritesStore.cs" Link="Services/SiteCommandFavoritesStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/PortConflictInspector.cs" Link="Services/PortConflictInspector.cs" />
     <Compile Include="../HerdMe.Windows/Services/SitePresentation.cs" Link="Services/SitePresentation.cs" />

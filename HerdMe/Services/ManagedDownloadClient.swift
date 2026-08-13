@@ -29,6 +29,7 @@ enum ManagedDownloadClient {
         for attempt in 1...attempts {
             do {
                 let result = try await activeSession.data(from: url)
+                try validateResponse(result.1, originalURL: url)
                 guard attempt < attempts,
                     let response = result.1 as? HTTPURLResponse,
                     shouldRetry(statusCode: response.statusCode)
@@ -70,6 +71,7 @@ enum ManagedDownloadClient {
         for attempt in 1...attempts {
             do {
                 let result = try await activeSession.download(from: url)
+                try validateResponse(result.1, originalURL: url)
                 guard attempt < attempts,
                     let response = result.1 as? HTTPURLResponse,
                     shouldRetry(statusCode: response.statusCode)
@@ -105,6 +107,13 @@ enum ManagedDownloadClient {
             || statusCode == 425
             || statusCode == 429
             || 500...599 ~= statusCode
+    }
+
+    private static func validateResponse(_ response: URLResponse, originalURL: URL) throws {
+        guard originalURL.scheme?.lowercased() == "https" else { return }
+        guard response.url?.scheme?.lowercased() == "https" else {
+            throw URLError(.appTransportSecurityRequiresSecureConnection)
+        }
     }
 
     private static func isTransient(_ error: Error) -> Bool {

@@ -10,21 +10,25 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <Grid>
-            <StackPanel>
+        <Grid ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="4">
                 <TextBlock x:Uid="NodePageTitle" AutomationProperties.AutomationId="NodePageRoot" Text="Node.js" Style="{StaticResource TitleTextBlockStyle}" />
                 <TextBlock x:Uid="NodePageDescription" Text="Official Windows runtimes managed by HerdMe" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ProgressRing x:Name="OperationProgress" Width="16" Height="16" IsActive="False" Visibility="Collapsed" />
+                    <TextBlock x:Name="OperationStatusText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
             </StackPanel>
-            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
-                <ProgressRing x:Name="OperationProgress" Width="18" Height="18" IsActive="False" Visibility="Collapsed" />
-                <TextBlock x:Name="OperationStatusText" VerticalAlignment="Center" />
-                <Button Click="Refresh_Click">
-                    <ToolTipService.ToolTip>
-                        <ToolTip><TextBlock x:Uid="NodeRefreshTooltip" Text="Refresh Node.js versions" /></ToolTip>
-                    </ToolTipService.ToolTip>
-                    <SymbolIcon Symbol="Refresh" />
-                </Button>
-            </StackPanel>
+            <Button Grid.Column="1" VerticalAlignment="Top" Click="Refresh_Click">
+                <ToolTipService.ToolTip>
+                    <ToolTip><TextBlock x:Uid="NodeRefreshTooltip" Text="Refresh Node.js versions" /></ToolTip>
+                </ToolTipService.ToolTip>
+                <SymbolIcon Symbol="Refresh" />
+            </Button>
         </Grid>
 
         <Border Grid.Row="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12">
@@ -32,25 +36,29 @@
                 <ListView.Header>
                     <Grid Padding="10,6" ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="140" />
-                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="150" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Uid="NodeMajorColumn" Text="Major" FontWeight="SemiBold" />
-                        <TextBlock x:Uid="NodeStatusColumn" Grid.Column="1" Text="Status" FontWeight="SemiBold" />
+                        <TextBlock x:Uid="NodeVersionColumn" Grid.Column="1" Text="Version" FontWeight="SemiBold" />
+                        <TextBlock x:Uid="NodeStatusColumn" Grid.Column="2" Text="Status" FontWeight="SemiBold" />
                     </Grid>
                 </ListView.Header>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="models:NodeRuntimeRow">
                         <Grid Padding="10,8" ColumnSpacing="16">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="140" />
-                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="100" />
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="150" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="{x:Bind Major}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="{x:Bind Status}" VerticalAlignment="Center" />
-                            <StackPanel Grid.Column="2" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                            <TextBlock Grid.Column="1" Text="{x:Bind DisplayVersion}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="{x:Bind Status}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="3" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
                                 <Button
                                     Tag="{x:Bind Major}"
                                     Click="Install_Click"

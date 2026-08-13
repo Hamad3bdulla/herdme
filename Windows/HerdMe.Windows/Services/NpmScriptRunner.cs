@@ -276,7 +276,7 @@ public static class NpmScriptRunner
         TimeSpan timeout
     )
     {
-        var supported = new[] { "install", "update", "audit" };
+        var supported = new[] { "install", "ci", "update", "audit" };
         if (arguments.Count is 0 or > 16
             || !supported.Contains(arguments[0], StringComparer.Ordinal)
             || arguments.Any(argument => string.IsNullOrWhiteSpace(argument)

@@ -28,19 +28,21 @@ public sealed class AppServices
             GitInstaller,
             UserPath
         );
+        Xdebug = new XdebugManager();
         Environment = new WindowsLocalEnvironment(
             Core,
             PhpInstaller,
             RuntimePolicy,
             Certificates,
-            Hosts
+            Hosts,
+            Xdebug,
+            NodeInstaller
         );
         Mail = new MailCaptureService();
         Dumps = new DumpCaptureService();
         Services = new WindowsServiceManager();
         Startup = new WindowsStartupManager();
         Updates = AppUpdateManager.Configured();
-        Xdebug = new XdebugManager();
         ComponentUpdates = new ManagedComponentUpdateManager(
             PhpInstaller,
             RuntimePolicy,

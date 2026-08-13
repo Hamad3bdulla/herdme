@@ -96,10 +96,21 @@ public sealed class PhpRuntimePolicy
             ? storedSettings.PhpCycle
             : phpCycle;
         var settings = ResolveVersion(storedSettings, selectedCycle);
+        var debuggerExtensionAvailable = File.Exists(Path.Combine(
+            supportRoot,
+            "Extensions",
+            "php",
+            settings.PhpCycle,
+            "php_xdebug.dll"
+        ));
         return new PhpRuntimeLaunchContract(
             extensions,
             settings,
-            BuildPhpOptions(settings, requireDebuggerExtension, supportRoot)
+            BuildPhpOptions(
+                settings,
+                requireDebuggerExtension && debuggerExtensionAvailable,
+                supportRoot
+            )
         );
     }
 

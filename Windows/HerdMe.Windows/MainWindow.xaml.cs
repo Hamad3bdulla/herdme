@@ -16,6 +16,7 @@ public sealed partial class MainWindow : Window
     private const int LogicalWindowHeight = 720;
     private const int LogicalWindowMargin = 16;
     private readonly AppServices services;
+    private readonly Dictionary<string, Page> persistentPages = new(StringComparer.Ordinal);
     private string? pendingLogSitePath;
     private string? configurationLoadWarning;
 
@@ -125,6 +126,12 @@ public sealed partial class MainWindow : Window
 
     private void ShowPage(string tag)
     {
+        if (persistentPages.TryGetValue(tag, out var existingPage))
+        {
+            ContentFrame.Content = existingPage;
+            return;
+        }
+
         switch (tag)
         {
             case "dashboard":
@@ -139,7 +146,9 @@ public sealed partial class MainWindow : Window
                     services.Certificates,
                     services.PhpInstaller,
                     services.RuntimePolicy,
-                    services.ComposerTools
+                    services.ComposerTools,
+                    services.NodeInstaller,
+                    services.GitInstaller
                 );
                 break;
             case "general":
@@ -252,6 +261,16 @@ public sealed partial class MainWindow : Window
                 );
                 break;
         }
+
+        if (IsPersistentPage(tag) && ContentFrame.Content is Page page)
+        {
+            persistentPages[tag] = page;
+        }
+    }
+
+    private static bool IsPersistentPage(string tag)
+    {
+        return tag is "general" or "php" or "node" or "services" or "debugger";
     }
 
     public void NavigateToLogs(string sitePath)

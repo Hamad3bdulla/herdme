@@ -3,6 +3,7 @@ import Network
 import Security
 
 final class LocalHTTPProxy: @unchecked Sendable {
+    private static let maximumSessions = 128
     private let queue = DispatchQueue(label: "app.herdme.http-proxy", qos: .userInitiated)
     private let sessionsLock = NSLock()
     private let routesLock = NSLock()
@@ -72,6 +73,11 @@ final class LocalHTTPProxy: @unchecked Sendable {
                 onStop: { [weak self] in self?.removeSession(id) }
             )
             self.sessionsLock.lock()
+            guard self.sessions.count < Self.maximumSessions else {
+                self.sessionsLock.unlock()
+                connection.cancel()
+                return
+            }
             self.sessions[id] = session
             self.sessionsLock.unlock()
             session.start()
