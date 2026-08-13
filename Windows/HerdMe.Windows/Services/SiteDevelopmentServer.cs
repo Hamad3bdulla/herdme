@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using HerdMe.Windows.Models;
 
@@ -7,20 +8,44 @@ namespace HerdMe.Windows.Services;
 
 public sealed class SiteDevelopmentServer : IAsyncDisposable
 {
+    public enum DevelopmentMode
+    {
+        PrimaryProxy,
+        LaravelAssets
+    }
+
     private readonly List<Process> processes = [];
     private readonly List<WindowsJobObject> jobs = [];
     private string? logPath;
+    private string? managedHotPath;
 
     public int? Port { get; private set; }
 
-    public bool IsRunning => Port is not null && processes.Count > 0
-        && processes.All(process => !process.HasExited);
+    public bool IsRunning => Port is int port && processes.Count > 0
+        && IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners()
+            .Any(endpoint => endpoint.Port == port);
+
+    public DevelopmentMode? Mode { get; private set; }
+
+    public bool ProxiesSiteTraffic => Mode == DevelopmentMode.PrimaryProxy;
+
+    public static DevelopmentMode? ModeFor(SiteRecord site)
+    {
+        var root = Path.GetFullPath(site.Path);
+        if (IsLaravelProject(site, root) && HasDevScript(root))
+            return DevelopmentMode.LaravelAssets;
+        if (site.Framework.Equals("Node.js", StringComparison.OrdinalIgnoreCase)
+            && HasDevScript(root)) return DevelopmentMode.PrimaryProxy;
+        var frontend = Path.Combine(root, "frontend");
+        return HasDevScript(frontend) ? DevelopmentMode.PrimaryProxy : null;
+    }
 
     public static string? ProjectDirectory(SiteRecord site)
     {
         var root = Path.GetFullPath(site.Path);
-        if (site.Framework.Equals("Node.js", StringComparison.OrdinalIgnoreCase)
-            && HasDevScript(root)) return root;
+        var mode = ModeFor(site);
+        if (mode == DevelopmentMode.LaravelAssets) return root;
+        if (mode == DevelopmentMode.PrimaryProxy && HasDevScript(root)) return root;
         var frontend = Path.Combine(root, "frontend");
         return HasDevScript(frontend) ? frontend : null;
     }
@@ -37,6 +62,13 @@ public sealed class SiteDevelopmentServer : IAsyncDisposable
         await StopAsync();
         var project = ProjectDirectory(site)
             ?? throw new InvalidOperationException("This site has no npm dev script.");
+        Mode = ModeFor(site)
+            ?? throw new InvalidOperationException("This site has no supported development mode.");
+        if (Mode == DevelopmentMode.LaravelAssets)
+        {
+            managedHotPath = Path.Combine(site.Path, "public", "hot");
+            DeleteManagedHotFile();
+        }
         if (!Directory.Exists(Path.Combine(project, "node_modules")))
         {
             throw new InvalidOperationException("Install the frontend dependencies before starting dev mode.");
@@ -62,6 +94,7 @@ public sealed class SiteDevelopmentServer : IAsyncDisposable
             {
                 FileName = invocation.NodeExecutable,
                 WorkingDirectory = project,
+                RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -81,6 +114,8 @@ public sealed class SiteDevelopmentServer : IAsyncDisposable
                 startInfo.Environment[variable.Key] = variable.Value;
             StartManaged(startInfo);
             await WaitUntilReadyAsync(port, cancellationToken);
+            if (Mode == DevelopmentMode.LaravelAssets)
+                await WaitForLaravelHotFileAsync(port, cancellationToken);
             Port = port;
             return port;
         }
@@ -107,6 +142,9 @@ public sealed class SiteDevelopmentServer : IAsyncDisposable
         processes.Clear();
         foreach (var job in jobs) job.Dispose();
         jobs.Clear();
+        DeleteManagedHotFile();
+        managedHotPath = null;
+        Mode = null;
     }
 
     public async ValueTask DisposeAsync()
@@ -175,6 +213,46 @@ public sealed class SiteDevelopmentServer : IAsyncDisposable
             return package.Contains("\"next\"", StringComparison.Ordinal);
         }
         catch (IOException) { return false; }
+    }
+
+    private static bool IsLaravelProject(SiteRecord site, string root)
+    {
+        return site.Framework.Equals("Laravel", StringComparison.OrdinalIgnoreCase)
+            || File.Exists(Path.Combine(root, "artisan"));
+    }
+
+    private async Task WaitForLaravelHotFileAsync(
+        int port,
+        CancellationToken cancellationToken
+    )
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                if (managedHotPath is not null && File.Exists(managedHotPath))
+                {
+                    var value = (await File.ReadAllTextAsync(managedHotPath, cancellationToken)).Trim();
+                    if (Uri.TryCreate(value, UriKind.Absolute, out var uri)
+                        && uri.Port == port) return;
+                }
+            }
+            catch (IOException) { }
+            await Task.Delay(100, cancellationToken);
+        }
+        throw new TimeoutException("Laravel Vite did not publish its hot-file endpoint.");
+    }
+
+    private void DeleteManagedHotFile()
+    {
+        if (managedHotPath is null) return;
+        try
+        {
+            if (File.Exists(managedHotPath)) File.Delete(managedHotPath);
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 
     private static async Task EnsureRequestedNodeAsync(

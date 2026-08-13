@@ -12,7 +12,10 @@ public static class RuntimeHealthInspector
     {
         AllowAutoRedirect = false,
         ConnectTimeout = TimeSpan.FromSeconds(3)
-    }) { Timeout = TimeSpan.FromSeconds(6) };
+    })
+    {
+        Timeout = TimeSpan.FromSeconds(6)
+    };
 
     public static async Task<RuntimeHealthResult> InspectSiteAsync(
         string domain,

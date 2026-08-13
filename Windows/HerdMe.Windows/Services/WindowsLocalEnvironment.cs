@@ -281,11 +281,13 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
                 var server = new SiteDevelopmentServer();
                 try
                 {
-                    developmentPorts[site.Path] = await server.StartAsync(
+                    var developmentPort = await server.StartAsync(
                         site,
                         nodeInstaller,
                         cancellationToken
                     );
+                    if (server.ProxiesSiteTraffic)
+                        developmentPorts[site.Path] = developmentPort;
                     developmentServers[site.Path] = server;
                 }
                 catch (Exception error) when (error is not OperationCanceledException)

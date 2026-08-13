@@ -227,6 +227,21 @@ internal static partial class ContractChecks
     {
         var projectRoot = Path.Combine(repositoryRoot, "Windows", "HerdMe.Windows");
         var xaml = File.ReadAllText(Path.Combine(projectRoot, "Pages", "SitesPage.xaml"));
+        var developmentServerSource = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "Services",
+            "SiteDevelopmentServer.cs"
+        ));
+        Check(
+            developmentServerSource.Contains(
+                "RedirectStandardInput = true",
+                StringComparison.Ordinal
+            ) && developmentServerSource.Contains(
+                "GetActiveTcpListeners()",
+                StringComparison.Ordinal
+            ),
+            "development servers keep Vite stdin open and monitor their listening endpoint"
+        );
         var source = File.ReadAllText(Path.Combine(
             projectRoot,
             "Pages",

@@ -204,6 +204,53 @@ internal static partial class ContractChecks
             SiteHealthInspector.IsLaravelProject(laravelSite),
             "site health detects Laravel from its Composer dependency"
         );
+        File.WriteAllText(Path.Combine(laravelSite, "artisan"), "#!/usr/bin/env php");
+        File.WriteAllText(
+            Path.Combine(laravelSite, "package.json"),
+            "{\"scripts\":{\"dev\":\"vite\"}}"
+        );
+        var laravelDevelopmentSite = new SiteRecord
+        {
+            Name = "Laravel Site",
+            Path = laravelSite,
+            Domain = "laravel.test",
+            Framework = "Laravel"
+        };
+        Check(
+            SiteDevelopmentServer.ModeFor(laravelDevelopmentSite)
+                == SiteDevelopmentServer.DevelopmentMode.LaravelAssets
+                && SiteDevelopmentServer.ProjectDirectory(laravelDevelopmentSite) == laravelSite,
+            "Laravel Vite runs as an asset server while PHP remains the primary site server"
+        );
+        var nodeSite = Path.Combine(supportRoot, "node-development-site");
+        Directory.CreateDirectory(nodeSite);
+        File.WriteAllText(
+            Path.Combine(nodeSite, "package.json"),
+            "{\"scripts\":{\"dev\":\"vite\"}}"
+        );
+        Check(
+            SiteDevelopmentServer.ModeFor(new SiteRecord
+            {
+                Name = "Node Site",
+                Path = nodeSite,
+                Domain = "node.test",
+                Framework = "Node.js"
+            }) == SiteDevelopmentServer.DevelopmentMode.PrimaryProxy,
+            "standalone Node development sites remain reverse-proxied"
+        );
+        var phpOnlyLaravel = Path.Combine(supportRoot, "php-only-laravel");
+        Directory.CreateDirectory(phpOnlyLaravel);
+        File.WriteAllText(Path.Combine(phpOnlyLaravel, "artisan"), "#!/usr/bin/env php");
+        Check(
+            SiteDevelopmentServer.ModeFor(new SiteRecord
+            {
+                Name = "PHP Laravel",
+                Path = phpOnlyLaravel,
+                Domain = "php-laravel.test",
+                Framework = "Laravel"
+            }) is null,
+            "Laravel projects without a dev script remain PHP-only sites"
+        );
         Check(
             RuntimeHealthInspector.NodePackageManager(laravelSite) == "npm",
             "runtime health defaults Node projects to npm"
