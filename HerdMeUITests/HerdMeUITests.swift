@@ -69,10 +69,42 @@ final class HerdMeUITests: XCTestCase {
         retainScreenshot(named: "application-shell-ar", from: app)
     }
 
+    func testDashboardCardsAndSiteCommandBarAreAvailable() throws {
+        let app = try launchApplication(onboardingCompleted: true, seedSite: true)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+
+        for identifier in ["sites", "services", "mail", "dumps"] {
+            XCTAssertTrue(
+                app.descendants(matching: .any)["dashboard.metric.\(identifier)"]
+                    .waitForExistence(timeout: 5),
+                "Missing Dashboard metric: \(identifier)"
+            )
+        }
+
+        let sitesButton = app.buttons["sidebar.sites"]
+        XCTAssertTrue(sitesButton.waitForExistence(timeout: 5))
+        click(sitesButton, in: window)
+
+        for identifier in ["open", "folder", "terminal", "environment", "more"] {
+            XCTAssertTrue(
+                app.descendants(matching: .any)["sites.command.\(identifier)"]
+                    .waitForExistence(timeout: 5),
+                "Missing site command: \(identifier)"
+            )
+        }
+        XCTAssertTrue(
+            app.descendants(matching: .any)["sites.preview.toggle"]
+                .waitForExistence(timeout: 5)
+        )
+        retainScreenshot(named: "sites-command-bar", from: app)
+    }
+
     private func launchApplication(
         onboardingCompleted: Bool,
         language: String = "en",
-        locale: String = "en_US"
+        locale: String = "en_US",
+        seedSite: Bool = false
     ) throws -> XCUIApplication {
         let fileManager = FileManager.default
         let rootURL = fileManager.temporaryDirectory.appendingPathComponent(
@@ -83,8 +115,20 @@ final class HerdMeUITests: XCTestCase {
 
         if onboardingCompleted {
             let projectsURL = rootURL.appendingPathComponent("Projects", isDirectory: true)
+            if seedSite {
+                let publicURL =
+                    projectsURL
+                    .appendingPathComponent("demo", isDirectory: true)
+                    .appendingPathComponent("public", isDirectory: true)
+                try fileManager.createDirectory(at: publicURL, withIntermediateDirectories: true)
+                try Data("<?php echo 'HerdMe';".utf8).write(
+                    to: publicURL.appendingPathComponent("index.php"),
+                    options: .atomic
+                )
+            }
             let configuration: [String: Any] = [
                 "configSchemaVersion": 1,
+                "independenceMigrationVersion": 1,
                 "parkPaths": [projectsURL.path],
                 "startAutomatically": false,
                 "automaticUpdates": false,

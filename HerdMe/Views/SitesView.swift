@@ -149,16 +149,6 @@ struct SitesView: View {
             .buttonStyle(.borderless)
             .help("Refresh sites")
             .accessibilityLabel("Refresh sites")
-            Button {
-                showPreview.toggle()
-                model.configuration.sitePreviews = showPreview
-                model.persist()
-            } label: {
-                Image(systemName: showPreview ? "photo" : "photo.slash")
-            }
-            .buttonStyle(.borderless)
-            .help("Toggle site previews")
-            .accessibilityLabel(showPreview ? "Hide site previews" : "Show site previews")
             TextField("Search", text: $search)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 230)
@@ -186,25 +176,34 @@ struct SitesView: View {
                             Button {
                                 navigation.selectedSiteID = site.id
                             } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: frameworkSymbol(for: site.framework))
-                                        .foregroundStyle(.secondary)
-                                        .frame(width: 16)
+                                HStack(spacing: 10) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(Color.accentColor.opacity(0.10))
+                                        Image(systemName: frameworkSymbol(for: site.framework))
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundStyle(Color.accentColor)
+                                    }
+                                    .frame(width: 32, height: 32)
+                                    .accessibilityHidden(true)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(site.domain(tld: model.configuration.tld))
+                                            .font(.callout.weight(.medium))
                                             .lineLimit(1)
-                                        Text("PHP \(site.phpVersion ?? model.configuration.selectedPHP)")
-                                            .font(.caption2.monospacedDigit())
-                                            .foregroundStyle(.secondary)
-                                        if let gitTitle = gitListStatusTitle(for: site) {
-                                            HStack(spacing: 4) {
-                                                Image(systemName: "arrow.triangle.branch")
-                                                Text(gitTitle)
-                                                    .lineLimit(1)
+                                        HStack(spacing: 6) {
+                                            Text(site.framework)
+                                                .lineLimit(1)
+                                            if let gitTitle = gitListStatusTitle(for: site) {
+                                                Spacer(minLength: 2)
+                                                HStack(spacing: 3) {
+                                                    Image(systemName: "arrow.triangle.branch")
+                                                    Text(gitTitle)
+                                                        .lineLimit(1)
+                                                }
                                             }
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
                                         }
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
                                     }
                                     Spacer(minLength: 4)
                                     Circle()
@@ -212,6 +211,7 @@ struct SitesView: View {
                                         .frame(width: 7, height: 7)
                                         .help(siteStatusTitle(for: site))
                                 }
+                                .padding(.vertical, 5)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
                             }
@@ -318,6 +318,8 @@ struct SitesView: View {
             VStack(spacing: 0) {
                 siteHeader(site)
                 Divider()
+                siteCommandBar(site)
+                Divider()
                 HStack(spacing: 22) {
                     ForEach(SiteTab.allCases, id: \.self) { item in
                         Button(item.localizedTitle) { tab = item }
@@ -388,6 +390,11 @@ struct SitesView: View {
                     .lineLimit(1)
                 }
                 Spacer(minLength: 8)
+                Toggle("Live Preview", isOn: previewBinding)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .fixedSize()
+                    .accessibilityIdentifier("sites.preview.toggle")
             }
 
             HStack(spacing: 6) {
@@ -403,104 +410,78 @@ struct SitesView: View {
                 Spacer(minLength: 4)
             }
 
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) {
-                    Button {
-                        model.openSite(site)
-                    } label: {
-                        Label("Open", systemImage: "safari")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    Button {
-                        model.openTerminal(for: site)
-                    } label: {
-                        Label("Terminal", systemImage: "terminal")
-                    }
-                    .buttonStyle(.bordered)
-                    Button {
-                        model.openTinker(for: site)
-                    } label: {
-                        Label("Tinker", systemImage: "chevron.left.forwardslash.chevron.right")
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(site.framework != "Laravel")
-                    Button {
-                        artisanSite = site
-                    } label: {
-                        Label("Artisan", systemImage: "hammer")
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(site.framework != "Laravel")
-                    Button {
-                        npmSite = site
-                    } label: {
-                        Label("npm", systemImage: "play.rectangle")
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!hasPackageJSON(site))
-                    Button {
-                        environmentSite = site
-                    } label: {
-                        Label("Edit .env", systemImage: "doc.text")
-                    }
-                    .buttonStyle(.bordered)
-                    Button(role: .destructive) {
-                        requestRemoval(of: site)
-                    } label: {
-                        Label(
-                            siteRemovalTitle(for: site),
-                            systemImage: site.isLinked ? "link.badge.minus" : "trash"
-                        )
-                    }
-                    .buttonStyle(.bordered)
-                    siteMoreActions(site)
-                    Spacer(minLength: 0)
-                }
-
-                HStack(spacing: 8) {
-                    compactSiteAction("Open in Browser", systemImage: "safari") {
-                        model.openSite(site)
-                    }
-                    compactSiteAction("Open Terminal", systemImage: "terminal") {
-                        model.openTerminal(for: site)
-                    }
-                    compactSiteAction(
-                        "Open Tinker",
-                        systemImage: "chevron.left.forwardslash.chevron.right",
-                        disabled: site.framework != "Laravel"
-                    ) {
-                        model.openTinker(for: site)
-                    }
-                    compactSiteAction(
-                        "Run Artisan Command",
-                        systemImage: "hammer",
-                        disabled: site.framework != "Laravel"
-                    ) {
-                        artisanSite = site
-                    }
-                    compactSiteAction(
-                        "Run npm Script",
-                        systemImage: "play.rectangle",
-                        disabled: !hasPackageJSON(site)
-                    ) {
-                        npmSite = site
-                    }
-                    compactSiteAction("Edit .env", systemImage: "doc.text") {
-                        environmentSite = site
-                    }
-                    compactSiteAction(
-                        siteRemovalTitle(for: site),
-                        systemImage: site.isLinked ? "link.badge.minus" : "trash"
-                    ) {
-                        requestRemoval(of: site)
-                    }
-                    siteMoreActions(site)
-                    Spacer(minLength: 0)
-                }
-            }
         }
         .padding(16)
         .accessibilityElement(children: .contain)
+    }
+
+    private var previewBinding: Binding<Bool> {
+        Binding(
+            get: { showPreview },
+            set: { value in
+                showPreview = value
+                model.configuration.sitePreviews = value
+                model.persist()
+            }
+        )
+    }
+
+    private func siteCommandBar(_ site: SiteProject) -> some View {
+        HStack(spacing: 8) {
+            compactSiteAction(
+                "Open in Browser",
+                systemImage: "safari",
+                accessibilityIdentifier: "sites.command.open"
+            ) {
+                model.openSite(site)
+            }
+            Menu {
+                Button {
+                    copySiteURL(site)
+                } label: {
+                    Label("Copy Link", systemImage: "link")
+                }
+                Button {
+                    copyToPasteboard(site.path.path)
+                } label: {
+                    Label("Copy Path", systemImage: "doc.on.doc")
+                }
+            } label: {
+                Image(systemName: "doc.on.doc")
+                    .frame(width: 18, height: 18)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .help("Copy site link or path")
+            .accessibilityLabel("Copy site link or path")
+            .accessibilityIdentifier("sites.command.copy")
+            compactSiteAction(
+                "Open Project Folder",
+                systemImage: "folder",
+                accessibilityIdentifier: "sites.command.folder"
+            ) {
+                NSWorkspace.shared.open(site.path)
+            }
+            compactSiteAction(
+                "Open Terminal",
+                systemImage: "terminal",
+                accessibilityIdentifier: "sites.command.terminal"
+            ) {
+                model.openTerminal(for: site)
+            }
+            compactSiteAction(
+                "Edit .env",
+                systemImage: "pencil",
+                accessibilityIdentifier: "sites.command.environment"
+            ) {
+                environmentSite = site
+            }
+            Spacer(minLength: 8)
+            siteMoreActions(site)
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 46)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
     }
 
     private func siteMetadataBadge(_ title: String, systemImage: String) -> some View {
@@ -522,6 +503,7 @@ struct SitesView: View {
         _ title: String,
         systemImage: String,
         disabled: Bool = false,
+        accessibilityIdentifier: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -532,6 +514,7 @@ struct SitesView: View {
         .disabled(disabled)
         .help(title)
         .accessibilityLabel(title)
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 
     private func siteMoreActions(_ site: SiteProject) -> some View {
@@ -545,6 +528,7 @@ struct SitesView: View {
         .fixedSize()
         .help("More site actions")
         .accessibilityLabel("More site actions")
+        .accessibilityIdentifier("sites.command.more")
     }
 
     @ViewBuilder
