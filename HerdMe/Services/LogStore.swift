@@ -39,6 +39,10 @@ struct LogStore: Sendable {
 
         var files: [LocalLogFile] = []
         for case let url as URL in enumerator {
+            if Task.isCancelled {
+                enumerator.skipDescendants()
+                return []
+            }
             guard let values = try? url.resourceValues(forKeys: Set(keys)),
                 values.isRegularFile == true
             else { continue }

@@ -99,13 +99,13 @@ struct PHPView: View {
             SettingsPanel {
                 VStack(spacing: 8) {
                     SettingRow("Max File Upload Size:", detail: "Maximum upload size accepted by PHP, in MB.") {
-                        TextField("", value: $runtimeCoordinator.phpRequestSettings.maxUploadMegabytes, format: .number)
+                        TextField("Max File Upload Size", value: $runtimeCoordinator.phpRequestSettings.maxUploadMegabytes, format: .number)
                             .frame(width: 100)
                             .onSubmit { model.persistPHPRequestSettings() }
                     }
                     PanelDivider()
                     SettingRow("Memory Limit:", detail: "Maximum memory available to PHP scripts, in MB.") {
-                        TextField("", value: $runtimeCoordinator.phpRequestSettings.memoryLimitMegabytes, format: .number)
+                        TextField("Memory Limit", value: $runtimeCoordinator.phpRequestSettings.memoryLimitMegabytes, format: .number)
                             .frame(width: 100)
                             .onSubmit { model.persistPHPRequestSettings() }
                     }

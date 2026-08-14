@@ -120,6 +120,27 @@ enum ServiceEnvironmentFile {
         credentials: ServiceCredentials,
         fileManager: FileManager = .default
     ) throws -> ServiceEnvironmentUpdate {
+        let variables = ServiceEnvironmentConfiguration.variables(
+            for: instance,
+            credentials: credentials
+        )
+        guard !variables.isEmpty else {
+            throw ServiceEnvironmentError.unsupported(instance.name)
+        }
+        return try update(
+            projectURL: projectURL,
+            variables: variables,
+            serviceName: instance.name,
+            fileManager: fileManager
+        )
+    }
+
+    static func update(
+        projectURL: URL,
+        variables: [ServiceEnvironmentVariable],
+        serviceName: String,
+        fileManager: FileManager = .default
+    ) throws -> ServiceEnvironmentUpdate {
         var isDirectory: ObjCBool = false
         guard fileManager.fileExists(atPath: projectURL.path, isDirectory: &isDirectory),
             isDirectory.boolValue
@@ -127,12 +148,8 @@ enum ServiceEnvironmentFile {
             throw ServiceEnvironmentError.projectMissing
         }
 
-        let variables = ServiceEnvironmentConfiguration.variables(
-            for: instance,
-            credentials: credentials
-        )
         guard !variables.isEmpty else {
-            throw ServiceEnvironmentError.unsupported(instance.name)
+            throw ServiceEnvironmentError.unsupported(serviceName)
         }
 
         let environmentURL = projectURL.appendingPathComponent(".env")
@@ -153,7 +170,7 @@ enum ServiceEnvironmentFile {
         let merged = merging(
             initialContents,
             variables: variables,
-            serviceName: instance.name
+            serviceName: serviceName
         )
         try Data(merged.contents.utf8).write(to: environmentURL, options: .atomic)
         return ServiceEnvironmentUpdate(

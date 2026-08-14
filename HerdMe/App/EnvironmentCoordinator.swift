@@ -3,6 +3,7 @@ import Foundation
 
 struct EnvironmentEngineSnapshot: Sendable {
     let isRunning: Bool
+    let developmentSitesHealthy: Bool
     let hasManagedState: Bool
     let sitePorts: [String: Int]
     let proxyPort: Int?
@@ -60,6 +61,7 @@ final class EnvironmentCoordinator: ObservableObject {
             )
             return EnvironmentEngineSnapshot(
                 isRunning: engine.isRunning,
+                developmentSitesHealthy: engine.developmentSitesHealthy,
                 hasManagedState: engine.hasManagedState,
                 sitePorts: ports,
                 proxyPort: engine.proxyPort,
@@ -78,6 +80,7 @@ final class EnvironmentCoordinator: ObservableObject {
     func engineSnapshot() -> EnvironmentEngineSnapshot {
         EnvironmentEngineSnapshot(
             isRunning: engine.isRunning,
+            developmentSitesHealthy: engine.developmentSitesHealthy,
             hasManagedState: engine.hasManagedState,
             sitePorts: engine.ports,
             proxyPort: engine.proxyPort,

@@ -63,10 +63,10 @@ struct HerdMeApp: App {
                 .environmentObject(model.sitesCoordinator)
                 .environmentObject(model.environment)
                 .environmentObject(model.security)
-                .frame(minWidth: 730, idealWidth: 730, minHeight: 527, idealHeight: 527)
                 .onAppear { applicationDelegate.model = model }
         }
         .defaultSize(width: 730, height: 527)
+        .windowResizability(.contentMinSize)
         .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .commands {
             CommandGroup(replacing: .appSettings) {

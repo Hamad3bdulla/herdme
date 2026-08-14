@@ -18,6 +18,7 @@ final class TestLocalEnvironmentRunner: LocalEnvironmentRunning, @unchecked Send
     private var immediateStopCalls = 0
 
     var isRunning: Bool { queue.sync { running } }
+    var developmentSitesHealthy: Bool { true }
     var hasManagedState: Bool { queue.sync { managed } }
     var ports: [String: Int] { queue.sync { sitePorts } }
     var proxyPort: Int? { queue.sync { httpPort } }

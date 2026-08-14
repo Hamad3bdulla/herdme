@@ -282,6 +282,20 @@ final class ServiceProcessManager: @unchecked Sendable {
         return URL(string: "http://127.0.0.1:\(port)")
     }
 
+    func databaseClientURL(for instance: ServiceInstance) -> URL? {
+        guard let server = executableURL(for: instance.definitionID) else { return nil }
+        let directory = server.deletingLastPathComponent()
+        let names: [String]
+        switch instance.definitionID {
+        case "mysql": names = ["mysql"]
+        case "mariadb": names = ["mariadb", "mysql"]
+        case "postgresql": names = ["psql"]
+        default: return nil
+        }
+        return names.map { directory.appendingPathComponent($0) }
+            .first { fileManager.isExecutableFile(atPath: $0.path) }
+    }
+
     private func installSynchronously(definitionID: String) throws -> String {
         guard let descriptor = Self.descriptor(for: definitionID), let formula = descriptor.formula else {
             throw ServiceRuntimeError.unsupported(Self.displayName(for: definitionID))

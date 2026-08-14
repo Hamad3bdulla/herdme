@@ -41,11 +41,13 @@ struct DashboardView: View {
                     DashboardMetricCard(
                         title: "Services",
                         value: String(model.configuration.serviceInstances.count),
-                        detail: String.localizedStringWithFormat(
-                            String(localized: "%1$lld of %2$lld running"),
-                            Int64(runningServiceCount),
-                            Int64(model.configuration.serviceInstances.count)
-                        ),
+                        detail: model.configuration.serviceInstances.isEmpty
+                            ? String(localized: "No services added")
+                            : String.localizedStringWithFormat(
+                                String(localized: "%1$lld of %2$lld running"),
+                                Int64(runningServiceCount),
+                                Int64(model.configuration.serviceInstances.count)
+                            ),
                         symbol: "externaldrive",
                         tint: .green,
                         statusColor: summaryStatusColor(
@@ -158,7 +160,11 @@ struct DashboardView: View {
                 HStack(spacing: 8) {
                     Image(systemName: healthIssues.isEmpty ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                         .foregroundStyle(healthIssues.isEmpty ? Color.green : Color.orange)
-                    Text(healthIssues.isEmpty ? "Everything is ready" : "Needs attention")
+                    Text(
+                        healthIssues.isEmpty
+                            ? String(localized: "Everything is ready")
+                            : String(localized: "Needs attention")
+                    )
                         .font(.headline)
                 }
                 if healthIssues.isEmpty {
@@ -254,7 +260,7 @@ struct DashboardView: View {
             return securityCoordinator.isDNSServerRunning
                 ? String(localized: "Active") : String(localized: "Configured")
         }
-        return securityCoordinator.domainResolverState.title
+        return securityCoordinator.domainResolverState.localizedTitle
     }
 
     private var resolverColor: Color {

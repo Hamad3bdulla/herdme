@@ -24,7 +24,7 @@ struct DumpsView: View {
                         detail: "Listen for Laravel and Symfony VarDumper payloads on port \(model.configuration.dumpPort)."
                     ) {
                         Toggle(
-                            "",
+                            "Intercept dumps",
                             isOn: Binding(
                                 get: { dumpsCoordinator.isServerRunning },
                                 set: { $0 ? model.startDumpServer() : model.stopDumpServer() }
@@ -35,7 +35,10 @@ struct DumpsView: View {
                     }
                     PanelDivider()
                     SettingRow("Show new dumps on top") {
-                        Toggle("", isOn: $showNewOnTop).labelsHidden().toggleStyle(.switch)
+                        Toggle("Show Newest First", isOn: $showNewOnTop)
+                            .labelsHidden()
+                            .accessibilityLabel("Show Newest First")
+                            .toggleStyle(.switch)
                     }
                     PanelDivider()
                     SettingRow("Font Size") {
@@ -65,28 +68,24 @@ struct DumpsView: View {
                         .padding(.bottom, 8)
 
                         if displayedDumps.isEmpty {
-                            EmptyStateView(symbol: "shippingbox.and.arrow.backward", title: "No Dumps Yet", message: "")
+                            EmptyStateView(
+                                symbol: "shippingbox.and.arrow.backward",
+                                title: "No Dumps Yet",
+                                message: "Captured dumps will appear here."
+                            )
                         } else {
-                            ScrollView {
-                                LazyVStack(spacing: 2) {
-                                    ForEach(displayedDumps) { dump in
-                                        Button {
-                                            selectedDumpID = dump.id
-                                        } label: {
-                                            VStack(alignment: .leading, spacing: 3) {
-                                                Text(dump.source).font(.caption.weight(.medium)).lineLimit(1)
-                                                Text(dump.summary).font(.caption2.monospaced()).lineLimit(2)
-                                                Text(dump.receivedAt, style: .time).font(.caption2).foregroundStyle(.secondary)
-                                            }
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .padding(8)
-                                            .background(selectedDumpID == dump.id ? Color.accentColor.opacity(0.2) : Color.clear)
-                                            .clipShape(RoundedRectangle(cornerRadius: 5))
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
+                            List(displayedDumps, selection: $selectedDumpID) { dump in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(dump.source).font(.caption.weight(.medium)).lineLimit(1)
+                                    Text(dump.summary).font(.caption2.monospaced()).lineLimit(2)
+                                    Text(dump.receivedAt, style: .time).font(.caption2).foregroundStyle(.secondary)
                                 }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 4)
+                                .tag(dump.id)
                             }
+                            .listStyle(.plain)
+                            .scrollContentBackground(.hidden)
                         }
                     }
                     .frame(width: 250)
@@ -99,7 +98,11 @@ struct DumpsView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     } else {
-                        EmptyStateView(symbol: "shippingbox", title: "Select a dump", message: "")
+                        EmptyStateView(
+                            symbol: "shippingbox",
+                            title: "Select a dump",
+                            message: "Choose a dump to inspect its value."
+                        )
                     }
                 }
                 .frame(height: 250)

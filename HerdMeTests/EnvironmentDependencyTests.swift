@@ -147,6 +147,32 @@ private final class TestFastCGIListenerFactory: @unchecked Sendable {
     }
 }
 
+private actor TestXdebugManager: XdebugManaging {
+    private let installedResult: XdebugInstallation?
+    private let installError: Error?
+    private(set) var installedCycles: [String] = []
+    private(set) var installCycles: [String] = []
+
+    init(installed: XdebugInstallation? = nil, installError: Error? = nil) {
+        installedResult = installed
+        self.installError = installError
+    }
+
+    func installed(cycle: String, php: URL) async -> XdebugInstallation? {
+        installedCycles.append(cycle)
+        return installedResult
+    }
+
+    func install(cycle: String) async throws -> XdebugInstallation {
+        installCycles.append(cycle)
+        if let installError { throw installError }
+        return XdebugInstallation(
+            version: "3.5.3",
+            extensionURL: URL(fileURLWithPath: "/tmp/xdebug.so")
+        )
+    }
+}
+
 final class EnvironmentDependencyTests: XCTestCase {
     func testInjectedEnvironmentDependenciesOwnCompleteLifecycle() async throws {
         let fixture = try makeFixture()
@@ -219,6 +245,43 @@ final class EnvironmentDependencyTests: XCTestCase {
         XCTAssertEqual(gatewayFactory.listeners.first?.stopCount, 1)
         XCTAssertEqual(http.stopCount, 1)
         XCTAssertEqual(https.stopCount, 1)
+    }
+
+    func testXdebugAutomaticInstallFailureDoesNotBlockSiteStartup() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let xdebug = TestXdebugManager(
+            installError: XdebugInstallationError.buildToolMissing("make")
+        )
+        let engine = LocalEnvironmentEngine(
+            rootURL: fixture.engineRoot,
+            xdebugManager: xdebug,
+            fpmManager: TestProcessRunner(),
+            gatewayFactory: TestFastCGIListenerFactory().make,
+            httpProxy: TestHTTPListener(),
+            httpsProxy: TestHTTPListener()
+        )
+
+        _ = try await engine.start(
+            sites: [fixture.site],
+            defaultPHP: fixture.php,
+            defaultPHPCycle: "8.4",
+            tld: "test",
+            debuggerSettings: DebuggerSettings(
+                enabled: true,
+                detectBreakpoints: true,
+                port: 9_003,
+                ideKey: "VSCODE"
+            ),
+            enableHTTPS: false
+        )
+
+        XCTAssertTrue(engine.isRunning)
+        let installedCycles = await xdebug.installedCycles
+        let installCycles = await xdebug.installCycles
+        XCTAssertEqual(installedCycles, ["8.4"])
+        XCTAssertEqual(installCycles, ["8.4"])
+        await engine.stopAll()
     }
 
     private func makeFixture() throws -> (

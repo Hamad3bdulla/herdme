@@ -97,12 +97,16 @@ enum SidebarPage: String, CaseIterable, Identifiable {
     var tint: Color {
         switch self {
         case .dashboard: Color(red: 0.16, green: 0.55, blue: 0.36)
-        case .general, .sites: .gray
+        case .general: .gray
+        case .sites: .blue
         case .php: Color(red: 0.37, green: 0.40, blue: 0.58)
         case .node: Color(red: 0.27, green: 0.58, blue: 0.29)
-        case .services, .mail, .dumps, .debugger: Color(red: 0.88, green: 0.12, blue: 0.13)
+        case .services: .teal
+        case .mail: .indigo
+        case .dumps: .orange
+        case .debugger: .red
         case .logs: Color(red: 0.28, green: 0.50, blue: 0.90)
-        case .about: .black
+        case .about: .gray
         }
     }
 

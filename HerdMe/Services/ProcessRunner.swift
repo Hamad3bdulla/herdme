@@ -26,6 +26,12 @@ enum ProcessRunnerError: LocalizedError {
 }
 
 enum ProcessRunner {
+    private static let ioQueue = DispatchQueue(
+        label: "app.herdme.process-runner.io",
+        qos: .utility,
+        attributes: .concurrent
+    )
+
     static func run(
         _ executable: URL,
         arguments: [String] = [],
@@ -59,7 +65,7 @@ enum ProcessRunner {
 
         try process.run()
         readerGroup.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
+        ioQueue.async {
             while let chunk = try? pipe.fileHandleForReading.read(upToCount: 65_536),
                 !chunk.isEmpty
             {
@@ -70,7 +76,7 @@ enum ProcessRunner {
         }
         if let standardInput, let inputPipe {
             writerGroup.enter()
-            DispatchQueue.global(qos: .userInitiated).async {
+            ioQueue.async {
                 do {
                     try inputPipe.fileHandleForWriting.write(contentsOf: standardInput)
                 } catch {

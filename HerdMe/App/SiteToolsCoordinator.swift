@@ -1,11 +1,50 @@
+import Combine
 import Foundation
 
+enum SiteBackgroundProcessKind: String, CaseIterable, Sendable {
+    case queue
+    case scheduler
+
+    var title: String {
+        switch self {
+        case .queue: String(localized: "Queue Worker")
+        case .scheduler: String(localized: "Scheduler")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .queue: "arrow.trianglehead.2.clockwise.rotate.90"
+        case .scheduler: "calendar.badge.clock"
+        }
+    }
+}
+
+struct SiteBackgroundProcessSnapshot: Sendable {
+    enum Status: Equatable, Sendable {
+        case running
+        case stopping
+        case stopped
+        case failed
+    }
+
+    let kind: SiteBackgroundProcessKind
+    var status: Status
+    var output: String
+
+    var isActive: Bool { status == .running || status == .stopping }
+}
+
 @MainActor
-final class SiteToolsCoordinator {
+final class SiteToolsCoordinator: ObservableObject {
+    @Published private(set) var backgroundProcesses: [String: SiteBackgroundProcessSnapshot] = [:]
+
     private let rootURL: URL
     private let fileManager: FileManager
     private let terminalCommandLauncher: any TerminalCommandLaunching
     private let runtimeInspector: any NodeRuntimeInspecting
+    private var backgroundTasks: [String: Task<Void, Never>] = [:]
+    private var backgroundCancellations: [String: SiteOperationCancellation] = [:]
 
     init(
         rootURL: URL,
@@ -127,6 +166,124 @@ final class SiteToolsCoordinator {
             environment: managedNPMEnvironment(runtimeBin: runtimeBin),
             timeout: NPMScriptCatalog.timeout(for: scriptName)
         )
+    }
+
+    func backgroundProcess(
+        for site: SiteProject,
+        kind: SiteBackgroundProcessKind
+    ) -> SiteBackgroundProcessSnapshot? {
+        backgroundProcesses[backgroundKey(site: site, kind: kind)]
+    }
+
+    func toggleBackgroundProcess(
+        for site: SiteProject,
+        kind: SiteBackgroundProcessKind,
+        defaultPHP: String
+    ) {
+        let key = backgroundKey(site: site, kind: kind)
+        if backgroundProcesses[key]?.isActive == true {
+            backgroundProcesses[key]?.status = .stopping
+            backgroundCancellations[key]?.cancel()
+            backgroundTasks[key]?.cancel()
+            return
+        }
+
+        let arguments: [String]
+        switch kind {
+        case .queue: arguments = ["queue:work", "--no-interaction", "--tries=3", "--timeout=90"]
+        case .scheduler: arguments = ["schedule:work", "--no-interaction"]
+        }
+        let invocation: SiteToolInvocation
+        do {
+            invocation = try SiteToolchain(rootURL: rootURL).artisan(
+                site: site,
+                defaultPHP: defaultPHP,
+                arguments: arguments,
+                timeout: 24 * 60 * 60
+            )
+        } catch {
+            backgroundProcesses[key] = SiteBackgroundProcessSnapshot(
+                kind: kind,
+                status: .failed,
+                output: error.localizedDescription
+            )
+            return
+        }
+
+        let cancellation = SiteOperationCancellation()
+        backgroundCancellations[key] = cancellation
+        backgroundProcesses[key] = SiteBackgroundProcessSnapshot(
+            kind: kind,
+            status: .running,
+            output: ""
+        )
+        let task = Task { [weak self] in
+            do {
+                let result = try await SiteCommandRunner.run(
+                    invocation,
+                    cancellation: cancellation
+                ) { [weak self] data in
+                    let value = String(decoding: data, as: UTF8.self)
+                    Task { @MainActor [weak self] in self?.appendBackgroundOutput(value, key: key) }
+                }
+                guard !cancellation.isCancelled else {
+                    self?.finishBackgroundProcess(key: key, status: .stopped)
+                    return
+                }
+                if result.output.isEmpty == false {
+                    self?.appendBackgroundOutput(result.output, key: key)
+                }
+                self?.finishBackgroundProcess(
+                    key: key,
+                    status: result.status == 0 ? .stopped : .failed
+                )
+            } catch is CancellationError {
+                self?.finishBackgroundProcess(key: key, status: .stopped)
+            } catch let error as ProcessRunnerError {
+                switch error {
+                case .cancelled:
+                    self?.finishBackgroundProcess(key: key, status: .stopped)
+                case .timedOut:
+                    self?.appendBackgroundOutput(error.localizedDescription + "\n", key: key)
+                    self?.finishBackgroundProcess(key: key, status: .failed)
+                }
+            } catch {
+                self?.appendBackgroundOutput(error.localizedDescription + "\n", key: key)
+                self?.finishBackgroundProcess(key: key, status: .failed)
+            }
+        }
+        backgroundTasks[key] = task
+    }
+
+    func stopAllBackgroundProcesses() {
+        for cancellation in backgroundCancellations.values { cancellation.cancel() }
+        for task in backgroundTasks.values { task.cancel() }
+        backgroundTasks.removeAll()
+        backgroundCancellations.removeAll()
+        for key in backgroundProcesses.keys { backgroundProcesses[key]?.status = .stopped }
+    }
+
+    private func backgroundKey(site: SiteProject, kind: SiteBackgroundProcessKind) -> String {
+        site.id + "\n" + kind.rawValue
+    }
+
+    private func appendBackgroundOutput(_ value: String, key: String) {
+        guard !value.isEmpty, var snapshot = backgroundProcesses[key] else { return }
+        snapshot.output.append(contentsOf: value)
+        let data = Data(snapshot.output.utf8)
+        if data.count > 1_048_576 {
+            snapshot.output = String(decoding: data.suffix(1_048_576), as: UTF8.self)
+        }
+        backgroundProcesses[key] = snapshot
+    }
+
+    private func finishBackgroundProcess(
+        key: String,
+        status: SiteBackgroundProcessSnapshot.Status
+    ) {
+        backgroundProcesses[key]?.status = status
+        backgroundTasks[key] = nil
+        backgroundCancellations[key] = nil
     }
 
     private func managedPHPExecutable(cycle: String) -> URL {

@@ -700,6 +700,43 @@ extension ConfigurationAndSiteScannerTests {
         XCTAssertTrue(unsatisfiable.body.isEmpty)
     }
 
+    func testFastCGIGatewayCleansUpEmptyHealthChecksAndKeepsServing() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("healthy-after-probes".utf8).write(to: root.appendingPathComponent("health.txt"))
+
+        let gateway = LocalFastCGIGateway(documentRoot: root, fpmPort: 1)
+        let port = try gateway.start(preferredPort: 42_040)
+        defer { gateway.stop() }
+
+        let readyDeadline = ProcessInfo.processInfo.systemUptime + 2
+        while !LocalEnvironmentEngine.canConnect(port: port),
+            ProcessInfo.processInfo.systemUptime < readyDeadline
+        {
+            usleep(10_000)
+        }
+        XCTAssertTrue(LocalEnvironmentEngine.canConnect(port: port))
+
+        for _ in 0..<32 {
+            XCTAssertTrue(LocalEnvironmentEngine.canConnect(port: port))
+            usleep(5_000)
+        }
+
+        let deadline = ProcessInfo.processInfo.systemUptime + 2
+        while gateway.activeSessionCount > 0, ProcessInfo.processInfo.systemUptime < deadline {
+            usleep(10_000)
+        }
+        XCTAssertEqual(gateway.activeSessionCount, 0)
+
+        let response = try Self.sendHTTPRequest(
+            port: port,
+            request: "GET /health.txt HTTP/1.1\r\nHost: health.test\r\nConnection: close\r\n\r\n"
+        )
+        XCTAssertTrue(response.contains("200 OK"), response)
+        XCTAssertTrue(response.contains("healthy-after-probes"), response)
+    }
+
     func testHTTPProxyAndGatewayReusePersistentConnectionForStaticResponses() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

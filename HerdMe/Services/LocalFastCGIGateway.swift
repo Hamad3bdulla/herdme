@@ -18,6 +18,12 @@ final class LocalFastCGIGateway: @unchecked Sendable {
 
     var isRunning: Bool { listener != nil }
 
+    var activeSessionCount: Int {
+        sessionsLock.lock()
+        defer { sessionsLock.unlock() }
+        return sessions.count
+    }
+
     var isHealthy: Bool {
         guard listener != nil, let port else { return false }
         return LocalEnvironmentEngine.canConnect(port: port)
@@ -178,8 +184,18 @@ private final class FastCGIHTTPSession: @unchecked Sendable {
         }
         incoming.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, complete, error in
             guard let self, !self.stopped else { return }
-            if let data { self.buffer.append(data) }
-            if complete || error != nil { self.peerCompleted = true }
+            if let data, !data.isEmpty { self.buffer.append(data) }
+            if error != nil {
+                self.stopOnQueue()
+                return
+            }
+            if complete {
+                self.peerCompleted = true
+                guard !self.buffer.isEmpty else {
+                    self.stopOnQueue()
+                    return
+                }
+            }
             self.receiveRequest()
         }
     }

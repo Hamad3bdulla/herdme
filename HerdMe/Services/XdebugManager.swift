@@ -140,6 +140,11 @@ enum XdebugInstallationError: LocalizedError {
     }
 }
 
+protocol XdebugManaging: Sendable {
+    func installed(cycle: String, php: URL) async -> XdebugInstallation?
+    func install(cycle: String) async throws -> XdebugInstallation
+}
+
 actor XdebugManager {
     private let rootURL: URL
     private let fileManager: FileManager
@@ -463,3 +468,5 @@ actor XdebugManager {
         return (result.status, result.output)
     }
 }
+
+extension XdebugManager: XdebugManaging {}

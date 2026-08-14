@@ -9,6 +9,7 @@ struct SettingsPanel<Content: View>: View {
 
     var body: some View {
         content
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
             .background(Color(nsColor: .controlBackgroundColor))
             .overlay {
@@ -87,7 +88,7 @@ struct PanelDivider: View {
 struct EmptyStateView: View {
     let symbol: String
     let title: LocalizedStringKey
-    let message: LocalizedStringKey
+    var message: LocalizedStringKey?
     var actionTitle: LocalizedStringKey?
     var action: (() -> Void)?
 
@@ -98,11 +99,13 @@ struct EmptyStateView: View {
                 .foregroundStyle(.secondary)
             Text(title)
                 .font(.title3.weight(.semibold))
-            Text(message)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 420)
+            if let message {
+                Text(message)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 420)
+            }
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .buttonStyle(.borderedProminent)

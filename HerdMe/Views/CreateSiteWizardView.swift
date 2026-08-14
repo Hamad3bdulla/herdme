@@ -302,7 +302,7 @@ struct CreateSiteWizardView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
                 labeledField("Testing Framework") {
-                    Picker("", selection: $testingFramework) {
+                    Picker("Testing Framework", selection: $testingFramework) {
                         Text("Pest").tag("Pest")
                         Text("PHPUnit").tag("PHPUnit")
                     }
@@ -410,7 +410,7 @@ struct CreateSiteWizardView: View {
 
     @ViewBuilder
     private var creationFooter: some View {
-        Button(isCreating ? (isCancelling ? "Cancelling..." : "Cancel") : (createdSiteURL == nil ? "Cancel" : "Close")) {
+        Button(creationDismissTitle) {
             if isCreating {
                 cancelCreation()
             } else {
@@ -435,6 +435,13 @@ struct CreateSiteWizardView: View {
                     .buttonStyle(.borderedProminent)
             }
         }
+    }
+
+    private var creationDismissTitle: String {
+        if isCreating {
+            return isCancelling ? String(localized: "Cancelling") : String(localized: "Cancel")
+        }
+        return createdSiteURL == nil ? String(localized: "Cancel") : String(localized: "Close")
     }
 
     private func templateCard(_ value: SiteTemplate, symbol: String, tint: Color) -> some View {
@@ -563,9 +570,12 @@ struct CreateSiteWizardView: View {
     }
 
     private var creationHeading: String {
-        if createdSiteURL != nil { return "Your Site Is Ready" }
-        if creationError != nil { return "Site Creation Stopped" }
-        return "Creating \(projectName.trimmingCharacters(in: .whitespacesAndNewlines))"
+        if createdSiteURL != nil { return String(localized: "Your Site Is Ready") }
+        if creationError != nil { return String(localized: "Site Creation Stopped") }
+        return String.localizedStringWithFormat(
+            String(localized: "Creating %@"),
+            projectName.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
     }
 
     private var canRetryCreation: Bool {

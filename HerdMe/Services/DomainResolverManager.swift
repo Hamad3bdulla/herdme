@@ -81,11 +81,11 @@ enum DomainResolverState: Equatable, Sendable {
     case managed
     case external
 
-    var title: String {
+    var localizedTitle: String {
         switch self {
-        case .missing: "Not configured"
-        case .managed: "HerdMe"
-        case .external: "External"
+        case .missing: String(localized: "Not configured")
+        case .managed: String(localized: "HerdMe")
+        case .external: String(localized: "External")
         }
     }
 }

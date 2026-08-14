@@ -2,6 +2,18 @@ import AppKit
 import Combine
 import Foundation
 
+private final class AutomaticHTTPSPreparationState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var finished = false
+    private var failure: String?
+
+    var isFinished: Bool { lock.withLock { finished } }
+    var errorDescription: String? { lock.withLock { failure } }
+
+    func finish() { lock.withLock { finished = true } }
+    func fail(_ message: String) { lock.withLock { failure = message } }
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     private static let automaticHTTPSKeychainAccessKey =
@@ -1506,6 +1518,7 @@ final class AppModel: ObservableObject {
 
         applicationSettings.shutdown()
         applicationTasks.cancelAllImmediately()
+        siteTools.stopAllBackgroundProcesses()
         environment.stopImmediately()
         mail.shutdown()
         dumpsCoordinator.shutdown()
@@ -1717,6 +1730,23 @@ final class AppModel: ObservableObject {
         let previousStatus = environmentStatus
         let engineSnapshot = environment.engineSnapshot()
         if engineSnapshot.isRunning {
+            if !engineSnapshot.developmentSitesHealthy {
+                do {
+                    try await startLocalEnvironment()
+                    let recovered = environment.engineSnapshot().developmentSitesHealthy
+                    try? logStore.append(
+                        recovered
+                            ? "Recovered stopped site development servers."
+                            : "Site development servers are still unavailable; check frontend dependencies and development logs."
+                    )
+                    return
+                } catch {
+                    try? logStore.append(
+                        "HerdMe could not recover site development servers: "
+                            + error.localizedDescription
+                    )
+                }
+            }
             apply(
                 EnvironmentEndpoints(
                     sitePorts: engineSnapshot.sitePorts,
@@ -1919,28 +1949,41 @@ final class AppModel: ObservableObject {
             )
         else { return }
 
-        let manager = security.certificateManager
+        // Keep a stalled automatic Keychain lookup from locking the manager
+        // used by the explicit HTTPS action.
+        let manager = LocalCertificateManager(rootURL: configurationStore.rootURL)
         let tld = configuration.tld
         let domains = sites.map { $0.domain(tld: tld) }
-        do {
-            try await Self.performBlockingOperation {
-                _ = try manager.prepareIdentity(
-                    tld: tld,
-                    domains: domains,
-                    allowKeychainInteraction: false
-                )
-                return ()
+        let state = AutomaticHTTPSPreparationState()
+        Task.detached(priority: .utility) {
+            defer { state.finish() }
+            do {
+                try await Self.performBlockingOperation {
+                    _ = try manager.prepareIdentity(
+                        tld: tld,
+                        domains: domains,
+                        allowKeychainInteraction: false
+                    )
+                    return ()
+                }
+            } catch {
+                state.fail(error.localizedDescription)
             }
-        } catch {
-            // App updates can invalidate a legacy Keychain ACL. Stop retrying
-            // silently until the user explicitly enables HTTPS for this build.
-            UserDefaults.standard.set(
-                false,
-                forKey: Self.automaticHTTPSKeychainAccessKey
-            )
+        }
+
+        // Security.framework can wait indefinitely when an old Keychain ACL
+        // needs user approval. Do not hold HTTP site startup behind that call.
+        try? await Task.sleep(for: .seconds(2))
+        guard state.isFinished else {
+            UserDefaults.standard.set(false, forKey: Self.automaticHTTPSKeychainAccessKey)
             try? logStore.append(
-                "Automatic HTTPS credential approval failed: " + error.localizedDescription
+                "Automatic HTTPS credential approval timed out. Sites will start over HTTP."
             )
+            return
+        }
+        if let error = state.errorDescription {
+            UserDefaults.standard.set(false, forKey: Self.automaticHTTPSKeychainAccessKey)
+            try? logStore.append("Automatic HTTPS credential approval failed: " + error)
         }
     }
 

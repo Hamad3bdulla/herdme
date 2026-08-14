@@ -162,7 +162,6 @@ struct ServicesView: View {
                     Label("Add Service", systemImage: "plus")
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.red)
             }
         }
         .sheet(isPresented: $showingAddService) {

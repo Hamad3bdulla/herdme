@@ -100,11 +100,45 @@ final class HerdMeUITests: XCTestCase {
         retainScreenshot(named: "sites-command-bar", from: app)
     }
 
+    func testSwitchingToALargeProjectLogRemainsResponsive() throws {
+        let app = try launchApplication(onboardingCompleted: true, seedLargeLogs: true)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+
+        let sitesMetric = app.buttons["dashboard.metric.sites"]
+        XCTAssertTrue(sitesMetric.waitForExistence(timeout: 5))
+        let discoveredSite = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "1"),
+            object: sitesMetric
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [discoveredSite], timeout: 10),
+            .completed,
+            "The seeded project was not discovered before opening the log source menu"
+        )
+
+        let logsButton = app.buttons["sidebar.logs"]
+        XCTAssertTrue(logsButton.waitForExistence(timeout: 5))
+        click(logsButton, in: window)
+
+        let sourcePicker = app.popUpButtons["logs.source"]
+        XCTAssertTrue(sourcePicker.waitForExistence(timeout: 5))
+        sourcePicker.click()
+        let projectSource = app.menuItems["large-logs"]
+        XCTAssertTrue(projectSource.waitForExistence(timeout: 3))
+        projectSource.click()
+
+        XCTAssertTrue(app.staticTexts["laravel.log"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.scrollViews["logs.content"].waitForExistence(timeout: 5))
+        retainScreenshot(named: "large-project-log", from: app)
+    }
+
     private func launchApplication(
         onboardingCompleted: Bool,
         language: String = "en",
         locale: String = "en_US",
-        seedSite: Bool = false
+        seedSite: Bool = false,
+        seedLargeLogs: Bool = false
     ) throws -> XCUIApplication {
         let fileManager = FileManager.default
         let rootURL = fileManager.temporaryDirectory.appendingPathComponent(
@@ -123,6 +157,20 @@ final class HerdMeUITests: XCTestCase {
                 try fileManager.createDirectory(at: publicURL, withIntermediateDirectories: true)
                 try Data("<?php echo 'HerdMe';".utf8).write(
                     to: publicURL.appendingPathComponent("index.php"),
+                    options: .atomic
+                )
+            }
+            if seedLargeLogs {
+                let siteURL = projectsURL.appendingPathComponent("large-logs", isDirectory: true)
+                let logsURL =
+                    siteURL
+                    .appendingPathComponent("storage", isDirectory: true)
+                    .appendingPathComponent("logs", isDirectory: true)
+                try fileManager.createDirectory(at: logsURL, withIntermediateDirectories: true)
+                try Data().write(to: siteURL.appendingPathComponent("artisan"), options: .atomic)
+                let line = "[2026-08-07 18:00:00] local.INFO: Large log rendering regression entry\n"
+                try Data(String(repeating: line, count: 14_000).utf8).write(
+                    to: logsURL.appendingPathComponent("laravel.log"),
                     options: .atomic
                 )
             }

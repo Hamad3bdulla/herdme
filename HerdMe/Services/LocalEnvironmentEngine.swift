@@ -29,6 +29,7 @@ enum LocalEnvironmentError: LocalizedError {
 
 protocol LocalEnvironmentRunning: Sendable {
     var isRunning: Bool { get }
+    var developmentSitesHealthy: Bool { get }
     var hasManagedState: Bool { get }
     var ports: [String: Int] { get }
     var proxyPort: Int? { get }
@@ -53,9 +54,12 @@ final class LocalEnvironmentEngine: LocalEnvironmentRunning, @unchecked Sendable
     let rootURL: URL
     private let fileManager = FileManager.default
     private let phpValidator = PHPRuntimeValidator()
+    private let xdebugManager: any XdebugManaging
     private let fpmManager: any ProcessRunning
     private let gatewayFactory: FastCGIListenerFactory
     private var gateways: [String: any FastCGIListening] = [:]
+    private var developmentServers: [String: SiteDevelopmentServer] = [:]
+    private var configuredSites: [SiteProject] = []
     private let httpProxy: any HTTPListening
     private let httpsProxy: any HTTPListening
     private let certificateManager: LocalCertificateManager
@@ -68,6 +72,7 @@ final class LocalEnvironmentEngine: LocalEnvironmentRunning, @unchecked Sendable
     init(
         rootURL: URL,
         certificateManager: LocalCertificateManager? = nil,
+        xdebugManager: (any XdebugManaging)? = nil,
         fpmManager: (any ProcessRunning)? = nil,
         gatewayFactory: @escaping FastCGIListenerFactory = {
             LocalFastCGIGateway(documentRoot: $0, fpmPort: $1)
@@ -76,6 +81,7 @@ final class LocalEnvironmentEngine: LocalEnvironmentRunning, @unchecked Sendable
         httpsProxy: (any HTTPListening)? = nil
     ) {
         self.rootURL = rootURL
+        self.xdebugManager = xdebugManager ?? XdebugManager(rootURL: rootURL)
         self.fpmManager = fpmManager ?? PHPFPMManager(rootURL: rootURL)
         self.gatewayFactory = gatewayFactory
         self.httpProxy = httpProxy ?? LocalHTTPProxy()
@@ -91,9 +97,14 @@ final class LocalEnvironmentEngine: LocalEnvironmentRunning, @unchecked Sendable
             && (httpsProxyPort == nil || httpsProxy.isHealthy)
     }
 
+    var developmentSitesHealthy: Bool {
+        developmentServersAreHealthy(for: configuredSites)
+    }
+
     var hasManagedState: Bool {
         fpmManager.isRunning
             || !gateways.isEmpty
+            || !developmentServers.isEmpty
             || proxyPort != nil
             || httpsProxyPort != nil
     }
@@ -112,10 +123,18 @@ final class LocalEnvironmentEngine: LocalEnvironmentRunning, @unchecked Sendable
             throw LocalEnvironmentError.phpMissing
         }
         _ = Self.removeLegacyRouterArtifacts(rootURL: rootURL, fileManager: fileManager)
-        if isRunning { return ports }
+        if isRunning {
+            configuredSites = sites
+            if !developmentServersAreHealthy(for: sites) {
+                try await startDevelopmentServers(for: sites)
+                await updateProxyRoutes(for: sites, tld: tld)
+            }
+            return ports
+        }
         if hasManagedState { await stopAll() }
         httpsStartupError = nil
         httpsStartupNeedsApproval = false
+        configuredSites = sites
 
         let logsDirectory = rootURL.appendingPathComponent("Log/sites", isDirectory: true)
         try fileManager.createDirectory(at: logsDirectory, withIntermediateDirectories: true)
@@ -127,6 +146,10 @@ final class LocalEnvironmentEngine: LocalEnvironmentRunning, @unchecked Sendable
                 let php = phpExecutable(for: site) ?? defaultPHP
                 if validatedPHP.insert(php.path).inserted {
                     try phpValidator.validate(executable: php)
+                    if debuggerSettings.enabled {
+                        let cycle = site.phpVersion ?? defaultPHPCycle ?? "default"
+                        try await prepareXdebugIfNeeded(cycle: cycle, php: php)
+                    }
                 }
                 let fpm = Self.phpFPMExecutable(for: php)
                 guard fileManager.isExecutableFile(atPath: fpm.path) else {
@@ -168,11 +191,8 @@ final class LocalEnvironmentEngine: LocalEnvironmentRunning, @unchecked Sendable
                 gateways[site.id] = gateway
                 ports[site.id] = gatewayPort
             }
-            var routes: [String: Int] = [:]
-            for site in sites {
-                guard let port = ports[site.id] else { continue }
-                routes[site.domain(tld: tld)] = port
-            }
+            try await startDevelopmentServers(for: sites)
+            let routes = routeMap(for: sites, tld: tld)
             proxyPort = try httpProxy.start(
                 routes: routes,
                 identity: nil,
@@ -219,6 +239,9 @@ final class LocalEnvironmentEngine: LocalEnvironmentRunning, @unchecked Sendable
         httpsProxyPort = nil
         for gateway in gateways.values { gateway.stop() }
         gateways.removeAll()
+        for server in developmentServers.values { await server.stop() }
+        developmentServers.removeAll()
+        configuredSites.removeAll()
         await fpmManager.stopAll()
         ports.removeAll()
         httpsStartupError = nil
@@ -232,6 +255,11 @@ final class LocalEnvironmentEngine: LocalEnvironmentRunning, @unchecked Sendable
         httpsProxyPort = nil
         for gateway in gateways.values { gateway.stop() }
         gateways.removeAll()
+        for server in developmentServers.values {
+            Task { await server.stop() }
+        }
+        developmentServers.removeAll()
+        configuredSites.removeAll()
         fpmManager.stopAllImmediately()
         ports.removeAll()
         httpsStartupError = nil
@@ -266,6 +294,75 @@ final class LocalEnvironmentEngine: LocalEnvironmentRunning, @unchecked Sendable
         guard let cycle = site.phpVersion else { return nil }
         let executable = rootURL.appendingPathComponent("Runtimes/php/\(cycle)/bin/php")
         return fileManager.isExecutableFile(atPath: executable.path) ? executable : nil
+    }
+
+    private func prepareXdebugIfNeeded(cycle: String, php: URL) async throws {
+        guard await xdebugManager.installed(cycle: cycle, php: php) == nil else { return }
+        do {
+            _ = try await xdebugManager.install(cycle: cycle)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            try? LogStore(rootURL: rootURL.appendingPathComponent("Log", isDirectory: true)).append(
+                "Xdebug for PHP \(cycle) could not be installed automatically. Sites will start without the debugger: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func routeMap(for sites: [SiteProject], tld: String) -> [String: Int] {
+        sites.reduce(into: [:]) { routes, site in
+            guard let phpPort = ports[site.id] else { return }
+            if let development = developmentServers[site.id], development.proxiesSiteTraffic,
+                let developmentPort = development.port
+            {
+                routes[site.domain(tld: tld)] = developmentPort
+            } else {
+                routes[site.domain(tld: tld)] = phpPort
+            }
+        }
+    }
+
+    private func updateProxyRoutes(for sites: [SiteProject], tld: String) async {
+        let routes = routeMap(for: sites, tld: tld)
+        httpProxy.update(routes: routes)
+        if httpsProxyPort != nil { httpsProxy.update(routes: routes) }
+    }
+
+    private func startDevelopmentServers(for sites: [SiteProject]) async throws {
+        let expectedSites = sites.filter {
+            SiteDevelopmentServer.isDevelopmentSite($0, fileManager: fileManager)
+        }
+        let expectedIDs = Set(expectedSites.map(\.id))
+        let obsoleteIDs = developmentServers.keys.filter { !expectedIDs.contains($0) }
+        for id in obsoleteIDs {
+            guard let server = developmentServers.removeValue(forKey: id) else { continue }
+            await server.stop()
+        }
+
+        for site in expectedSites {
+            if let existing = developmentServers[site.id], existing.isRunning { continue }
+            let server = developmentServers[site.id] ?? SiteDevelopmentServer(rootURL: rootURL, fileManager: fileManager)
+            do {
+                _ = try await server.start(site: site)
+                developmentServers[site.id] = server
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                developmentServers[site.id] = server
+                try? LogStore(rootURL: rootURL.appendingPathComponent("Log", isDirectory: true)).append(
+                    "The development server for \(site.name) could not start: \(error.localizedDescription)"
+                )
+            }
+        }
+    }
+
+    private func developmentServersAreHealthy(for sites: [SiteProject]) -> Bool {
+        let expected = sites.filter { SiteDevelopmentServer.isDevelopmentSite($0, fileManager: fileManager) }
+        guard Set(expected.map(\.id)) == Set(developmentServers.keys) else { return false }
+        return expected.allSatisfy { site in
+            guard let server = developmentServers[site.id], server.isRunning else { return false }
+            return server.port.map(Self.canConnect(port:)) == true
+        }
     }
 
     static func phpFPMExecutable(for php: URL) -> URL {

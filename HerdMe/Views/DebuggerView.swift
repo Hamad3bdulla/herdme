@@ -38,7 +38,7 @@ struct DebuggerView: View {
                     }
                     PanelDivider()
                     SettingRow("Enable Xdebug") {
-                        Toggle("", isOn: $runtimeCoordinator.debuggerSettings.enabled)
+                        Toggle("Enable Xdebug", isOn: $runtimeCoordinator.debuggerSettings.enabled)
                             .labelsHidden()
                             .toggleStyle(.switch)
                             .disabled(runtimeCoordinator.xdebugInstallation == nil)
@@ -48,7 +48,7 @@ struct DebuggerView: View {
                     }
                     PanelDivider()
                     SettingRow("Require Debug Trigger") {
-                        Toggle("", isOn: $runtimeCoordinator.debuggerSettings.startOnlyOnTrigger)
+                        Toggle("Require Debug Trigger", isOn: $runtimeCoordinator.debuggerSettings.startOnlyOnTrigger)
                             .labelsHidden()
                             .toggleStyle(.switch)
                             .help("Start Xdebug only for requests that include XDEBUG_TRIGGER")
@@ -58,13 +58,13 @@ struct DebuggerView: View {
                     }
                     PanelDivider()
                     SettingRow("Debug Port") {
-                        TextField("", value: $runtimeCoordinator.debuggerSettings.port, format: .number.grouping(.never))
+                        TextField("Debug Port", value: $runtimeCoordinator.debuggerSettings.port, format: .number.grouping(.never))
                             .frame(width: 90)
                             .onSubmit { model.persistDebuggerSettings() }
                     }
                     PanelDivider()
                     SettingRow("IDE Key") {
-                        TextField("", text: $runtimeCoordinator.debuggerSettings.ideKey)
+                        TextField("IDE Key", text: $runtimeCoordinator.debuggerSettings.ideKey)
                             .frame(width: 120)
                             .onSubmit { model.persistDebuggerSettings() }
                     }
@@ -85,7 +85,7 @@ struct DebuggerView: View {
                     }
                     PanelDivider()
                     SettingRow("Site") {
-                        Picker("", selection: $selectedSiteID) {
+                        Picker("Site", selection: $selectedSiteID) {
                             ForEach(sitesCoordinator.sites) { site in
                                 Text(site.domain(tld: model.configuration.tld))
                                     .tag(Optional(site.id))

@@ -5,6 +5,33 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-08-14
+
+### Added
+
+- Add a complete site workspace with project health checks, Git details, runtime
+  controls, favorite commands, and guided repair actions.
+- Add per-site database provisioning and environment configuration for managed
+  MySQL and MariaDB services.
+- Add managed development-server detection and controls for Laravel asset builds,
+  Node.js projects, and nested frontend applications.
+- Add reusable site workflows for local mail configuration, project maintenance,
+  dependency installation, and application diagnostics.
+
+### Changed
+
+- Improve the site list, logs, mail, dumps, dashboard, sidebar, and setup views for
+  denser workflows and clearer operation state.
+- Keep service and site operations responsive while long-running processes stream
+  output in the background.
+
+### Fixed
+
+- Prevent local HTTP and FastCGI connections from accumulating after requests,
+  keeping multiple development sites responsive during sustained use.
+- Improve managed service startup, environment-file updates, domain repair, Xdebug
+  handling, and actionable error logging.
+
 ## [0.1.12] - 2026-08-13
 
 ### Added

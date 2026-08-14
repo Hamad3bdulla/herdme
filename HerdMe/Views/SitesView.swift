@@ -12,11 +12,13 @@ struct SitesView: View {
     @EnvironmentObject private var environmentCoordinator: EnvironmentCoordinator
     @EnvironmentObject private var securityCoordinator: SecuritySetupCoordinator
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.layoutDirection) private var layoutDirection
     @State private var search = ""
     @State private var tab = SiteTab.general
     @State private var showPreview = true
     @State private var artisanSite: SiteProject?
     @State private var npmSite: SiteProject?
+    @State private var toolsSite: SiteProject?
     @State private var environmentSite: SiteProject?
     @State private var sitePendingRemoval: SiteProject?
     @State private var siteDetails: SiteDetailsSnapshot?
@@ -67,6 +69,10 @@ struct SitesView: View {
             NPMScriptRunnerView(site: site)
                 .environmentObject(model)
         }
+        .sheet(item: $toolsSite, onDismiss: refreshSelectedSiteDetails) { site in
+            SiteControlCenterView(site: site, siteTools: model.siteTools)
+                .environmentObject(model)
+        }
         .sheet(item: $environmentSite, onDismiss: refreshSelectedSiteDetails) { site in
             SiteEnvironmentEditor(site: site)
         }
@@ -90,7 +96,7 @@ struct SitesView: View {
 
     private var toolbar: some View {
         HStack(spacing: 14) {
-            Image(systemName: "sidebar.left")
+            Image(systemName: layoutDirection == .rightToLeft ? "sidebar.right" : "sidebar.left")
                 .foregroundStyle(.secondary)
             Text("Sites")
                 .font(.headline)
@@ -123,7 +129,9 @@ struct SitesView: View {
             .accessibilityLabel("Sites environment")
             .accessibilityValue(
                 environmentCoordinator.status == .running
-                    ? environmentCoordinator.isHTTPSActive ? "Running, HTTPS active" : "Running, HTTP only"
+                    ? environmentCoordinator.isHTTPSActive
+                        ? String(localized: "Running, HTTPS active")
+                        : String(localized: "Running, HTTP only")
                     : environmentCoordinator.status.localizedTitle
             )
             Button {
@@ -137,8 +145,8 @@ struct SitesView: View {
                     || environmentCoordinator.status == .starting
                     || environmentCoordinator.status == .stopping
             )
-            .help(environmentCoordinator.status == .running ? "Stop all sites" : "Start all sites")
-            .accessibilityLabel(environmentCoordinator.status == .running ? "Stop all sites" : "Start all sites")
+            .help(environmentToggleTitle)
+            .accessibilityLabel(environmentToggleTitle)
             Spacer()
             Button {
                 gitRefreshID = UUID()
@@ -170,60 +178,51 @@ struct SitesView: View {
                     Spacer()
                 }
             } else {
-                List {
+                List(selection: $navigation.selectedSiteID) {
                     Section("Ungrouped") {
                         ForEach(filteredSites) { site in
-                            Button {
-                                navigation.selectedSiteID = site.id
-                            } label: {
-                                HStack(spacing: 10) {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .fill(Color.accentColor.opacity(0.10))
-                                        Image(systemName: frameworkSymbol(for: site.framework))
-                                            .font(.system(size: 14, weight: .medium))
-                                            .foregroundStyle(Color.accentColor)
-                                    }
-                                    .frame(width: 32, height: 32)
-                                    .accessibilityHidden(true)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(site.domain(tld: model.configuration.tld))
-                                            .font(.callout.weight(.medium))
+                            HStack(spacing: 10) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(Color.accentColor.opacity(0.10))
+                                    Image(systemName: frameworkSymbol(for: site.framework))
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundStyle(Color.accentColor)
+                                }
+                                .frame(width: 32, height: 32)
+                                .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(site.domain(tld: model.configuration.tld))
+                                        .font(.callout.weight(.medium))
+                                        .lineLimit(1)
+                                    HStack(spacing: 6) {
+                                        Text(site.framework)
                                             .lineLimit(1)
-                                        HStack(spacing: 6) {
-                                            Text(site.framework)
-                                                .lineLimit(1)
-                                            if let gitTitle = gitListStatusTitle(for: site) {
-                                                Spacer(minLength: 2)
-                                                HStack(spacing: 3) {
-                                                    Image(systemName: "arrow.triangle.branch")
-                                                    Text(gitTitle)
-                                                        .lineLimit(1)
-                                                }
+                                        if let gitTitle = gitListStatusTitle(for: site) {
+                                            Spacer(minLength: 2)
+                                            HStack(spacing: 3) {
+                                                Image(systemName: "arrow.triangle.branch")
+                                                Text(gitTitle)
+                                                    .lineLimit(1)
                                             }
                                         }
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
                                     }
-                                    Spacer(minLength: 4)
-                                    Circle()
-                                        .fill(siteStatusColor(for: site))
-                                        .frame(width: 7, height: 7)
-                                        .help(siteStatusTitle(for: site))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
                                 }
-                                .padding(.vertical, 5)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentShape(Rectangle())
+                                Spacer(minLength: 4)
+                                Circle()
+                                    .fill(siteStatusColor(for: site))
+                                    .frame(width: 7, height: 7)
+                                    .help(siteStatusTitle(for: site))
                             }
-                            .buttonStyle(.plain)
+                            .padding(.vertical, 5)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                            .tag(site.id)
                             .accessibilityLabel(site.domain(tld: model.configuration.tld))
                             .accessibilityValue(
                                 "PHP \(site.phpVersion ?? model.configuration.selectedPHP), \(siteStatusTitle(for: site))"
-                            )
-                            .listRowBackground(
-                                navigation.selectedSiteID == site.id
-                                    ? Color.accentColor.opacity(0.18)
-                                    : Color.clear
                             )
                             .contextMenu {
                                 siteActionMenu(site)
@@ -331,6 +330,7 @@ struct SitesView: View {
                                     Rectangle().fill(Color.accentColor).frame(height: 2)
                                 }
                             }
+                            .accessibilityAddTraits(tab == item ? .isSelected : [])
                     }
                     Spacer()
                 }
@@ -404,7 +404,10 @@ struct SitesView: View {
                     systemImage: "chevron.left.forwardslash.chevron.right"
                 )
                 siteMetadataBadge(
-                    "Node \(site.nodeVersion ?? "Project")",
+                    String.localizedStringWithFormat(
+                        String(localized: "Node %@"),
+                        site.nodeVersion ?? String(localized: "Project")
+                    ),
                     systemImage: "hexagon"
                 )
                 Spacer(minLength: 4)
@@ -424,6 +427,12 @@ struct SitesView: View {
                 model.persist()
             }
         )
+    }
+
+    private var environmentToggleTitle: String {
+        environmentCoordinator.status == .running
+            ? String(localized: "Stop all sites")
+            : String(localized: "Start all sites")
     }
 
     private func siteCommandBar(_ site: SiteProject) -> some View {
@@ -475,6 +484,13 @@ struct SitesView: View {
                 accessibilityIdentifier: "sites.command.environment"
             ) {
                 environmentSite = site
+            }
+            compactSiteAction(
+                "Site Tools",
+                systemImage: "wrench.and.screwdriver",
+                accessibilityIdentifier: "sites.command.tools"
+            ) {
+                toolsSite = site
             }
             Spacer(minLength: 8)
             siteMoreActions(site)
@@ -577,6 +593,11 @@ struct SitesView: View {
         }
         .disabled(!hasPackageJSON(site))
         Button {
+            toolsSite = site
+        } label: {
+            Label("Site Tools", systemImage: "wrench.and.screwdriver")
+        }
+        Button {
             environmentSite = site
         } label: {
             Label("Edit .env", systemImage: "doc.text")
@@ -629,7 +650,7 @@ struct SitesView: View {
 
     private func copySiteURL(_ site: SiteProject) {
         guard let url = model.siteURL(for: site) else {
-            model.lastError = "The site does not have an active local address."
+            model.lastError = String(localized: "The site does not have an active local address.")
             return
         }
         copyToPasteboard(url.absoluteString)
@@ -638,7 +659,7 @@ struct SitesView: View {
     private func copyToPasteboard(_ value: String) {
         NSPasteboard.general.clearContents()
         guard NSPasteboard.general.setString(value, forType: .string) else {
-            model.lastError = "HerdMe could not copy the value."
+            model.lastError = String(localized: "HerdMe could not copy the value.")
             return
         }
     }
@@ -646,17 +667,34 @@ struct SitesView: View {
     private func siteGeneral(_ site: SiteProject) -> some View {
         ScrollView {
             VStack(spacing: 16) {
+                if site.framework == "Laravel" {
+                    SiteBackgroundControls(
+                        site: site,
+                        siteTools: model.siteTools,
+                        defaultPHP: model.configuration.selectedPHP
+                    ) {
+                        toolsSite = site
+                    }
+                }
                 Group {
                     if showPreview {
-                        SiteWebPreview(url: model.sitePreviewURL(for: site))
+                        SiteWebPreview(
+                            url: environmentCoordinator.status == .running
+                                ? model.sitePreviewURL(for: site)
+                                : nil,
+                            isStarting: environmentCoordinator.status == .starting,
+                            onStartEnvironment: { model.toggleEnvironment() },
+                            onOpenSite: { model.openSite(site) },
+                            onOpenLogs: { model.showLogs(for: site) }
+                        )
                     } else {
                         Image(systemName: "globe")
                             .font(.system(size: 44))
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .frame(height: 240)
                     }
                 }
-                .aspectRatio(16 / 9, contentMode: .fit)
                 .frame(maxWidth: .infinity)
                 .background(Color(nsColor: .textBackgroundColor))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -666,7 +704,7 @@ struct SitesView: View {
                     VStack(spacing: 9) {
                         SettingRow("PHP") {
                             Picker(
-                                "",
+                                "PHP",
                                 selection: Binding(
                                     get: { site.phpVersion ?? defaultPHPTag },
                                     set: { model.setSitePHPVersion($0 == defaultPHPTag ? nil : $0, for: site) }
@@ -686,7 +724,7 @@ struct SitesView: View {
                         PanelDivider()
                         SettingRow("Node") {
                             Picker(
-                                "",
+                                "Node",
                                 selection: Binding(
                                     get: { site.nodeVersion ?? defaultNodeTag },
                                     set: { model.setSiteNodeVersion($0 == defaultNodeTag ? nil : $0, for: site) }
@@ -1305,7 +1343,8 @@ private struct ArtisanRunnerView: View {
     @State private var selectedPresetID = "route-list"
     @State private var customCommand = ""
     @State private var output = ""
-    @State private var status = "Ready"
+    @State private var status = String(localized: "Ready")
+    @State private var hasFailure = false
     @State private var isRunning = false
     @State private var cancellation: ArtisanCancellation?
     @State private var commandTask: Task<Void, Never>?
@@ -1342,13 +1381,13 @@ private struct ArtisanRunnerView: View {
                 }
                 Text(status)
                     .font(.callout.weight(.medium))
-                    .foregroundStyle(status.hasPrefix("Failed") ? Color.red : Color.secondary)
+                    .foregroundStyle(hasFailure ? Color.red : Color.secondary)
                 Spacer()
             }
             .frame(height: 20)
 
             ScrollView {
-                Text(output.isEmpty ? "Output will appear here." : output)
+                Text(output.isEmpty ? String(localized: "Output will appear here.") : output)
                     .font(.system(.body, design: .monospaced))
                     .foregroundStyle(output.isEmpty ? Color.secondary : Color.primary)
                     .textSelection(.enabled)
@@ -1367,7 +1406,7 @@ private struct ArtisanRunnerView: View {
                 Spacer()
                 Button {
                     cancellation?.cancel()
-                    status = "Cancelling"
+                    status = String(localized: "Cancelling")
                 } label: {
                     Label("Cancel", systemImage: "xmark")
                 }
@@ -1403,15 +1442,17 @@ private struct ArtisanRunnerView: View {
                 customCommand: customCommand
             )
         } catch {
-            status = "Failed"
+            status = String(localized: "Failed")
             output = error.localizedDescription
+            hasFailure = true
             return
         }
 
         let cancellation = ArtisanCancellation()
         self.cancellation = cancellation
         output = ""
-        status = "Running"
+        status = String(localized: "Running")
+        hasFailure = false
         isRunning = true
         commandTask = Task {
             do {
@@ -1426,20 +1467,28 @@ private struct ArtisanRunnerView: View {
                     }
                 }
                 if output.isEmpty { appendOutput(result.output) }
-                status = result.status == 0 ? "Completed" : "Failed (exit \(result.status))"
+                hasFailure = result.status != 0
+                status = result.status == 0
+                    ? String(localized: "Completed")
+                    : String.localizedStringWithFormat(
+                        String(localized: "Failed (exit %lld)"),
+                        Int64(result.status)
+                    )
             } catch let error as ProcessRunnerError {
                 switch error {
                 case .cancelled(let capturedOutput):
                     if output.isEmpty { appendOutput(capturedOutput) }
-                    status = "Cancelled"
+                    status = String(localized: "Cancelled")
                 case .timedOut(_, let capturedOutput):
                     if output.isEmpty { appendOutput(capturedOutput) }
-                    status = "Timed out"
+                    status = String(localized: "Timed out")
+                    hasFailure = true
                 }
             } catch is CancellationError {
-                status = "Cancelled"
+                status = String(localized: "Cancelled")
             } catch {
-                status = "Failed"
+                status = String(localized: "Failed")
+                hasFailure = true
                 appendOutput(error.localizedDescription)
             }
             isRunning = false
@@ -1652,34 +1701,912 @@ private struct NPMScriptRunnerView: View {
     }
 }
 
-private struct SiteWebPreview: NSViewRepresentable {
+private struct SiteBackgroundControls: View {
+    let site: SiteProject
+    @ObservedObject var siteTools: SiteToolsCoordinator
+    let defaultPHP: String
+    let showTools: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(SiteBackgroundProcessKind.allCases, id: \.rawValue) { kind in
+                let snapshot = siteTools.backgroundProcess(for: site, kind: kind)
+                Button {
+                    siteTools.toggleBackgroundProcess(for: site, kind: kind, defaultPHP: defaultPHP)
+                } label: {
+                    Label(
+                        backgroundActionTitle(kind, isActive: snapshot?.isActive == true),
+                        systemImage: snapshot?.isActive == true ? "stop.fill" : kind.systemImage
+                    )
+                }
+                .buttonStyle(.bordered)
+                .tint(snapshot?.isActive == true ? .orange : .accentColor)
+            }
+            Spacer()
+            Button(action: showTools) {
+                Label("Output and Tools", systemImage: "terminal")
+            }
+            .buttonStyle(.borderless)
+        }
+        .padding(.horizontal, 2)
+    }
+
+    private func backgroundActionTitle(_ kind: SiteBackgroundProcessKind, isActive: Bool) -> String {
+        String.localizedStringWithFormat(
+            isActive ? String(localized: "Stop %@") : String(localized: "Start %@"),
+            kind.title
+        )
+    }
+}
+
+private struct SiteControlCenterView: View {
+    private enum Section: String, CaseIterable {
+        case commands
+        case database
+        case processes
+        case workflows
+        case health
+
+        var title: String {
+            switch self {
+            case .commands: String(localized: "Commands")
+            case .database: String(localized: "Database")
+            case .processes: String(localized: "Background Processes")
+            case .workflows: String(localized: "Automations")
+            case .health: String(localized: "Site Health")
+            }
+        }
+    }
+
+    private struct ComposerOption: Identifiable {
+        let id: String
+        let title: String
+    }
+
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    let site: SiteProject
+    @ObservedObject var siteTools: SiteToolsCoordinator
+    @State private var section = Section.commands
+    @State private var composerOption = "install"
+    @State private var composerPackage = ""
+    @State private var favorites: [SiteCommandFavorite] = []
+    @State private var selectedFavoriteID: UUID?
+    @State private var healthReport: SiteHealthReport?
+    @State private var selectedDatabaseID: UUID?
+    @State private var databaseProvisioning: SiteDatabaseProvisioning?
+    @State private var databaseInspection: SiteDatabaseInspection?
+    @State private var isLoadingHealth = false
+    @State private var isRunning = false
+    @State private var status = String(localized: "Ready")
+    @State private var output = ""
+    @State private var cancellation: SiteOperationCancellation?
+    @State private var operationTask: Task<Void, Never>?
+    @State private var pendingWorkflow: SiteWorkflowOperation?
+    @State private var artifactURL: URL?
+
+    private let composerOptions = [
+        ComposerOption(id: "install", title: String(localized: "Install dependencies")),
+        ComposerOption(id: "update", title: String(localized: "Update dependencies")),
+        ComposerOption(id: "dump-autoload", title: String(localized: "Optimize autoloader")),
+        ComposerOption(id: "audit", title: String(localized: "Security audit")),
+        ComposerOption(id: "require", title: String(localized: "Require package"))
+    ]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Site Tools")
+                        .font(.title2.weight(.semibold))
+                    Text(site.name)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                    .disabled(isRunning)
+            }
+            .padding(20)
+
+            Picker("Site tools section", selection: $section) {
+                ForEach(Section.allCases, id: \.self) { item in Text(item.title).tag(item) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 20)
+            .padding(.bottom, 14)
+
+            Divider()
+            ScrollView {
+                VStack(spacing: 16) {
+                    switch section {
+                    case .commands: commandsSection
+                    case .database: databaseSection
+                    case .processes: processesSection
+                    case .workflows: workflowsSection
+                    case .health: healthSection
+                    }
+                    operationOutput
+                }
+                .padding(20)
+            }
+        }
+        .frame(minWidth: 760, minHeight: 620)
+        .interactiveDismissDisabled(isRunning)
+        .task(id: site.id) {
+            loadFavorites()
+            selectedDatabaseID = databaseServices.first?.id
+            await loadHealth()
+        }
+        .onDisappear {
+            cancellation?.cancel()
+            operationTask?.cancel()
+        }
+        .alert(
+            pendingWorkflow?.title ?? String(localized: "Confirm Operation"),
+            isPresented: Binding(
+                get: { pendingWorkflow != nil },
+                set: { if !$0 { pendingWorkflow = nil } }
+            )
+        ) {
+            Button("Cancel", role: .cancel) { pendingWorkflow = nil }
+            Button("Continue", role: pendingWorkflow?.isDestructive == true ? .destructive : nil) {
+                guard let operation = pendingWorkflow else { return }
+                pendingWorkflow = nil
+                runWorkflow(operation)
+            }
+        } message: {
+            Text(workflowConfirmationMessage)
+        }
+    }
+
+    private var commandsSection: some View {
+        SettingsPanel {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Label("Composer", systemImage: "shippingbox")
+                        .font(.headline)
+                    Spacer()
+                    Button {
+                        runComposer()
+                    } label: {
+                        Label("Run", systemImage: "play.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isRunning || (composerOption == "require" && composerPackage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+                }
+                HStack(spacing: 10) {
+                    Picker("Command", selection: $composerOption) {
+                        ForEach(composerOptions) { option in Text(option.title).tag(option.id) }
+                    }
+                    .frame(width: 220)
+                    if composerOption == "require" {
+                        TextField("vendor/package", text: $composerPackage)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                }
+                HStack(spacing: 8) {
+                    Picker("Favorites", selection: $selectedFavoriteID) {
+                        Text("Command Favorites").tag(UUID?.none)
+                        ForEach(favorites) { favorite in Text(favorite.command).tag(Optional(favorite.id)) }
+                    }
+                    .onChange(of: selectedFavoriteID) { id in applyFavorite(id) }
+                    Button {
+                        saveFavorite()
+                    } label: {
+                        Image(systemName: "star")
+                    }
+                    .help("Save command favorite")
+                    .accessibilityLabel("Save command favorite")
+                    Button {
+                        removeFavorite()
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .disabled(selectedFavoriteID == nil)
+                    .help("Delete command favorite")
+                    .accessibilityLabel("Delete command favorite")
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    private var processesSection: some View {
+        SettingsPanel {
+            VStack(spacing: 0) {
+                ForEach(Array(SiteBackgroundProcessKind.allCases.enumerated()), id: \.element.rawValue) { index, kind in
+                    if index > 0 { PanelDivider() }
+                    let snapshot = siteTools.backgroundProcess(for: site, kind: kind)
+                    SettingRow(LocalizedStringKey(kind.title)) {
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(backgroundColor(snapshot))
+                                .frame(width: 7, height: 7)
+                            Text(backgroundStatus(snapshot))
+                                .foregroundStyle(.secondary)
+                            Button {
+                                siteTools.toggleBackgroundProcess(
+                                    for: site,
+                                    kind: kind,
+                                    defaultPHP: model.configuration.selectedPHP
+                                )
+                            } label: {
+                                Label(snapshot?.isActive == true ? "Stop" : "Start", systemImage: snapshot?.isActive == true ? "stop.fill" : "play.fill")
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(snapshot?.isActive == true ? .orange : .accentColor)
+                        }
+                    }
+                    if let snapshot, !snapshot.output.isEmpty {
+                        Text(snapshot.output)
+                            .font(.system(.caption, design: .monospaced))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 10)
+                    }
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    private var databaseSection: some View {
+        VStack(spacing: 14) {
+            SettingsPanel {
+                VStack(spacing: 12) {
+                    SettingRow("Database Service") {
+                        Picker("Database", selection: $selectedDatabaseID) {
+                            Text("Select a running service").tag(Optional<UUID>.none)
+                            ForEach(databaseServices) { instance in
+                                Text(verbatim: "\(instance.name) :\(instance.port)").tag(Optional(instance.id))
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 250)
+                    }
+                    PanelDivider()
+                    SettingRow("Site Database") {
+                        Text(databaseProvisioning?.databaseName ?? String(localized: "Not configured"))
+                            .foregroundStyle(databaseProvisioning == nil ? Color.secondary : Color.primary)
+                            .textSelection(.enabled)
+                    }
+                    if let inspection = databaseInspection {
+                        PanelDivider()
+                        SettingRow("Server Version") { Text(inspection.serverVersion).textSelection(.enabled) }
+                        PanelDivider()
+                        SettingRow("Tables") { Text(inspection.tableCount.formatted()).monospacedDigit() }
+                        PanelDivider()
+                        SettingRow("Database Size") { Text(formattedBytes(inspection.sizeBytes)).monospacedDigit() }
+                        PanelDivider()
+                        SettingRow("Response Time") { Text(String(format: "%.1f ms", inspection.responseMilliseconds)).monospacedDigit() }
+                    }
+                }
+                .padding(16)
+            }
+            HStack(spacing: 8) {
+                Button {
+                    provisionDatabase()
+                } label: {
+                    Label(databaseProvisioning == nil ? "Create and Connect" : "Repair Connection", systemImage: "cylinder.split.1x2")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isRunning || selectedDatabaseID == nil)
+                Button {
+                    inspectDatabase()
+                } label: {
+                    Label("Inspect", systemImage: "waveform.path.ecg")
+                }
+                .disabled(isRunning || databaseProvisioning == nil)
+                Button {
+                    backupDatabase()
+                } label: {
+                    Label("Back Up", systemImage: "externaldrive.badge.timemachine")
+                }
+                .disabled(isRunning || databaseProvisioning == nil)
+                Spacer()
+                Button {
+                    openDatabase()
+                } label: {
+                    Label("Open in TablePlus", systemImage: "arrow.up.right.square")
+                }
+                .disabled(databaseProvisioning == nil)
+            }
+        }
+    }
+
+    private var workflowsSection: some View {
+        SettingsPanel {
+            VStack(spacing: 0) {
+                ForEach(Array(SiteWorkflowOperation.allCases.filter { $0 != .repair }.enumerated()), id: \.element.id) { index, operation in
+                    if index > 0 { PanelDivider() }
+                    HStack(spacing: 12) {
+                        Image(systemName: operation.systemImage)
+                            .foregroundStyle(operation.isDestructive ? Color.red : Color.accentColor)
+                            .frame(width: 24)
+                        Text(operation.title)
+                            .font(.callout.weight(.medium))
+                        Spacer()
+                        Button("Run") { requestWorkflow(operation) }
+                            .disabled(isRunning || (operation == .reset && site.framework != "Laravel"))
+                    }
+                    .padding(.vertical, 11)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
+    private var healthSection: some View {
+        VStack(spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Site Health")
+                        .font(.headline)
+                    Text(healthReport?.summary ?? String(localized: "Checking"))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if isLoadingHealth { ProgressView().controlSize(.small) }
+                Button {
+                    Task { await loadHealth() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .disabled(isLoadingHealth || isRunning)
+                .help("Refresh site health")
+                Button {
+                    requestWorkflow(.repair)
+                } label: {
+                    Label("Repair", systemImage: "wrench.and.screwdriver")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isRunning)
+            }
+            SettingsPanel {
+                VStack(spacing: 0) {
+                    ForEach(Array((healthReport?.checks ?? []).enumerated()), id: \.element.id) { index, check in
+                        if index > 0 { PanelDivider() }
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: check.isHealthy ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .foregroundStyle(check.isHealthy ? Color.green : Color.orange)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(check.title).font(.callout.weight(.medium))
+                                Text(check.detail).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 10)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    private var operationOutput: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                if isRunning { ProgressView().controlSize(.small) }
+                Text(status)
+                    .font(.callout.weight(.medium))
+                Spacer()
+                if let artifactURL {
+                    Button {
+                        NSWorkspace.shared.activateFileViewerSelecting([artifactURL])
+                    } label: {
+                        Label("Reveal", systemImage: "folder")
+                    }
+                    .buttonStyle(.borderless)
+                }
+                Button {
+                    cancellation?.cancel()
+                    operationTask?.cancel()
+                    status = String(localized: "Cancelling")
+                } label: {
+                    Label("Cancel", systemImage: "xmark")
+                }
+                .disabled(!isRunning)
+            }
+            ScrollView {
+                Text(output.isEmpty ? String(localized: "Output will appear here.") : output)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(output.isEmpty ? Color.secondary : Color.primary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+                    .padding(10)
+            }
+            .frame(maxHeight: 210)
+            .background(Color(nsColor: .textBackgroundColor))
+            .overlay { RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .separatorColor)) }
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+    }
+
+    private var workflowConfirmationMessage: String {
+        guard let operation = pendingWorkflow else { return "" }
+        switch operation {
+        case .reset: return String(localized: "This creates a backup, then rebuilds and seeds the local database. Existing local data will be replaced.")
+        case .update: return String(localized: "This creates a backup, updates project dependencies, runs migrations, and rebuilds frontend assets.")
+        case .clean: return String(localized: "This creates a backup, removes installed dependencies, and rebuilds the project from lock files.")
+        default: return String.localizedStringWithFormat(String(localized: "Run %@ for this site?"), operation.title)
+        }
+    }
+
+    private func requestWorkflow(_ operation: SiteWorkflowOperation) {
+        if [.update, .clean, .reset].contains(operation) {
+            pendingWorkflow = operation
+        } else {
+            runWorkflow(operation)
+        }
+    }
+
+    private func runWorkflow(_ operation: SiteWorkflowOperation) {
+        guard !isRunning else { return }
+        beginOperation(status: operation.title)
+        let cancellation = SiteOperationCancellation()
+        self.cancellation = cancellation
+        let runner = SiteWorkflowRunner(rootURL: model.configurationStore.rootURL)
+        let defaultPHP = model.configuration.selectedPHP
+        let smtpPort = model.configuration.smtpPort
+        operationTask = Task {
+            do {
+                let result = try await runner.run(
+                    operation,
+                    site: site,
+                    defaultPHP: defaultPHP,
+                    smtpPort: smtpPort,
+                    cancellation: cancellation
+                ) { value in
+                    Task { @MainActor in appendOutput(value) }
+                }
+                appendOutput("\n" + result.output + "\n")
+                artifactURL = result.artifactURL
+                status = String(localized: "Completed")
+                if operation == .repair { await loadHealth() }
+            } catch let error as ProcessRunnerError {
+                status = error.localizedDescription == String(localized: "The command was cancelled.") ? String(localized: "Cancelled") : String(localized: "Failed")
+                appendOutput(error.localizedDescription + "\n")
+            } catch is CancellationError {
+                status = String(localized: "Cancelled")
+            } catch {
+                status = String(localized: "Failed")
+                appendOutput(error.localizedDescription + "\n")
+            }
+            finishOperation()
+        }
+    }
+
+    private func runComposer() {
+        guard !isRunning else { return }
+        let arguments: [String]
+        switch composerOption {
+        case "install": arguments = ["install", "--no-interaction", "--prefer-dist"]
+        case "update": arguments = ["update", "--no-interaction", "--with-all-dependencies"]
+        case "dump-autoload": arguments = ["dump-autoload", "--optimize", "--no-interaction"]
+        case "audit": arguments = ["audit", "--no-interaction"]
+        case "require": arguments = ["require", composerPackage.trimmingCharacters(in: .whitespacesAndNewlines), "--no-interaction"]
+        default: return
+        }
+        let invocation: SiteToolInvocation
+        do {
+            invocation = try SiteToolchain(rootURL: model.configurationStore.rootURL).composer(
+                site: site,
+                defaultPHP: model.configuration.selectedPHP,
+                arguments: arguments
+            )
+        } catch {
+            status = String(localized: "Failed")
+            output = error.localizedDescription
+            return
+        }
+        beginOperation(
+            status: String.localizedStringWithFormat(
+                String(localized: "Composer %@"),
+                arguments.joined(separator: " ")
+            )
+        )
+        let cancellation = SiteOperationCancellation()
+        self.cancellation = cancellation
+        operationTask = Task {
+            do {
+                let result = try await SiteCommandRunner.run(invocation, cancellation: cancellation) { data in
+                    let value = String(decoding: data, as: UTF8.self)
+                    Task { @MainActor in appendOutput(value) }
+                }
+                if output.isEmpty { appendOutput(result.output) }
+                status = result.status == 0 ? String(localized: "Completed") : String.localizedStringWithFormat(String(localized: "Failed (exit %lld)"), Int64(result.status))
+            } catch is CancellationError {
+                status = String(localized: "Cancelled")
+            } catch {
+                status = String(localized: "Failed")
+                appendOutput(error.localizedDescription)
+            }
+            finishOperation()
+        }
+    }
+
+    private var databaseServices: [ServiceInstance] {
+        model.configuration.serviceInstances.filter {
+            DatabaseServiceAuthenticator.protectedDefinitions.contains($0.definitionID)
+                && model.services.state(for: $0) == .running
+        }
+    }
+
+    private func selectedDatabaseService() -> ServiceInstance? {
+        databaseServices.first { $0.id == selectedDatabaseID }
+    }
+
+    private func provisionDatabase() {
+        guard !isRunning, let instance = selectedDatabaseService() else { return }
+        beginOperation(status: String(localized: "Creating site database"))
+        operationTask = Task {
+            do {
+                let provisioning = try await model.services.provisionDatabase(for: site, using: instance)
+                databaseProvisioning = provisioning
+                databaseInspection = try await model.services.inspectDatabase(provisioning)
+                appendOutput("[OK] \(provisioning.databaseName)\n[OK] Updated \(provisioning.environmentURL.path)\n")
+                status = String(localized: "Completed")
+                await loadHealth()
+            } catch is CancellationError {
+                status = String(localized: "Cancelled")
+            } catch {
+                status = String(localized: "Failed")
+                appendOutput(error.localizedDescription + "\n")
+            }
+            finishOperation()
+        }
+    }
+
+    private func inspectDatabase() {
+        guard !isRunning, let provisioning = databaseProvisioning else { return }
+        beginOperation(status: String(localized: "Inspecting database"))
+        operationTask = Task {
+            do {
+                databaseInspection = try await model.services.inspectDatabase(provisioning)
+                status = String(localized: "Completed")
+                appendOutput("[OK] Database connection is healthy.\n")
+            } catch is CancellationError {
+                status = String(localized: "Cancelled")
+            } catch {
+                status = String(localized: "Failed")
+                appendOutput(error.localizedDescription + "\n")
+            }
+            finishOperation()
+        }
+    }
+
+    private func backupDatabase() {
+        guard !isRunning, let provisioning = databaseProvisioning else { return }
+        beginOperation(status: String(localized: "Backing up database"))
+        let cancellation = SiteOperationCancellation()
+        self.cancellation = cancellation
+        operationTask = Task {
+            do {
+                let url = try await model.services.backupDatabase(
+                    for: site,
+                    provisioning: provisioning,
+                    cancellation: cancellation
+                )
+                artifactURL = url
+                status = String(localized: "Completed")
+                appendOutput("[OK] Backup: \(url.path)\n")
+            } catch is CancellationError {
+                status = String(localized: "Cancelled")
+            } catch {
+                status = String(localized: "Failed")
+                appendOutput(error.localizedDescription + "\n")
+            }
+            finishOperation()
+        }
+    }
+
+    private func openDatabase() {
+        guard let provisioning = databaseProvisioning else { return }
+        do {
+            guard let url = try model.services.siteDatabaseConnectionURL(provisioning) else {
+                throw SiteDatabaseError.unsupported
+            }
+            guard NSWorkspace.shared.open(url) else {
+                throw SiteDatabaseError.commandFailed(String(localized: "Install TablePlus before opening this database."))
+            }
+        } catch {
+            status = error.localizedDescription
+        }
+    }
+
+    private func formattedBytes(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    @MainActor
+    private func loadHealth() async {
+        isLoadingHealth = true
+        let site = site
+        let defaultPHP = model.configuration.selectedPHP
+        let environmentStatus = model.environment.status
+        let rootURL = model.configurationStore.rootURL
+        let report = await Task.detached(priority: .utility) {
+            SiteHealthInspector.inspect(site: site, defaultPHP: defaultPHP, environmentStatus: environmentStatus, rootURL: rootURL)
+        }.value
+        guard !Task.isCancelled else { return }
+        healthReport = report
+        isLoadingHealth = false
+    }
+
+    private func beginOperation(status: String) {
+        output = ""
+        artifactURL = nil
+        self.status = status
+        isRunning = true
+    }
+
+    private func finishOperation() {
+        isRunning = false
+        cancellation = nil
+        operationTask = nil
+    }
+
+    private func appendOutput(_ value: String) {
+        guard !value.isEmpty else { return }
+        output.append(contentsOf: value)
+        let data = Data(output.utf8)
+        if data.count > 1_048_576 { output = String(decoding: data.suffix(1_048_576), as: UTF8.self) }
+    }
+
+    private func backgroundStatus(_ snapshot: SiteBackgroundProcessSnapshot?) -> String {
+        guard let snapshot else { return String(localized: "Stopped") }
+        switch snapshot.status {
+        case .running: return String(localized: "Running")
+        case .stopping: return String(localized: "Stopping")
+        case .stopped: return String(localized: "Stopped")
+        case .failed: return String(localized: "Failed")
+        }
+    }
+
+    private func backgroundColor(_ snapshot: SiteBackgroundProcessSnapshot?) -> Color {
+        guard let snapshot else { return .secondary }
+        switch snapshot.status {
+        case .running: return .green
+        case .stopping: return .orange
+        case .stopped: return .secondary
+        case .failed: return .red
+        }
+    }
+
+    private func currentFavoriteCommand() -> String? {
+        switch composerOption {
+        case "require":
+            let package = composerPackage.trimmingCharacters(in: .whitespacesAndNewlines)
+            return package.isEmpty ? nil : "require " + package
+        default: return composerOption
+        }
+    }
+
+    private func loadFavorites() {
+        do {
+            favorites = try SiteCommandFavoritesStore(rootURL: model.configurationStore.rootURL).load(site: site.path, tool: "composer")
+        } catch {
+            status = error.localizedDescription
+        }
+    }
+
+    private func saveFavorite() {
+        guard let command = currentFavoriteCommand() else { return }
+        do {
+            try SiteCommandFavoritesStore(rootURL: model.configurationStore.rootURL).add(site: site.path, tool: "composer", command: command)
+            loadFavorites()
+            selectedFavoriteID = favorites.first(where: { $0.command == command })?.id
+        } catch {
+            status = error.localizedDescription
+        }
+    }
+
+    private func removeFavorite() {
+        guard let favorite = favorites.first(where: { $0.id == selectedFavoriteID }) else { return }
+        do {
+            try SiteCommandFavoritesStore(rootURL: model.configurationStore.rootURL).remove(site: site.path, tool: "composer", command: favorite.command)
+            selectedFavoriteID = nil
+            loadFavorites()
+        } catch {
+            status = error.localizedDescription
+        }
+    }
+
+    private func applyFavorite(_ id: UUID?) {
+        guard let favorite = favorites.first(where: { $0.id == id }) else { return }
+        let parts = favorite.command.split(separator: " ", maxSplits: 1).map(String.init)
+        guard composerOptions.contains(where: { $0.id == parts[0] }) else { return }
+        composerOption = parts[0]
+        composerPackage = parts.count > 1 ? parts[1] : ""
+    }
+}
+
+private enum SitePreviewPhase: Equatable {
+    case loading
+    case ready
+    case failed
+}
+
+private struct SiteWebPreview: View {
     let url: URL?
+    let isStarting: Bool
+    let onStartEnvironment: () -> Void
+    let onOpenSite: () -> Void
+    let onOpenLogs: () -> Void
+    @State private var phase = SitePreviewPhase.loading
+    @State private var requestID = UUID()
+
+    var body: some View {
+        Group {
+            if usesBrowserViewport {
+                previewContent
+                    .aspectRatio(16 / 9, contentMode: .fit)
+            } else {
+                previewContent
+                    .frame(height: 240)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .onChange(of: url) { _ in
+            phase = .loading
+            requestID = UUID()
+        }
+    }
+
+    private var usesBrowserViewport: Bool {
+        url != nil && phase != .failed
+    }
+
+    private var previewContent: some View {
+        ZStack {
+            if let url {
+                SiteWebPreviewRepresentable(
+                    url: url,
+                    requestID: requestID,
+                    onPhaseChange: { phase = $0 }
+                )
+
+                if phase == .loading {
+                    ProgressView("Loading preview")
+                        .padding(16)
+                        .background(.regularMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                } else if phase == .failed {
+                    previewFailure
+                }
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "play.rectangle")
+                        .font(.system(size: 34, weight: .light))
+                        .foregroundStyle(.secondary)
+                    Text("Start Sites to Use Live Preview")
+                        .font(.headline)
+                    Text("The local site environment must be running before HerdMe can load this preview.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 420)
+                    Button {
+                        onStartEnvironment()
+                    } label: {
+                        Label(
+                            isStarting ? "Starting" : "Start Sites",
+                            systemImage: isStarting ? "hourglass" : "play.fill"
+                        )
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isStarting)
+                }
+                .padding(24)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var previewFailure: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 32, weight: .light))
+                .foregroundStyle(.orange)
+            Text("Preview Unavailable")
+                .font(.headline)
+            Text("HerdMe could not load this site in Live Preview.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            HStack(spacing: 8) {
+                Button {
+                    phase = .loading
+                    requestID = UUID()
+                } label: {
+                    Label("Retry", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button(action: onOpenSite) {
+                    Label("Open in Browser", systemImage: "safari")
+                }
+                .buttonStyle(.bordered)
+
+                Button(action: onOpenLogs) {
+                    Label("View Logs", systemImage: "doc.text.magnifyingglass")
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.regularMaterial)
+    }
+}
+
+private struct SiteWebPreviewRepresentable: NSViewRepresentable {
+    let url: URL
+    let requestID: UUID
+    let onPhaseChange: (SitePreviewPhase) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(onPhaseChange: onPhaseChange)
     }
 
     func makeNSView(context: Context) -> DesktopPreviewScrollView {
         let configuration = WKWebViewConfiguration()
-        return DesktopPreviewScrollView(configuration: configuration)
+        let preview = DesktopPreviewScrollView(configuration: configuration)
+        preview.webView.navigationDelegate = context.coordinator
+        return preview
     }
 
     func updateNSView(_ preview: DesktopPreviewScrollView, context: Context) {
-        context.coordinator.load(url, in: preview.webView)
+        context.coordinator.onPhaseChange = onPhaseChange
+        context.coordinator.load(url, requestID: requestID, in: preview.webView)
     }
 
     @MainActor
-    final class Coordinator {
-        private var requestedURL: URL?
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        var onPhaseChange: (SitePreviewPhase) -> Void
+        private var requestedID: UUID?
 
-        func load(_ url: URL?, in webView: WKWebView) {
-            guard requestedURL != url else { return }
-            requestedURL = url
-            guard let url else {
-                webView.loadHTMLString("", baseURL: nil)
-                return
-            }
+        init(onPhaseChange: @escaping (SitePreviewPhase) -> Void) {
+            self.onPhaseChange = onPhaseChange
+        }
+
+        func load(_ url: URL, requestID: UUID, in webView: WKWebView) {
+            guard requestedID != requestID else { return }
+            requestedID = requestID
+            onPhaseChange(.loading)
+            webView.stopLoading()
             webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 6))
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
+            onPhaseChange(.ready)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFailProvisionalNavigation navigation: WKNavigation?,
+            withError error: Error
+        ) {
+            onPhaseChange(.failed)
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation?, withError error: Error) {
+            onPhaseChange(.failed)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationResponse: WKNavigationResponse
+        ) async -> WKNavigationResponsePolicy {
+            if let response = navigationResponse.response as? HTTPURLResponse,
+                response.statusCode >= 400
+            {
+                onPhaseChange(.failed)
+                return .cancel
+            }
+            return .allow
         }
     }
 }

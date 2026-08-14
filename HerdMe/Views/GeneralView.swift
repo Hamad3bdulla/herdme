@@ -152,7 +152,7 @@ struct GeneralView: View {
                                 Button("Open Settings") { model.openLoginItemsSettings() }
                             }
                             Toggle(
-                                "",
+                                "Launch at Login",
                                 isOn: Binding(
                                     get: { model.configuration.launchAtLogin },
                                     set: { model.setLaunchAtLogin($0) }
@@ -165,7 +165,7 @@ struct GeneralView: View {
                     PanelDivider()
                     SettingRow("Update HerdMe automatically") {
                         Toggle(
-                            "",
+                            "Update HerdMe automatically",
                             isOn: Binding(
                                 get: { model.configuration.automaticUpdates },
                                 set: { model.setAutomaticUpdates($0) }
@@ -177,7 +177,7 @@ struct GeneralView: View {
                     PanelDivider()
                     SettingRow("Update Channel") {
                         Picker(
-                            "",
+                            "Update Channel",
                             selection: Binding(
                                 get: { model.configuration.updateChannel },
                                 set: { model.setUpdateChannel($0) }
@@ -199,7 +199,7 @@ struct GeneralView: View {
                     }
                     PanelDivider()
                     SettingRow("IDE", detail: "The default IDE to open from the sites list and log viewer.") {
-                        Picker("", selection: $model.configuration.ide) {
+                        Picker("IDE", selection: $model.configuration.ide) {
                             ForEach(["VSCode", "PhpStorm", "Sublime Text"], id: \.self) { Text($0) }
                         }
                         .labelsHidden()
@@ -208,7 +208,7 @@ struct GeneralView: View {
                     }
                     PanelDivider()
                     SettingRow("Theme", detail: "Choose between auto, light, or dark theme.") {
-                        Picker("", selection: $model.configuration.theme) {
+                        Picker("Theme", selection: $model.configuration.theme) {
                             ForEach(AppTheme.allCases, id: \.self) { theme in
                                 Text(theme.localizedTitle).tag(theme)
                             }
@@ -269,15 +269,19 @@ struct GeneralView: View {
 
     private var resolverTitle: String {
         if securityCoordinator.domainResolverState == .managed {
-            if securityCoordinator.networkHelperNeedsUpdate { return "Update available" }
-            return securityCoordinator.isDNSServerRunning ? "Active" : "Configured"
+            if securityCoordinator.networkHelperNeedsUpdate { return String(localized: "Update available") }
+            return securityCoordinator.isDNSServerRunning
+                ? String(localized: "Active")
+                : String(localized: "Configured")
         }
-        return securityCoordinator.domainResolverState.title
+        return securityCoordinator.domainResolverState.localizedTitle
     }
 
     private var resolverActionTitle: String {
-        if securityCoordinator.domainResolverState == .managed { return "Update" }
-        return securityCoordinator.domainResolverState == .external ? "Use HerdMe" : "Set Up"
+        if securityCoordinator.domainResolverState == .managed { return String(localized: "Update") }
+        return securityCoordinator.domainResolverState == .external
+            ? String(localized: "Use HerdMe")
+            : String(localized: "Set Up")
     }
 
     private var resolverColor: Color {

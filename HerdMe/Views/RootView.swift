@@ -22,6 +22,10 @@ struct RootView: View {
                 }
             }
         }
+        .frame(
+            minWidth: navigation.selectedPage.minimumContentSize.width,
+            minHeight: navigation.selectedPage.minimumContentSize.height
+        )
         .environment(\.layoutDirection, AppLocalization.layoutDirection(for: locale))
         .herdTheme(model.configuration.theme)
         .background(WindowSizeController(page: navigation.selectedPage))
@@ -183,31 +187,34 @@ private struct WindowSizeController: NSViewRepresentable {
                 self.window = window
                 lastPage = nil
                 window.setFrameAutosaveName("HerdMeMainWindow")
-                window.contentMinSize = NSSize(width: 730, height: 527)
             }
             guard lastPage != page else { return }
             lastPage = page
 
-            let preferredWidth: CGFloat =
-                switch page {
-                case .dashboard: 980
-                case .sites: 1_100
-                case .services: 980
-                case .mail, .dumps, .debugger, .logs: 900
-                default: 730
-                }
+            let preferredSize = page.minimumContentSize
             let current = window.contentView?.frame.size ?? window.frame.size
             let visibleFrame = (window.screen ?? NSScreen.main)?.visibleFrame
             let maximumContentSize = visibleFrame.map {
                 window.contentRect(forFrameRect: $0).size
             }
+            let minimumSize = NSSize(
+                width: min(
+                    preferredSize.width,
+                    maximumContentSize?.width ?? preferredSize.width
+                ),
+                height: min(
+                    preferredSize.height,
+                    maximumContentSize?.height ?? preferredSize.height
+                )
+            )
+            window.contentMinSize = minimumSize
             let targetSize = NSSize(
                 width: min(
-                    max(current.width, preferredWidth),
+                    max(current.width, preferredSize.width),
                     maximumContentSize?.width ?? .greatestFiniteMagnitude
                 ),
                 height: min(
-                    max(current.height, 527),
+                    max(current.height, preferredSize.height),
                     maximumContentSize?.height ?? .greatestFiniteMagnitude
                 )
             )
@@ -230,6 +237,18 @@ private struct WindowSizeController: NSViewRepresentable {
             if constrainedFrame != window.frame {
                 window.setFrame(constrainedFrame, display: true)
             }
+        }
+    }
+}
+
+private extension SidebarPage {
+    var minimumContentSize: NSSize {
+        switch self {
+        case .dashboard: NSSize(width: 980, height: 527)
+        case .sites: NSSize(width: 1_100, height: 600)
+        case .services: NSSize(width: 980, height: 527)
+        case .mail, .dumps, .debugger, .logs: NSSize(width: 900, height: 527)
+        default: NSSize(width: 730, height: 527)
         }
     }
 }

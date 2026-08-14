@@ -59,7 +59,7 @@ struct MailView: View {
                     }
                     PanelDivider()
                     SettingRow("SMTP Port") {
-                        TextField("", value: $model.configuration.smtpPort, format: .number.grouping(.never))
+                        TextField("SMTP Port", value: $model.configuration.smtpPort, format: .number.grouping(.never))
                             .frame(width: 90)
                             .onSubmit { model.restartMailServer() }
                     }
@@ -103,32 +103,32 @@ struct MailView: View {
                             .padding(.bottom, 8)
 
                         if mail.messages.isEmpty {
-                            EmptyStateView(symbol: "tray", title: "Inbox is empty", message: "")
+                            EmptyStateView(
+                                symbol: "tray",
+                                title: "Inbox is empty",
+                                message: "Captured messages will appear here."
+                            )
                         } else if filteredMessages.isEmpty {
-                            EmptyStateView(symbol: "magnifyingglass", title: "No matching messages", message: "")
+                            EmptyStateView(
+                                symbol: "magnifyingglass",
+                                title: "No matching messages",
+                                message: "Try another search term."
+                            )
                         } else {
-                            ScrollView {
-                                LazyVStack(spacing: 2) {
-                                    ForEach(filteredMessages) { message in
-                                        Button {
-                                            selectedMessageID = message.id
-                                        } label: {
-                                            VStack(alignment: .leading, spacing: 3) {
-                                                Text(message.sender).font(.callout.weight(.medium)).lineLimit(1)
-                                                Text(message.subject).font(.caption).lineLimit(1)
-                                                Text(message.receivedAt, format: .dateTime.month().day().hour().minute())
-                                                    .font(.caption2)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .padding(8)
-                                            .background(selectedMessageID == message.id ? Color.accentColor.opacity(0.2) : Color.clear)
-                                            .clipShape(RoundedRectangle(cornerRadius: 5))
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
+                            List(filteredMessages, selection: $selectedMessageID) { message in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(message.sender).font(.callout.weight(.medium)).lineLimit(1)
+                                    Text(message.subject).font(.caption).lineLimit(1)
+                                    Text(message.receivedAt, format: .dateTime.month().day().hour().minute())
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
                                 }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 4)
+                                .tag(message.id)
                             }
+                            .listStyle(.plain)
+                            .scrollContentBackground(.hidden)
                         }
                     }
                     .frame(width: 245)
@@ -148,8 +148,22 @@ struct MailView: View {
                                 .help("Delete message")
                                 .accessibilityLabel("Delete message")
                             }
-                            Text("From: " + message.sender).font(.caption).foregroundStyle(.secondary)
-                            Text("To: " + message.recipients.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
+                            Text(
+                                String.localizedStringWithFormat(
+                                    String(localized: "From: %@"),
+                                    message.sender
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            Text(
+                                String.localizedStringWithFormat(
+                                    String(localized: "To: %@"),
+                                    message.recipients.joined(separator: ", ")
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                             Divider()
                             Picker("View", selection: $detailTab) {
                                 ForEach(DetailTab.allCases) { tab in Text(tab.localizedTitle).tag(tab) }
@@ -184,7 +198,11 @@ struct MailView: View {
                         ProgressView("Loading message")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        EmptyStateView(symbol: "envelope.open", title: "Select a message", message: "")
+                        EmptyStateView(
+                            symbol: "envelope.open",
+                            title: "Select a message",
+                            message: "Choose a message from the inbox to view it."
+                        )
                     }
                 }
                 .frame(height: 260)

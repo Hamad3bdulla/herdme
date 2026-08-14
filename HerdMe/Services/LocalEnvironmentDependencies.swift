@@ -24,7 +24,12 @@ protocol HTTPListening: Sendable {
         preferredPort: Int,
         fallbackPort: Int
     ) throws -> Int
+    func update(routes: [String: Int])
     func stop()
+}
+
+extension HTTPListening {
+    func update(routes: [String: Int]) {}
 }
 
 protocol FastCGIListening: Sendable {
