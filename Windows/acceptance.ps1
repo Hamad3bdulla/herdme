@@ -31,6 +31,7 @@ if ($releaseMode -eq "public" -and $SkipLiveReleaseChecks) {
     throw "Public release acceptance cannot skip live runtime and service release checks."
 }
 $publishDirectory = Join-Path $repoRoot "build\windows-portable-win-x64"
+$script:captureDatabaseDriverInitialized = $false
 $executable = Join-Path $publishDirectory "HerdMe.Windows.exe"
 $project = Join-Path $PSScriptRoot "HerdMe.Windows\HerdMe.Windows.csproj"
 $contractProject = Join-Path $PSScriptRoot "HerdMe.Windows.ContractTests\HerdMe.Windows.ContractTests.csproj"
@@ -42,6 +43,15 @@ $installerChecksumFile = "$installer.sha256"
 $installerTestDirectory = Join-Path $repoRoot "build\windows-installer-acceptance"
 $startupRegistryPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 $startupValueName = "HerdMe"
+$onboardingAfterReinstallPath = Join-Path ([Environment]::GetFolderPath(
+    [Environment+SpecialFolder]::LocalApplicationData
+)) "HerdMe\Config\onboarding-after-reinstall.flag"
+$onboardingAfterReinstallExisted = Test-Path -LiteralPath $onboardingAfterReinstallPath -PathType Leaf
+$onboardingAfterReinstallContents = if ($onboardingAfterReinstallExisted) {
+    [System.IO.File]::ReadAllBytes($onboardingAfterReinstallPath)
+} else {
+    $null
+}
 if ($releaseMode -eq "public") {
     . (Join-Path $PSScriptRoot "sign-windows-artifact.ps1")
 }
@@ -200,6 +210,14 @@ if (Test-Path -LiteralPath $installedExecutable -PathType Leaf) {
 if ($null -ne (Get-HerdMeStartupValue)) {
     throw "The Windows uninstaller left HerdMe enabled at login."
 }
+if ($onboardingAfterReinstallExisted) {
+    [System.IO.File]::WriteAllBytes(
+        $onboardingAfterReinstallPath,
+        $onboardingAfterReinstallContents
+    )
+} elseif (Test-Path -LiteralPath $onboardingAfterReinstallPath) {
+    Remove-Item -LiteralPath $onboardingAfterReinstallPath -Force
+}
 if (Test-Path -LiteralPath $installerTestDirectory) {
     Remove-Item -LiteralPath $installerTestDirectory -Recurse -Force
 }
@@ -336,6 +354,7 @@ function Assert-WinUiNavigation(
         @{ Navigation = "NavPhp"; Page = "PhpPageRoot" },
         @{ Navigation = "NavNode"; Page = "NodePageRoot" },
         @{ Navigation = "NavServices"; Page = "ServicesPageRoot" },
+        @{ Navigation = "NavUpdates"; Page = "UpdatesPageRoot" },
         @{ Navigation = "NavMail"; Page = "MailPageRoot" },
         @{ Navigation = "NavDumps"; Page = "DumpsPageRoot" },
         @{ Navigation = "NavDebugger"; Page = "DebuggerPageRoot" },
@@ -367,35 +386,118 @@ function Assert-ResponsePrefix(
     }
 }
 
+function Initialize-CaptureDatabaseDriver {
+    if ($script:captureDatabaseDriverInitialized) { return }
+
+    $nativeLibrary = Join-Path $publishDirectory "e_sqlite3.dll"
+    $managedLibraries = @(
+        "SQLitePCLRaw.core.dll",
+        "SQLitePCLRaw.provider.e_sqlite3.dll",
+        "SQLitePCLRaw.batteries_v2.dll",
+        "Microsoft.Data.Sqlite.dll"
+    )
+    foreach ($library in @($nativeLibrary) + @($managedLibraries | ForEach-Object {
+        Join-Path $publishDirectory $_
+    })) {
+        if (-not (Test-Path -LiteralPath $library -PathType Leaf)) {
+            throw "The packaged SQLite dependency was not found: $library"
+        }
+    }
+
+    [System.Runtime.InteropServices.NativeLibrary]::Load($nativeLibrary) | Out-Null
+    foreach ($library in $managedLibraries) {
+        [System.Reflection.Assembly]::LoadFrom((Join-Path $publishDirectory $library)) | Out-Null
+    }
+    [SQLitePCL.Batteries_V2]::Init()
+    $script:captureDatabaseDriverInitialized = $true
+}
+
+function Open-CaptureDatabase {
+    Initialize-CaptureDatabaseDriver
+    $databasePath = Join-Path ([Environment]::GetFolderPath(
+        [Environment+SpecialFolder]::LocalApplicationData
+    )) "HerdMe\captures.sqlite3"
+    $builder = [Microsoft.Data.Sqlite.SqliteConnectionStringBuilder]::new()
+    $builder.DataSource = $databasePath
+    $builder.Mode = [Microsoft.Data.Sqlite.SqliteOpenMode]::ReadWrite
+    $builder.Cache = [Microsoft.Data.Sqlite.SqliteCacheMode]::Shared
+    $builder.Pooling = $false
+    $connection = [Microsoft.Data.Sqlite.SqliteConnection]::new($builder.ToString())
+    $connection.Open()
+    return $connection
+}
+
 function Wait-CapturedRecord(
-    [string]$Directory,
+    [ValidateSet("mail", "dumps")]
+    [string]$Table,
     [string]$Property,
     [string]$ExpectedValue,
     [string]$Component
 ) {
     $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    $lastDatabaseError = $null
     do {
-        foreach ($file in @(Get-ChildItem -LiteralPath $Directory -Filter "*.json" -File -ErrorAction SilentlyContinue)) {
-            try {
-                $record = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
+        $connection = $null
+        $command = $null
+        $reader = $null
+        try {
+            $connection = Open-CaptureDatabase
+            $command = $connection.CreateCommand()
+            $command.CommandText = "SELECT id, payload FROM $Table ORDER BY received_at DESC"
+            $reader = $command.ExecuteReader()
+            while ($reader.Read()) {
+                try {
+                    $record = $reader.GetString(1) | ConvertFrom-Json
+                }
+                catch {
+                    continue
+                }
                 if ($record.$Property -eq $ExpectedValue) {
-                    return [PSCustomObject]@{ File = $file; Record = $record }
+                    return [PSCustomObject]@{ Id = $reader.GetString(0); Record = $record }
                 }
             }
-            catch {
-            }
+        }
+        catch {
+            $lastDatabaseError = $_
+        }
+        finally {
+            if ($null -ne $reader) { $reader.Dispose() }
+            if ($null -ne $command) { $command.Dispose() }
+            if ($null -ne $connection) { $connection.Dispose() }
         }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
+    if ($null -ne $lastDatabaseError) {
+        throw "The $Component acceptance payload was not persisted. Last SQLite error: $($lastDatabaseError.Exception.Message)"
+    }
     throw "The $Component acceptance payload was not persisted."
+}
+
+function Remove-CapturedRecord(
+    [ValidateSet("mail", "dumps")]
+    [string]$Table,
+    [string]$Id
+) {
+    $connection = Open-CaptureDatabase
+    try {
+        $command = $connection.CreateCommand()
+        try {
+            $command.CommandText = "DELETE FROM $Table WHERE id = `$id"
+            $command.Parameters.AddWithValue("`$id", $Id) | Out-Null
+            $command.ExecuteNonQuery() | Out-Null
+        }
+        finally {
+            $command.Dispose()
+        }
+    }
+    finally {
+        $connection.Dispose()
+    }
 }
 
 function Assert-SmtpCapture {
     $nonce = [Guid]::NewGuid().ToString("N")
     $subject = "HerdMe acceptance $nonce"
-    $mailDirectory = Join-Path ([Environment]::GetFolderPath(
-        [Environment+SpecialFolder]::LocalApplicationData
-    )) "HerdMe\Mail"
     $captured = $null
     $client = [System.Net.Sockets.TcpClient]::new()
     try {
@@ -446,7 +548,7 @@ function Assert-SmtpCapture {
             $reader.Dispose()
         }
 
-        $captured = Wait-CapturedRecord $mailDirectory "Subject" $subject "SMTP"
+        $captured = Wait-CapturedRecord "mail" "Subject" $subject "SMTP"
         if (
             $captured.Record.Sender -ne "acceptance@herdme.test" -or
             $captured.Record.Raw -notlike "*Live Windows SMTP acceptance payload*"
@@ -458,13 +560,13 @@ function Assert-SmtpCapture {
         $client.Dispose()
         if ($null -eq $captured) {
             try {
-                $captured = Wait-CapturedRecord $mailDirectory "Subject" $subject "SMTP cleanup"
+                $captured = Wait-CapturedRecord "mail" "Subject" $subject "SMTP cleanup"
             }
             catch {
             }
         }
-        if ($null -ne $captured -and (Test-Path -LiteralPath $captured.File.FullName)) {
-            Remove-Item -LiteralPath $captured.File.FullName -Force
+        if ($null -ne $captured) {
+            Remove-CapturedRecord "mail" $captured.Id
         }
     }
 }
@@ -474,9 +576,6 @@ function Assert-DumpCapture {
     $source = "herdme-acceptance-$nonce.php"
     $serialized = "a:2:{s:4:`"file`";s:$($source.Length):`"$source`";s:5:`"value`";s:2:`"ok`";}"
     $payload = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($serialized))
-    $dumpDirectory = Join-Path ([Environment]::GetFolderPath(
-        [Environment+SpecialFolder]::LocalApplicationData
-    )) "HerdMe\Dumps"
     $captured = $null
     $client = [System.Net.Sockets.TcpClient]::new()
     try {
@@ -497,7 +596,7 @@ function Assert-DumpCapture {
             $writer.Dispose()
         }
 
-        $captured = Wait-CapturedRecord $dumpDirectory "Source" $source "VarDumper"
+        $captured = Wait-CapturedRecord "dumps" "Source" $source "VarDumper"
         if ($captured.Record.Payload -ne $payload -or $captured.Record.Summary -notlike '*value: "ok"*') {
             throw "The VarDumper acceptance payload was persisted incorrectly."
         }
@@ -506,13 +605,13 @@ function Assert-DumpCapture {
         $client.Dispose()
         if ($null -eq $captured) {
             try {
-                $captured = Wait-CapturedRecord $dumpDirectory "Source" $source "VarDumper cleanup"
+                $captured = Wait-CapturedRecord "dumps" "Source" $source "VarDumper cleanup"
             }
             catch {
             }
         }
-        if ($null -ne $captured -and (Test-Path -LiteralPath $captured.File.FullName)) {
-            Remove-Item -LiteralPath $captured.File.FullName -Force
+        if ($null -ne $captured) {
+            Remove-CapturedRecord "dumps" $captured.Id
         }
     }
 }

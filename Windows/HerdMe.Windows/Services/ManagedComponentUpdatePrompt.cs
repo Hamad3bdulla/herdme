@@ -60,7 +60,7 @@ internal static class ManagedComponentUpdatePrompt
             DefaultButton = ContentDialogButton.Primary
         };
         return await dialog.ShowAsync() == ContentDialogResult.Primary
-            ? result.Updates[0].PageTag
+            ? "updates"
             : null;
     }
 }

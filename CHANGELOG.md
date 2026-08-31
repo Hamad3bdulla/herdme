@@ -5,6 +5,22 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-08-31
+
+### Added
+
+- Add a unified Updates page for HerdMe, PHP, Node.js, Composer, Laravel
+  Installer, Git, Xdebug, and every installed managed service.
+- Add individual update actions and a single Update All workflow for all
+  available components.
+
+### Changed
+
+- Open the unified Updates page from component update notifications instead of
+  sending each component to a separate settings page.
+- Preserve running sites and services across component updates by stopping only
+  affected processes and restoring them after installation.
+
 ## [0.1.13] - 2026-08-14
 
 ### Added

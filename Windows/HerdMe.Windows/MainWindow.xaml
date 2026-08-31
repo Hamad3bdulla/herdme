@@ -33,6 +33,9 @@
             <NavigationViewItem x:Uid="NavServices" AutomationProperties.AutomationId="NavServices" Content="Services" Tag="services">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></NavigationViewItem.Icon>
             </NavigationViewItem>
+            <NavigationViewItem x:Uid="NavUpdates" AutomationProperties.AutomationId="NavUpdates" Content="Updates" Tag="updates">
+                <NavigationViewItem.Icon><SymbolIcon Symbol="Download" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
             <NavigationViewItem x:Uid="NavMail" AutomationProperties.AutomationId="NavMail" Content="Mail" Tag="mail">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Mail" /></NavigationViewItem.Icon>
             </NavigationViewItem>

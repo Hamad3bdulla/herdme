@@ -864,4 +864,36 @@
   <data name="SitesWorkflowFailedWithBackup" xml:space="preserve"><value>{0}
 
 نسخة الاسترجاع: {1}</value></data>
+  <data name="NavUpdates.Content" xml:space="preserve"><value>التحديثات</value></data>
+  <data name="UpdatesPageRoot.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>التحديثات</value></data>
+  <data name="UpdatesTitle.Text" xml:space="preserve"><value>التحديثات</value></data>
+  <data name="UpdatesRefreshButtonText.Text" xml:space="preserve"><value>فحص</value></data>
+  <data name="UpdatesUpdateAllButtonText.Text" xml:space="preserve"><value>تحديث الكل</value></data>
+  <data name="UpdatesDownloadButtonText.Text" xml:space="preserve"><value>تنزيل</value></data>
+  <data name="UpdatesComponentsTitle.Text" xml:space="preserve"><value>المكونات والخدمات</value></data>
+  <data name="UpdatesNoComponents.Text" xml:space="preserve"><value>جميع المكونات المثبتة محدّثة.</value></data>
+  <data name="UpdatesChecking" xml:space="preserve"><value>جارٍ فحص التحديثات…</value></data>
+  <data name="UpdatesLastChecked" xml:space="preserve"><value>آخر فحص {0}</value></data>
+  <data name="UpdatesCheckFailed" xml:space="preserve"><value>فشل فحص التحديثات</value></data>
+  <data name="UpdatesInstalledVersion" xml:space="preserve"><value>الإصدار المثبت {0}</value></data>
+  <data name="UpdatesVersionAvailable" xml:space="preserve"><value>يتوفر الإصدار {0}.</value></data>
+  <data name="UpdatesApplicationCheckUnavailable" xml:space="preserve"><value>خدمة تحديث HerdMe غير متاحة.</value></data>
+  <data name="UpdatesCurrent" xml:space="preserve"><value>محدّث</value></data>
+  <data name="UpdatesVersionChange" xml:space="preserve"><value>من {0} إلى {1}</value></data>
+  <data name="UpdatesInstallingCount" xml:space="preserve"><value>جارٍ تحديث {0} من المكونات…</value></data>
+  <data name="UpdatesInstallingComponent" xml:space="preserve"><value>جارٍ تحديث {0}…</value></data>
+  <data name="UpdatesCompletedTitle" xml:space="preserve"><value>اكتملت التحديثات</value></data>
+  <data name="UpdatesCompletedMessage" xml:space="preserve"><value>تم تحديث {0} من المكونات بنجاح.</value></data>
+  <data name="UpdatesFailedTitle" xml:space="preserve"><value>فشلت بعض التحديثات</value></data>
+  <data name="UpdatesUnsupportedComponent" xml:space="preserve"><value>لا يمكن تحديث {0} من هذه الصفحة.</value></data>
+  <data name="UpdatesDownloadFailedTitle" xml:space="preserve"><value>تعذر فتح التنزيل</value></data>
+  <data name="UpdatesDownloadUnavailable" xml:space="preserve"><value>لا يتوفر تنزيل Windows موثّق لهذا الإصدار.</value></data>
+  <data name="UpdatesPartialTitle" xml:space="preserve"><value>تعذر إجراء بعض الفحوصات</value></data>
+  <data name="UpdatesPartialMessage" xml:space="preserve"><value>تعذر فحص: {0}. لا تزال التحديثات الأخرى المتاحة ظاهرة.</value></data>
+  <data name="UpdatesCurrentTitle" xml:space="preserve"><value>كل المكونات محدّثة</value></data>
+  <data name="UpdatesCategoryPhp" xml:space="preserve"><value>PHP وأدوات Laravel</value></data>
+  <data name="UpdatesCategoryNode" xml:space="preserve"><value>بيئة Node.js</value></data>
+  <data name="UpdatesCategoryService" xml:space="preserve"><value>خدمة محلية</value></data>
+  <data name="UpdatesCategoryDebugger" xml:space="preserve"><value>المصحح</value></data>
+  <data name="UpdatesCategoryTool" xml:space="preserve"><value>أداة سطر أوامر</value></data>
 </root>

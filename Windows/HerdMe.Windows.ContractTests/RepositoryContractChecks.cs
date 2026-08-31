@@ -528,6 +528,17 @@ internal static partial class ContractChecks
         var mainWindowSource = File.ReadAllText(
             Path.Combine(repositoryRoot, "Windows", "HerdMe.Windows", "MainWindow.xaml.cs")
         );
+        Check(
+            appSource.Contains(
+                "var onboardingAfterReinstall = !acceptanceRun",
+                StringComparison.Ordinal
+            )
+                && appSource.Contains(
+                    "services.SiteSettings.ApplyOnboardingAfterReinstallRequest()",
+                    StringComparison.Ordinal
+                ),
+            "Windows acceptance bypasses the persisted reinstall onboarding request"
+        );
         var dashboardXaml = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "Windows",
@@ -677,6 +688,52 @@ internal static partial class ContractChecks
                 )
                 && appSource.Contains("result.UsedBundledFallback", StringComparison.Ordinal),
             "Windows checks once in the background for application and component updates and prompts from live results"
+        );
+        var managedUpdatePromptSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "Windows",
+            "HerdMe.Windows",
+            "Services",
+            "ManagedComponentUpdatePrompt.cs"
+        ));
+        var updatesPageSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "Windows",
+            "HerdMe.Windows",
+            "Pages",
+            "UpdatesPage.xaml.cs"
+        ));
+        Check(
+            managedUpdatePromptSource.Contains("? \"updates\"", StringComparison.Ordinal)
+                && !managedUpdatePromptSource.Contains(
+                    "result.Updates[0].PageTag",
+                    StringComparison.Ordinal
+                ),
+            "managed component update prompts open the centralized Updates page"
+        );
+        Check(
+            updatesPageSource.Contains("WithStoppedEnvironmentAsync", StringComparison.Ordinal)
+                && updatesPageSource.Contains(
+                    "await environment.StopAsync()",
+                    StringComparison.Ordinal
+                )
+                && updatesPageSource.Contains(
+                    "await environment.StartConfiguredAsync(settingsStore)",
+                    StringComparison.Ordinal
+                )
+                && updatesPageSource.Contains(
+                    "foreach (var instance in running) await serviceManager.StopAsync(instance.Id)",
+                    StringComparison.Ordinal
+                )
+                && updatesPageSource.Contains(
+                    "foreach (var instance in running) await serviceManager.StartAsync(instance.Id)",
+                    StringComparison.Ordinal
+                )
+                && updatesPageSource.Contains(
+                    "GroupBy(OperationKey",
+                    StringComparison.Ordinal
+                ),
+            "centralized component updates preserve running PHP sites and managed service state"
         );
         Check(
             environmentSource.Contains(
@@ -1049,6 +1106,7 @@ internal static partial class ContractChecks
             (Tag: "php", NavigationId: "NavPhp", Page: "PhpPage.xaml", PageId: "PhpPageRoot"),
             (Tag: "node", NavigationId: "NavNode", Page: "NodePage.xaml", PageId: "NodePageRoot"),
             (Tag: "services", NavigationId: "NavServices", Page: "ServicesPage.xaml", PageId: "ServicesPageRoot"),
+            (Tag: "updates", NavigationId: "NavUpdates", Page: "UpdatesPage.xaml", PageId: "UpdatesPageRoot"),
             (Tag: "mail", NavigationId: "NavMail", Page: "MailPage.xaml", PageId: "MailPageRoot"),
             (Tag: "dumps", NavigationId: "NavDumps", Page: "DumpsPage.xaml", PageId: "DumpsPageRoot"),
             (Tag: "debugger", NavigationId: "NavDebugger", Page: "DebuggerPage.xaml", PageId: "DebuggerPageRoot"),
@@ -1102,6 +1160,37 @@ internal static partial class ContractChecks
                 && acceptanceSource.Contains("OnboardingStartButton", StringComparison.Ordinal)
                 && acceptanceSource.Contains("IsOffscreen", StringComparison.Ordinal),
             "native Windows acceptance rejects clipped first-run onboarding"
+        );
+        Check(
+            acceptanceSource.Contains(@"HerdMe\captures.sqlite3", StringComparison.Ordinal)
+                && acceptanceSource.Contains(
+                    "SELECT id, payload FROM $Table",
+                    StringComparison.Ordinal
+                )
+                && acceptanceSource.Contains(
+                    "DELETE FROM $Table WHERE id",
+                    StringComparison.Ordinal
+                )
+                && !acceptanceSource.Contains(
+                    "Get-ChildItem -LiteralPath $Directory -Filter \"*.json\"",
+                    StringComparison.Ordinal
+                ),
+            "native Windows acceptance verifies and removes SQLite-backed capture records"
+        );
+        Check(
+            acceptanceSource.Contains(
+                "$onboardingAfterReinstallExisted = Test-Path",
+                StringComparison.Ordinal
+            )
+                && acceptanceSource.Contains(
+                    "[System.IO.File]::WriteAllBytes(",
+                    StringComparison.Ordinal
+                )
+                && acceptanceSource.Contains(
+                    "Remove-Item -LiteralPath $onboardingAfterReinstallPath",
+                    StringComparison.Ordinal
+                ),
+            "native Windows installer acceptance restores the pre-existing onboarding marker state"
         );
         var sitesPageCodeBehind = File.ReadAllText(
             Path.Combine(projectRoot, "Pages", "SitesPage.xaml.cs")

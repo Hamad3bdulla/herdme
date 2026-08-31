@@ -864,4 +864,36 @@
   <data name="SitesWorkflowFailedWithBackup" xml:space="preserve"><value>{0}
 
 Recovery backup: {1}</value></data>
+  <data name="NavUpdates.Content" xml:space="preserve"><value>Updates</value></data>
+  <data name="UpdatesPageRoot.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Updates</value></data>
+  <data name="UpdatesTitle.Text" xml:space="preserve"><value>Updates</value></data>
+  <data name="UpdatesRefreshButtonText.Text" xml:space="preserve"><value>Check</value></data>
+  <data name="UpdatesUpdateAllButtonText.Text" xml:space="preserve"><value>Update all</value></data>
+  <data name="UpdatesDownloadButtonText.Text" xml:space="preserve"><value>Download</value></data>
+  <data name="UpdatesComponentsTitle.Text" xml:space="preserve"><value>Components and services</value></data>
+  <data name="UpdatesNoComponents.Text" xml:space="preserve"><value>All installed components are up to date.</value></data>
+  <data name="UpdatesChecking" xml:space="preserve"><value>Checking for updates…</value></data>
+  <data name="UpdatesLastChecked" xml:space="preserve"><value>Last checked {0}</value></data>
+  <data name="UpdatesCheckFailed" xml:space="preserve"><value>Update check failed</value></data>
+  <data name="UpdatesInstalledVersion" xml:space="preserve"><value>Installed version {0}</value></data>
+  <data name="UpdatesVersionAvailable" xml:space="preserve"><value>Version {0} is available.</value></data>
+  <data name="UpdatesApplicationCheckUnavailable" xml:space="preserve"><value>The HerdMe update service is unavailable.</value></data>
+  <data name="UpdatesCurrent" xml:space="preserve"><value>Up to date</value></data>
+  <data name="UpdatesVersionChange" xml:space="preserve"><value>{0} → {1}</value></data>
+  <data name="UpdatesInstallingCount" xml:space="preserve"><value>Updating {0} components…</value></data>
+  <data name="UpdatesInstallingComponent" xml:space="preserve"><value>Updating {0}…</value></data>
+  <data name="UpdatesCompletedTitle" xml:space="preserve"><value>Updates completed</value></data>
+  <data name="UpdatesCompletedMessage" xml:space="preserve"><value>Updated {0} components successfully.</value></data>
+  <data name="UpdatesFailedTitle" xml:space="preserve"><value>Some updates failed</value></data>
+  <data name="UpdatesUnsupportedComponent" xml:space="preserve"><value>{0} cannot be updated from this page.</value></data>
+  <data name="UpdatesDownloadFailedTitle" xml:space="preserve"><value>Download could not be opened</value></data>
+  <data name="UpdatesDownloadUnavailable" xml:space="preserve"><value>This release has no verified Windows download.</value></data>
+  <data name="UpdatesPartialTitle" xml:space="preserve"><value>Some checks were unavailable</value></data>
+  <data name="UpdatesPartialMessage" xml:space="preserve"><value>Could not check: {0}. Other available updates are shown.</value></data>
+  <data name="UpdatesCurrentTitle" xml:space="preserve"><value>Everything is current</value></data>
+  <data name="UpdatesCategoryPhp" xml:space="preserve"><value>PHP and Laravel tools</value></data>
+  <data name="UpdatesCategoryNode" xml:space="preserve"><value>Node.js runtime</value></data>
+  <data name="UpdatesCategoryService" xml:space="preserve"><value>Local service</value></data>
+  <data name="UpdatesCategoryDebugger" xml:space="preserve"><value>Debugger</value></data>
+  <data name="UpdatesCategoryTool" xml:space="preserve"><value>Command-line tool</value></data>
 </root>

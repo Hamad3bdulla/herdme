@@ -211,6 +211,22 @@ public sealed partial class MainWindow : Window
                     services.SiteSettings
                 );
                 break;
+            case "updates":
+                ContentFrame.Content = new UpdatesPage(
+                    services.SiteSettings,
+                    services.Updates,
+                    services.ComponentUpdates,
+                    services.Environment,
+                    services.PhpInstaller,
+                    services.RuntimePolicy,
+                    services.NodeInstaller,
+                    services.ComposerTools,
+                    services.GitInstaller,
+                    services.Xdebug,
+                    services.Services,
+                    services.UserPath
+                );
+                break;
             case "mail":
                 ContentFrame.Content = new MailPage(
                     services.Mail,
@@ -270,7 +286,7 @@ public sealed partial class MainWindow : Window
 
     private static bool IsPersistentPage(string tag)
     {
-        return tag is "general" or "php" or "node" or "services" or "debugger";
+        return tag is "general" or "php" or "node" or "services" or "updates" or "debugger";
     }
 
     public void NavigateToLogs(string sitePath)
