@@ -107,7 +107,9 @@ public sealed class PhpFastCgiProcess : IAsyncDisposable
         startInfo.ArgumentList.Add($"127.0.0.1:{port}");
         startInfo.Environment["PHPRC"] = Path.GetDirectoryName(phpCgiExecutable)!;
         startInfo.Environment["PHP_FCGI_CHILDREN"] = "4";
-        startInfo.Environment["PHP_FCGI_MAX_REQUESTS"] = "500";
+        // The built-in Windows FastCGI manager does not replace workers after this limit.
+        // Keep HerdMe's long-lived local workers available until the supervised process stops.
+        startInfo.Environment["PHP_FCGI_MAX_REQUESTS"] = "0";
         return startInfo;
     }
 

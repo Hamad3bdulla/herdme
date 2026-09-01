@@ -613,6 +613,24 @@ internal static partial class ContractChecks
             "Services",
             "WindowsLocalEnvironment.cs"
         ));
+        var phpFastCgiSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "Windows",
+            "HerdMe.Windows",
+            "Services",
+            "PhpFastCgiProcess.cs"
+        ));
+        Check(
+            phpFastCgiSource.Contains(
+                "startInfo.Environment[\"PHP_FCGI_MAX_REQUESTS\"] = \"0\"",
+                StringComparison.Ordinal
+            )
+                && !phpFastCgiSource.Contains(
+                    "startInfo.Environment[\"PHP_FCGI_MAX_REQUESTS\"] = \"500\"",
+                    StringComparison.Ordinal
+                ),
+            "managed PHP FastCGI workers remain available for long-running local environments"
+        );
         var phpPolicySource = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "Windows",

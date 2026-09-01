@@ -5,6 +5,14 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-09-01
+
+### Fixed
+
+- Keep Windows PHP FastCGI workers available for the lifetime of the supervised
+  local environment, preventing all PHP sites from becoming unresponsive after
+  sustained use reaches the previous per-worker request limit.
+
 ## [0.1.14] - 2026-08-31
 
 ### Added
@@ -540,7 +548,8 @@ Semantic Versioning for public releases.
 - Unique 256-bit credentials for managed storage and Typesense instances, stored
   in macOS Keychain or Windows Credential Manager and shared with `.env` export.
 
-[Unreleased]: https://github.com/Hamad3bdulla/herdme/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/Hamad3bdulla/herdme/compare/v0.1.15...HEAD
+[0.1.15]: https://github.com/Hamad3bdulla/herdme/releases/tag/v0.1.15
 [0.1.3]: https://github.com/Hamad3bdulla/herdme/releases/tag/v0.1.3
 [0.1.2]: https://github.com/Hamad3bdulla/herdme/releases/tag/preview-0.1.2
 [0.1.1]: https://github.com/Hamad3bdulla/herdme/releases/tag/v0.1.1
