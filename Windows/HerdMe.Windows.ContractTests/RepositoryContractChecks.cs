@@ -258,6 +258,15 @@ internal static partial class ContractChecks
             "SitesPage.xaml.cs"
         ));
         Check(
+            xaml.Contains("x:Name=\"StartLaravelButton\"", StringComparison.Ordinal)
+                && xaml.Contains("Click=\"StartLaravel_Click\"", StringComparison.Ordinal)
+                && pageSource.Contains("await environment.StartAsync(allSites)", StringComparison.Ordinal)
+                && pageSource.Contains("await serviceManager.StartEnabledAsync()", StringComparison.Ordinal)
+                && pageSource.Contains("SiteBackgroundProcessKind.Queue", StringComparison.Ordinal)
+                && pageSource.Contains("SiteBackgroundProcessKind.Scheduler", StringComparison.Ordinal),
+            "a single Laravel action starts the site environment, enabled services, queue, and scheduler"
+        );
+        Check(
             xaml.Contains("x:Name=\"SiteOperationLogText\"", StringComparison.Ordinal)
                 && xaml.Contains("TextWrapping=\"NoWrap\"", StringComparison.Ordinal)
                 && pageSource.Contains("AppendSiteOperationOutput(text)", StringComparison.Ordinal)

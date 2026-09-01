@@ -639,6 +639,9 @@
   <data name="SitesStopQueueWorker" xml:space="preserve"><value>إيقاف قائمة الانتظار</value></data>
   <data name="SitesStartScheduler" xml:space="preserve"><value>تشغيل المجدول</value></data>
   <data name="SitesStopScheduler" xml:space="preserve"><value>إيقاف المجدول</value></data>
+  <data name="SitesStartLaravelTooltip.Text" xml:space="preserve"><value>تشغيل الموقع والخدمات التلقائية وقائمة الانتظار والمجدول وخادم التطوير</value></data>
+  <data name="SitesStartLaravelButton" xml:space="preserve"><value>تشغيل Laravel</value></data>
+  <data name="SitesStopLaravelButton" xml:space="preserve"><value>إيقاف العمال</value></data>
   <data name="SitesRunning" xml:space="preserve"><value>يعمل</value></data>
   <data name="SitesStopped" xml:space="preserve"><value>متوقف</value></data>
   <data name="SitesBackgroundProcessStatus" xml:space="preserve"><value>قائمة الانتظار: {0} · المجدول: {1}</value></data>

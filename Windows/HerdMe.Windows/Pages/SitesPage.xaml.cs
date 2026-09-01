@@ -805,6 +805,7 @@ public sealed partial class SitesPage : Page
         selectedSite = site;
         NoSelectionState.Visibility = site is null ? Visibility.Visible : Visibility.Collapsed;
         SiteDetail.Visibility = site is null ? Visibility.Collapsed : Visibility.Visible;
+        StartLaravelButton.IsEnabled = false;
         if (site is null) return;
 
         SiteNameText.Text = site.Name;
@@ -826,6 +827,7 @@ public sealed partial class SitesPage : Page
         RemoveSiteButton.Visibility = site.Linked ? Visibility.Collapsed : Visibility.Visible;
         ArtisanButton.IsEnabled = site.Framework == "Laravel"
             && File.Exists(Path.Combine(site.Path, "artisan"));
+        StartLaravelButton.IsEnabled = ArtisanButton.IsEnabled;
         NpmButton.IsEnabled = File.Exists(Path.Combine(site.Path, "package.json"));
         ComposerButton.IsEnabled = File.Exists(Path.Combine(site.Path, "composer.json"));
         if (TryCurrentSiteDatabase(site, out var databaseService, out var database, out _))
@@ -867,6 +869,51 @@ public sealed partial class SitesPage : Page
             scheduler.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped")
         );
         ProcessesDetailsText.Text = BackgroundProcessesText.Text;
+        var allLaravelServicesRunning = queue.Running && scheduler.Running && environment.IsRunning;
+        StartLaravelIcon.Symbol = allLaravelServicesRunning ? Symbol.Stop : Symbol.Play;
+        StartLaravelTooltipText.Text = AppLocalization.Get(
+            allLaravelServicesRunning ? "SitesStopLaravelButton" : "SitesStartLaravelButton"
+        );
+    }
+
+    private async void StartLaravel_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not { } site || !ArtisanButton.IsEnabled) return;
+
+        StartLaravelButton.IsEnabled = false;
+        try
+        {
+            var allSites = Sites.ToArray();
+            var queue = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Queue);
+            var scheduler = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Scheduler);
+            if (queue.Running && scheduler.Running && environment.IsRunning)
+            {
+                await siteProcesses.StopAsync(site.Path, SiteBackgroundProcessKind.Queue);
+                await siteProcesses.StopAsync(site.Path, SiteBackgroundProcessKind.Scheduler);
+                return;
+            }
+
+            if (!environment.IsRunning) await environment.StartAsync(allSites);
+            await serviceManager.StartEnabledAsync();
+            await mail.StartAsync();
+
+            var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
+            var php = phpInstaller.PhpExecutable(cycle);
+            await runtimePolicy.PrepareLaunchAsync(php, cycle);
+            var managedEnvironment = composerTools.ManagedEnvironment(cycle);
+            if (!queue.Running)
+                siteProcesses.Start(site.Path, SiteBackgroundProcessKind.Queue, php, managedEnvironment);
+            if (!scheduler.Running) siteProcesses.Start(site.Path, SiteBackgroundProcessKind.Scheduler, php, managedEnvironment);
+        }
+        catch (Exception error) when (error is IOException or InvalidDataException or InvalidOperationException or ArgumentException)
+        {
+            await ShowErrorAsync(error.Message);
+        }
+        finally
+        {
+            StartLaravelButton.IsEnabled = ArtisanButton.IsEnabled;
+            UpdateBackgroundProcessState();
+        }
     }
 
     private void UpdatePerformanceDetails(SiteRecord site)
@@ -2227,7 +2274,10 @@ public sealed partial class SitesPage : Page
         };
         static NumberBox Number(string header, double value, double minimum, double maximum) => new()
         {
-            Header = header, Value = value, Minimum = minimum, Maximum = maximum,
+            Header = header,
+            Value = value,
+            Minimum = minimum,
+            Maximum = maximum,
             SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact
         };
         var triesBox = Number(AppLocalization.Get("SitesQueueTries"), 1, 1, 100);
@@ -2251,8 +2301,11 @@ public sealed partial class SitesPage : Page
         Grid.SetRow(maxTimeBox, 3); settingsGrid.Children.Add(maxTimeBox);
         var outputBox = new TextBox
         {
-            IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap,
-            Height = 210, FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.NoWrap,
+            Height = 210,
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
         };
         var startStopButton = new Button();
         var failedButton = new Button { Content = AppLocalization.Get("SitesQueueFailedRefresh") };
@@ -2409,8 +2462,10 @@ public sealed partial class SitesPage : Page
         timer.Tick += (_, _) => RefreshState();
         var dialog = new ContentDialog
         {
-            XamlRoot = XamlRoot, Title = AppLocalization.Format("SitesQueueTitle", site.Name),
-            Content = content, CloseButtonText = AppLocalization.Get("SitesClose")
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Format("SitesQueueTitle", site.Name),
+            Content = content,
+            CloseButtonText = AppLocalization.Get("SitesClose")
         };
         dialog.Opened += async (_, _) => { RefreshState(); timer.Start(); await RunActionAsync("failed"); };
         dialog.Closing += (_, args) => { if (busy) args.Cancel = true; };

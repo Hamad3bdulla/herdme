@@ -5,6 +5,15 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.16] - 2026-09-01
+
+### Added
+
+- Add one-click Laravel site controls on Windows that start the local site
+  environment, enabled managed services, mail capture, queue worker, and
+  scheduler together, with a matching stop action for the selected site's
+  queue and scheduler.
+
 ## [0.1.15] - 2026-09-01
 
 ### Fixed
