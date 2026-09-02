@@ -633,18 +633,16 @@
   <data name="SitesRepairLocalServer" xml:space="preserve"><value>Repairing local HTTPS and server</value></data>
   <data name="SitesPhpExtensionsCommand.Label" xml:space="preserve"><value>PHP extensions</value></data>
   <data name="SitesCancelOperationButton.Content" xml:space="preserve"><value>Cancel</value></data>
-  <data name="SitesQueueWorkerButton.Content" xml:space="preserve"><value>Manage queue</value></data>
-  <data name="SitesSchedulerButton.Content" xml:space="preserve"><value>Manage scheduler</value></data>
   <data name="SitesStartQueueWorker" xml:space="preserve"><value>Start queue</value></data>
   <data name="SitesStopQueueWorker" xml:space="preserve"><value>Stop queue</value></data>
   <data name="SitesStartScheduler" xml:space="preserve"><value>Start scheduler</value></data>
   <data name="SitesStopScheduler" xml:space="preserve"><value>Stop scheduler</value></data>
-  <data name="SitesStartLaravelTooltip.Text" xml:space="preserve"><value>Start the site, automatic services, queue, scheduler, and development server</value></data>
-  <data name="SitesStartLaravelButton" xml:space="preserve"><value>Start Laravel</value></data>
-  <data name="SitesStopLaravelButton" xml:space="preserve"><value>Stop workers</value></data>
+  <data name="SitesStartLaravelTooltip.Text" xml:space="preserve"><value>Start all development processes with php artisan dev</value></data>
+  <data name="SitesStartLaravelButton" xml:space="preserve"><value>Start php artisan dev</value></data>
+  <data name="SitesStopLaravelButton" xml:space="preserve"><value>Stop development processes</value></data>
   <data name="SitesRunning" xml:space="preserve"><value>running</value></data>
   <data name="SitesStopped" xml:space="preserve"><value>stopped</value></data>
-  <data name="SitesBackgroundProcessStatus" xml:space="preserve"><value>Queue: {0} · Scheduler: {1}</value></data>
+  <data name="SitesBackgroundProcessStatus" xml:space="preserve"><value>Development processes: {0}</value></data>
   <data name="SitesComposerCommandField" xml:space="preserve"><value>Composer command</value></data>
   <data name="SitesComposerPreset" xml:space="preserve"><value>Composer command</value></data>
   <data name="SitesComposerPackageField" xml:space="preserve"><value>Package</value></data>
@@ -794,7 +792,6 @@
   <data name="SitesActionTerminalTooltip.Text" xml:space="preserve"><value>Open terminal</value></data>
   <data name="SitesActionEnvironmentTooltip.Text" xml:space="preserve"><value>Edit .env</value></data>
   <data name="SitesActionDatabaseTooltip.Text" xml:space="preserve"><value>Manage database</value></data>
-  <data name="SitesActionQueueTooltip.Text" xml:space="preserve"><value>Manage queue</value></data>
   <data name="SitesActionLogsTooltip.Text" xml:space="preserve"><value>Open site logs</value></data>
   <data name="SitesActionHealthTooltip.Text" xml:space="preserve"><value>Check and repair site</value></data>
   <data name="PhpTimezoneInput.PlaceholderText" xml:space="preserve"><value>UTC</value></data>

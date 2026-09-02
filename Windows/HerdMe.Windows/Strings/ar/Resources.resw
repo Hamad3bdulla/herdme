@@ -633,18 +633,16 @@
   <data name="SitesRepairLocalServer" xml:space="preserve"><value>جارٍ إصلاح HTTPS والخادم المحلي</value></data>
   <data name="SitesPhpExtensionsCommand.Label" xml:space="preserve"><value>إضافات PHP</value></data>
   <data name="SitesCancelOperationButton.Content" xml:space="preserve"><value>إلغاء</value></data>
-  <data name="SitesQueueWorkerButton.Content" xml:space="preserve"><value>إدارة قائمة الانتظار</value></data>
-  <data name="SitesSchedulerButton.Content" xml:space="preserve"><value>إدارة المجدول</value></data>
   <data name="SitesStartQueueWorker" xml:space="preserve"><value>تشغيل قائمة الانتظار</value></data>
   <data name="SitesStopQueueWorker" xml:space="preserve"><value>إيقاف قائمة الانتظار</value></data>
   <data name="SitesStartScheduler" xml:space="preserve"><value>تشغيل المجدول</value></data>
   <data name="SitesStopScheduler" xml:space="preserve"><value>إيقاف المجدول</value></data>
-  <data name="SitesStartLaravelTooltip.Text" xml:space="preserve"><value>تشغيل الموقع والخدمات التلقائية وقائمة الانتظار والمجدول وخادم التطوير</value></data>
-  <data name="SitesStartLaravelButton" xml:space="preserve"><value>تشغيل Laravel</value></data>
-  <data name="SitesStopLaravelButton" xml:space="preserve"><value>إيقاف العمال</value></data>
+  <data name="SitesStartLaravelTooltip.Text" xml:space="preserve"><value>تشغيل جميع عمليات التطوير عبر php artisan dev</value></data>
+  <data name="SitesStartLaravelButton" xml:space="preserve"><value>تشغيل php artisan dev</value></data>
+  <data name="SitesStopLaravelButton" xml:space="preserve"><value>إيقاف عمليات التطوير</value></data>
   <data name="SitesRunning" xml:space="preserve"><value>يعمل</value></data>
   <data name="SitesStopped" xml:space="preserve"><value>متوقف</value></data>
-  <data name="SitesBackgroundProcessStatus" xml:space="preserve"><value>قائمة الانتظار: {0} · المجدول: {1}</value></data>
+  <data name="SitesBackgroundProcessStatus" xml:space="preserve"><value>عمليات التطوير: {0}</value></data>
   <data name="SitesComposerCommandField" xml:space="preserve"><value>أمر Composer</value></data>
   <data name="SitesComposerPreset" xml:space="preserve"><value>أمر Composer</value></data>
   <data name="SitesComposerPackageField" xml:space="preserve"><value>الحزمة</value></data>
@@ -794,7 +792,6 @@
   <data name="SitesActionTerminalTooltip.Text" xml:space="preserve"><value>فتح الطرفية</value></data>
   <data name="SitesActionEnvironmentTooltip.Text" xml:space="preserve"><value>تعديل ملف .env</value></data>
   <data name="SitesActionDatabaseTooltip.Text" xml:space="preserve"><value>إدارة قاعدة البيانات</value></data>
-  <data name="SitesActionQueueTooltip.Text" xml:space="preserve"><value>إدارة الطابور</value></data>
   <data name="SitesActionLogsTooltip.Text" xml:space="preserve"><value>فتح سجلات الموقع</value></data>
   <data name="SitesActionHealthTooltip.Text" xml:space="preserve"><value>فحص الموقع وإصلاحه</value></data>
   <data name="PhpTimezoneInput.PlaceholderText" xml:space="preserve"><value>مثال: Asia/Bahrain</value></data>

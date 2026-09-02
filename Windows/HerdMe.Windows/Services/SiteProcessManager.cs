@@ -5,7 +5,8 @@ namespace HerdMe.Windows.Services;
 public enum SiteBackgroundProcessKind
 {
     Queue,
-    Scheduler
+    Scheduler,
+    Development
 }
 
 public sealed record SiteQueueWorkerOptions(
@@ -150,15 +151,22 @@ public sealed class SiteProcessManager : IAsyncDisposable
         CancellationToken cancellationToken
     )
     {
-        var command = kind == SiteBackgroundProcessKind.Queue
-            ? new ArtisanCommandSpec(
+        var command = kind switch
+        {
+            SiteBackgroundProcessKind.Queue => new ArtisanCommandSpec(
                 (queueOptions ?? new SiteQueueWorkerOptions()).Arguments(),
                 TimeSpan.FromDays(30)
-            )
-            : new ArtisanCommandSpec(
+            ),
+            SiteBackgroundProcessKind.Scheduler => new ArtisanCommandSpec(
                 ["schedule:work", "--no-interaction"],
                 TimeSpan.FromDays(30)
-            );
+            ),
+            SiteBackgroundProcessKind.Development => new ArtisanCommandSpec(
+                ["dev", "--no-interaction"],
+                TimeSpan.FromDays(30)
+            ),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
         var output = new Progress<string>(text => UpdateOutput(key, text));
         int? exitCode = null;
         try

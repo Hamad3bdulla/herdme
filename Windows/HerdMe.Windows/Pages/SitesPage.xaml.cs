@@ -859,20 +859,15 @@ public sealed partial class SitesPage : Page
     private void UpdateBackgroundProcessState()
     {
         if (selectedSite is not { } site) return;
-        var queue = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Queue);
-        var scheduler = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Scheduler);
-        QueueWorkerButton.Content = AppLocalization.Get("SitesManageQueueWorker");
-        SchedulerButton.Content = AppLocalization.Get("SitesManageScheduler");
+        var development = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Development);
         BackgroundProcessesText.Text = AppLocalization.Format(
             "SitesBackgroundProcessStatus",
-            queue.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped"),
-            scheduler.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped")
+            development.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped")
         );
         ProcessesDetailsText.Text = BackgroundProcessesText.Text;
-        var allLaravelServicesRunning = queue.Running && scheduler.Running && environment.IsRunning;
-        StartLaravelIcon.Symbol = allLaravelServicesRunning ? Symbol.Stop : Symbol.Play;
+        StartLaravelIcon.Symbol = development.Running ? Symbol.Stop : Symbol.Play;
         StartLaravelTooltipText.Text = AppLocalization.Get(
-            allLaravelServicesRunning ? "SitesStopLaravelButton" : "SitesStartLaravelButton"
+            development.Running ? "SitesStopLaravelButton" : "SitesStartLaravelButton"
         );
     }
 
@@ -884,26 +879,30 @@ public sealed partial class SitesPage : Page
         try
         {
             var allSites = Sites.ToArray();
-            var queue = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Queue);
-            var scheduler = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Scheduler);
-            if (queue.Running && scheduler.Running && environment.IsRunning)
+            var development = siteProcesses.State(
+                site.Path,
+                SiteBackgroundProcessKind.Development
+            );
+            if (development.Running)
             {
-                await siteProcesses.StopAsync(site.Path, SiteBackgroundProcessKind.Queue);
-                await siteProcesses.StopAsync(site.Path, SiteBackgroundProcessKind.Scheduler);
+                await siteProcesses.StopAsync(
+                    site.Path,
+                    SiteBackgroundProcessKind.Development
+                );
                 return;
             }
 
             if (!environment.IsRunning) await environment.StartAsync(allSites);
-            await serviceManager.StartEnabledAsync();
-            await mail.StartAsync();
-
             var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
             var php = phpInstaller.PhpExecutable(cycle);
             await runtimePolicy.PrepareLaunchAsync(php, cycle);
             var managedEnvironment = composerTools.ManagedEnvironment(cycle);
-            if (!queue.Running)
-                siteProcesses.Start(site.Path, SiteBackgroundProcessKind.Queue, php, managedEnvironment);
-            if (!scheduler.Running) siteProcesses.Start(site.Path, SiteBackgroundProcessKind.Scheduler, php, managedEnvironment);
+            siteProcesses.Start(
+                site.Path,
+                SiteBackgroundProcessKind.Development,
+                php,
+                managedEnvironment
+            );
         }
         catch (Exception error) when (error is IOException or InvalidDataException or InvalidOperationException or ArgumentException)
         {
@@ -2658,13 +2657,10 @@ public sealed partial class SitesPage : Page
     private async void BackgroundOutput_Click(object sender, RoutedEventArgs e)
     {
         if (selectedSite is not { } site) return;
-        var queue = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Queue);
-        var scheduler = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Scheduler);
-        var output = $"=== Queue ==={Environment.NewLine}{queue.Output}{Environment.NewLine}"
-            + $"=== Scheduler ==={Environment.NewLine}{scheduler.Output}";
+        var development = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Development);
         await ShowCommandResultAsync(
             AppLocalization.Get("SitesBackgroundOutputTitle"),
-            output,
+            development.Output,
             true
         );
     }

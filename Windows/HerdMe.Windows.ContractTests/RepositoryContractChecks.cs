@@ -261,10 +261,11 @@ internal static partial class ContractChecks
             xaml.Contains("x:Name=\"StartLaravelButton\"", StringComparison.Ordinal)
                 && xaml.Contains("Click=\"StartLaravel_Click\"", StringComparison.Ordinal)
                 && pageSource.Contains("await environment.StartAsync(allSites)", StringComparison.Ordinal)
-                && pageSource.Contains("await serviceManager.StartEnabledAsync()", StringComparison.Ordinal)
-                && pageSource.Contains("SiteBackgroundProcessKind.Queue", StringComparison.Ordinal)
-                && pageSource.Contains("SiteBackgroundProcessKind.Scheduler", StringComparison.Ordinal),
-            "a single Laravel action starts the site environment, enabled services, queue, and scheduler"
+                && pageSource.Contains("SiteBackgroundProcessKind.Development", StringComparison.Ordinal)
+                && !pageSource.Contains("await serviceManager.StartEnabledAsync()", StringComparison.Ordinal)
+                && !xaml.Contains("SitesActionQueueTooltip", StringComparison.Ordinal)
+                && !xaml.Contains("SitesSchedulerButton", StringComparison.Ordinal),
+            "a single Laravel action starts and stops the unified Artisan dev process"
         );
         Check(
             xaml.Contains("x:Name=\"SiteOperationLogText\"", StringComparison.Ordinal)

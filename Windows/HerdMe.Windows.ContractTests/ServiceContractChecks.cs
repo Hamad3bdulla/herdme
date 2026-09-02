@@ -222,6 +222,23 @@ internal static partial class ContractChecks
                 && SiteDevelopmentServer.ProjectDirectory(laravelDevelopmentSite) == laravelSite,
             "Laravel Vite runs as an asset server while PHP remains the primary site server"
         );
+        var artisanDevCommand = Path.Combine(
+            laravelSite,
+            "vendor",
+            "laravel",
+            "framework",
+            "src",
+            "Illuminate",
+            "Foundation",
+            "Console",
+            "DevCommand.php"
+        );
+        Directory.CreateDirectory(Path.GetDirectoryName(artisanDevCommand)!);
+        File.WriteAllText(artisanDevCommand, "<?php // Laravel Artisan dev command");
+        Check(
+            SiteDevelopmentServer.ModeFor(laravelDevelopmentSite) is null,
+            "Laravel projects with Artisan dev do not start a duplicate Vite process"
+        );
         var nodeSite = Path.Combine(supportRoot, "node-development-site");
         Directory.CreateDirectory(nodeSite);
         File.WriteAllText(

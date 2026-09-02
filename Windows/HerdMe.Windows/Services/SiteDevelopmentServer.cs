@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text.Json;
 using HerdMe.Windows.Models;
 
 namespace HerdMe.Windows.Services;
@@ -32,6 +33,7 @@ public sealed class SiteDevelopmentServer : IAsyncDisposable
     public static DevelopmentMode? ModeFor(SiteRecord site)
     {
         var root = Path.GetFullPath(site.Path);
+        if (IsLaravelProject(site, root) && UsesArtisanDev(root)) return null;
         if (IsLaravelProject(site, root) && HasDevScript(root))
             return DevelopmentMode.LaravelAssets;
         if (site.Framework.Equals("Node.js", StringComparison.OrdinalIgnoreCase)
@@ -203,6 +205,52 @@ public sealed class SiteDevelopmentServer : IAsyncDisposable
         if (!File.Exists(Path.Combine(path, "package.json"))) return false;
         try { return NpmScriptCatalog.Discover(path).Any(script => script.Name == "dev"); }
         catch (Exception error) when (error is IOException or InvalidDataException or NpmScriptException) { return false; }
+    }
+
+    private static bool UsesArtisanDev(string path)
+    {
+        var frameworkCommand = Path.Combine(
+            path,
+            "vendor",
+            "laravel",
+            "framework",
+            "src",
+            "Illuminate",
+            "Foundation",
+            "Console",
+            "DevCommand.php"
+        );
+        if (File.Exists(frameworkCommand)) return true;
+
+        var composerPath = Path.Combine(path, "composer.json");
+        if (!File.Exists(composerPath)) return false;
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(composerPath));
+            if (!document.RootElement.TryGetProperty("scripts", out var scripts)
+                || !scripts.TryGetProperty("dev", out var dev)) return false;
+            return dev.ValueKind switch
+            {
+                JsonValueKind.String => IsArtisanDevCommand(dev.GetString()),
+                JsonValueKind.Array => dev.EnumerateArray().Any(command =>
+                    command.ValueKind == JsonValueKind.String
+                        && IsArtisanDevCommand(command.GetString())),
+                _ => false
+            };
+        }
+        catch (Exception error) when (error is IOException or JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsArtisanDevCommand(string? command)
+    {
+        var normalized = command?.Trim().TrimStart('@');
+        return normalized is not null
+            && normalized.StartsWith("php artisan dev", StringComparison.OrdinalIgnoreCase)
+            && (normalized.Length == "php artisan dev".Length
+                || char.IsWhiteSpace(normalized["php artisan dev".Length]));
     }
 
     private static bool IsNextProject(string path)
