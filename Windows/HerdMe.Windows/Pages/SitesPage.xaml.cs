@@ -859,14 +859,22 @@ public sealed partial class SitesPage : Page
     private void UpdateBackgroundProcessState()
     {
         if (selectedSite is not { } site) return;
+        var queue = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Queue);
+        var scheduler = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Scheduler);
         var development = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Development);
         BackgroundProcessesText.Text = AppLocalization.Format(
-            "SitesBackgroundProcessStatus",
-            development.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped")
+            "SitesQueueSchedulerStatus",
+            queue.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped"),
+            scheduler.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped")
         );
-        ProcessesDetailsText.Text = BackgroundProcessesText.Text;
+        ProcessesDetailsText.Text = AppLocalization.Format(
+            "SitesBackgroundProcessDetails",
+            development.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped"),
+            queue.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped"),
+            scheduler.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped")
+        );
         StartLaravelIcon.Symbol = development.Running ? Symbol.Stop : Symbol.Play;
-        StartLaravelTooltipText.Text = AppLocalization.Get(
+        StartLaravelButton.Label = AppLocalization.Get(
             development.Running ? "SitesStopLaravelButton" : "SitesStartLaravelButton"
         );
     }

@@ -240,12 +240,12 @@
   <data name="SitesOpenFolderCommand.Label" xml:space="preserve"><value>فتح مجلد المشروع</value></data>
   <data name="SitesOpenTerminalCommand.Label" xml:space="preserve"><value>فتح الطرفية</value></data>
   <data name="SitesEditEnvironmentCommand.Label" xml:space="preserve"><value>تعديل .env</value></data>
-  <data name="SitesOpenLogsCommand.Label" xml:space="preserve"><value>فتح سجلات الموقع</value></data>
-  <data name="SitesArtisanCommand.Label" xml:space="preserve"><value>تشغيل أمر Artisan</value></data>
-  <data name="SitesNpmCommand.Label" xml:space="preserve"><value>تشغيل سكربت npm</value></data>
-  <data name="SitesConfigureRuntimesCommand.Label" xml:space="preserve"><value>ضبط PHP وNode.js</value></data>
-  <data name="SitesUnlinkCommand.Label" xml:space="preserve"><value>إلغاء ربط المشروع</value></data>
-  <data name="SitesMoveToRecycleBinCommand.Label" xml:space="preserve"><value>نقل المشروع إلى سلة المحذوفات</value></data>
+  <data name="SitesOpenLogsCommand.Text" xml:space="preserve"><value>فتح سجلات الموقع</value></data>
+  <data name="SitesArtisanCommand.Text" xml:space="preserve"><value>تشغيل أمر Artisan</value></data>
+  <data name="SitesNpmCommand.Text" xml:space="preserve"><value>تشغيل سكربت npm</value></data>
+  <data name="SitesConfigureRuntimesCommand.Text" xml:space="preserve"><value>ضبط PHP وNode.js</value></data>
+  <data name="SitesUnlinkCommand.Text" xml:space="preserve"><value>إلغاء ربط المشروع</value></data>
+  <data name="SitesMoveToRecycleBinCommand.Text" xml:space="preserve"><value>نقل المشروع إلى سلة المحذوفات</value></data>
   <data name="SitesMoveToRecycleBinTitle" xml:space="preserve"><value>نقل {0} إلى سلة المحذوفات؟</value></data>
   <data name="SitesMoveToRecycleBinMessage" xml:space="preserve"><value>سيُنقل مجلد المشروع إلى سلة المحذوفات ويمكن استعادته منها.</value></data>
   <data name="SitesMoveToRecycleBin" xml:space="preserve"><value>نقل إلى سلة المحذوفات</value></data>
@@ -595,8 +595,8 @@
   <data name="GeneralGitUpdated" xml:space="preserve"><value>أصبح Git {0} جاهزًا.</value></data>
   <data name="DebuggerUpdateButton" xml:space="preserve"><value>تحديث</value></data>
   <data name="DebuggerUpdateAvailable" xml:space="preserve"><value>يتوفر Xdebug {0}.</value></data>
-  <data name="SitesCreateDatabaseCommand.Label" xml:space="preserve"><value>إنشاء قاعدة بيانات</value></data>
-  <data name="SitesImportDatabaseCommand.Label" xml:space="preserve"><value>استيراد قاعدة بيانات</value></data>
+  <data name="SitesCreateDatabaseCommand.Text" xml:space="preserve"><value>إنشاء قاعدة بيانات</value></data>
+  <data name="SitesImportDatabaseCommand.Text" xml:space="preserve"><value>استيراد قاعدة بيانات</value></data>
   <data name="SitesDatabaseNoRunningService" xml:space="preserve"><value>شغّل خدمة MySQL أو MariaDB أو PostgreSQL قبل إنشاء قاعدة بيانات للموقع.</value></data>
   <data name="SitesDatabaseServiceField" xml:space="preserve"><value>خدمة قاعدة البيانات</value></data>
   <data name="SitesDatabaseNameField" xml:space="preserve"><value>اسم قاعدة البيانات</value></data>
@@ -609,9 +609,9 @@
   <data name="SitesDatabaseCreatedTitle" xml:space="preserve"><value>تم إنشاء قاعدة البيانات</value></data>
   <data name="SitesDatabaseAddToEnvironment" xml:space="preserve"><value>إضافة إلى .env</value></data>
   <data name="SitesDatabaseEnvironmentUpdated" xml:space="preserve"><value>تمت إضافة {0} متغيرات وتحديث {1} متغيرات في .env.</value></data>
-  <data name="SitesComposerCommand.Label" xml:space="preserve"><value>تشغيل أمر Composer</value></data>
-  <data name="SitesDoctorCommand.Label" xml:space="preserve"><value>فحص وإصلاح الموقع</value></data>
-  <data name="SitesPerformanceCommand.Label" xml:space="preserve"><value>الأداء</value></data>
+  <data name="SitesComposerCommand.Text" xml:space="preserve"><value>تشغيل أمر Composer</value></data>
+  <data name="SitesDoctorCommand.Text" xml:space="preserve"><value>فحص وإصلاح الموقع</value></data>
+  <data name="SitesPerformanceCommand.Text" xml:space="preserve"><value>الأداء</value></data>
   <data name="SitesPerformanceDetailsLabel.Text" xml:space="preserve"><value>الأداء</value></data>
   <data name="SitesPerformanceSummary" xml:space="preserve"><value>{0} طلب، متوسط {1:0.0} مللي ثانية، {2} أخطاء خادم</value></data>
   <data name="SitesPerformanceReport" xml:space="preserve"><value>الطلبات: {0}&#xA;النشطة: {1}&#xA;أخطاء الخادم: {2}&#xA;المتوسط: {3:0.0} مللي ثانية&#xA;الأبطأ: {4:0.0} مللي ثانية&#xA;آخر طلب: {5}</value></data>
@@ -619,7 +619,12 @@
   <data name="SitesPerformanceReset" xml:space="preserve"><value>تصفير العدادات</value></data>
   <data name="SitesPerformanceNever" xml:space="preserve"><value>لا يوجد</value></data>
   <data name="SitesPerformanceNoRequests" xml:space="preserve"><value>لم تُسجّل طلبات بعد.</value></data>
-  <data name="SitesManageScheduler" xml:space="preserve"><value>إدارة المجدول</value></data>
+  <data name="SitesManageScheduler.Content" xml:space="preserve"><value>إدارة المجدول</value></data>
+  <data name="SitesManageQueueWorker.Content" xml:space="preserve"><value>إدارة قائمة الانتظار</value></data>
+  <data name="SitesQueueSchedulerStatus" xml:space="preserve"><value>قائمة الانتظار: {0} · المجدول: {1}</value></data>
+  <data name="SitesBackgroundProcessDetails" xml:space="preserve"><value>التطوير: {0} · قائمة الانتظار: {1} · المجدول: {2}</value></data>
+  <data name="SitesStartLaravelCommand.Label" xml:space="preserve"><value>تشغيل php artisan dev</value></data>
+  <data name="SitesMoreActionsCommand.Label" xml:space="preserve"><value>المزيد</value></data>
   <data name="SitesSchedulerTitle" xml:space="preserve"><value>مجدول {0}</value></data>
   <data name="SitesSchedulerRefresh" xml:space="preserve"><value>تحديث قائمة المهام</value></data>
   <data name="SitesSchedulerTasks" xml:space="preserve"><value>المهام المجدولة</value></data>
@@ -631,7 +636,7 @@
   <data name="SitesRepairDependencies" xml:space="preserve"><value>جارٍ تثبيت اعتماديات المشروع</value></data>
   <data name="SitesRepairLaravel" xml:space="preserve"><value>جارٍ إصلاح ملفات Laravel وذاكرته المؤقتة</value></data>
   <data name="SitesRepairLocalServer" xml:space="preserve"><value>جارٍ إصلاح HTTPS والخادم المحلي</value></data>
-  <data name="SitesPhpExtensionsCommand.Label" xml:space="preserve"><value>إضافات PHP</value></data>
+  <data name="SitesPhpExtensionsCommand.Text" xml:space="preserve"><value>إضافات PHP</value></data>
   <data name="SitesCancelOperationButton.Content" xml:space="preserve"><value>إلغاء</value></data>
   <data name="SitesStartQueueWorker" xml:space="preserve"><value>تشغيل قائمة الانتظار</value></data>
   <data name="SitesStopQueueWorker" xml:space="preserve"><value>إيقاف قائمة الانتظار</value></data>
@@ -666,7 +671,7 @@
   <data name="SitesOperationFailed" xml:space="preserve"><value>فشلت العملية</value></data>
   <data name="SitesOperationLogLabel.Text" xml:space="preserve"><value>سجل العملية</value></data>
   <data name="SitesNoCommandOutput" xml:space="preserve"><value>اكتمل الأمر دون مخرجات.</value></data>
-  <data name="SitesManageDatabaseCommand.Label" xml:space="preserve"><value>إدارة قاعدة البيانات</value></data>
+  <data name="SitesManageDatabaseCommand.Text" xml:space="preserve"><value>إدارة قاعدة البيانات</value></data>
   <data name="SitesDatabaseManageTitle" xml:space="preserve"><value>قاعدة بيانات الموقع {0}</value></data>
   <data name="SitesDatabaseActionField" xml:space="preserve"><value>الإجراء</value></data>
   <data name="SitesDatabaseBackup" xml:space="preserve"><value>نسخ احتياطي إلى SQL</value></data>
@@ -712,7 +717,6 @@
   <data name="SitesDatabaseInspectionLatency" xml:space="preserve"><value>زمن الاستجابة</value></data>
   <data name="SitesDatabaseInspectionEndpoint" xml:space="preserve"><value>عنوان الاتصال</value></data>
   <data name="SitesQueueTitle" xml:space="preserve"><value>قائمة انتظار {0}</value></data>
-  <data name="SitesManageQueueWorker" xml:space="preserve"><value>إدارة قائمة الانتظار</value></data>
   <data name="SitesQueueConnection" xml:space="preserve"><value>الاتصال</value></data>
   <data name="SitesQueueNames" xml:space="preserve"><value>قوائم الانتظار (افصل بفاصلة)</value></data>
   <data name="SitesQueueDefault" xml:space="preserve"><value>إعدادات التطبيق الافتراضية</value></data>
@@ -818,7 +822,7 @@
   <data name="SitesDatabaseImportCreateTitle" xml:space="preserve"><value>إنشاء القاعدة والاستيراد؟</value></data>
   <data name="SitesDatabaseImportCreateMessage" xml:space="preserve"><value>قاعدة {0} غير موجودة. سينشئها HerdMe ويستورد بيانات SQL ويضيف بيانات الاتصال المولدة إلى ملف .env للموقع.</value></data>
   <data name="SitesDatabaseImport" xml:space="preserve"><value>استيراد</value></data>
-  <data name="SitesAutomationCommand.Label" xml:space="preserve"><value>الإجراءات التلقائية</value></data>
+  <data name="SitesAutomationCommand.Text" xml:space="preserve"><value>الإجراءات التلقائية</value></data>
   <data name="SitesAutomationUpdateLaravel.Text" xml:space="preserve"><value>تحديث مشروع Laravel</value></data>
   <data name="SitesAutomationCleanProject.Text" xml:space="preserve"><value>تنظيف المشروع وإعادة بنائه</value></data>
   <data name="SitesAutomationResetProject.Text" xml:space="preserve"><value>إعادة ضبط المشروع المحلي</value></data>

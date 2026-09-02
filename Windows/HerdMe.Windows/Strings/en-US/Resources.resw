@@ -240,12 +240,12 @@
   <data name="SitesOpenFolderCommand.Label" xml:space="preserve"><value>Open project folder</value></data>
   <data name="SitesOpenTerminalCommand.Label" xml:space="preserve"><value>Open terminal</value></data>
   <data name="SitesEditEnvironmentCommand.Label" xml:space="preserve"><value>Edit .env</value></data>
-  <data name="SitesOpenLogsCommand.Label" xml:space="preserve"><value>Open site logs</value></data>
-  <data name="SitesArtisanCommand.Label" xml:space="preserve"><value>Run Artisan command</value></data>
-  <data name="SitesNpmCommand.Label" xml:space="preserve"><value>Run npm script</value></data>
-  <data name="SitesConfigureRuntimesCommand.Label" xml:space="preserve"><value>Configure PHP and Node.js</value></data>
-  <data name="SitesUnlinkCommand.Label" xml:space="preserve"><value>Unlink project</value></data>
-  <data name="SitesMoveToRecycleBinCommand.Label" xml:space="preserve"><value>Move project to Recycle Bin</value></data>
+  <data name="SitesOpenLogsCommand.Text" xml:space="preserve"><value>Open site logs</value></data>
+  <data name="SitesArtisanCommand.Text" xml:space="preserve"><value>Run Artisan command</value></data>
+  <data name="SitesNpmCommand.Text" xml:space="preserve"><value>Run npm script</value></data>
+  <data name="SitesConfigureRuntimesCommand.Text" xml:space="preserve"><value>Configure PHP and Node.js</value></data>
+  <data name="SitesUnlinkCommand.Text" xml:space="preserve"><value>Unlink project</value></data>
+  <data name="SitesMoveToRecycleBinCommand.Text" xml:space="preserve"><value>Move project to Recycle Bin</value></data>
   <data name="SitesMoveToRecycleBinTitle" xml:space="preserve"><value>Move {0} to Recycle Bin?</value></data>
   <data name="SitesMoveToRecycleBinMessage" xml:space="preserve"><value>The project folder will be moved to the Recycle Bin and can be restored from there.</value></data>
   <data name="SitesMoveToRecycleBin" xml:space="preserve"><value>Move to Recycle Bin</value></data>
@@ -595,8 +595,8 @@
   <data name="GeneralGitUpdated" xml:space="preserve"><value>Git {0} is ready.</value></data>
   <data name="DebuggerUpdateButton" xml:space="preserve"><value>Update</value></data>
   <data name="DebuggerUpdateAvailable" xml:space="preserve"><value>Xdebug {0} is available.</value></data>
-  <data name="SitesCreateDatabaseCommand.Label" xml:space="preserve"><value>Create database</value></data>
-  <data name="SitesImportDatabaseCommand.Label" xml:space="preserve"><value>Import database</value></data>
+  <data name="SitesCreateDatabaseCommand.Text" xml:space="preserve"><value>Create database</value></data>
+  <data name="SitesImportDatabaseCommand.Text" xml:space="preserve"><value>Import database</value></data>
   <data name="SitesDatabaseNoRunningService" xml:space="preserve"><value>Start a MySQL, MariaDB, or PostgreSQL service before creating a site database.</value></data>
   <data name="SitesDatabaseServiceField" xml:space="preserve"><value>Database service</value></data>
   <data name="SitesDatabaseNameField" xml:space="preserve"><value>Database name</value></data>
@@ -609,9 +609,9 @@
   <data name="SitesDatabaseCreatedTitle" xml:space="preserve"><value>Database created</value></data>
   <data name="SitesDatabaseAddToEnvironment" xml:space="preserve"><value>Add to .env</value></data>
   <data name="SitesDatabaseEnvironmentUpdated" xml:space="preserve"><value>Added {0} and updated {1} variables in .env.</value></data>
-  <data name="SitesComposerCommand.Label" xml:space="preserve"><value>Run Composer command</value></data>
-  <data name="SitesDoctorCommand.Label" xml:space="preserve"><value>Check and repair site</value></data>
-  <data name="SitesPerformanceCommand.Label" xml:space="preserve"><value>Performance</value></data>
+  <data name="SitesComposerCommand.Text" xml:space="preserve"><value>Run Composer command</value></data>
+  <data name="SitesDoctorCommand.Text" xml:space="preserve"><value>Check and repair site</value></data>
+  <data name="SitesPerformanceCommand.Text" xml:space="preserve"><value>Performance</value></data>
   <data name="SitesPerformanceDetailsLabel.Text" xml:space="preserve"><value>Performance</value></data>
   <data name="SitesPerformanceSummary" xml:space="preserve"><value>{0} requests, average {1:0.0} ms, {2} server errors</value></data>
   <data name="SitesPerformanceReport" xml:space="preserve"><value>Requests: {0}&#xA;Active: {1}&#xA;Server errors: {2}&#xA;Average: {3:0.0} ms&#xA;Slowest: {4:0.0} ms&#xA;Last request: {5}</value></data>
@@ -619,7 +619,12 @@
   <data name="SitesPerformanceReset" xml:space="preserve"><value>Reset counters</value></data>
   <data name="SitesPerformanceNever" xml:space="preserve"><value>Never</value></data>
   <data name="SitesPerformanceNoRequests" xml:space="preserve"><value>No requests recorded yet.</value></data>
-  <data name="SitesManageScheduler" xml:space="preserve"><value>Manage scheduler</value></data>
+  <data name="SitesManageScheduler.Content" xml:space="preserve"><value>Manage scheduler</value></data>
+  <data name="SitesManageQueueWorker.Content" xml:space="preserve"><value>Manage queue</value></data>
+  <data name="SitesQueueSchedulerStatus" xml:space="preserve"><value>Queue: {0} · Scheduler: {1}</value></data>
+  <data name="SitesBackgroundProcessDetails" xml:space="preserve"><value>Dev: {0} · Queue: {1} · Scheduler: {2}</value></data>
+  <data name="SitesStartLaravelCommand.Label" xml:space="preserve"><value>Start php artisan dev</value></data>
+  <data name="SitesMoreActionsCommand.Label" xml:space="preserve"><value>More</value></data>
   <data name="SitesSchedulerTitle" xml:space="preserve"><value>Scheduler: {0}</value></data>
   <data name="SitesSchedulerRefresh" xml:space="preserve"><value>Refresh task list</value></data>
   <data name="SitesSchedulerTasks" xml:space="preserve"><value>Scheduled tasks</value></data>
@@ -631,7 +636,7 @@
   <data name="SitesRepairDependencies" xml:space="preserve"><value>Installing project dependencies</value></data>
   <data name="SitesRepairLaravel" xml:space="preserve"><value>Repairing Laravel files and caches</value></data>
   <data name="SitesRepairLocalServer" xml:space="preserve"><value>Repairing local HTTPS and server</value></data>
-  <data name="SitesPhpExtensionsCommand.Label" xml:space="preserve"><value>PHP extensions</value></data>
+  <data name="SitesPhpExtensionsCommand.Text" xml:space="preserve"><value>PHP extensions</value></data>
   <data name="SitesCancelOperationButton.Content" xml:space="preserve"><value>Cancel</value></data>
   <data name="SitesStartQueueWorker" xml:space="preserve"><value>Start queue</value></data>
   <data name="SitesStopQueueWorker" xml:space="preserve"><value>Stop queue</value></data>
@@ -666,7 +671,7 @@
   <data name="SitesOperationFailed" xml:space="preserve"><value>Operation failed</value></data>
   <data name="SitesOperationLogLabel.Text" xml:space="preserve"><value>Operation log</value></data>
   <data name="SitesNoCommandOutput" xml:space="preserve"><value>The command completed without output.</value></data>
-  <data name="SitesManageDatabaseCommand.Label" xml:space="preserve"><value>Manage database</value></data>
+  <data name="SitesManageDatabaseCommand.Text" xml:space="preserve"><value>Manage database</value></data>
   <data name="SitesDatabaseManageTitle" xml:space="preserve"><value>Database for {0}</value></data>
   <data name="SitesDatabaseActionField" xml:space="preserve"><value>Action</value></data>
   <data name="SitesDatabaseBackup" xml:space="preserve"><value>Back up to SQL</value></data>
@@ -712,7 +717,6 @@
   <data name="SitesDatabaseInspectionLatency" xml:space="preserve"><value>Response time</value></data>
   <data name="SitesDatabaseInspectionEndpoint" xml:space="preserve"><value>Endpoint</value></data>
   <data name="SitesQueueTitle" xml:space="preserve"><value>Queue: {0}</value></data>
-  <data name="SitesManageQueueWorker" xml:space="preserve"><value>Manage queue</value></data>
   <data name="SitesQueueConnection" xml:space="preserve"><value>Connection</value></data>
   <data name="SitesQueueNames" xml:space="preserve"><value>Queues (comma separated)</value></data>
   <data name="SitesQueueDefault" xml:space="preserve"><value>Application default</value></data>
@@ -818,7 +822,7 @@
   <data name="SitesDatabaseImportCreateTitle" xml:space="preserve"><value>Create database and import?</value></data>
   <data name="SitesDatabaseImportCreateMessage" xml:space="preserve"><value>{0} does not exist. HerdMe will create it, import the SQL data, and add the generated connection settings to the site's .env file.</value></data>
   <data name="SitesDatabaseImport" xml:space="preserve"><value>Import</value></data>
-  <data name="SitesAutomationCommand.Label" xml:space="preserve"><value>Automations</value></data>
+  <data name="SitesAutomationCommand.Text" xml:space="preserve"><value>Automations</value></data>
   <data name="SitesAutomationUpdateLaravel.Text" xml:space="preserve"><value>Update Laravel project</value></data>
   <data name="SitesAutomationCleanProject.Text" xml:space="preserve"><value>Clean and rebuild project</value></data>
   <data name="SitesAutomationResetProject.Text" xml:space="preserve"><value>Reset local project</value></data>

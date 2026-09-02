@@ -244,27 +244,13 @@
                     </StackPanel>
 
                     <Grid x:Name="SiteDetail" Visibility="Collapsed">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="52" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <StackPanel x:Name="SiteActionRail" Grid.RowSpan="3" Padding="6,10" Spacing="5" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
-                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="OpenSite_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionOpenBrowserTooltip" Text="Open in browser" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="Globe" /></Button>
-                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="OpenFolder_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionOpenFolderTooltip" Text="Open project folder" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="Folder" /></Button>
-                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="OpenTerminal_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionTerminalTooltip" Text="Open terminal" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="OpenFile" /></Button>
-                            <Button x:Name="StartLaravelButton" Style="{StaticResource SitesIconButtonStyle}" Click="StartLaravel_Click" IsEnabled="False"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesStartLaravelTooltip" x:Name="StartLaravelTooltipText" Text="Start Laravel site services" /></ToolTip></ToolTipService.ToolTip><SymbolIcon x:Name="StartLaravelIcon" Symbol="Play" /></Button>
-                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="EditEnvironment_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionEnvironmentTooltip" Text="Edit .env" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="Edit" /></Button>
-                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="ManageDatabase_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionDatabaseTooltip" Text="Manage database" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="Library" /></Button>
-                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="OpenLogs_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionLogsTooltip" Text="Open site logs" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="Document" /></Button>
-                            <Button Style="{StaticResource SitesIconButtonStyle}" Click="SiteDoctor_Click"><ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="SitesActionHealthTooltip" Text="Check and repair site" /></ToolTip></ToolTipService.ToolTip><SymbolIcon Symbol="Repair" /></Button>
-                        </StackPanel>
 
-                        <Grid Grid.Column="1" Padding="16,14,16,8" ColumnSpacing="12">
+                        <Grid Grid.Row="0" Padding="16,14,16,8" ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
@@ -288,26 +274,12 @@
 
                         <CommandBar
                             Grid.Row="1"
-                            Grid.Column="1"
                             Margin="8,0"
                             Background="Transparent"
                             DefaultLabelPosition="Collapsed"
-                            IsDynamicOverflowEnabled="True">
+                            IsDynamicOverflowEnabled="False">
                             <CommandBar.PrimaryCommands>
-                                <AppBarButton x:Uid="SitesAutomationCommand" Label="Automations">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="AllApps" /></AppBarButton.Icon>
-                                    <AppBarButton.Flyout>
-                                        <MenuFlyout>
-                                            <MenuFlyoutItem x:Uid="SitesAutomationUpdateLaravel" Text="Update Laravel project" Click="UpdateLaravelWorkflow_Click" />
-                                            <MenuFlyoutItem x:Uid="SitesAutomationCleanProject" Text="Clean and rebuild project" Click="CleanProjectWorkflow_Click" />
-                                            <MenuFlyoutItem x:Uid="SitesAutomationResetProject" Text="Reset local project" Click="ResetProjectWorkflow_Click" />
-                                            <MenuFlyoutItem x:Uid="SitesAutomationExportProject" Text="Export transferable package" Click="ExportProjectWorkflow_Click" />
-                                            <MenuFlyoutItem x:Uid="SitesAutomationSetupMail" Text="Configure local mail" Click="SetupMailWorkflow_Click" />
-                                            <MenuFlyoutItem x:Uid="SitesAutomationHandoffAudit" Text="Run handoff audit" Click="HandoffAuditWorkflow_Click" />
-                                        </MenuFlyout>
-                                    </AppBarButton.Flyout>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesOpenBrowserCommand" Label="Open in browser" Click="OpenSite_Click" Visibility="Collapsed">
+                                <AppBarButton x:Uid="SitesOpenBrowserCommand" Label="Open in browser" Click="OpenSite_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Globe" /></AppBarButton.Icon>
                                 </AppBarButton>
                                 <AppBarButton x:Uid="SitesCopyCommand" Label="Copy site link or path">
@@ -319,65 +291,64 @@
                                         </MenuFlyout>
                                     </AppBarButton.Flyout>
                                 </AppBarButton>
-                                <AppBarButton x:Uid="SitesOpenFolderCommand" Label="Open project folder" Click="OpenFolder_Click" Visibility="Collapsed">
+                                <AppBarButton x:Uid="SitesOpenFolderCommand" Label="Open project folder" Click="OpenFolder_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Folder" /></AppBarButton.Icon>
                                 </AppBarButton>
-                                <AppBarButton x:Uid="SitesOpenTerminalCommand" Label="Open terminal" Click="OpenTerminal_Click" Visibility="Collapsed">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="OpenFile" /></AppBarButton.Icon>
+                                <AppBarButton x:Uid="SitesOpenTerminalCommand" Label="Open terminal" Click="OpenTerminal_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="OpenLocal" /></AppBarButton.Icon>
                                 </AppBarButton>
-                                <AppBarButton x:Uid="SitesEditEnvironmentCommand" Label="Edit .env" Click="EditEnvironment_Click" Visibility="Collapsed">
+                                <AppBarButton x:Uid="SitesEditEnvironmentCommand" Label="Edit .env" Click="EditEnvironment_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Edit" /></AppBarButton.Icon>
                                 </AppBarButton>
-                                <AppBarButton x:Uid="SitesCreateDatabaseCommand" x:Name="CreateDatabaseButton" Label="Create database" Click="CreateDatabase_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Library" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesImportDatabaseCommand" Label="Import database" Click="ImportDatabase_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="OpenFile" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesManageDatabaseCommand" Label="Manage database" Click="ManageDatabase_Click" Visibility="Collapsed">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Manage" /></AppBarButton.Icon>
+                                <AppBarButton
+                                    x:Uid="SitesStartLaravelCommand"
+                                    x:Name="StartLaravelButton"
+                                    Label="Start php artisan dev"
+                                    Click="StartLaravel_Click"
+                                    IsEnabled="False">
+                                    <AppBarButton.Icon><SymbolIcon x:Name="StartLaravelIcon" Symbol="Play" /></AppBarButton.Icon>
                                 </AppBarButton>
                             </CommandBar.PrimaryCommands>
                             <CommandBar.SecondaryCommands>
-                                <AppBarButton x:Uid="SitesOpenLogsCommand" Label="Open site logs" Click="OpenLogs_Click" Visibility="Collapsed">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Document" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesArtisanCommand" x:Name="ArtisanButton" Label="Run Artisan command" Click="Artisan_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Play" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesNpmCommand" x:Name="NpmButton" Label="Run npm script" Click="Npm_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Library" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesComposerCommand" x:Name="ComposerButton" Label="Run Composer command" Click="Composer_Click">
-                                    <AppBarButton.Icon><FontIcon Glyph="&#xE943;" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesDoctorCommand" Label="Check and repair site" Click="SiteDoctor_Click" Visibility="Collapsed">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Repair" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesPerformanceCommand" Label="Performance" Click="Performance_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Clock" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesPhpExtensionsCommand" Label="PHP extensions" Click="PhpExtensions_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Bullets" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesConfigureRuntimesCommand" Label="Configure PHP and Node.js" Click="EditRuntimes_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Setting" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesUnlinkCommand" x:Name="UnlinkButton" Label="Unlink project" Click="UnlinkSelectedSite_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Remove" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton
-                                    x:Uid="SitesMoveToRecycleBinCommand"
-                                    x:Name="RemoveSiteButton"
-                                    Label="Move project to Recycle Bin"
-                                    Click="MoveSelectedSiteToRecycleBin_Click"
-                                    Visibility="Collapsed">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Delete" /></AppBarButton.Icon>
+                                <AppBarButton x:Uid="SitesMoreActionsCommand" Label="More site actions">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="More" /></AppBarButton.Icon>
+                                    <AppBarButton.Flyout>
+                                        <MenuFlyout>
+                                            <MenuFlyoutItem x:Uid="SitesOpenLogsCommand" Text="Open site logs" Click="OpenLogs_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesManageDatabaseCommand" Text="Manage database" Click="ManageDatabase_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesCreateDatabaseCommand" x:Name="CreateDatabaseButton" Text="Create database" Click="CreateDatabase_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesImportDatabaseCommand" Text="Import database" Click="ImportDatabase_Click" />
+                                            <MenuFlyoutSeparator />
+                                            <MenuFlyoutItem x:Uid="SitesArtisanCommand" x:Name="ArtisanButton" Text="Run Artisan command" Click="Artisan_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesNpmCommand" x:Name="NpmButton" Text="Run npm script" Click="Npm_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesComposerCommand" x:Name="ComposerButton" Text="Run Composer command" Click="Composer_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesDoctorCommand" Text="Check and repair site" Click="SiteDoctor_Click" />
+                                            <MenuFlyoutSeparator />
+                                            <MenuFlyoutSubItem x:Uid="SitesAutomationCommand" Text="Automations">
+                                                <MenuFlyoutItem x:Uid="SitesAutomationUpdateLaravel" Text="Update Laravel project" Click="UpdateLaravelWorkflow_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesAutomationCleanProject" Text="Clean and rebuild project" Click="CleanProjectWorkflow_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesAutomationResetProject" Text="Reset local project" Click="ResetProjectWorkflow_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesAutomationExportProject" Text="Export transferable package" Click="ExportProjectWorkflow_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesAutomationSetupMail" Text="Configure local mail" Click="SetupMailWorkflow_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesAutomationHandoffAudit" Text="Run handoff audit" Click="HandoffAuditWorkflow_Click" />
+                                            </MenuFlyoutSubItem>
+                                            <MenuFlyoutItem x:Uid="SitesPerformanceCommand" Text="Performance" Click="Performance_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesPhpExtensionsCommand" Text="PHP extensions" Click="PhpExtensions_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesConfigureRuntimesCommand" Text="Configure PHP and Node.js" Click="EditRuntimes_Click" />
+                                            <MenuFlyoutSeparator />
+                                            <MenuFlyoutItem x:Uid="SitesUnlinkCommand" x:Name="UnlinkButton" Text="Unlink project" Click="UnlinkSelectedSite_Click" />
+                                            <MenuFlyoutItem
+                                                x:Uid="SitesMoveToRecycleBinCommand"
+                                                x:Name="RemoveSiteButton"
+                                                Text="Move project to Recycle Bin"
+                                                Click="MoveSelectedSiteToRecycleBin_Click" />
+                                        </MenuFlyout>
+                                    </AppBarButton.Flyout>
                                 </AppBarButton>
                             </CommandBar.SecondaryCommands>
                         </CommandBar>
 
-                        <ScrollViewer Grid.Row="2" Grid.Column="1" Padding="16,6,16,16" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer Grid.Row="2" Padding="16,6,16,16" VerticalScrollBarVisibility="Auto">
                             <StackPanel Spacing="14">
                                 <InfoBar
                                     x:Name="SiteOperationBar"
@@ -414,14 +385,14 @@
                                             ScrollViewer.VerticalScrollBarVisibility="Auto" />
                                     </StackPanel>
                                 </Border>
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button x:Uid="SitesBackgroundOutputButton" Grid.Column="0" Content="Output" Click="BackgroundOutput_Click" />
-                                    <TextBlock x:Name="BackgroundProcessesText" Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </Grid>
+                                <StackPanel Spacing="8">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button x:Uid="SitesManageQueueWorker" Click="QueueWorker_Click" />
+                                        <Button x:Uid="SitesManageScheduler" Click="Scheduler_Click" />
+                                        <Button x:Uid="SitesBackgroundOutputButton" Click="BackgroundOutput_Click" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="BackgroundProcessesText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
                                 <Border x:Name="PreviewBorder" Height="160" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6">
                                     <Grid>
                                         <WebView2
