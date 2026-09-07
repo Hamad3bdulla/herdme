@@ -29,8 +29,11 @@ function Invoke-DotNetChecked {
 
 $resolvedProject = (Resolve-Path -LiteralPath $ProjectPath).Path
 $previousPlatform = $env:Platform
+$previousRollForward = $env:DOTNET_ROLL_FORWARD
 try {
     $env:Platform = $Architecture
+    # The .NET 8 formatter otherwise opts into the newest installed major runtime.
+    $env:DOTNET_ROLL_FORWARD = "LatestPatch"
     if (-not $NoRestore) {
         Invoke-DotNetChecked `
             -Arguments @(
@@ -56,6 +59,7 @@ try {
 }
 finally {
     $env:Platform = $previousPlatform
+    $env:DOTNET_ROLL_FORWARD = $previousRollForward
 }
 
 $outputText = $formatOutput -join "`n"
