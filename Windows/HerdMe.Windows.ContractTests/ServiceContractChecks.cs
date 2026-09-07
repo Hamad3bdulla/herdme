@@ -475,7 +475,8 @@ internal static partial class ContractChecks
             "herdme_0123456789abcdef",
             "0123456789abcdef0123456789abcdef0123456789abcdef"
         );
-        var mysqlSiteSql = SiteDatabaseProvisioner.MySqlCreateDatabaseSql(siteDatabase);
+        var mysqlSiteSql = SiteDatabaseProvisioner.MySqlCreateDatabaseSql(siteDatabase)
+            + SiteDatabaseProvisioner.MySqlCreateUserSql(siteDatabase);
         Check(
             mysqlSiteSql.Contains("CREATE DATABASE `demo_store`", StringComparison.Ordinal)
                 && mysqlSiteSql.Contains(
@@ -485,6 +486,27 @@ internal static partial class ContractChecks
                 && !mysqlSiteSql.Contains("ON *.*", StringComparison.Ordinal),
             "site MySQL users are limited to their own database"
         );
+        var databaseCredentialStore = new WindowsServiceCredentialStore(
+            new WindowsCredentialStore("database-administrator-contract", new MemoryCredentialBackend())
+        );
+        var databaseServiceId = Guid.NewGuid();
+        var serviceLogin = databaseCredentialStore.GetOrCreate(databaseServiceId);
+        foreach (var definition in new[] { "mysql", "mariadb" })
+        {
+            var administrator = databaseCredentialStore.GetDatabaseAdministrator(databaseServiceId, definition);
+            Check(administrator.Username == "root" && administrator.Secret == serviceLogin.Secret,
+                $"{definition} site administration uses the protected root login");
+        }
+        Check(databaseCredentialStore.GetDatabaseAdministrator(databaseServiceId, "postgresql") == serviceLogin,
+            "PostgreSQL administration preserves its initialized superuser login");
+        Check(databaseCredentialStore.GetOrCreate(databaseServiceId) == serviceLogin
+                && ServiceEnvironmentConfiguration.Variables(
+                    new ManagedServiceInstance { DefinitionId = "mariadb" }, serviceLogin
+                ).Single(variable => variable.Key == "DB_USERNAME").Value == serviceLogin.Username,
+            "administrative login selection does not promote the service login exported to projects");
+        Throws<NotSupportedException>(
+            () => databaseCredentialStore.GetDatabaseAdministrator(databaseServiceId, "redis"),
+            "non-SQL services cannot request database administration credentials");
         var postgreSqlSiteSql = SiteDatabaseProvisioner.PostgreSqlCreateDatabaseSql(siteDatabase);
         Check(
             postgreSqlSiteSql.CreateRole.Contains(

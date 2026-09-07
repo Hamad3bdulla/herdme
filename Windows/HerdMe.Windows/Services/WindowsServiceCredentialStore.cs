@@ -78,6 +78,18 @@ public sealed class WindowsServiceCredentialStore
         }
     }
 
+    public ServiceCredentials GetDatabaseAdministrator(Guid identifier, string definitionId)
+    {
+        if (!SiteDatabaseProvisioner.SupportedDefinitions.Contains(definitionId))
+            throw new NotSupportedException($"{definitionId} does not support site databases.");
+
+        var credentials = GetOrCreate(identifier);
+        // MySQL-compatible service logins only own laravel; bootstrap protects root with the same secret.
+        return definitionId.Equals("postgresql", StringComparison.OrdinalIgnoreCase)
+            ? credentials
+            : credentials with { Username = "root" };
+    }
+
     private static string Account(Guid identifier) => identifier.ToString("D");
 
     private static string Username(Guid identifier) => "herdme_" + identifier.ToString("N")[..12];

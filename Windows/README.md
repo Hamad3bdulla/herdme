@@ -44,6 +44,13 @@ MariaDB, and PostgreSQL receive a unique Credential Manager secret per service.
 PostgreSQL is initialized with SCRAM, and existing passwordless database data is
 migrated before the service is reported as running. `.env` and TablePlus use the
 same protected username and password.
+From a site's toolbar, **Create database** suggests a name and offers
+**Create, connect & open**. The same dialog installs or starts the database
+service when needed, creates a dedicated database and user, updates `.env`,
+clears cached Laravel configuration, and opens TablePlus. With no configured SQL
+service, it prepares MariaDB on an available local port. Progress and errors stay
+in the dialog; retrying after creation resumes the remaining steps using the
+same credentials. TablePlus opening can be disabled without skipping `.env` setup.
 Packages with GitHub or vendor SHA-256 metadata require SHA-256. Oracle's MySQL
 Windows page currently publishes MD5 plus a detached signature rather than
 SHA-256, so HerdMe accepts its published MD5 only for the exact release parsed

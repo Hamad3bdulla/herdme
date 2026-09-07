@@ -619,11 +619,8 @@
   <data name="SitesPerformanceReset" xml:space="preserve"><value>Reset counters</value></data>
   <data name="SitesPerformanceNever" xml:space="preserve"><value>Never</value></data>
   <data name="SitesPerformanceNoRequests" xml:space="preserve"><value>No requests recorded yet.</value></data>
-  <data name="SitesManageScheduler.Content" xml:space="preserve"><value>Manage scheduler</value></data>
-  <data name="SitesManageQueueWorker.Content" xml:space="preserve"><value>Manage queue</value></data>
   <data name="SitesQueueSchedulerStatus" xml:space="preserve"><value>Queue: {0} · Scheduler: {1}</value></data>
   <data name="SitesBackgroundProcessDetails" xml:space="preserve"><value>Dev: {0} · Queue: {1} · Scheduler: {2}</value></data>
-  <data name="SitesStartLaravelCommand.Label" xml:space="preserve"><value>Start php artisan dev</value></data>
   <data name="SitesMoreActionsCommand.Label" xml:space="preserve"><value>More</value></data>
   <data name="SitesSchedulerTitle" xml:space="preserve"><value>Scheduler: {0}</value></data>
   <data name="SitesSchedulerRefresh" xml:space="preserve"><value>Refresh task list</value></data>
@@ -703,7 +700,8 @@
   <data name="SitesHealthCheckAvailable" xml:space="preserve"><value>Use Check and repair site for a complete report.</value></data>
   <data name="SitesHealthSummary" xml:space="preserve"><value>{0} of {1} checks are healthy</value></data>
   <data name="SitesBackgroundOutputButton.Content" xml:space="preserve"><value>Output</value></data>
-  <data name="SitesBackgroundOutputTitle" xml:space="preserve"><value>Queue and scheduler output</value></data>
+  <data name="SitesBackgroundOutputTitle" xml:space="preserve"><value>php artisan dev output</value></data>
+  <data name="SitesDevelopmentStatus" xml:space="preserve"><value>php artisan dev: {0}</value></data>
   <data name="SitesDatabaseInspect" xml:space="preserve"><value>Inspect connection</value></data>
   <data name="SitesDatabaseInspectionTitle" xml:space="preserve"><value>Database connection</value></data>
   <data name="SitesDatabaseInspectionSuccess" xml:space="preserve"><value>Connection successful</value></data>
@@ -896,4 +894,13 @@ Recovery backup: {1}</value></data>
   <data name="SitesDatabaseQuickSetupDescription" xml:space="preserve"><value>Creates the database and updates this site's connection settings in .env automatically. You can change the suggested name.</value></data>
   <data name="SitesDatabaseOpenAfterCreate" xml:space="preserve"><value>Open in TablePlus after creation</value></data>
   <data name="SitesDatabaseEnvironmentReady" xml:space="preserve"><value>The database is ready and its connection settings are saved in .env.</value></data>
+  <data name="SitesDatabaseCreateAndOpen" xml:space="preserve"><value>Create, connect &amp; open</value></data>
+  <data name="SitesDatabaseCreateAndConnect" xml:space="preserve"><value>Create &amp; connect</value></data>
+  <data name="SitesDatabaseContinueSetup" xml:space="preserve"><value>Retry remaining steps</value></data>
+  <data name="SitesDatabaseConnectionDetails" xml:space="preserve"><value>Connection details</value></data>
+  <data name="SitesDatabaseCreating" xml:space="preserve"><value>Creating database...</value></data>
+  <data name="SitesDatabaseSavingEnvironment" xml:space="preserve"><value>Saving connection to .env...</value></data>
+  <data name="SitesDatabaseApplyingConfiguration" xml:space="preserve"><value>Applying Laravel configuration...</value></data>
+  <data name="SitesDatabaseOpeningTablePlus" xml:space="preserve"><value>Opening TablePlus...</value></data>
+  <data name="SitesDatabaseNoAvailablePort" xml:space="preserve"><value>No local port is available for the database service.</value></data>
 </root>

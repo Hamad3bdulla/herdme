@@ -370,8 +370,13 @@ public static class SiteDatabaseProvisioner
     internal static string MySqlCreateDatabaseSql(SiteDatabaseProvisioning provisioning)
     {
         RequireValidProvisioning(provisioning);
-        return $"CREATE DATABASE `{provisioning.DatabaseName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\n"
-            + $"CREATE USER '{provisioning.Username}'@'127.0.0.1' IDENTIFIED BY '{provisioning.Password}';\n"
+        return $"CREATE DATABASE `{provisioning.DatabaseName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\n";
+    }
+
+    internal static string MySqlCreateUserSql(SiteDatabaseProvisioning provisioning)
+    {
+        RequireValidProvisioning(provisioning);
+        return $"CREATE USER '{provisioning.Username}'@'127.0.0.1' IDENTIFIED BY '{provisioning.Password}';\n"
             + $"GRANT ALL PRIVILEGES ON `{provisioning.DatabaseName}`.* TO '{provisioning.Username}'@'127.0.0.1';\n"
             + "FLUSH PRIVILEGES;\n";
     }
@@ -415,13 +420,20 @@ public static class SiteDatabaseProvisioner
             throw new InvalidOperationException($"A database named {provisioning.DatabaseName} already exists.");
         }
 
+        // Only roll back a database after this invocation successfully created it.
+        // Another request may have claimed the name since the existence check.
+        var database = await RunAsync(
+            client, arguments, environment, MySqlCreateDatabaseSql(provisioning), cancellationToken
+        );
+        RequireSuccess(database, instance.Name, "create the site database");
+
         try
         {
             var created = await RunAsync(
                 client,
                 arguments,
                 environment,
-                MySqlCreateDatabaseSql(provisioning),
+                MySqlCreateUserSql(provisioning),
                 cancellationToken
             );
             if (created.ExitCode != 0) throw ProvisioningFailed(instance.Name);

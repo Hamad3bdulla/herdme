@@ -619,11 +619,8 @@
   <data name="SitesPerformanceReset" xml:space="preserve"><value>تصفير العدادات</value></data>
   <data name="SitesPerformanceNever" xml:space="preserve"><value>لا يوجد</value></data>
   <data name="SitesPerformanceNoRequests" xml:space="preserve"><value>لم تُسجّل طلبات بعد.</value></data>
-  <data name="SitesManageScheduler.Content" xml:space="preserve"><value>إدارة المجدول</value></data>
-  <data name="SitesManageQueueWorker.Content" xml:space="preserve"><value>إدارة قائمة الانتظار</value></data>
   <data name="SitesQueueSchedulerStatus" xml:space="preserve"><value>قائمة الانتظار: {0} · المجدول: {1}</value></data>
   <data name="SitesBackgroundProcessDetails" xml:space="preserve"><value>التطوير: {0} · قائمة الانتظار: {1} · المجدول: {2}</value></data>
-  <data name="SitesStartLaravelCommand.Label" xml:space="preserve"><value>تشغيل php artisan dev</value></data>
   <data name="SitesMoreActionsCommand.Label" xml:space="preserve"><value>المزيد</value></data>
   <data name="SitesSchedulerTitle" xml:space="preserve"><value>مجدول {0}</value></data>
   <data name="SitesSchedulerRefresh" xml:space="preserve"><value>تحديث قائمة المهام</value></data>
@@ -703,7 +700,8 @@
   <data name="SitesHealthCheckAvailable" xml:space="preserve"><value>استخدم فحص وإصلاح الموقع للحصول على تقرير كامل.</value></data>
   <data name="SitesHealthSummary" xml:space="preserve"><value>{0} من {1} فحوصات سليمة</value></data>
   <data name="SitesBackgroundOutputButton.Content" xml:space="preserve"><value>المخرجات</value></data>
-  <data name="SitesBackgroundOutputTitle" xml:space="preserve"><value>مخرجات قائمة الانتظار والمجدول</value></data>
+  <data name="SitesBackgroundOutputTitle" xml:space="preserve"><value>مخرجات php artisan dev</value></data>
+  <data name="SitesDevelopmentStatus" xml:space="preserve"><value>حالة php artisan dev: {0}</value></data>
   <data name="SitesDatabaseInspect" xml:space="preserve"><value>فحص الاتصال</value></data>
   <data name="SitesDatabaseInspectionTitle" xml:space="preserve"><value>اتصال قاعدة البيانات</value></data>
   <data name="SitesDatabaseInspectionSuccess" xml:space="preserve"><value>تم الاتصال بنجاح</value></data>
@@ -896,4 +894,13 @@
   <data name="SitesDatabaseQuickSetupDescription" xml:space="preserve"><value>سننشئ قاعدة البيانات ونحدّث إعدادات اتصال الموقع في .env تلقائيًا. يمكنك تعديل الاسم المقترح.</value></data>
   <data name="SitesDatabaseOpenAfterCreate" xml:space="preserve"><value>فتح في TablePlus بعد الإنشاء</value></data>
   <data name="SitesDatabaseEnvironmentReady" xml:space="preserve"><value>قاعدة البيانات جاهزة وتم حفظ إعدادات الاتصال في .env.</value></data>
+  <data name="SitesDatabaseCreateAndOpen" xml:space="preserve"><value>إنشاء وربط وفتح</value></data>
+  <data name="SitesDatabaseCreateAndConnect" xml:space="preserve"><value>إنشاء وربط</value></data>
+  <data name="SitesDatabaseContinueSetup" xml:space="preserve"><value>إكمال الإعداد</value></data>
+  <data name="SitesDatabaseConnectionDetails" xml:space="preserve"><value>بيانات الاتصال</value></data>
+  <data name="SitesDatabaseCreating" xml:space="preserve"><value>جارٍ إنشاء قاعدة البيانات...</value></data>
+  <data name="SitesDatabaseSavingEnvironment" xml:space="preserve"><value>جارٍ حفظ الاتصال في .env...</value></data>
+  <data name="SitesDatabaseApplyingConfiguration" xml:space="preserve"><value>جارٍ تطبيق إعدادات Laravel...</value></data>
+  <data name="SitesDatabaseOpeningTablePlus" xml:space="preserve"><value>جارٍ فتح TablePlus...</value></data>
+  <data name="SitesDatabaseNoAvailablePort" xml:space="preserve"><value>لا يوجد منفذ محلي متاح لخدمة قاعدة البيانات.</value></data>
 </root>

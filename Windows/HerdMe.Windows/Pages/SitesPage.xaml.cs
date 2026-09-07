@@ -859,22 +859,14 @@ public sealed partial class SitesPage : Page
     private void UpdateBackgroundProcessState()
     {
         if (selectedSite is not { } site) return;
-        var queue = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Queue);
-        var scheduler = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Scheduler);
         var development = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Development);
         BackgroundProcessesText.Text = AppLocalization.Format(
-            "SitesQueueSchedulerStatus",
-            queue.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped"),
-            scheduler.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped")
+            "SitesDevelopmentStatus",
+            development.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped")
         );
-        ProcessesDetailsText.Text = AppLocalization.Format(
-            "SitesBackgroundProcessDetails",
-            development.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped"),
-            queue.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped"),
-            scheduler.Running ? AppLocalization.Get("SitesRunning") : AppLocalization.Get("SitesStopped")
-        );
+        ProcessesDetailsText.Text = BackgroundProcessesText.Text;
         StartLaravelIcon.Symbol = development.Running ? Symbol.Stop : Symbol.Play;
-        StartLaravelButton.Label = AppLocalization.Get(
+        StartLaravelLabel.Text = AppLocalization.Get(
             development.Running ? "SitesStopLaravelButton" : "SitesStartLaravelButton"
         );
     }
@@ -1486,18 +1478,22 @@ public sealed partial class SitesPage : Page
     private async void CreateDatabase_Click(object sender, RoutedEventArgs e)
     {
         if (selectedSite is not { } site) return;
+        var preferredServiceId = TryCurrentSiteDatabase(site, out var currentService, out _, out _)
+            ? currentService.Id : Guid.Empty;
         var services = serviceManager.LoadInstances()
             .Where(instance => SiteDatabaseProvisioner.SupportedDefinitions.Contains(
                 instance.DefinitionId
             ))
-            .OrderByDescending(instance => serviceManager.State(instance.Id, instance.DefinitionId)
+            .OrderByDescending(instance => instance.Id == preferredServiceId)
+            .ThenByDescending(instance => serviceManager.State(instance.Id, instance.DefinitionId)
                 == ManagedServiceState.Running)
             .Select(instance => new DatabaseServiceOption(instance))
             .ToArray();
+        ManagedServiceInstance? newService = null;
         if (services.Length == 0)
         {
-            await ShowErrorAsync(AppLocalization.Get("SitesDatabaseNoRunningService"));
-            return;
+            newService = new ManagedServiceInstance();
+            services = [new DatabaseServiceOption(newService)];
         }
 
         var serviceBox = new ComboBox
@@ -1523,12 +1519,7 @@ public sealed partial class SitesPage : Page
                 "SystemFillColorCriticalBrush"
             ]
         };
-        var content = new StackPanel { Width = 420, Spacing = 10 };
-        content.Children.Add(new TextBlock
-        {
-            Text = AppLocalization.Get("SitesDatabaseQuickSetupDescription"),
-            TextWrapping = TextWrapping.Wrap
-        });
+        var content = new StackPanel { MaxWidth = 420, Spacing = 10 };
         var openInTablePlus = new CheckBox
         {
             Content = AppLocalization.Get("SitesDatabaseOpenAfterCreate"),
@@ -1536,184 +1527,192 @@ public sealed partial class SitesPage : Page
         };
         content.Children.Add(serviceBox);
         content.Children.Add(nameBox);
+        content.Children.Add(new TextBlock
+        {
+            Text = Path.Combine(site.Path, ".env"),
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.7
+        });
         content.Children.Add(openInTablePlus);
         content.Children.Add(validationText);
+        var progressBar = new ProgressBar
+        {
+            IsIndeterminate = true,
+            Visibility = Visibility.Collapsed
+        };
+        var statusText = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        content.Children.Add(progressBar);
+        content.Children.Add(statusText);
+        var usernameBox = new TextBox
+        {
+            Header = AppLocalization.Get("SitesDatabaseUsernameField"),
+            IsReadOnly = true
+        };
+        var passwordBox = new TextBox
+        {
+            Header = AppLocalization.Get("SitesDatabasePasswordField"),
+            IsReadOnly = true
+        };
+        var connectionFields = new StackPanel { Spacing = 8 };
+        connectionFields.Children.Add(usernameBox);
+        connectionFields.Children.Add(passwordBox);
+        var connectionDetails = new Expander
+        {
+            Header = AppLocalization.Get("SitesDatabaseConnectionDetails"),
+            Content = connectionFields,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Visibility = Visibility.Collapsed
+        };
+        content.Children.Add(connectionDetails);
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
             Title = AppLocalization.Format("SitesDatabaseDialogTitle", site.Name),
             Content = content,
-            PrimaryButtonText = AppLocalization.Get("SitesDatabaseCreate"),
+            PrimaryButtonText = AppLocalization.Get("SitesDatabaseCreateAndOpen"),
             CloseButtonText = AppLocalization.Get("SitesCancel"),
             DefaultButton = ContentDialogButton.Primary,
             IsPrimaryButtonEnabled = true
         };
+        SiteDatabaseProvisioning? provisioning = null;
+        var environmentUpdated = false;
+        var configurationCleared = false;
+        var busy = false;
         nameBox.TextChanged += (_, _) =>
         {
             var valid = SiteDatabaseProvisioner.IsValidDatabaseName(nameBox.Text.Trim());
             dialog.IsPrimaryButtonEnabled = valid;
             validationText.Visibility = valid ? Visibility.Collapsed : Visibility.Visible;
         };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary
-            || serviceBox.SelectedItem is not DatabaseServiceOption selectedService)
+        void UpdatePrimaryButton()
         {
-            return;
+            dialog.PrimaryButtonText = AppLocalization.Get(provisioning is not null
+                ? "SitesDatabaseContinueSetup"
+                : openInTablePlus.IsChecked == true
+                    ? "SitesDatabaseCreateAndOpen"
+                    : "SitesDatabaseCreateAndConnect");
         }
-
-        databaseCancellation?.Cancel();
-        databaseCancellation?.Dispose();
-        var cancellation = new CancellationTokenSource();
-        databaseCancellation = cancellation;
-        CreateDatabaseButton.IsEnabled = false;
-        SiteDatabaseProvisioning provisioning;
-        try
+        openInTablePlus.Checked += (_, _) => UpdatePrimaryButton();
+        openInTablePlus.Unchecked += (_, _) => UpdatePrimaryButton();
+        dialog.Closing += (_, args) => args.Cancel = busy;
+        dialog.PrimaryButtonClick += async (_, args) =>
         {
-            await serviceManager.StartAsync(selectedService.Instance.Id, cancellation.Token);
-            provisioning = await serviceManager.CreateSiteDatabaseAsync(
-                selectedService.Instance,
-                nameBox.Text.Trim(),
-                cancellation.Token
-            );
-        }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
-        {
-            return;
-        }
-        catch (Exception error) when (error is IOException
-            or UnauthorizedAccessException
-            or InvalidDataException
-            or InvalidOperationException
-            or NotSupportedException
-            or ArgumentException)
-        {
-            await ShowErrorAsync(error.Message);
-            return;
-        }
-        finally
-        {
-            if (ReferenceEquals(databaseCancellation, cancellation)) databaseCancellation = null;
-            cancellation.Dispose();
-            CreateDatabaseButton.IsEnabled = true;
-        }
-
-        var environmentUpdated = false;
-        Exception? completionError = null;
-        CreateDatabaseButton.IsEnabled = false;
-        try
-        {
-            await Task.Run(() => serviceManager.AddSiteDatabaseToEnvironment(
-                site.Path, selectedService.Instance, provisioning
-            ));
-            environmentUpdated = true;
-            await ClearDatabaseConfigurationCacheAsync(site);
-            if (IsSelected(site)) await RefreshSiteDetailsAsync(site);
-            if (openInTablePlus.IsChecked == true)
+            if (busy || serviceBox.SelectedItem is not DatabaseServiceOption selectedService)
             {
-                OpenSiteDatabaseInTablePlus(selectedService.Instance, provisioning);
+                args.Cancel = true;
+                return;
             }
-            return;
-        }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException
-            or InvalidOperationException or NotSupportedException or ArgumentException or TimeoutException)
-        {
-            // Keep the created credentials available so retrying never creates another database.
-            completionError = error;
-        }
-        finally
-        {
-            CreateDatabaseButton.IsEnabled = true;
-        }
-
-        var usernameBox = new TextBox
-        {
-            Header = AppLocalization.Get("SitesDatabaseUsernameField"),
-            Text = provisioning.Username,
-            IsReadOnly = true
-        };
-        var passwordBox = new TextBox
-        {
-            Header = AppLocalization.Get("SitesDatabasePasswordField"),
-            Text = provisioning.Password,
-            IsReadOnly = true
-        };
-        var statusText = new TextBlock
-        {
-            Text = AppLocalization.Get(environmentUpdated
-                ? "SitesDatabaseEnvironmentReady"
-                : "SitesDatabaseCreatedStatus") + Environment.NewLine + completionError?.Message,
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                "SystemFillColorSuccessBrush"
-            ]
-        };
-        var resultContent = new StackPanel { Width = 420, Spacing = 10 };
-        resultContent.Children.Add(new TextBlock
-        {
-            Text = $"{selectedService}  /  {provisioning.DatabaseName}",
-            TextWrapping = TextWrapping.Wrap,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
-        });
-        resultContent.Children.Add(usernameBox);
-        resultContent.Children.Add(passwordBox);
-        resultContent.Children.Add(new TextBlock
-        {
-            Text = Path.Combine(site.Path, ".env"),
-            TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.7
-        });
-        resultContent.Children.Add(statusText);
-        var resultDialog = new ContentDialog
-        {
-            XamlRoot = XamlRoot,
-            Title = AppLocalization.Get("SitesDatabaseCreatedTitle"),
-            Content = resultContent,
-            PrimaryButtonText = AppLocalization.Get(environmentUpdated
-                ? "SitesDatabaseOpenTablePlus"
-                : "SitesDatabaseAddToEnvironment"),
-            CloseButtonText = AppLocalization.Get("SitesDone"),
-            DefaultButton = ContentDialogButton.Primary
-        };
-        resultDialog.PrimaryButtonClick += async (_, args) =>
-        {
             var deferral = args.GetDeferral();
+            using var cancellation = new CancellationTokenSource();
+            databaseCancellation = cancellation;
+            busy = true;
+            serviceBox.IsEnabled = false;
+            nameBox.IsEnabled = false;
+            openInTablePlus.IsEnabled = false;
+            dialog.IsPrimaryButtonEnabled = false;
+            dialog.CloseButtonText = string.Empty;
+            progressBar.Visibility = Visibility.Visible;
+            statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                "TextFillColorPrimaryBrush"
+            ];
             try
             {
+                if (provisioning is null)
+                {
+                    await Task.Run(() => ProjectEnvironmentFile.Load(site.Path));
+                    var instance = selectedService.Instance;
+                    var instances = serviceManager.LoadInstances().ToList();
+                    if (!instances.Any(candidate => candidate.Id == instance.Id))
+                    {
+                        if (instance != newService)
+                            throw new InvalidOperationException(AppLocalization.Get("SitesDatabaseServiceMissing"));
+                        instance.Port = WindowsServiceManager.AvailablePort(
+                            instance.Port, instances.Select(candidate => candidate.Port)
+                        ) ?? throw new InvalidOperationException(
+                            AppLocalization.Get("SitesDatabaseNoAvailablePort"));
+                        instances.Add(instance);
+                        serviceManager.SaveInstances(instances);
+                    }
+                    if (!serviceManager.IsInstalled(instance.DefinitionId))
+                    {
+                        statusText.Text = AppLocalization.Format("ServicesInstalling", instance.Name);
+                        await serviceManager.InstallAsync(instance.DefinitionId, cancellation.Token);
+                    }
+                    statusText.Text = AppLocalization.Format("ServicesStarting", instance.Name);
+                    await serviceManager.StartAsync(instance.Id, cancellation.Token);
+                    statusText.Text = AppLocalization.Get("SitesDatabaseCreating");
+                    provisioning = await serviceManager.CreateSiteDatabaseAsync(
+                        instance, nameBox.Text.Trim(), cancellation.Token
+                    );
+                }
+                // Retain completed stages so a retry cannot create another database or user.
                 if (!environmentUpdated)
                 {
+                    statusText.Text = AppLocalization.Get("SitesDatabaseSavingEnvironment");
                     await Task.Run(() => serviceManager.AddSiteDatabaseToEnvironment(
                         site.Path, selectedService.Instance, provisioning
                     ));
                     environmentUpdated = true;
-                    resultDialog.PrimaryButtonText = AppLocalization.Get("SitesDatabaseOpenTablePlus");
                 }
-                await ClearDatabaseConfigurationCacheAsync(site);
-                statusText.Text = AppLocalization.Get("SitesDatabaseEnvironmentReady");
+                if (!configurationCleared)
+                {
+                    statusText.Text = AppLocalization.Get("SitesDatabaseApplyingConfiguration");
+                    await ClearDatabaseConfigurationCacheAsync(site);
+                    configurationCleared = true;
+                }
                 if (openInTablePlus.IsChecked == true)
                 {
+                    statusText.Text = AppLocalization.Get("SitesDatabaseOpeningTablePlus");
                     OpenSiteDatabaseInTablePlus(selectedService.Instance, provisioning);
                 }
-                statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                    "SystemFillColorSuccessBrush"
-                ];
+                SiteOperationBar.Title = AppLocalization.Get("SitesDatabaseCreatedTitle");
+                SiteOperationBar.Message = AppLocalization.Get("SitesDatabaseEnvironmentReady");
+                SiteOperationBar.Severity = InfoBarSeverity.Success;
+                SiteOperationBar.IsOpen = true;
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                args.Cancel = true;
+                statusText.Text = AppLocalization.Get("SitesOperationCancelled");
             }
             catch (Exception error) when (error is IOException
                 or UnauthorizedAccessException
                 or InvalidDataException
                 or InvalidOperationException
-                or NotSupportedException or ArgumentException or TimeoutException)
+                or NotSupportedException or ArgumentException or TimeoutException
+                or System.Net.Http.HttpRequestException)
             {
                 args.Cancel = true;
-                statusText.Text = error.Message;
+                statusText.Text = (provisioning is null ? string.Empty
+                    : AppLocalization.Get(environmentUpdated
+                        ? "SitesDatabaseEnvironmentReady"
+                        : "SitesDatabaseCreatedStatus") + Environment.NewLine) + error.Message;
                 statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
                     "SystemFillColorCriticalBrush"
                 ];
+                if (provisioning is not null && !environmentUpdated)
+                {
+                    usernameBox.Text = provisioning.Username;
+                    passwordBox.Text = provisioning.Password;
+                    connectionDetails.Visibility = Visibility.Visible;
+                }
             }
             finally
             {
+                if (ReferenceEquals(databaseCancellation, cancellation)) databaseCancellation = null;
+                busy = false;
+                serviceBox.IsEnabled = provisioning is null;
+                nameBox.IsEnabled = provisioning is null;
+                openInTablePlus.IsEnabled = true;
+                progressBar.Visibility = Visibility.Collapsed;
+                dialog.IsPrimaryButtonEnabled = SiteDatabaseProvisioner.IsValidDatabaseName(nameBox.Text.Trim());
+                dialog.CloseButtonText = AppLocalization.Get(environmentUpdated ? "SitesDone" : "SitesCancel");
+                UpdatePrimaryButton();
                 deferral.Complete();
             }
         };
-        await resultDialog.ShowAsync();
+        await dialog.ShowAsync();
         if (environmentUpdated && IsSelected(site)) await RefreshSiteDetailsAsync(site);
     }
 

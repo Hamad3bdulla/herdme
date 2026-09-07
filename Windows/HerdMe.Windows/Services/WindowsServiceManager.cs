@@ -634,7 +634,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             configured,
             installer.ExecutablePath(configured.DefinitionId),
             DataDirectory(configured.Id),
-            credentialStore.GetOrCreate(configured.Id),
+            credentialStore.GetDatabaseAdministrator(configured.Id, configured.DefinitionId),
             databaseName,
             cancellationToken
         );
@@ -696,7 +696,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             configured,
             installer.ExecutablePath(configured.DefinitionId),
             DataDirectory(configured.Id),
-            credentialStore.GetOrCreate(configured.Id),
+            credentialStore.GetDatabaseAdministrator(configured.Id, configured.DefinitionId),
             databaseName,
             cancellationToken
         );
@@ -712,7 +712,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
     )
     {
         var configured = RequireRunningDatabaseService(instance);
-        var administrator = credentialStore.GetOrCreate(configured.Id);
+        var administrator = credentialStore.GetDatabaseAdministrator(configured.Id, configured.DefinitionId);
         await SiteDatabaseProvisioner.RestoreAsync(
             configured,
             installer.ExecutablePath(configured.DefinitionId),
@@ -768,7 +768,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         instance,
         installer.ExecutablePath(instance.DefinitionId),
         DataDirectory(instance.Id),
-        credentialStore.GetOrCreate(instance.Id),
+        credentialStore.GetDatabaseAdministrator(instance.Id, instance.DefinitionId),
         provisioning,
         newPassword,
         cancellationToken
@@ -782,7 +782,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         instance,
         installer.ExecutablePath(instance.DefinitionId),
         DataDirectory(instance.Id),
-        credentialStore.GetOrCreate(instance.Id),
+        credentialStore.GetDatabaseAdministrator(instance.Id, instance.DefinitionId),
         provisioning,
         cancellationToken
     );

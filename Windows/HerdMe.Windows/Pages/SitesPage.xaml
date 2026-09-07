@@ -304,15 +304,7 @@
                                     <AppBarButton.Icon><SymbolIcon Symbol="Add" /></AppBarButton.Icon>
                                 </AppBarButton>
                                 <AppBarButton x:Uid="SitesOpenDatabaseCommand" Label="Open in TablePlus" Click="OpenDatabase_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="DataArea" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton
-                                    x:Uid="SitesStartLaravelCommand"
-                                    x:Name="StartLaravelButton"
-                                    Label="Start php artisan dev"
-                                    Click="StartLaravel_Click"
-                                    IsEnabled="False">
-                                    <AppBarButton.Icon><SymbolIcon x:Name="StartLaravelIcon" Symbol="Play" /></AppBarButton.Icon>
+                                    <AppBarButton.Icon><SymbolIcon Symbol="OpenLocal" /></AppBarButton.Icon>
                                 </AppBarButton>
                             </CommandBar.PrimaryCommands>
                             <CommandBar.SecondaryCommands>
@@ -355,6 +347,32 @@
 
                         <ScrollViewer Grid.Row="2" Padding="16,6,16,16" VerticalScrollBarVisibility="Auto">
                             <StackPanel Spacing="14">
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button
+                                            x:Name="StartLaravelButton"
+                                            Click="StartLaravel_Click"
+                                            IsEnabled="False"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch"
+                                            Style="{StaticResource AccentButtonStyle}">
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <SymbolIcon x:Name="StartLaravelIcon" Symbol="Play" />
+                                                <TextBlock x:Name="StartLaravelLabel" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Button>
+                                        <Button Grid.Column="1" x:Uid="SitesBackgroundOutputButton" Click="BackgroundOutput_Click" VerticalAlignment="Stretch" />
+                                    </Grid>
+                                    <TextBlock x:Name="BackgroundProcessesText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
                                 <InfoBar
                                     x:Name="SiteOperationBar"
                                     IsOpen="False"
@@ -390,14 +408,6 @@
                                             ScrollViewer.VerticalScrollBarVisibility="Auto" />
                                     </StackPanel>
                                 </Border>
-                                <StackPanel Spacing="8">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button x:Uid="SitesManageQueueWorker" Click="QueueWorker_Click" />
-                                        <Button x:Uid="SitesManageScheduler" Click="Scheduler_Click" />
-                                        <Button x:Uid="SitesBackgroundOutputButton" Click="BackgroundOutput_Click" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="BackgroundProcessesText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
                                 <Border x:Name="PreviewBorder" Height="160" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6">
                                     <Grid>
                                         <WebView2

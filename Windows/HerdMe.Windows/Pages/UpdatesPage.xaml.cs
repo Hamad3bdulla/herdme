@@ -102,13 +102,17 @@ public sealed partial class UpdatesPage : Page
             {
                 applicationError = error;
             }
-            var components = await componentsTask;
             cancellation.Token.ThrowIfCancellationRequested();
             if (!loaded) return;
 
             latestApplication = application;
-            latestComponents = components;
             RenderApplication(applicationError);
+
+            var components = await componentsTask;
+            cancellation.Token.ThrowIfCancellationRequested();
+            if (!loaded) return;
+
+            latestComponents = components;
             RenderComponents();
             LastCheckedText.Text = AppLocalization.Format(
                 "UpdatesLastChecked",
