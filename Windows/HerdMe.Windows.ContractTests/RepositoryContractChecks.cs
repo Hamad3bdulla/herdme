@@ -745,8 +745,12 @@ internal static partial class ContractChecks
         var componentAwait = updatesPageSource.IndexOf(
             "await componentsTask", StringComparison.Ordinal
         );
+        var uncoverApplication = updatesPageSource.IndexOf(
+            "BusyOverlay.Visibility = Visibility.Collapsed", StringComparison.Ordinal
+        );
         Check(
             applicationRender >= 0 && componentAwait > applicationRender
+                && uncoverApplication > applicationRender && uncoverApplication < componentAwait
                 && updatesPageSource.Contains("await RefreshAsync();", StringComparison.Ordinal),
             "the Updates page checks on entry and renders application results before waiting for components"
         );

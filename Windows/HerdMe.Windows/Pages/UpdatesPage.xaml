@@ -76,6 +76,7 @@
 
                 <StackPanel Spacing="10">
                     <TextBlock x:Uid="UpdatesComponentsTitle" Text="Components and services" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <ProgressBar x:Name="ComponentCheckProgress" IsIndeterminate="True" Visibility="Collapsed" />
                     <StackPanel x:Name="ComponentRows" Spacing="8" />
                     <Border
                         x:Name="EmptyState"

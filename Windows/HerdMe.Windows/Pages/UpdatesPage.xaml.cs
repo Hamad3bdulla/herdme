@@ -107,6 +107,9 @@ public sealed partial class UpdatesPage : Page
 
             latestApplication = application;
             RenderApplication(applicationError);
+            BusyOverlay.Visibility = Visibility.Collapsed;
+            ComponentCheckProgress.Visibility = Visibility.Visible;
+            EmptyState.Visibility = Visibility.Collapsed;
 
             var components = await componentsTask;
             cancellation.Token.ThrowIfCancellationRequested();
@@ -136,6 +139,7 @@ public sealed partial class UpdatesPage : Page
         {
             Interlocked.CompareExchange(ref refreshCancellation, null, cancellation);
             cancellation.Dispose();
+            ComponentCheckProgress.Visibility = Visibility.Collapsed;
             SetBusy(false, string.Empty);
         }
     }
