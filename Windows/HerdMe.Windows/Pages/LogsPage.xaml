@@ -6,15 +6,26 @@
     AutomationProperties.AutomationId="LogsPageRoot"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
-    <Grid Padding="32" RowSpacing="16">
+    <Grid Padding="{StaticResource PagePadding}" RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <Grid>
-            <TextBlock x:Uid="LogsPageTitle" AutomationProperties.AutomationId="LogsPageRoot" Text="Logs" Style="{StaticResource TitleTextBlockStyle}" />
-            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+        <Grid RowSpacing="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock x:Uid="LogsPageTitle" AutomationProperties.AutomationId="LogsPageRoot" Text="Logs" Style="{StaticResource PageTitleStyle}" />
+            <Grid Grid.Row="1" ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="190" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <ComboBox
                     x:Name="SourceBox"
                     Width="190"
@@ -23,29 +34,30 @@
                     SelectionChanged="SourceBox_SelectionChanged" />
                 <ToggleSwitch
                     x:Name="LiveRefreshToggle"
+                    Grid.Column="1"
                     x:Uid="LogsLiveRefreshToggle"
                     IsOn="True"
                     OnContent="Live"
                     OffContent="Paused" />
                 <TextBox
                     x:Name="SearchBox"
+                    Grid.Column="2"
                     x:Uid="LogsSearchField"
-                    Width="220"
                     PlaceholderText="Search current log"
                     TextChanged="SearchBox_TextChanged" />
-                <Button Click="OpenFolder_Click">
+                <Button Grid.Column="3" Click="OpenFolder_Click" Style="{StaticResource ToolbarIconButtonStyle}">
                     <ToolTipService.ToolTip>
                         <ToolTip><TextBlock x:Uid="LogsOpenFolderTooltip" Text="Open log folder" /></ToolTip>
                     </ToolTipService.ToolTip>
                     <SymbolIcon Symbol="Folder" />
                 </Button>
-                <Button Click="Refresh_Click">
+                <Button Grid.Column="4" Click="Refresh_Click" Style="{StaticResource ToolbarIconButtonStyle}">
                     <ToolTipService.ToolTip>
                         <ToolTip><TextBlock x:Uid="LogsRefreshTooltip" Text="Refresh logs" /></ToolTip>
                     </ToolTipService.ToolTip>
                     <SymbolIcon Symbol="Refresh" />
                 </Button>
-            </StackPanel>
+            </Grid>
         </Grid>
         <InfoBar
             x:Name="SourceWarning"
@@ -57,10 +69,10 @@
             Message="Some log sources could not be loaded. HerdMe application logs remain available." />
         <Grid Grid.Row="2" ColumnSpacing="16">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="2*" MinWidth="220" MaxWidth="300" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12">
+            <Border Style="{StaticResource ToolPaneStyle}" Padding="12">
                 <ListView x:Name="LogList" ItemsSource="{x:Bind Logs}" SelectionChanged="LogList_SelectionChanged">
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="models:LogFileRecord">
@@ -76,15 +88,15 @@
                     </ListView.ItemTemplate>
                 </ListView>
             </Border>
-            <Border Grid.Column="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
+            <Border Grid.Column="1" Padding="4,12">
                 <Grid RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <TextBlock x:Name="LogTitleText" x:Uid="LogsSelectLogInitial" Text="Select a log" Style="{StaticResource SubtitleTextBlockStyle}" />
-                    <ScrollViewer Grid.Row="1">
-                        <TextBlock x:Name="LogContentText" FontFamily="Consolas" FontSize="13" TextWrapping="NoWrap" IsTextSelectionEnabled="True" />
+                    <TextBlock x:Name="LogTitleText" x:Uid="LogsSelectLogInitial" Text="Select a log" Style="{StaticResource SectionTitleStyle}" />
+                    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="LogContentText" FontFamily="Consolas" FontSize="13" TextWrapping="NoWrap" IsTextSelectionEnabled="True" FlowDirection="LeftToRight" />
                     </ScrollViewer>
                 </Grid>
             </Border>

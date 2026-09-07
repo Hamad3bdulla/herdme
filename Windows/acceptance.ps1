@@ -275,7 +275,7 @@ function Select-AutomationElement(
     throw "The WinUI navigation element '$AutomationId' is not selectable."
 }
 
-function Assert-FixedMainWindow(
+function Assert-ResizableMainWindow(
     [System.Diagnostics.Process]$Process
 ) {
     $window = [System.Windows.Automation.AutomationElement]::FromHandle(
@@ -303,11 +303,11 @@ function Assert-FixedMainWindow(
     $windowPattern = [System.Windows.Automation.WindowPattern]$windowPatternObject
     $transformPattern = [System.Windows.Automation.TransformPattern]$transformPatternObject
     if (
-        $windowPattern.Current.CanMaximize -or
-        $windowPattern.Current.CanMinimize -or
-        $transformPattern.Current.CanResize
+        -not $windowPattern.Current.CanMaximize -or
+        -not $windowPattern.Current.CanMinimize -or
+        -not $transformPattern.Current.CanResize
     ) {
-        throw "The native HerdMe window can still be minimized, maximized, or resized."
+        throw "The native HerdMe window must support minimizing, maximizing, and resizing."
     }
 }
 
@@ -332,7 +332,7 @@ function Assert-OnboardingLayout(
         $buttonBounds.Top -lt $windowBounds.Top -or
         $buttonBounds.Bottom -gt $windowBounds.Bottom
     ) {
-        throw "The onboarding start button is clipped or outside the fixed window."
+        throw "The onboarding start button is clipped or outside the window."
     }
 }
 
@@ -629,7 +629,7 @@ try {
     if ($onboarding.MainWindowHandle -eq 0) {
         throw "The onboarding acceptance window did not become available."
     }
-    Assert-FixedMainWindow $onboarding
+    Assert-ResizableMainWindow $onboarding
     Assert-OnboardingLayout $onboarding
 }
 finally {
@@ -665,7 +665,7 @@ try {
     if ($primary.MainWindowHandle -eq 0) {
         throw "The native HerdMe window did not become available."
     }
-    Assert-FixedMainWindow $primary
+    Assert-ResizableMainWindow $primary
 
     Start-Process -FilePath $executable | Out-Null
     Start-Sleep -Seconds 2

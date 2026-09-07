@@ -5,7 +5,7 @@
     xmlns:models="using:HerdMe.Windows.Models"
     AutomationProperties.AutomationId="NodePageRoot"
     Loaded="Page_Loaded">
-    <Grid Padding="32" RowSpacing="16">
+    <Grid Padding="{StaticResource PagePadding}" RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -16,14 +16,14 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="4">
-                <TextBlock x:Uid="NodePageTitle" AutomationProperties.AutomationId="NodePageRoot" Text="Node.js" Style="{StaticResource TitleTextBlockStyle}" />
-                <TextBlock x:Uid="NodePageDescription" Text="Official Windows runtimes managed by HerdMe" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBlock x:Uid="NodePageTitle" AutomationProperties.AutomationId="NodePageRoot" Text="Node.js" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock x:Uid="NodePageDescription" Text="Official Windows runtimes managed by HerdMe" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <ProgressRing x:Name="OperationProgress" Width="16" Height="16" IsActive="False" Visibility="Collapsed" />
                     <TextBlock x:Name="OperationStatusText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                 </StackPanel>
             </StackPanel>
-            <Button Grid.Column="1" VerticalAlignment="Top" Click="Refresh_Click">
+            <Button Grid.Column="1" VerticalAlignment="Top" Click="Refresh_Click" Style="{StaticResource ToolbarIconButtonStyle}">
                 <ToolTipService.ToolTip>
                     <ToolTip><TextBlock x:Uid="NodeRefreshTooltip" Text="Refresh Node.js versions" /></ToolTip>
                 </ToolTipService.ToolTip>
@@ -31,10 +31,10 @@
             </Button>
         </Grid>
 
-        <Border Grid.Row="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12">
+        <Border Grid.Row="1" Style="{StaticResource SectionDividerStyle}">
             <ListView ItemsSource="{x:Bind Rows}">
                 <ListView.Header>
-                    <Grid Padding="10,6" ColumnSpacing="16">
+                    <Grid Padding="18,6" ColumnSpacing="16" Background="{ThemeResource SubtleSurfaceBrush}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="100" />
                             <ColumnDefinition Width="150" />

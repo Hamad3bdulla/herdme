@@ -7,10 +7,14 @@
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
     <ScrollViewer>
-        <StackPanel Padding="32" Spacing="16">
-            <Grid>
-                <TextBlock x:Uid="GeneralPageTitle" AutomationProperties.AutomationId="GeneralPageRoot" Text="General" Style="{StaticResource TitleTextBlockStyle}" />
-                <Button HorizontalAlignment="Right" Click="Refresh_Click">
+        <StackPanel Padding="{StaticResource PagePadding}" Spacing="16">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Uid="GeneralPageTitle" AutomationProperties.AutomationId="GeneralPageRoot" Text="General" Style="{StaticResource PageTitleStyle}" />
+                <Button Grid.Column="1" Click="Refresh_Click">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <SymbolIcon Symbol="Refresh" />
                         <TextBlock x:Uid="GeneralRefresh" Text="Refresh" />
@@ -18,32 +22,32 @@
                 </Button>
             </Grid>
 
-            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+            <Border Style="{StaticResource SectionDividerStyle}">
                 <Grid ColumnSpacing="16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel>
-                        <TextBlock x:Uid="GeneralLaunchAtSigninTitle" Text="Launch at sign-in" Style="{StaticResource SubtitleTextBlockStyle}" />
-                        <TextBlock x:Uid="GeneralLaunchAtSigninDescription" Text="Keep local sites available after signing in to Windows." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Uid="GeneralLaunchAtSigninTitle" Text="Launch at sign-in" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock x:Uid="GeneralLaunchAtSigninDescription" Text="Keep local sites available after signing in to Windows." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                     </StackPanel>
                     <ToggleSwitch x:Name="StartupToggle" Grid.Column="1" Toggled="StartupToggle_Toggled" />
                 </Grid>
             </Border>
 
-            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+            <Border Style="{StaticResource SectionDividerStyle}">
                 <Grid ColumnSpacing="16">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <StackPanel>
-                        <TextBlock x:Uid="GeneralCompactModeTitle" Text="Compact interface" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <TextBlock x:Uid="GeneralCompactModeTitle" Text="Compact interface" Style="{StaticResource SectionTitleStyle}" />
                         <TextBlock x:Uid="GeneralCompactModeDescription" Text="Use tighter spacing on sites and dashboard pages." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                     </StackPanel>
                     <ToggleSwitch x:Name="CompactModeToggle" Grid.Column="1" Toggled="CompactModeToggle_Toggled" />
                 </Grid>
             </Border>
 
-            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+            <Border Style="{StaticResource SectionDividerStyle}">
                 <StackPanel Spacing="14">
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
@@ -51,7 +55,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock x:Uid="GeneralLocalDomainsTitle" Text="Local domains" Style="{StaticResource SubtitleTextBlockStyle}" />
+                            <TextBlock x:Uid="GeneralLocalDomainsTitle" Text="Local domains" Style="{StaticResource SectionTitleStyle}" />
                             <TextBlock x:Name="DomainsStatusText" x:Uid="GeneralDomainsChecking" Text="Checking" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
@@ -80,7 +84,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock x:Uid="GeneralHttpsCertificateTitle" Text="HTTPS certificate" Style="{StaticResource SubtitleTextBlockStyle}" />
+                            <TextBlock x:Uid="GeneralHttpsCertificateTitle" Text="HTTPS certificate" Style="{StaticResource SectionTitleStyle}" />
                             <TextBlock x:Name="CertificateStatusText" x:Uid="GeneralCertificateChecking" Text="Checking" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                         <Button
@@ -93,7 +97,7 @@
                 </StackPanel>
             </Border>
 
-            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+            <Border Style="{StaticResource SectionDividerStyle}">
                 <StackPanel Spacing="12">
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
@@ -101,7 +105,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock x:Uid="GeneralApplicationUpdatesTitle" Text="Application updates" Style="{StaticResource SubtitleTextBlockStyle}" />
+                            <TextBlock x:Uid="GeneralApplicationUpdatesTitle" Text="Application updates" Style="{StaticResource SectionTitleStyle}" />
                             <TextBlock x:Name="CurrentVersionText" FontWeight="SemiBold" />
                             <TextBlock x:Name="UpdateStatusText" x:Uid="GeneralStableChannel" Text="Stable channel" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
@@ -146,9 +150,9 @@
                 </StackPanel>
             </Border>
 
-            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+            <Border Style="{StaticResource SectionDividerStyle}">
                 <StackPanel Spacing="12">
-                    <TextBlock x:Uid="GeneralPortableCoreTitle" Text="Portable core" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <TextBlock x:Uid="GeneralPortableCoreTitle" Text="Portable core" Style="{StaticResource SectionTitleStyle}" />
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="140" />
@@ -187,9 +191,9 @@
                 </StackPanel>
             </Border>
 
-            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+            <Border Style="{StaticResource SectionDividerStyle}">
                 <StackPanel Spacing="10">
-                    <TextBlock x:Uid="GeneralRuntimeCheckTitle" Text="Runtime check" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <TextBlock x:Uid="GeneralRuntimeCheckTitle" Text="Runtime check" Style="{StaticResource SectionTitleStyle}" />
                     <ListView ItemsSource="{x:Bind Runtimes}">
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:RuntimeCheck">
@@ -209,9 +213,9 @@
                 </StackPanel>
             </Border>
 
-            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+            <Border Style="{StaticResource SectionDividerStyle}">
                 <StackPanel Spacing="10">
-                    <TextBlock x:Uid="GeneralLaravelExtensionsTitle" Text="Laravel PHP extensions" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <TextBlock x:Uid="GeneralLaravelExtensionsTitle" Text="Laravel PHP extensions" Style="{StaticResource SectionTitleStyle}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <ProgressRing x:Name="PhpExtensionProgress" Width="16" Height="16" />
                         <TextBlock x:Name="PhpExtensionStatusText" x:Uid="GeneralPhpUnavailable" Text="PHP unavailable" />

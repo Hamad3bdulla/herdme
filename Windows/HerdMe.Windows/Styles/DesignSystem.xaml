@@ -1,0 +1,109 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <SolidColorBrush x:Key="WorkspaceBackgroundBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ShellBackgroundBrush" Color="#F4F5F7" />
+            <SolidColorBrush x:Key="SubtleSurfaceBrush" Color="#F7F8FA" />
+            <SolidColorBrush x:Key="BrandBrush" Color="#C92B3D" />
+            <SolidColorBrush x:Key="AccentButtonBackground" Color="#C92B3D" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#B62435" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="#9D2030" />
+            <SolidColorBrush x:Key="AccentButtonForeground" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="SitesTintBrush" Color="#FCEDEF" />
+            <SolidColorBrush x:Key="ServicesTintBrush" Color="#E7F5F0" />
+            <SolidColorBrush x:Key="MailTintBrush" Color="#EAF1FC" />
+            <SolidColorBrush x:Key="DumpsTintBrush" Color="#FFF3DB" />
+            <SolidColorBrush x:Key="ServicesInkBrush" Color="#13765D" />
+            <SolidColorBrush x:Key="MailInkBrush" Color="#315EAD" />
+            <SolidColorBrush x:Key="DumpsInkBrush" Color="#956300" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Default">
+            <SolidColorBrush x:Key="WorkspaceBackgroundBrush" Color="#202124" />
+            <SolidColorBrush x:Key="ShellBackgroundBrush" Color="#191A1D" />
+            <SolidColorBrush x:Key="SubtleSurfaceBrush" Color="#282A2E" />
+            <SolidColorBrush x:Key="BrandBrush" Color="#FF8794" />
+            <SolidColorBrush x:Key="AccentButtonBackground" Color="#FF8794" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#FF9DA7" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="#E87887" />
+            <SolidColorBrush x:Key="AccentButtonForeground" Color="#202124" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#202124" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#202124" />
+            <SolidColorBrush x:Key="SitesTintBrush" Color="#42292F" />
+            <SolidColorBrush x:Key="ServicesTintBrush" Color="#203C34" />
+            <SolidColorBrush x:Key="MailTintBrush" Color="#27364C" />
+            <SolidColorBrush x:Key="DumpsTintBrush" Color="#403824" />
+            <SolidColorBrush x:Key="ServicesInkBrush" Color="#78D9B3" />
+            <SolidColorBrush x:Key="MailInkBrush" Color="#97BEFF" />
+            <SolidColorBrush x:Key="DumpsInkBrush" Color="#F3CE7C" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <SolidColorBrush x:Key="WorkspaceBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="ShellBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SubtleSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="BrandBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="AccentButtonBackground" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="AccentButtonForeground" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <SolidColorBrush x:Key="SitesTintBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="ServicesTintBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="MailTintBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="DumpsTintBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="ServicesInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="MailInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="DumpsInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+    <Thickness x:Key="PagePadding">28,24,28,24</Thickness>
+    <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
+    <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
+
+    <Style x:Key="PageTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="26" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="SectionDividerStyle" TargetType="Border">
+        <Setter Property="BorderBrush" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="Padding" Value="0,20,0,4" />
+    </Style>
+    <Style x:Key="ToolPaneStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource SubtleSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <Style x:Key="ToolbarIconButtonStyle" TargetType="Button">
+        <Setter Property="Width" Value="36" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style TargetType="ListViewItem">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="Padding" Value="8,6" />
+        <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    <Style TargetType="NavigationViewItem">
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Margin" Value="4,2" />
+        <Setter Property="CornerRadius" Value="6" />
+    </Style>
+</ResourceDictionary>

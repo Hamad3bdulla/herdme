@@ -67,16 +67,16 @@ public sealed partial class DashboardPage : Page
 
     private void Page_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        var compact = e.NewSize.Width < 680;
+        var compact = e.NewSize.Width < 820;
         var compactMode = settingsStore.Load().CompactMode;
         if (usesCompactLayout == compact && !compactMode) return;
         usesCompactLayout = compact;
 
         DashboardLayout.Padding = compact || compactMode
             ? new Thickness(18, 18, 18, 20)
-            : new Thickness(28, 22, 28, 24);
+            : new Thickness(28, 24, 28, 24);
         DashboardLayout.RowSpacing = compactMode ? 10 : 18;
-        var summaryHeight = compactMode ? 112 : 148;
+        var summaryHeight = compactMode ? 112 : 136;
         SitesCard.MinHeight = summaryHeight;
         ServicesCard.MinHeight = summaryHeight;
         MailCard.MinHeight = summaryHeight;

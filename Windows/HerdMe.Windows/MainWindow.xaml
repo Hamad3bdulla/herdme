@@ -4,26 +4,32 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:views="using:HerdMe.Windows.Views"
     Title="HerdMe">
-    <Grid x:Name="RootLayout">
+    <Grid x:Name="RootLayout" Background="{ThemeResource ShellBackgroundBrush}">
         <NavigationView
             x:Name="Navigation"
             AutomationProperties.AutomationId="NavigationRoot"
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="False"
             IsTitleBarAutoPaddingEnabled="True"
-            OpenPaneLength="220"
-            PaneDisplayMode="Left"
+            OpenPaneLength="212"
+            CompactModeThresholdWidth="640"
+            ExpandedModeThresholdWidth="1100"
+            PaneDisplayMode="Auto"
             SelectionChanged="Navigation_SelectionChanged">
+            <NavigationView.PaneHeader>
+                <StackPanel Orientation="Horizontal" Spacing="10" Margin="16,14,12,20">
+                    <Image Source="ms-appx:///Assets/HerdMe.png" Width="32" Height="32" />
+                    <TextBlock Text="HerdMe" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+            </NavigationView.PaneHeader>
             <NavigationView.MenuItems>
             <NavigationViewItem x:Uid="NavDashboard" AutomationProperties.AutomationId="NavDashboard" Content="Dashboard" Tag="dashboard">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItem x:Uid="NavGeneral" AutomationProperties.AutomationId="NavGeneral" Content="General" Tag="general">
-                <NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></NavigationViewItem.Icon>
-            </NavigationViewItem>
             <NavigationViewItem x:Uid="NavSites" AutomationProperties.AutomationId="NavSites" Content="Sites" Tag="sites">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Folder" /></NavigationViewItem.Icon>
             </NavigationViewItem>
+            <NavigationViewItemHeader x:Uid="NavEnvironmentGroup" Content="Environment" />
             <NavigationViewItem x:Uid="NavPhp" AutomationProperties.AutomationId="NavPhp" Content="PHP" Tag="php">
                 <NavigationViewItem.Icon><FontIcon Glyph="&#xE943;" /></NavigationViewItem.Icon>
             </NavigationViewItem>
@@ -33,9 +39,7 @@
             <NavigationViewItem x:Uid="NavServices" AutomationProperties.AutomationId="NavServices" Content="Services" Tag="services">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItem x:Uid="NavUpdates" AutomationProperties.AutomationId="NavUpdates" Content="Updates" Tag="updates">
-                <NavigationViewItem.Icon><SymbolIcon Symbol="Download" /></NavigationViewItem.Icon>
-            </NavigationViewItem>
+            <NavigationViewItemHeader x:Uid="NavToolsGroup" Content="Tools" />
             <NavigationViewItem x:Uid="NavMail" AutomationProperties.AutomationId="NavMail" Content="Mail" Tag="mail">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Mail" /></NavigationViewItem.Icon>
             </NavigationViewItem>
@@ -48,12 +52,23 @@
             <NavigationViewItem x:Uid="NavLogs" AutomationProperties.AutomationId="NavLogs" Content="Logs" Tag="logs">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Document" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItemSeparator />
+            </NavigationView.MenuItems>
+            <NavigationView.FooterMenuItems>
+            <NavigationViewItem x:Uid="NavGeneral" AutomationProperties.AutomationId="NavGeneral" Content="General" Tag="general">
+                <NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem x:Uid="NavUpdates" AutomationProperties.AutomationId="NavUpdates" Content="Updates" Tag="updates">
+                <NavigationViewItem.Icon><SymbolIcon Symbol="Download" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
             <NavigationViewItem x:Uid="NavAbout" AutomationProperties.AutomationId="NavAbout" Content="About" Tag="about">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Help" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            </NavigationView.MenuItems>
-            <Frame x:Name="ContentFrame" />
+            </NavigationView.FooterMenuItems>
+            <Border Background="{ThemeResource WorkspaceBackgroundBrush}" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1,0,0,0">
+                <ScrollViewer x:Name="WorkspaceScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                    <Frame x:Name="ContentFrame" Width="{Binding ViewportWidth, ElementName=WorkspaceScroll}" MinWidth="740" />
+                </ScrollViewer>
+            </Border>
         </NavigationView>
         <views:OnboardingView
             x:Name="Onboarding"

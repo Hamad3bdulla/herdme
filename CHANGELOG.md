@@ -5,11 +5,28 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.18] - 2026-09-07
+
 ### Added
 
 - Create a site database, start its managed server, update `.env`, clear cached
   Laravel configuration, and open TablePlus through one Windows site action.
 - Open an existing site's database directly from the site command bar.
+
+### Fixed
+
+- Use the protected database administrator account when provisioning MariaDB
+  and MySQL site databases, instead of the restricted default database user.
+- Preserve existing databases when another request creates the same database.
+- Show the application update result as soon as its check completes, without
+  waiting for managed component checks.
+
+### Changed
+
+- Refresh the Windows interface with shared light, dark, and high-contrast
+  styles, clearer navigation, responsive layouts, and standard window controls.
+- Restore the prominent `php artisan dev` start/stop button above the site
+  preview and remove separate Manage Queue and Manage Scheduler controls.
 
 ## [0.1.17] - 2026-09-07
 

@@ -8,7 +8,7 @@
     Unloaded="Page_Unloaded">
     <Page.Resources>
         <Style x:Key="DashboardSummaryCardStyle" TargetType="Button">
-            <Setter Property="MinHeight" Value="148" />
+            <Setter Property="MinHeight" Value="136" />
             <Setter Property="Padding" Value="16" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="VerticalAlignment" Value="Stretch" />
@@ -20,7 +20,7 @@
             <Setter Property="CornerRadius" Value="6" />
         </Style>
         <Style x:Key="DashboardSummaryCountStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="28" />
+            <Setter Property="FontSize" Value="30" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
@@ -34,7 +34,7 @@
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
     </Page.Resources>
-    <Grid x:Name="DashboardLayout" Padding="28,22,28,24" RowSpacing="18">
+    <Grid x:Name="DashboardLayout" Padding="{StaticResource PagePadding}" RowSpacing="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -46,7 +46,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="4">
-                <TextBlock x:Uid="DashboardPageTitle" AutomationProperties.AutomationId="DashboardPageRoot" Text="Dashboard" Style="{StaticResource TitleTextBlockStyle}" />
+                <TextBlock x:Uid="DashboardPageTitle" AutomationProperties.AutomationId="DashboardPageRoot" Text="Dashboard" Style="{StaticResource PageTitleStyle}" />
                 <TextBlock
                     x:Uid="DashboardPageSubtitle"
                     Text="Your local development environment at a glance."
@@ -132,8 +132,8 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource ControlFillColorDefaultBrush}">
-                                    <SymbolIcon Symbol="Folder" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource SitesTintBrush}">
+                                    <SymbolIcon Symbol="Folder" Foreground="{ThemeResource BrandBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                                 <TextBlock x:Name="SitesCountText" Grid.Column="1" Text="0" HorizontalAlignment="Right" Style="{StaticResource DashboardSummaryCountStyle}" />
                             </Grid>
@@ -166,8 +166,8 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource ControlFillColorDefaultBrush}">
-                                    <SymbolIcon Symbol="AllApps" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource ServicesTintBrush}">
+                                    <SymbolIcon Symbol="AllApps" Foreground="{ThemeResource ServicesInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                                 <TextBlock x:Name="ServicesCountText" Grid.Column="1" Text="0" HorizontalAlignment="Right" Style="{StaticResource DashboardSummaryCountStyle}" />
                             </Grid>
@@ -200,8 +200,8 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource ControlFillColorDefaultBrush}">
-                                    <SymbolIcon Symbol="Mail" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource MailTintBrush}">
+                                    <SymbolIcon Symbol="Mail" Foreground="{ThemeResource MailInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                                 <TextBlock x:Name="MailCountText" Grid.Column="1" Text="0" HorizontalAlignment="Right" Style="{StaticResource DashboardSummaryCountStyle}" />
                             </Grid>
@@ -234,8 +234,8 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource ControlFillColorDefaultBrush}">
-                                    <SymbolIcon Symbol="View" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource DumpsTintBrush}">
+                                    <SymbolIcon Symbol="View" Foreground="{ThemeResource DumpsInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                                 <TextBlock x:Name="DumpsCountText" Grid.Column="1" Text="0" HorizontalAlignment="Right" Style="{StaticResource DashboardSummaryCountStyle}" />
                             </Grid>
@@ -252,14 +252,9 @@
                     </Button>
                 </Grid>
 
-                <Border
-                    Padding="16"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="6">
+                <Border Style="{StaticResource SectionDividerStyle}">
                     <StackPanel Spacing="10">
-                        <TextBlock x:Uid="DashboardEnvironmentSectionTitle" Text="Environment" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <TextBlock x:Uid="DashboardEnvironmentSectionTitle" Text="Environment" Style="{StaticResource SectionTitleStyle}" />
                         <Grid x:Name="EnvironmentGrid" ColumnSpacing="14">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition x:Name="EnvironmentLabelColumn" Width="170" />
@@ -287,14 +282,9 @@
                     </StackPanel>
                 </Border>
 
-                <Border
-                    Padding="16"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="6">
+                <Border Style="{StaticResource SectionDividerStyle}">
                     <StackPanel Spacing="12">
-                        <TextBlock x:Uid="DashboardRecentActivityTitle" Text="Recent activity" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <TextBlock x:Uid="DashboardRecentActivityTitle" Text="Recent activity" Style="{StaticResource SectionTitleStyle}" />
                         <Grid x:Name="RecentActivityGrid" ColumnSpacing="24">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

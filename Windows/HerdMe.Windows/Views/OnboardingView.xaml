@@ -2,7 +2,7 @@
     x:Class="HerdMe.Windows.Views.OnboardingView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid Background="{ThemeResource WorkspaceBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="7" />
@@ -21,20 +21,7 @@
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Spacing="14">
-                <Border
-                    Width="64"
-                    Height="64"
-                    HorizontalAlignment="Center"
-                    Background="#FFED1F2B"
-                    CornerRadius="8">
-                    <TextBlock
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        FontSize="34"
-                        FontWeight="Bold"
-                        Foreground="White"
-                        Text="H" />
-                </Border>
+                <Image Source="ms-appx:///Assets/HerdMe.png" Width="72" Height="72" HorizontalAlignment="Center" />
                 <TextBlock
                     x:Uid="OnboardingWelcomeTitle"
                     HorizontalAlignment="Center"

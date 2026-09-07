@@ -6,6 +6,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <ResourceDictionary Source="Styles/DesignSystem.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <XamlUICommand x:Key="OpenHerdMeCommand" x:Uid="TrayOpenCommand" Label="Open HerdMe">

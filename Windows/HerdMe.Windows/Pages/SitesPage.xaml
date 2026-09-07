@@ -8,7 +8,7 @@
     Unloaded="Page_Unloaded">
     <Page.Resources>
         <Style x:Key="SitesToolSurfaceStyle" TargetType="Border">
-            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="Background" Value="{ThemeResource SubtleSurfaceBrush}" />
             <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
@@ -38,7 +38,7 @@
             <Setter Property="CornerRadius" Value="6" />
         </Style>
     </Page.Resources>
-    <Grid x:Name="SitesLayout" Padding="28,22,28,24" RowSpacing="14">
+    <Grid x:Name="SitesLayout" Padding="{StaticResource PagePadding}" RowSpacing="14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -51,7 +51,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel VerticalAlignment="Center">
-                <TextBlock x:Uid="SitesPageTitle" AutomationProperties.AutomationId="SitesPageRoot" Text="Sites" Style="{StaticResource TitleTextBlockStyle}" />
+                <TextBlock x:Uid="SitesPageTitle" AutomationProperties.AutomationId="SitesPageRoot" Text="Sites" Style="{StaticResource PageTitleStyle}" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <TextBlock x:Uid="SitesEnvironmentStatus" x:Name="EnvironmentStatusText" Text="Stopped" FontWeight="SemiBold" />
                     <TextBlock x:Name="EnvironmentEndpointText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -64,13 +64,13 @@
                         <TextBlock x:Uid="SitesParkFolderButton" Text="Park folder" />
                     </StackPanel>
                 </Button>
-                <Button x:Name="CreateLaravelButton" Click="CreateLaravel_Click">
+                <Button x:Name="CreateLaravelButton" Click="CreateLaravel_Click" Style="{StaticResource AccentButtonStyle}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <SymbolIcon Symbol="Add" />
                         <TextBlock x:Uid="SitesCreateLaravelButton" Text="Create Laravel" />
                     </StackPanel>
                 </Button>
-                <Button Click="Scan_Click">
+                <Button Click="Scan_Click" Style="{StaticResource ToolbarIconButtonStyle}">
                     <ToolTipService.ToolTip>
                         <ToolTip><TextBlock x:Uid="SitesRefreshTooltip" Text="Refresh sites" /></ToolTip>
                     </ToolTipService.ToolTip>
@@ -79,13 +79,13 @@
             </StackPanel>
         </Grid>
 
-        <Border Grid.Row="1" Style="{StaticResource SitesToolSurfaceStyle}">
+        <Border Grid.Row="1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,1">
             <Expander
                 x:Uid="SitesFoldersExpander"
                 Header="Parked folders and linked projects"
                 HorizontalAlignment="Stretch"
                 HorizontalContentAlignment="Stretch"
-                IsExpanded="True">
+                IsExpanded="False">
                 <Grid Padding="16,10,16,14" ColumnSpacing="8" RowSpacing="10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -164,7 +164,7 @@
 
         <Grid Grid.Row="2" ColumnSpacing="14">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="2*" MinWidth="220" MaxWidth="280" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -231,16 +231,16 @@
                     </StackPanel>
                     <StackPanel x:Name="EmptyState" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
                         <FontIcon Glyph="&#xE8B7;" FontSize="36" />
-                        <TextBlock x:Uid="SitesEmptyState" Text="No sites found" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <TextBlock x:Uid="SitesEmptyState" Text="No sites found" Style="{StaticResource SectionTitleStyle}" />
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <Border Grid.Column="1" Style="{StaticResource SitesToolSurfaceStyle}">
+            <Border Grid.Column="1">
                 <Grid>
                     <StackPanel x:Name="NoSelectionState" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
                         <FontIcon Glyph="&#xE774;" FontSize="42" />
-                        <TextBlock x:Uid="SitesNoSelection" Text="Select a site" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <TextBlock x:Uid="SitesNoSelection" Text="Select a site" Style="{StaticResource SectionTitleStyle}" />
                     </StackPanel>
 
                     <Grid x:Name="SiteDetail" Visibility="Collapsed">
@@ -258,7 +258,7 @@
                             <StackPanel Spacing="2">
                                 <TextBlock
                                     x:Name="SiteNameText"
-                                    Style="{StaticResource SubtitleTextBlockStyle}"
+                                    Style="{StaticResource SectionTitleStyle}"
                                     TextWrapping="Wrap"
                                     TextTrimming="CharacterEllipsis" />
                                 <TextBlock
@@ -277,7 +277,7 @@
                             Margin="8,0"
                             Background="Transparent"
                             DefaultLabelPosition="Collapsed"
-                            IsDynamicOverflowEnabled="False">
+                            IsDynamicOverflowEnabled="True">
                             <CommandBar.PrimaryCommands>
                                 <AppBarButton x:Uid="SitesOpenBrowserCommand" Label="Open in browser" Click="OpenSite_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Globe" /></AppBarButton.Icon>
@@ -304,15 +304,7 @@
                                     <AppBarButton.Icon><SymbolIcon Symbol="Add" /></AppBarButton.Icon>
                                 </AppBarButton>
                                 <AppBarButton x:Uid="SitesOpenDatabaseCommand" Label="Open in TablePlus" Click="OpenDatabase_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="DataArea" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton
-                                    x:Uid="SitesStartLaravelCommand"
-                                    x:Name="StartLaravelButton"
-                                    Label="Start php artisan dev"
-                                    Click="StartLaravel_Click"
-                                    IsEnabled="False">
-                                    <AppBarButton.Icon><SymbolIcon x:Name="StartLaravelIcon" Symbol="Play" /></AppBarButton.Icon>
+                                    <AppBarButton.Icon><SymbolIcon Symbol="OpenLocal" /></AppBarButton.Icon>
                                 </AppBarButton>
                             </CommandBar.PrimaryCommands>
                             <CommandBar.SecondaryCommands>
@@ -355,6 +347,32 @@
 
                         <ScrollViewer Grid.Row="2" Padding="16,6,16,16" VerticalScrollBarVisibility="Auto">
                             <StackPanel Spacing="14">
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button
+                                            x:Name="StartLaravelButton"
+                                            Click="StartLaravel_Click"
+                                            IsEnabled="False"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch"
+                                            Style="{StaticResource AccentButtonStyle}">
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <SymbolIcon x:Name="StartLaravelIcon" Symbol="Play" />
+                                                <TextBlock x:Name="StartLaravelLabel" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Button>
+                                        <Button Grid.Column="1" x:Uid="SitesBackgroundOutputButton" Click="BackgroundOutput_Click" VerticalAlignment="Stretch" />
+                                    </Grid>
+                                    <TextBlock x:Name="BackgroundProcessesText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
                                 <InfoBar
                                     x:Name="SiteOperationBar"
                                     IsOpen="False"
@@ -390,14 +408,6 @@
                                             ScrollViewer.VerticalScrollBarVisibility="Auto" />
                                     </StackPanel>
                                 </Border>
-                                <StackPanel Spacing="8">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button x:Uid="SitesManageQueueWorker" Click="QueueWorker_Click" />
-                                        <Button x:Uid="SitesManageScheduler" Click="Scheduler_Click" />
-                                        <Button x:Uid="SitesBackgroundOutputButton" Click="BackgroundOutput_Click" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="BackgroundProcessesText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
                                 <Border x:Name="PreviewBorder" Height="160" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6">
                                     <Grid>
                                         <WebView2

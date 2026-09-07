@@ -6,22 +6,22 @@
     AutomationProperties.AutomationId="DumpsPageRoot"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
-    <Grid Padding="32" RowSpacing="16">
+    <Grid Padding="{StaticResource PagePadding}" RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <TextBlock x:Uid="DumpsPageTitle" AutomationProperties.AutomationId="DumpsPageRoot" Text="Dumps" Style="{StaticResource TitleTextBlockStyle}" />
+        <TextBlock x:Uid="DumpsPageTitle" AutomationProperties.AutomationId="DumpsPageRoot" Text="Dumps" Style="{StaticResource PageTitleStyle}" />
 
-        <Border Grid.Row="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
+        <Border Grid.Row="1" Style="{StaticResource SectionDividerStyle}">
             <Grid ColumnSpacing="16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock x:Uid="DumpsCaptureTitle" Text="VarDumper capture" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <TextBlock x:Uid="DumpsCaptureTitle" Text="VarDumper capture" Style="{StaticResource SectionTitleStyle}" />
                     <TextBlock x:Name="ServerStatusText" x:Uid="DumpsStoppedInitial" Text="Stopped" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
                 <Button x:Name="ServerButton" Grid.Column="1" Click="Server_Click">
@@ -35,18 +35,22 @@
 
         <Grid Grid.Row="2" ColumnSpacing="16">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="2*" MinWidth="220" MaxWidth="340" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12">
+            <Border Style="{StaticResource ToolPaneStyle}" Padding="12">
                 <Grid RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <Grid>
-                        <TextBlock x:Uid="DumpsCapturedTitle" Text="Captured" Style="{StaticResource SubtitleTextBlockStyle}" />
-                        <Button HorizontalAlignment="Right" Click="Clear_Click">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Uid="DumpsCapturedTitle" Text="Captured" Style="{StaticResource SectionTitleStyle}" />
+                        <Button Grid.Column="1" Click="Clear_Click" Style="{StaticResource ToolbarIconButtonStyle}">
                             <ToolTipService.ToolTip>
                                 <ToolTip><TextBlock x:Uid="DumpsClearTooltip" Text="Delete all dumps" /></ToolTip>
                             </ToolTipService.ToolTip>
@@ -70,13 +74,13 @@
                     </ListView>
                 </Grid>
             </Border>
-            <Border Grid.Column="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="18">
+            <Border Grid.Column="1" Padding="4,12">
                 <Grid RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <TextBlock x:Name="SourceText" x:Uid="DumpsSelectDumpInitial" Text="Select a dump" Style="{StaticResource SubtitleTextBlockStyle}" TextWrapping="Wrap" />
+                    <TextBlock x:Name="SourceText" x:Uid="DumpsSelectDumpInitial" Text="Select a dump" Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" />
                     <ScrollViewer Grid.Row="1" Margin="0,8,0,0">
                         <TextBlock x:Name="SummaryText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontFamily="Consolas" FontSize="14" />
                     </ScrollViewer>

@@ -6,22 +6,26 @@
     AutomationProperties.AutomationId="ServicesPageRoot"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
-    <Grid Padding="32" RowSpacing="16">
+    <Grid Padding="{StaticResource PagePadding}" RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid>
-            <StackPanel>
-                <TextBlock x:Uid="ServicesPageTitle" AutomationProperties.AutomationId="ServicesPageRoot" Text="Services" Style="{StaticResource TitleTextBlockStyle}" />
-                <TextBlock x:Uid="ServicesPageDescription" Text="Checksum-verified open-source Windows service runtimes" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Grid ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="4">
+                <TextBlock x:Uid="ServicesPageTitle" AutomationProperties.AutomationId="ServicesPageRoot" Text="Services" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock x:Uid="ServicesPageDescription" Text="Checksum-verified open-source Windows service runtimes" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
             </StackPanel>
-            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <ProgressRing x:Name="OperationProgress" Width="18" Height="18" />
-                <TextBlock x:Name="OperationStatusText" VerticalAlignment="Center" />
-                <Button Click="Refresh_Click">
+                <TextBlock x:Name="OperationStatusText" VerticalAlignment="Center" MaxWidth="180" TextWrapping="Wrap" />
+                <Button Click="Refresh_Click" Style="{StaticResource ToolbarIconButtonStyle}">
                     <ToolTipService.ToolTip>
                         <ToolTip><TextBlock x:Uid="ServicesRefreshTooltip" Text="Refresh service status" /></ToolTip>
                     </ToolTipService.ToolTip>
@@ -30,7 +34,7 @@
             </StackPanel>
         </Grid>
 
-        <Border Grid.Row="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
+        <Border Grid.Row="1" Style="{StaticResource SectionDividerStyle}">
             <Grid ColumnSpacing="10">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -53,6 +57,7 @@
                 <NumberBox x:Uid="ServicesPortField" x:Name="ServicePortBox" Grid.Column="2" Header="Port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Compact" />
                 <Button
                     x:Name="AddServiceButton"
+                    Style="{StaticResource AccentButtonStyle}"
                     Grid.Column="3"
                     VerticalAlignment="Bottom"
                     Click="Add_Click">
@@ -72,17 +77,17 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="2" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12">
+        <Border Grid.Row="2" Style="{StaticResource SectionDividerStyle}">
             <Grid>
                 <ListView x:Name="ServiceList" ItemsSource="{x:Bind Rows}">
                     <ListView.Header>
-                        <Grid Padding="10,6" ColumnSpacing="14">
+                        <Grid Padding="18,6" ColumnSpacing="10" Background="{ThemeResource SubtleSurfaceBrush}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="170" />
-                                <ColumnDefinition Width="100" />
-                                <ColumnDefinition Width="120" />
-                                <ColumnDefinition Width="120" />
-                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" MinWidth="100" />
+                                <ColumnDefinition Width="60" />
+                                <ColumnDefinition Width="74" />
+                                <ColumnDefinition Width="88" />
+                                <ColumnDefinition Width="160" />
                             </Grid.ColumnDefinitions>
                             <TextBlock x:Uid="ServicesServiceColumn" Text="Service" FontWeight="SemiBold" />
                             <TextBlock x:Uid="ServicesPortColumn" Grid.Column="1" Text="Port" FontWeight="SemiBold" />
@@ -92,38 +97,36 @@
                     </ListView.Header>
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="models:ManagedServiceRow">
-                            <Grid Padding="10,8" ColumnSpacing="14">
+                            <Grid Padding="10,8" ColumnSpacing="10">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="170" />
-                                    <ColumnDefinition Width="100" />
-                                    <ColumnDefinition Width="120" />
-                                    <ColumnDefinition Width="120" />
-                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" MinWidth="100" />
+                                    <ColumnDefinition Width="60" />
+                                    <ColumnDefinition Width="74" />
+                                    <ColumnDefinition Width="88" />
+                                    <ColumnDefinition Width="160" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" />
-                                    <TextBlock Text="{x:Bind Subtitle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Name}" />
+                                    <TextBlock Text="{x:Bind Subtitle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Subtitle}" />
                                 </StackPanel>
                                 <TextBlock Grid.Column="1" Text="{x:Bind Port}" VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="2" Text="{x:Bind Version}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Grid.Column="3" Text="{x:Bind Status}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="3" Text="{x:Bind Status}" VerticalAlignment="Center" TextWrapping="Wrap" />
                                 <StackPanel Grid.Column="4" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="6">
-                                    <Button
+                                    <Button Style="{StaticResource ToolbarIconButtonStyle}"
                                         Tag="{x:Bind Id}"
                                         Click="Install_Click"
+                                        AutomationProperties.Name="{x:Bind InstallLabel}"
                                         Visibility="{x:Bind CanInstallOrUpdate}">
                                         <ToolTipService.ToolTip>
                                             <ToolTip><TextBlock x:Uid="ServicesInstallTooltip" Text="Install or update runtime" /></ToolTip>
                                         </ToolTipService.ToolTip>
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <SymbolIcon Symbol="Download" />
-                                            <TextBlock Text="{x:Bind InstallLabel}" />
-                                        </StackPanel>
+                                        <SymbolIcon Symbol="Download" />
                                     </Button>
                                     <Button Tag="{x:Bind Id}" Click="Toggle_Click" IsEnabled="{x:Bind CanToggle}">
                                         <TextBlock Text="{x:Bind ToggleLabel}" />
                                     </Button>
-                                    <Button IsEnabled="{x:Bind CanManage}">
+                                    <Button IsEnabled="{x:Bind CanManage}" Style="{StaticResource ToolbarIconButtonStyle}">
                                         <ToolTipService.ToolTip>
                                             <ToolTip><TextBlock x:Uid="ServicesMoreTooltip" Text="More service actions" /></ToolTip>
                                         </ToolTipService.ToolTip>
@@ -201,7 +204,7 @@
                     Spacing="8"
                     Visibility="Collapsed">
                     <SymbolIcon Symbol="Library" />
-                    <TextBlock x:Uid="ServicesEmptyState" Text="No services added" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <TextBlock x:Uid="ServicesEmptyState" Text="No services added" Style="{StaticResource SectionTitleStyle}" />
                 </StackPanel>
             </Grid>
         </Border>

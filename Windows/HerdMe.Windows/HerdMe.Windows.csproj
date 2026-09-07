@@ -50,6 +50,11 @@
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       <TargetPath>Assets\HerdMe.ico</TargetPath>
     </Content>
+    <Content Include="..\..\HerdMe\Resources\Assets.xcassets\AppIcon.appiconset\icon-128.png" Link="Assets\HerdMe.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>Assets\HerdMe.png</TargetPath>
+    </Content>
     <Content Include="Runtime\herdme-core.exe" Condition="Exists('Runtime\herdme-core.exe')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>Runtime\herdme-core.exe</TargetPath>

@@ -12,8 +12,8 @@ namespace HerdMe.Windows;
 
 public sealed partial class MainWindow : Window
 {
-    private const int LogicalWindowWidth = 1_080;
-    private const int LogicalWindowHeight = 720;
+    private const int LogicalWindowWidth = 1_240;
+    private const int LogicalWindowHeight = 800;
     private const int LogicalWindowMargin = 16;
     private readonly AppServices services;
     private readonly Dictionary<string, Page> persistentPages = new(StringComparer.Ordinal);
@@ -102,9 +102,9 @@ public sealed partial class MainWindow : Window
         ));
         if (appWindow.Presenter is OverlappedPresenter presenter)
         {
-            presenter.IsResizable = false;
-            presenter.IsMaximizable = false;
-            presenter.IsMinimizable = false;
+            presenter.IsResizable = true;
+            presenter.IsMaximizable = true;
+            presenter.IsMinimizable = true;
         }
     }
 
@@ -313,6 +313,7 @@ public sealed partial class MainWindow : Window
     public void NavigateToPage(string tag)
     {
         var item = Navigation.MenuItems
+            .Concat(Navigation.FooterMenuItems)
             .OfType<NavigationViewItem>()
             .FirstOrDefault(candidate => string.Equals(
                 candidate.Tag?.ToString(),

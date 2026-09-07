@@ -568,10 +568,10 @@ internal static partial class ContractChecks
                 && mainWindowSource.Contains("LogicalWindowWidth * scale", StringComparison.Ordinal)
                 && mainWindowSource.Contains("displayArea.WorkArea", StringComparison.Ordinal)
                 && mainWindowSource.Contains("MoveAndResize", StringComparison.Ordinal)
-                && mainWindowSource.Contains("IsResizable = false", StringComparison.Ordinal)
-                && mainWindowSource.Contains("IsMaximizable = false", StringComparison.Ordinal)
-                && mainWindowSource.Contains("IsMinimizable = false", StringComparison.Ordinal),
-            "the main window keeps a fixed DPI-aware size within the display work area"
+                && mainWindowSource.Contains("IsResizable = true", StringComparison.Ordinal)
+                && mainWindowSource.Contains("IsMaximizable = true", StringComparison.Ordinal)
+                && mainWindowSource.Contains("IsMinimizable = true", StringComparison.Ordinal),
+            "the main window starts within the display work area and supports standard window controls"
         );
         Check(
             dashboardXaml.Contains("SizeChanged=\"Page_SizeChanged\"", StringComparison.Ordinal)
@@ -579,7 +579,7 @@ internal static partial class ContractChecks
                 && dashboardXaml.Contains("x:Key=\"DashboardSummaryCardStyle\"", StringComparison.Ordinal)
                 && dashboardXaml.Contains("Property=\"HorizontalAlignment\" Value=\"Stretch\"", StringComparison.Ordinal)
                 && dashboardXaml.Contains("TextWrapping=\"Wrap\"", StringComparison.Ordinal)
-                && dashboardSource.Contains("e.NewSize.Width < 680", StringComparison.Ordinal)
+                && dashboardSource.Contains("e.NewSize.Width < 820", StringComparison.Ordinal)
                 && dashboardSource.Contains("SummaryStatusBrush", StringComparison.Ordinal)
                 && dashboardSource.Contains("PositionEnvironmentRow", StringComparison.Ordinal)
                 && dashboardSource.Contains("RecentDumpsPanel", StringComparison.Ordinal),
@@ -829,6 +829,23 @@ internal static partial class ContractChecks
                 $"{Path.GetRelativePath(repositoryRoot, xamlPath)} has a root element"
             );
             var documentRoot = root!;
+
+            if (documentRoot.Name.LocalName == "ResourceDictionary")
+            {
+                foreach (var dictionary in documentRoot.DescendantsAndSelf()
+                    .Where(element => element.Name.LocalName == "ResourceDictionary"))
+                {
+                    var keys = dictionary.Elements()
+                        .Select(element => element.Attribute(xamlNamespace + "Key")?.Value)
+                        .Where(key => key is not null)
+                        .ToArray();
+                    Check(
+                        keys.Distinct(StringComparer.Ordinal).Count() == keys.Length,
+                        $"{Path.GetRelativePath(repositoryRoot, xamlPath)} has unique resource keys within each dictionary"
+                    );
+                }
+                continue;
+            }
 
             var xClass = documentRoot.Attribute(xamlNamespace + "Class")?.Value.Trim()
                 ?? string.Empty;
@@ -1177,11 +1194,11 @@ internal static partial class ContractChecks
             "native Windows acceptance executes the WinUI navigation smoke test"
         );
         Check(
-            acceptanceSource.Contains("Assert-FixedMainWindow $primary", StringComparison.Ordinal)
+            acceptanceSource.Contains("Assert-ResizableMainWindow $primary", StringComparison.Ordinal)
                 && acceptanceSource.Contains("CanMaximize", StringComparison.Ordinal)
                 && acceptanceSource.Contains("CanMinimize", StringComparison.Ordinal)
                 && acceptanceSource.Contains("CanResize", StringComparison.Ordinal),
-            "native Windows acceptance rejects resizable main windows"
+            "native Windows acceptance requires standard window controls"
         );
         Check(
             acceptanceSource.Contains("Assert-OnboardingLayout $onboarding", StringComparison.Ordinal)

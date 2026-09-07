@@ -5,12 +5,12 @@
     AutomationProperties.AutomationId="DebuggerPageRoot"
     Loaded="Page_Loaded">
     <ScrollViewer>
-        <StackPanel Padding="32" Spacing="16" MaxWidth="900" HorizontalAlignment="Left">
-            <TextBlock x:Uid="DebuggerPageTitle" AutomationProperties.AutomationId="DebuggerPageRoot" Text="Debugger" Style="{StaticResource TitleTextBlockStyle}" />
+        <StackPanel Padding="{StaticResource PagePadding}" Spacing="16" MaxWidth="900" HorizontalAlignment="Stretch">
+            <TextBlock x:Uid="DebuggerPageTitle" AutomationProperties.AutomationId="DebuggerPageRoot" Text="Debugger" Style="{StaticResource PageTitleStyle}" />
 
-            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+            <Border Style="{StaticResource SectionDividerStyle}">
                 <StackPanel Spacing="12">
-                    <TextBlock x:Uid="DebuggerXdebugTitle" Text="Xdebug" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <TextBlock x:Uid="DebuggerXdebugTitle" Text="Xdebug" Style="{StaticResource SectionTitleStyle}" />
                     <TextBlock x:Name="ExtensionPathText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <ProgressRing x:Name="InstallProgress" Width="16" Height="16" />
@@ -25,9 +25,9 @@
                 </StackPanel>
             </Border>
 
-            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+            <Border Style="{StaticResource SectionDividerStyle}">
                 <StackPanel Spacing="14">
-                    <TextBlock x:Uid="DebuggerSessionSettingsTitle" Text="Session settings" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <TextBlock x:Uid="DebuggerSessionSettingsTitle" Text="Session settings" Style="{StaticResource SectionTitleStyle}" />
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="220" />
@@ -67,7 +67,7 @@
                         <TextBox x:Name="IdeKeyBox" Grid.Column="1" MaxLength="80" />
                     </Grid>
                     <TextBlock x:Name="EndpointText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <Button HorizontalAlignment="Left" Click="Save_Click">
+                    <Button HorizontalAlignment="Left" Click="Save_Click" Style="{StaticResource AccentButtonStyle}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <SymbolIcon Symbol="Save" />
                             <TextBlock x:Uid="DebuggerSaveButton" Text="Save" />
@@ -77,9 +77,9 @@
                 </StackPanel>
             </Border>
 
-            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+            <Border Style="{StaticResource SectionDividerStyle}">
                 <StackPanel Spacing="14">
-                    <TextBlock x:Uid="DebuggerSessionTitle" Text="Debug session" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <TextBlock x:Uid="DebuggerSessionTitle" Text="Debug session" Style="{StaticResource SectionTitleStyle}" />
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="220" />
