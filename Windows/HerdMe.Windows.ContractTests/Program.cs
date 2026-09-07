@@ -107,6 +107,7 @@ try
         "operation journal durably records backend transitions"
     );
     await VerifyDownloadAndStorageContractsAsync(supportRoot);
+    await VerifyPhpPromotionAsync(supportRoot);
 
     VerifySiteContracts(supportRoot);
 

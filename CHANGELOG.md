@@ -5,6 +5,25 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-09-07
+
+### Fixed
+
+- Retry temporary Windows access-denied and sharing violations when installing
+  PHP, including the final directory move during onboarding.
+- Restore the previous PHP runtime after failed or cancelled installation,
+  preserve its backup if rollback fails, and prevent cleanup errors from
+  hiding the installation failure.
+- Remove obsolete English and Arabic site tooltip resources left behind by
+  the command bar update.
+- Include the required C++ array header so native Windows builds compile
+  reliably with the hosted MSVC toolchain.
+
+### Changed
+
+- Unify Laravel development processes and update the site controls and
+  localization for background process management.
+
 ## [0.1.16] - 2026-09-01
 
 ### Added

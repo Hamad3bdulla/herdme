@@ -1,6 +1,7 @@
 #include "herdme/core.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>

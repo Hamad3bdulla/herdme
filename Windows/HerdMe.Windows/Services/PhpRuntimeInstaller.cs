@@ -436,28 +436,92 @@ public sealed class PhpRuntimeInstaller
                 cancellationToken
             );
 
-            if (Directory.Exists(destination)) Directory.Move(destination, backupPath);
-            try
-            {
-                Directory.Move(stagingPath, destination);
-                if (Directory.Exists(backupPath)) Directory.Delete(backupPath, true);
-            }
-            catch
-            {
-                if (!Directory.Exists(destination) && Directory.Exists(backupPath))
-                {
-                    Directory.Move(backupPath, destination);
-                }
-                throw;
-            }
+            await PromoteRuntimeAsync(stagingPath, destination, backupPath, cancellationToken);
+            TryCleanup(() => Directory.Delete(backupPath, true));
         }
         finally
         {
-            if (File.Exists(archivePath)) File.Delete(archivePath);
-            if (Directory.Exists(stagingPath)) Directory.Delete(stagingPath, true);
-            if (Directory.Exists(backupPath)) Directory.Delete(backupPath, true);
+            TryCleanup(() => File.Delete(archivePath));
+            TryCleanup(() => Directory.Delete(stagingPath, true));
+            // A failed rollback may leave the only working runtime in backupPath.
         }
         return release;
+    }
+
+    internal static async Task PromoteRuntimeAsync(
+        string stagingPath,
+        string destination,
+        string backupPath,
+        CancellationToken cancellationToken,
+        Action<string, string>? move = null
+    )
+    {
+        move ??= Directory.Move;
+        if (Directory.Exists(destination))
+        {
+            await MoveWithRetryAsync(destination, backupPath, cancellationToken, move);
+        }
+        try
+        {
+            await MoveWithRetryAsync(stagingPath, destination, cancellationToken, move);
+        }
+        catch (Exception installationError)
+        {
+            if (!Directory.Exists(destination) && Directory.Exists(backupPath))
+            {
+                try
+                {
+                    // Cancellation must not prevent restoring the previous installation.
+                    await MoveWithRetryAsync(backupPath, destination, CancellationToken.None, move);
+                }
+                catch (Exception rollbackError)
+                {
+                    throw new IOException(
+                        $"PHP installation failed and the previous runtime could not be restored. "
+                        + $"It has been preserved at '{backupPath}'.",
+                        new AggregateException(installationError, rollbackError)
+                    );
+                }
+            }
+            throw;
+        }
+    }
+
+    private static async Task MoveWithRetryAsync(
+        string source,
+        string destination,
+        CancellationToken cancellationToken,
+        Action<string, string> move
+    )
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                move(source, destination);
+                return;
+            }
+            catch (Exception error) when (
+                attempt < 5 && (error is UnauthorizedAccessException
+                    || (error is IOException && (error.HResult & 0xffff) is 5 or 32 or 33)))
+            {
+                // Newly extracted executables can briefly remain locked by Windows scanners.
+                await Task.Delay(TimeSpan.FromMilliseconds(200 * (attempt + 1)), cancellationToken);
+            }
+        }
+    }
+
+    private static void TryCleanup(Action cleanup)
+    {
+        try
+        {
+            cleanup();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            System.Diagnostics.Debug.WriteLine($"PHP installer cleanup deferred: {error.Message}");
+        }
     }
 
     internal static void CopyVcRuntimeFiles(string sourceDirectory, string destinationDirectory)

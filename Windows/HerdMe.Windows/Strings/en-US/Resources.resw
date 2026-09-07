@@ -642,7 +642,6 @@
   <data name="SitesStopQueueWorker" xml:space="preserve"><value>Stop queue</value></data>
   <data name="SitesStartScheduler" xml:space="preserve"><value>Start scheduler</value></data>
   <data name="SitesStopScheduler" xml:space="preserve"><value>Stop scheduler</value></data>
-  <data name="SitesStartLaravelTooltip.Text" xml:space="preserve"><value>Start all development processes with php artisan dev</value></data>
   <data name="SitesStartLaravelButton" xml:space="preserve"><value>Start php artisan dev</value></data>
   <data name="SitesStopLaravelButton" xml:space="preserve"><value>Stop development processes</value></data>
   <data name="SitesRunning" xml:space="preserve"><value>running</value></data>
@@ -791,13 +790,6 @@
   <data name="DashboardDiagnosticsExportedTitle" xml:space="preserve"><value>Diagnostics exported</value></data>
   <data name="DashboardNoFailedRepairs" xml:space="preserve"><value>No failed site repairs are available to retry.</value></data>
   <data name="CommonClose" xml:space="preserve"><value>Close</value></data>
-  <data name="SitesActionOpenBrowserTooltip.Text" xml:space="preserve"><value>Open in browser</value></data>
-  <data name="SitesActionOpenFolderTooltip.Text" xml:space="preserve"><value>Open project folder</value></data>
-  <data name="SitesActionTerminalTooltip.Text" xml:space="preserve"><value>Open terminal</value></data>
-  <data name="SitesActionEnvironmentTooltip.Text" xml:space="preserve"><value>Edit .env</value></data>
-  <data name="SitesActionDatabaseTooltip.Text" xml:space="preserve"><value>Manage database</value></data>
-  <data name="SitesActionLogsTooltip.Text" xml:space="preserve"><value>Open site logs</value></data>
-  <data name="SitesActionHealthTooltip.Text" xml:space="preserve"><value>Check and repair site</value></data>
   <data name="PhpTimezoneInput.PlaceholderText" xml:space="preserve"><value>UTC</value></data>
   <data name="GeneralCurrentVersion" xml:space="preserve"><value>HerdMe {0} (build {1})</value></data>
   <data name="GeneralUpdateReadyToCheck" xml:space="preserve"><value>{0} channel · Version {1} · Background checks enabled</value></data>

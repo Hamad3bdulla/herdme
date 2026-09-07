@@ -642,7 +642,6 @@
   <data name="SitesStopQueueWorker" xml:space="preserve"><value>إيقاف قائمة الانتظار</value></data>
   <data name="SitesStartScheduler" xml:space="preserve"><value>تشغيل المجدول</value></data>
   <data name="SitesStopScheduler" xml:space="preserve"><value>إيقاف المجدول</value></data>
-  <data name="SitesStartLaravelTooltip.Text" xml:space="preserve"><value>تشغيل جميع عمليات التطوير عبر php artisan dev</value></data>
   <data name="SitesStartLaravelButton" xml:space="preserve"><value>تشغيل php artisan dev</value></data>
   <data name="SitesStopLaravelButton" xml:space="preserve"><value>إيقاف عمليات التطوير</value></data>
   <data name="SitesRunning" xml:space="preserve"><value>يعمل</value></data>
@@ -791,13 +790,6 @@
   <data name="DashboardDiagnosticsExportedTitle" xml:space="preserve"><value>تم تصدير التشخيصات</value></data>
   <data name="DashboardNoFailedRepairs" xml:space="preserve"><value>لا توجد إصلاحات مواقع فاشلة لإعادة المحاولة.</value></data>
   <data name="CommonClose" xml:space="preserve"><value>إغلاق</value></data>
-  <data name="SitesActionOpenBrowserTooltip.Text" xml:space="preserve"><value>فتح في المتصفح</value></data>
-  <data name="SitesActionOpenFolderTooltip.Text" xml:space="preserve"><value>فتح مجلد المشروع</value></data>
-  <data name="SitesActionTerminalTooltip.Text" xml:space="preserve"><value>فتح الطرفية</value></data>
-  <data name="SitesActionEnvironmentTooltip.Text" xml:space="preserve"><value>تعديل ملف .env</value></data>
-  <data name="SitesActionDatabaseTooltip.Text" xml:space="preserve"><value>إدارة قاعدة البيانات</value></data>
-  <data name="SitesActionLogsTooltip.Text" xml:space="preserve"><value>فتح سجلات الموقع</value></data>
-  <data name="SitesActionHealthTooltip.Text" xml:space="preserve"><value>فحص الموقع وإصلاحه</value></data>
   <data name="PhpTimezoneInput.PlaceholderText" xml:space="preserve"><value>مثال: Asia/Bahrain</value></data>
   <data name="GeneralCurrentVersion" xml:space="preserve"><value>HerdMe {0} (البنية {1})</value></data>
   <data name="GeneralUpdateReadyToCheck" xml:space="preserve"><value>قناة {0} · الإصدار {1} · الفحص يعمل في الخلفية</value></data>

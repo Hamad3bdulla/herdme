@@ -13,6 +13,88 @@ using HerdMe.Windows.Services;
 
 internal static partial class ContractChecks
 {
+    internal static async Task VerifyPhpPromotionAsync(string supportRoot)
+    {
+        var root = Path.Combine(supportRoot, "php-promotion");
+        var staging = Path.Combine(root, "staging");
+        var destination = Path.Combine(root, "runtime");
+        var backup = Path.Combine(root, "backup");
+        Directory.CreateDirectory(staging);
+        File.WriteAllText(Path.Combine(staging, "version"), "new");
+        var attempts = 0;
+        await PhpRuntimeInstaller.PromoteRuntimeAsync(
+            staging, destination, backup, CancellationToken.None,
+            (source, target) =>
+            {
+                if (++attempts == 1) throw new IOException("Access denied", unchecked((int)0x80070005));
+                Directory.Move(source, target);
+            }
+        );
+        Check(attempts == 2 && File.ReadAllText(Path.Combine(destination, "version")) == "new",
+            "PHP promotion retries a transient Windows access-denied error");
+
+        Directory.CreateDirectory(staging);
+        using var cancellation = new CancellationTokenSource();
+        try
+        {
+            await PhpRuntimeInstaller.PromoteRuntimeAsync(
+                staging, destination, backup, cancellation.Token,
+                (source, target) =>
+                {
+                    Directory.Move(source, target);
+                    if (target == backup) cancellation.Cancel();
+                }
+            );
+            Check(false, "PHP promotion honors cancellation");
+        }
+        catch (OperationCanceledException) { }
+        Check(File.Exists(Path.Combine(destination, "version")) && !Directory.Exists(backup),
+            "Cancelled PHP promotion restores the previous runtime");
+
+        try
+        {
+            await PhpRuntimeInstaller.PromoteRuntimeAsync(
+                staging, destination, backup, CancellationToken.None,
+                (source, target) =>
+                {
+                    if (target == destination) throw new IOException("Permanent move failure");
+                    Directory.Move(source, target);
+                }
+            );
+            Check(false, "PHP promotion reports rollback failure");
+        }
+        catch (IOException error)
+        {
+            Check(error.InnerException is AggregateException && error.Message.Contains(backup),
+                "PHP rollback failure reports both errors and the recovery path");
+        }
+        Check(File.Exists(Path.Combine(backup, "version")),
+            "PHP rollback failure preserves the previous runtime backup");
+
+        Directory.Move(backup, destination);
+        attempts = 0;
+        try
+        {
+            await PhpRuntimeInstaller.PromoteRuntimeAsync(
+                staging, destination, backup, CancellationToken.None,
+                (source, target) =>
+                {
+                    if (source == staging)
+                    {
+                        attempts++;
+                        throw new UnauthorizedAccessException("Persistent access denial");
+                    }
+                    Directory.Move(source, target);
+                }
+            );
+            Check(false, "PHP promotion reports exhausted access-denied retries");
+        }
+        catch (UnauthorizedAccessException) { }
+        Check(attempts == 6 && File.Exists(Path.Combine(destination, "version"))
+            && !Directory.Exists(backup),
+            "PHP promotion bounds retries and restores the previous runtime after exhaustion");
+    }
+
     internal static async Task VerifyCoreClientAsync(string coreExecutable, string supportRoot)
     {
         Check(File.Exists(coreExecutable), "CoreClient test executable exists");
