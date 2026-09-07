@@ -95,7 +95,9 @@ public static class ServiceEnvironmentConfiguration
             ("DB_PORT", instance.Port.ToString(CultureInfo.InvariantCulture)),
             ("DB_DATABASE", provisioning.DatabaseName),
             ("DB_USERNAME", provisioning.Username),
-            ("DB_PASSWORD", provisioning.Password)
+            ("DB_PASSWORD", provisioning.Password),
+            ("DB_URL", ""),
+            ("DATABASE_URL", "")
         );
     }
 

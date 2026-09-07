@@ -595,9 +595,9 @@
   <data name="GeneralGitUpdated" xml:space="preserve"><value>Git {0} is ready.</value></data>
   <data name="DebuggerUpdateButton" xml:space="preserve"><value>Update</value></data>
   <data name="DebuggerUpdateAvailable" xml:space="preserve"><value>Xdebug {0} is available.</value></data>
-  <data name="SitesCreateDatabaseCommand.Text" xml:space="preserve"><value>Create database</value></data>
+  <data name="SitesCreateDatabaseCommand.Label" xml:space="preserve"><value>Create database</value></data>
   <data name="SitesImportDatabaseCommand.Text" xml:space="preserve"><value>Import database</value></data>
-  <data name="SitesDatabaseNoRunningService" xml:space="preserve"><value>Start a MySQL, MariaDB, or PostgreSQL service before creating a site database.</value></data>
+  <data name="SitesDatabaseNoRunningService" xml:space="preserve"><value>Add a MySQL, MariaDB, or PostgreSQL service from Services first. It will start automatically.</value></data>
   <data name="SitesDatabaseServiceField" xml:space="preserve"><value>Database service</value></data>
   <data name="SitesDatabaseNameField" xml:space="preserve"><value>Database name</value></data>
   <data name="SitesDatabaseNameValidation" xml:space="preserve"><value>Start with a letter and use only letters, numbers, and underscores (maximum 63 characters).</value></data>
@@ -892,4 +892,8 @@ Recovery backup: {1}</value></data>
   <data name="UpdatesCategoryService" xml:space="preserve"><value>Local service</value></data>
   <data name="UpdatesCategoryDebugger" xml:space="preserve"><value>Debugger</value></data>
   <data name="UpdatesCategoryTool" xml:space="preserve"><value>Command-line tool</value></data>
+  <data name="SitesOpenDatabaseCommand.Label" xml:space="preserve"><value>Open in TablePlus</value></data>
+  <data name="SitesDatabaseQuickSetupDescription" xml:space="preserve"><value>Creates the database and updates this site's connection settings in .env automatically. You can change the suggested name.</value></data>
+  <data name="SitesDatabaseOpenAfterCreate" xml:space="preserve"><value>Open in TablePlus after creation</value></data>
+  <data name="SitesDatabaseEnvironmentReady" xml:space="preserve"><value>The database is ready and its connection settings are saved in .env.</value></data>
 </root>

@@ -595,9 +595,9 @@
   <data name="GeneralGitUpdated" xml:space="preserve"><value>أصبح Git {0} جاهزًا.</value></data>
   <data name="DebuggerUpdateButton" xml:space="preserve"><value>تحديث</value></data>
   <data name="DebuggerUpdateAvailable" xml:space="preserve"><value>يتوفر Xdebug {0}.</value></data>
-  <data name="SitesCreateDatabaseCommand.Text" xml:space="preserve"><value>إنشاء قاعدة بيانات</value></data>
+  <data name="SitesCreateDatabaseCommand.Label" xml:space="preserve"><value>إنشاء قاعدة بيانات</value></data>
   <data name="SitesImportDatabaseCommand.Text" xml:space="preserve"><value>استيراد قاعدة بيانات</value></data>
-  <data name="SitesDatabaseNoRunningService" xml:space="preserve"><value>شغّل خدمة MySQL أو MariaDB أو PostgreSQL قبل إنشاء قاعدة بيانات للموقع.</value></data>
+  <data name="SitesDatabaseNoRunningService" xml:space="preserve"><value>أضف خدمة MySQL أو MariaDB أو PostgreSQL من صفحة الخدمات أولًا. سيتم تشغيلها تلقائيًا.</value></data>
   <data name="SitesDatabaseServiceField" xml:space="preserve"><value>خدمة قاعدة البيانات</value></data>
   <data name="SitesDatabaseNameField" xml:space="preserve"><value>اسم قاعدة البيانات</value></data>
   <data name="SitesDatabaseNameValidation" xml:space="preserve"><value>ابدأ بحرف واستخدم الحروف والأرقام والشرطة السفلية فقط (63 محرفاً كحد أقصى).</value></data>
@@ -892,4 +892,8 @@
   <data name="UpdatesCategoryService" xml:space="preserve"><value>خدمة محلية</value></data>
   <data name="UpdatesCategoryDebugger" xml:space="preserve"><value>المصحح</value></data>
   <data name="UpdatesCategoryTool" xml:space="preserve"><value>أداة سطر أوامر</value></data>
+  <data name="SitesOpenDatabaseCommand.Label" xml:space="preserve"><value>فتح في TablePlus</value></data>
+  <data name="SitesDatabaseQuickSetupDescription" xml:space="preserve"><value>سننشئ قاعدة البيانات ونحدّث إعدادات اتصال الموقع في .env تلقائيًا. يمكنك تعديل الاسم المقترح.</value></data>
+  <data name="SitesDatabaseOpenAfterCreate" xml:space="preserve"><value>فتح في TablePlus بعد الإنشاء</value></data>
+  <data name="SitesDatabaseEnvironmentReady" xml:space="preserve"><value>قاعدة البيانات جاهزة وتم حفظ إعدادات الاتصال في .env.</value></data>
 </root>

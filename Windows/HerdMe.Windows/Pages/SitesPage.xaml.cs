@@ -1490,7 +1490,7 @@ public sealed partial class SitesPage : Page
             .Where(instance => SiteDatabaseProvisioner.SupportedDefinitions.Contains(
                 instance.DefinitionId
             ))
-            .Where(instance => serviceManager.State(instance.Id, instance.DefinitionId)
+            .OrderByDescending(instance => serviceManager.State(instance.Id, instance.DefinitionId)
                 == ManagedServiceState.Running)
             .Select(instance => new DatabaseServiceOption(instance))
             .ToArray();
@@ -1524,8 +1524,19 @@ public sealed partial class SitesPage : Page
             ]
         };
         var content = new StackPanel { Width = 420, Spacing = 10 };
+        content.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.Get("SitesDatabaseQuickSetupDescription"),
+            TextWrapping = TextWrapping.Wrap
+        });
+        var openInTablePlus = new CheckBox
+        {
+            Content = AppLocalization.Get("SitesDatabaseOpenAfterCreate"),
+            IsChecked = true
+        };
         content.Children.Add(serviceBox);
         content.Children.Add(nameBox);
+        content.Children.Add(openInTablePlus);
         content.Children.Add(validationText);
         var dialog = new ContentDialog
         {
@@ -1557,6 +1568,7 @@ public sealed partial class SitesPage : Page
         SiteDatabaseProvisioning provisioning;
         try
         {
+            await serviceManager.StartAsync(selectedService.Instance.Id, cancellation.Token);
             provisioning = await serviceManager.CreateSiteDatabaseAsync(
                 selectedService.Instance,
                 nameBox.Text.Trim(),
@@ -1584,6 +1596,34 @@ public sealed partial class SitesPage : Page
             CreateDatabaseButton.IsEnabled = true;
         }
 
+        var environmentUpdated = false;
+        Exception? completionError = null;
+        CreateDatabaseButton.IsEnabled = false;
+        try
+        {
+            await Task.Run(() => serviceManager.AddSiteDatabaseToEnvironment(
+                site.Path, selectedService.Instance, provisioning
+            ));
+            environmentUpdated = true;
+            await ClearDatabaseConfigurationCacheAsync(site);
+            if (IsSelected(site)) await RefreshSiteDetailsAsync(site);
+            if (openInTablePlus.IsChecked == true)
+            {
+                OpenSiteDatabaseInTablePlus(selectedService.Instance, provisioning);
+            }
+            return;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException
+            or InvalidOperationException or NotSupportedException or ArgumentException or TimeoutException)
+        {
+            // Keep the created credentials available so retrying never creates another database.
+            completionError = error;
+        }
+        finally
+        {
+            CreateDatabaseButton.IsEnabled = true;
+        }
+
         var usernameBox = new TextBox
         {
             Header = AppLocalization.Get("SitesDatabaseUsernameField"),
@@ -1598,7 +1638,9 @@ public sealed partial class SitesPage : Page
         };
         var statusText = new TextBlock
         {
-            Text = AppLocalization.Get("SitesDatabaseCreatedStatus"),
+            Text = AppLocalization.Get(environmentUpdated
+                ? "SitesDatabaseEnvironmentReady"
+                : "SitesDatabaseCreatedStatus") + Environment.NewLine + completionError?.Message,
             TextWrapping = TextWrapping.Wrap,
             Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
                 "SystemFillColorSuccessBrush"
@@ -1625,27 +1667,31 @@ public sealed partial class SitesPage : Page
             XamlRoot = XamlRoot,
             Title = AppLocalization.Get("SitesDatabaseCreatedTitle"),
             Content = resultContent,
-            PrimaryButtonText = AppLocalization.Get("SitesDatabaseAddToEnvironment"),
+            PrimaryButtonText = AppLocalization.Get(environmentUpdated
+                ? "SitesDatabaseOpenTablePlus"
+                : "SitesDatabaseAddToEnvironment"),
             CloseButtonText = AppLocalization.Get("SitesDone"),
             DefaultButton = ContentDialogButton.Primary
         };
-        var environmentUpdated = false;
         resultDialog.PrimaryButtonClick += async (_, args) =>
         {
             var deferral = args.GetDeferral();
             try
             {
-                var update = await Task.Run(() => serviceManager.AddSiteDatabaseToEnvironment(
-                    site.Path,
-                    selectedService.Instance,
-                    provisioning
-                ));
-                environmentUpdated = true;
-                statusText.Text = AppLocalization.Format(
-                    "SitesDatabaseEnvironmentUpdated",
-                    update.AddedKeys,
-                    update.UpdatedKeys
-                );
+                if (!environmentUpdated)
+                {
+                    await Task.Run(() => serviceManager.AddSiteDatabaseToEnvironment(
+                        site.Path, selectedService.Instance, provisioning
+                    ));
+                    environmentUpdated = true;
+                    resultDialog.PrimaryButtonText = AppLocalization.Get("SitesDatabaseOpenTablePlus");
+                }
+                await ClearDatabaseConfigurationCacheAsync(site);
+                statusText.Text = AppLocalization.Get("SitesDatabaseEnvironmentReady");
+                if (openInTablePlus.IsChecked == true)
+                {
+                    OpenSiteDatabaseInTablePlus(selectedService.Instance, provisioning);
+                }
                 statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
                     "SystemFillColorSuccessBrush"
                 ];
@@ -1654,7 +1700,7 @@ public sealed partial class SitesPage : Page
                 or UnauthorizedAccessException
                 or InvalidDataException
                 or InvalidOperationException
-                or NotSupportedException)
+                or NotSupportedException or ArgumentException or TimeoutException)
             {
                 args.Cancel = true;
                 statusText.Text = error.Message;
@@ -1669,6 +1715,48 @@ public sealed partial class SitesPage : Page
         };
         await resultDialog.ShowAsync();
         if (environmentUpdated && IsSelected(site)) await RefreshSiteDetailsAsync(site);
+    }
+
+    private static void OpenSiteDatabaseInTablePlus(
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning
+    )
+    {
+        TablePlusConnection.Open(TablePlusConnection.UriForDatabase(instance, provisioning)
+            ?? throw new NotSupportedException(AppLocalization.Get("SitesDatabaseTablePlusUnavailable")));
+    }
+
+    private async Task ClearDatabaseConfigurationCacheAsync(SiteRecord site)
+    {
+        if (!File.Exists(Path.Combine(site.Path, "artisan"))
+            || !File.Exists(Path.Combine(site.Path, "bootstrap", "cache", "config.php"))) return;
+        var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
+        var result = await ArtisanCommandRunner.RunAsync(
+            phpInstaller.PhpExecutable(cycle), site.Path,
+            ["config:clear", "--no-ansi", "--no-interaction"],
+            composerTools.ManagedEnvironment(cycle), TimeSpan.FromMinutes(2)
+        );
+        if (result.ExitCode != 0) throw new InvalidOperationException(result.Output);
+    }
+
+    private async void OpenDatabase_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSite is not { } site) return;
+        if (!TryCurrentSiteDatabase(site, out var instance, out var provisioning, out var error))
+        {
+            await ShowErrorAsync(error);
+            return;
+        }
+        try
+        {
+            await serviceManager.StartAsync(instance.Id);
+            OpenSiteDatabaseInTablePlus(instance, provisioning);
+        }
+        catch (Exception openError) when (openError is IOException or UnauthorizedAccessException
+            or InvalidOperationException or NotSupportedException or ArgumentException)
+        {
+            await ShowErrorAsync(openError.Message);
+        }
     }
 
     private async void ManageDatabase_Click(object sender, RoutedEventArgs e)

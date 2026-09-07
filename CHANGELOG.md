@@ -5,6 +5,12 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+### Added
+
+- Create a site database, start its managed server, update `.env`, clear cached
+  Laravel configuration, and open TablePlus through one Windows site action.
+- Open an existing site's database directly from the site command bar.
+
 ## [0.1.17] - 2026-09-07
 
 ### Fixed

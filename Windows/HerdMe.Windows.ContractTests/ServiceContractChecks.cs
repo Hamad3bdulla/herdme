@@ -499,6 +499,8 @@ internal static partial class ContractChecks
         );
         var siteDatabaseProject = Path.Combine(supportRoot, "site-database-environment");
         Directory.CreateDirectory(siteDatabaseProject);
+        await File.WriteAllTextAsync(Path.Combine(siteDatabaseProject, ".env"),
+            "APP_NAME=KeepMe\nDB_URL=mysql://old.example/legacy\nDATABASE_URL=mysql://old.example/legacy\n");
         var siteDatabaseUpdate = ServiceEnvironmentFile.Update(
             siteDatabaseProject,
             ServiceEnvironmentConfiguration.DatabaseVariables(environmentInstance, siteDatabase),
@@ -509,6 +511,9 @@ internal static partial class ContractChecks
         );
         Check(
             siteDatabaseUpdate.AddedKeys == 6
+                && siteDatabaseUpdate.UpdatedKeys == 2
+                && siteDatabaseEnvironment.Contains("APP_NAME=KeepMe", StringComparison.Ordinal)
+                && !siteDatabaseEnvironment.Contains("old.example", StringComparison.Ordinal)
                 && siteDatabaseEnvironment.Contains("DB_DATABASE=demo_store", StringComparison.Ordinal)
                 && siteDatabaseEnvironment.Contains(
                     "DB_USERNAME=herdme_0123456789abcdef",
