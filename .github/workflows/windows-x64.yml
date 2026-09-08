@@ -40,11 +40,12 @@ jobs:
           cmake --version
 
       - name: Set the acceptance profile language
-        shell: pwsh
+        shell: powershell
         env:
           UI_TEST_LANGUAGE: ${{ matrix.ui-language }}
         run: |
-          Set-WinUserLanguageList -LanguageList $env:UI_TEST_LANGUAGE -Force
+          $languages = New-WinUserLanguageList -Language $env:UI_TEST_LANGUAGE
+          Set-WinUserLanguageList -LanguageList $languages -Force
           Set-WinUILanguageOverride -Language $env:UI_TEST_LANGUAGE
           Set-Culture -CultureInfo $env:UI_TEST_LANGUAGE
 

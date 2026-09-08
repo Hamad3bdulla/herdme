@@ -93,7 +93,7 @@ final class SiteDevelopmentServer: @unchecked Sendable {
         try LogRotation.rotateIfNeeded(log)
         if !fileManager.fileExists(atPath: log.path) { fileManager.createFile(atPath: log.path, contents: nil) }
 
-        let processCancellation = SiteOperationCancellation()
+        let processCancellation = cancellationToken ?? SiteOperationCancellation()
         let hotPath =
             selectedMode == .laravelAssets
             ? Self.laravelHotFile(for: site)
@@ -121,7 +121,7 @@ final class SiteDevelopmentServer: @unchecked Sendable {
                         SiteToolInvocation(
                             executable: invocation.executable,
                             arguments: invocation.arguments,
-                            projectDirectory: invocation.projectDirectory,
+                            projectDirectory: project,
                             environment: invocation.environment,
                             timeout: invocation.timeout
                         ),

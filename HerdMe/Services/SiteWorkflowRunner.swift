@@ -143,7 +143,9 @@ struct SiteToolchain: @unchecked Sendable {
         let runtimes = RuntimeInspector(managedRoot: rootURL).nodeVersions()
         let runtime: RuntimeVersion?
         if let cycle = site.nodeVersion {
-            runtime = runtimes.first { $0.cycle == cycle && $0.isInstalled }
+            let normalized = cycle.trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "v"))
+            runtime = runtimes.first { ($0.cycle == normalized || $0.installedVersion == normalized) && $0.isInstalled }
         } else {
             runtime = runtimes.first(where: \.isActive) ?? runtimes.first(where: \.isInstalled)
         }
@@ -370,11 +372,16 @@ struct SiteWorkflowRunner: @unchecked Sendable {
             }
             try? fileManager.removeItem(at: staging)
         } catch {
+            var rollbackFailed = false
             for (source, target) in moved.reversed() where fileManager.fileExists(atPath: target.path) {
-                try? fileManager.removeItem(at: source)
-                try? fileManager.moveItem(at: target, to: source)
+                do {
+                    if fileManager.fileExists(atPath: source.path) { try fileManager.removeItem(at: source) }
+                    try fileManager.moveItem(at: target, to: source)
+                } catch {
+                    rollbackFailed = true
+                }
             }
-            try? fileManager.removeItem(at: staging)
+            if !rollbackFailed { try? fileManager.removeItem(at: staging) }
             throw error
         }
     }
@@ -455,17 +462,21 @@ struct SiteWorkflowRunner: @unchecked Sendable {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         let name = SiteProject.dnsLabel(for: site.name)
-        let target = directory.appendingPathComponent("\(name)-\(label)-\(formatter.string(from: Date())).zip")
+        let target = directory.appendingPathComponent("\(name)-\(label)-\(formatter.string(from: Date()))-\(UUID().uuidString).zip")
+        let staged = directory.appendingPathComponent(".\(UUID().uuidString).zip.tmp")
+        defer { try? fileManager.removeItem(at: staged) }
         progress("Creating backup...\n")
         let invocation = SiteToolInvocation(
             executable: URL(fileURLWithPath: "/usr/bin/ditto"),
-            arguments: ["-c", "-k", "--sequesterRsrc", "--keepParent", site.path.path, target.path],
+            arguments: ["-c", "-k", "--sequesterRsrc", "--keepParent", site.path.path, staged.path],
             projectDirectory: site.path.deletingLastPathComponent(),
             environment: ProcessInfo.processInfo.environment,
             timeout: 60 * 60
         )
         let result = try await SiteCommandRunner.run(invocation, cancellation: cancellation)
         guard result.status == 0 else { throw SiteWorkflowError.commandFailed("backup", result.status, result.output) }
+        guard !cancellation.isCancelled else { throw CancellationError() }
+        try fileManager.moveItem(at: staged, to: target)
         progress("[OK] Backup: \(target.path)\n")
         return target
     }
