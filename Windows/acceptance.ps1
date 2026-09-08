@@ -404,6 +404,29 @@ function Assert-WinUiNavigation(
         Write-Host "Verified WinUI page: $($page.Page)"
         Save-WindowEvidence $window $page.Page
     }
+
+    if ($CaptureScreenshots) {
+        $originalBounds = $window.Current.BoundingRectangle
+        $transform = [System.Windows.Automation.TransformPattern]$window.GetCurrentPattern(
+            [System.Windows.Automation.TransformPattern]::Pattern
+        )
+        try {
+            $sites = Wait-AutomationElementById $navigation "NavSites"
+            Select-AutomationElement $sites "NavSites"
+            $null = Wait-AutomationElementById $window "SitesPageRoot"
+            $transform.Resize(800, 600)
+            $search = Wait-AutomationElementById $window "SearchBox"
+            Start-Sleep -Milliseconds 500
+            $windowBounds = $window.Current.BoundingRectangle
+            $searchBounds = $search.Current.BoundingRectangle
+            if ($search.Current.IsOffscreen -or $searchBounds.Width -le 0 -or
+                $searchBounds.Left -lt $windowBounds.Left -or $searchBounds.Right -gt $windowBounds.Right) {
+                throw "The sites search control is clipped in a compact window."
+            }
+            Save-WindowEvidence $window "SitesPageRoot-compact"
+        }
+        finally { $transform.Resize($originalBounds.Width, $originalBounds.Height) }
+    }
 }
 
 function Assert-ResponsePrefix(

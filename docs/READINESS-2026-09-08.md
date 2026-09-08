@@ -1,9 +1,11 @@
 # Release Readiness, 2026-09-08
 
-The current working tree contains a Windows release candidate based on 0.1.18.
-It is not yet approved for public distribution. Version metadata has not been
-advanced, and no tag or public release was created by this review. Improvements
-are being verified on a review branch using the hosted platform workflows.
+The review branch prepares HerdMe 0.1.19 (build 1) for Windows and macOS.
+It is not yet ready for signed public distribution. The owner confirmed that
+platform code-signing certificates are not currently available. No release tag
+or public release has been created.
+
+Branch: `codex/release-readiness-2026-09-08`.
 
 ## Implemented
 
@@ -24,6 +26,28 @@ are being verified on a review branch using the hosted platform workflows.
   PowerShell delegates on worker threads.
 - Require an empty, regular directory for ZIP extraction and check destination
   directories for links before writing files. Exercise actual Windows junctions.
+- Stage macOS database exports with owner-only permissions, drain diagnostics
+  during execution, propagate cancellation, and use unique backup filenames.
+- Prepare Roslyn's generated-output directory before WinUI's `XamlPreCompile`
+  pass. CodeQL keeps generated-source analysis enabled.
+- Apply the official Swift and C++ formatters, complete missing Arabic runtime
+  messages, and capture native Windows acceptance screenshots.
+
+## Hosted Verification
+
+The following completed runs verify the 0.1.19 source at `19cb67d`:
+
+| Check | Result |
+| --- | --- |
+| [Windows x64](https://github.com/Hamad3bdulla/herdme/actions/runs/34237253798) | Passed: Debug and Release, MSVC, contracts, portable ZIP, Setup install/uninstall, native navigation, SMTP and dump capture |
+| [macOS deep diagnostics](https://github.com/Hamad3bdulla/herdme/actions/runs/34237253715) | Passed: static analysis, native helper checks, ASan/UBSan, TSan, C++ sanitizers; each Swift sanitizer run executed 250 tests with 6 integration tests skipped |
+| [Portable core and Swift parser fuzzing](https://github.com/Hamad3bdulla/herdme/actions/runs/34237253813) | Passed with ASan/UBSan and supported leak detection |
+| [CodeQL](https://github.com/Hamad3bdulla/herdme/actions/runs/34237253717) | C# and C++ passed; Swift verification pending |
+
+The macOS package job passed source formatting and update-feed, asset-set, tag,
+and workflow-security contracts. Its Arabic localization gate exposed six
+missing messages, which have been added for the next run. Final macOS unit/UI
+tests, packaging, and English/Arabic compact Windows captures are still pending.
 
 ## Verified Locally
 
@@ -63,26 +87,33 @@ MSVC acceptance run in CI.
 These are unsigned local testing artifacts. The candidate filename deliberately
 differs from the public-release filename for version 0.1.18.
 
+The verified hosted Windows 0.1.19 artifacts are downloaded under
+`build/readiness-ci-windows-0.1.19/`. Their SHA-256 sidecars match:
+
+- Portable ZIP: `ccbeca506ac7d578fdf7773959401dd8870cca3d1701ec4b8194903f360ad5d7`
+- Setup: `976d7a66966ac7e8d53072d6797b73bfacbfbf13327c34c2f5b7016022e17f7e`
+
+These packages are unsigned and are intended for testing, not public release.
+
 ## Remaining Gates
 
 - Visually inspect the modified WinUI build, including Arabic/RTL, narrow
   windows, and display scaling. The existing installed application was inspected;
   its active development session has been left running pending permission to
   restart it with the new build.
-- Run installer acceptance on a clean Windows profile. The current profile has
-  an installed and running HerdMe. Automatic approval review rejected installing
-  Inno Setup 6.7.1 with `blocked by policy`; a new Setup artifact was not produced.
-- Complete the official Windows build/acceptance workflow with MSVC. GitHub
-  authentication is available and hosted verification is in progress. The local C++
-  compiler is LLVM-MinGW, and Visual Studio is not installed on this machine.
-- Execute the Linux release-asset negative tests. Git Bash normally copies files
-  for the symlink fixture; with `MSYS=winsymlinks:nativestrict`, this machine
-  explicitly refuses symlink creation with `Operation not permitted`. The
-  symlink rejection case cannot provide valid evidence here.
-- Build and test macOS on macOS/Xcode, including signed helper acceptance.
-- Select the next release version, produce signed Windows artifacts and signed,
-  notarized macOS artifacts, then verify the signed update feed and exact asset
-  set from the final release commit before publication.
+- Finish the final hosted macOS package and UI gates and Swift CodeQL analysis.
+- Exercise the opt-in managed PHP-FPM, Laravel, Xdebug, and database integration
+  cases in their configured runtime environments; the six skips are explicit.
+- Obtain the Windows Authenticode and Apple Developer ID/notarization
+  credentials documented in `docs/RELEASING.md`. Only the update-feed signing
+  secret is currently configured in GitHub Actions.
+- Produce and validate a GitHub-verified signed annotated release tag, signed
+  Windows artifacts, notarized macOS artifacts, the signed update feed, and the
+  exact final release asset set before publication.
+
+Local Inno Setup installation was rejected by automatic approval review. The
+existing hosted Windows workflow supplied the clean-profile installer evidence;
+the local installed HerdMe session was preserved.
 
 No public-release gate should be marked complete solely because the local
 portable build and contract tests passed.

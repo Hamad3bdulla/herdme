@@ -14,9 +14,13 @@ concurrency:
 
 jobs:
   acceptance:
-    name: Build, test, package, and run
+    name: Build, test, package, and run (${{ matrix.ui-language }})
     runs-on: windows-2022
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        ui-language: [en-US, ar-BH]
 
     steps:
       - name: Check out source
@@ -34,6 +38,15 @@ jobs:
         run: |
           dotnet --info
           cmake --version
+
+      - name: Set the acceptance profile language
+        shell: pwsh
+        env:
+          UI_TEST_LANGUAGE: ${{ matrix.ui-language }}
+        run: |
+          Set-WinUserLanguageList -LanguageList $env:UI_TEST_LANGUAGE -Force
+          Set-WinUILanguageOverride -Language $env:UI_TEST_LANGUAGE
+          Set-Culture -CultureInfo $env:UI_TEST_LANGUAGE
 
       - name: Verify C# formatting
         shell: pwsh
@@ -57,6 +70,9 @@ jobs:
           $ErrorActionPreference = "Stop"
           $transcript = Join-Path $env:GITHUB_WORKSPACE "build\windows-acceptance.log"
           New-Item -ItemType Directory -Force -Path (Split-Path -Parent $transcript) | Out-Null
+          $fixture = Join-Path $env:USERPROFILE "HerdMe\readiness-site\public"
+          New-Item -ItemType Directory -Force -Path $fixture | Out-Null
+          Set-Content -LiteralPath (Join-Path $fixture "index.html") -Value '<!doctype html><title>Readiness site</title><h1>Readiness site</h1>'
           Start-Transcript -Path $transcript -Force -UseMinimalHeader | Out-Null
           try {
               & ./Windows/acceptance.ps1 -Configuration Release -SkipLiveReleaseChecks -CaptureScreenshots
@@ -75,7 +91,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: HerdMe-${{ github.run_number }}-win-x64-UI
+          name: HerdMe-${{ github.run_number }}-win-x64-${{ matrix.ui-language }}-UI
           path: build/windows-ui-evidence
           if-no-files-found: warn
           retention-days: 14
@@ -105,7 +121,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: HerdMe-${{ github.run_number }}-win-x64-failure-diagnostics
+          name: HerdMe-${{ github.run_number }}-win-x64-${{ matrix.ui-language }}-failure-diagnostics
           path: |
             build/windows-acceptance.log
             build/windows-diagnostics
@@ -117,6 +133,7 @@ jobs:
           retention-days: 14
 
       - name: Upload Windows artifacts
+        if: matrix.ui-language == 'en-US'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: HerdMe-${{ github.run_number }}-win-x64

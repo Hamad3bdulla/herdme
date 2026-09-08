@@ -1,6 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Install the frontend dependencies before starting development mode." : { "localizations" : { "ar" : { "stringUnit" : { "state" : "translated", "value" : "ثبّت اعتماديات الواجهة الأمامية قبل بدء وضع التطوير." } } } },
+    "Laravel Vite did not publish its hot-file endpoint." : { "localizations" : { "ar" : { "stringUnit" : { "state" : "translated", "value" : "لم ينشر Laravel Vite عنوان نقطة الاتصال في ملف hot." } } } },
+    "The detected camera backend did not open port 8000." : { "localizations" : { "ar" : { "stringUnit" : { "state" : "translated", "value" : "لم تفتح خدمة الكاميرا الخلفية المكتشفة المنفذ 8000." } } } },
+    "The development server did not open port %lld." : { "localizations" : { "ar" : { "stringUnit" : { "state" : "translated", "value" : "لم يفتح خادم التطوير المنفذ %lld." } } } },
+    "The requested Node.js version %@ is invalid." : { "localizations" : { "ar" : { "stringUnit" : { "state" : "translated", "value" : "إصدار Node.js المطلوب %@ غير صالح." } } } },
+    "This site has no runnable npm dev script." : { "localizations" : { "ar" : { "stringUnit" : { "state" : "translated", "value" : "لا يحتوي هذا الموقع على سكربت npm dev قابل للتشغيل." } } } },
     "Cancelled" : { "localizations" : { "ar" : { "stringUnit" : { "state" : "translated", "value" : "أُلغي" } } } },
     "Cancelling" : { "localizations" : { "ar" : { "stringUnit" : { "state" : "translated", "value" : "جارٍ الإلغاء" } } } },
     "Completed" : { "localizations" : { "ar" : { "stringUnit" : { "state" : "translated", "value" : "اكتمل" } } } },
