@@ -71,7 +71,8 @@ public sealed class ServicePackageInstaller
 
     public async Task<ServicePackageRelease> InstallAsync(
         string definitionId,
-        CancellationToken cancellationToken = default
+        CancellationToken cancellationToken = default,
+        IProgress<ServiceInstallationProgress>? progress = null
     )
     {
         EnsureInstallable(definitionId);
@@ -80,6 +81,7 @@ public sealed class ServicePackageInstaller
             throw new PlatformNotSupportedException("Managed Windows services can only be installed on Windows.");
         }
 
+        progress?.Report(new(definitionId, ServiceInstallationStage.Resolving));
         var release = await ResolveReleaseAsync(definitionId, cancellationToken);
         Directory.CreateDirectory(RuntimeRoot);
         var cache = Path.Combine(SupportRoot, "Cache", "services");
@@ -92,7 +94,8 @@ public sealed class ServicePackageInstaller
 
         try
         {
-            await DownloadAndVerifyAsync(release, download, cancellationToken);
+            await DownloadAndVerifyAsync(release, download, cancellationToken, progress: progress);
+            progress?.Report(new(definitionId, ServiceInstallationStage.Extracting));
             Directory.CreateDirectory(stagingContainer);
             if (release.IsZipArchive)
             {
@@ -126,27 +129,45 @@ public sealed class ServicePackageInstaller
                 cancellationToken
             );
 
-            if (Directory.Exists(destination)) Directory.Move(destination, backup);
-            try
-            {
-                Directory.Move(stagingRuntime, destination);
-                if (Directory.Exists(backup)) Directory.Delete(backup, true);
-            }
-            catch
-            {
-                if (!Directory.Exists(destination) && Directory.Exists(backup))
-                {
-                    Directory.Move(backup, destination);
-                }
-                throw;
-            }
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(new(definitionId, ServiceInstallationStage.Installing));
+            PromoteRuntime(stagingRuntime, destination, backup);
             return release;
         }
         finally
         {
-            if (File.Exists(download)) File.Delete(download);
-            if (Directory.Exists(stagingContainer)) Directory.Delete(stagingContainer, true);
-            if (Directory.Exists(backup)) Directory.Delete(backup, true);
+            try { File.Delete(download); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                System.Diagnostics.Debug.WriteLine(error.Message);
+            }
+            TryRemoveDirectory(stagingContainer);
+            // A failed rollback must retain the previous runtime for recovery.
+        }
+    }
+
+    internal static void PromoteRuntime(string stagingRuntime, string destination, string backup)
+    {
+        if (Directory.Exists(destination)) Directory.Move(destination, backup);
+        try
+        {
+            Directory.Move(stagingRuntime, destination);
+        }
+        catch
+        {
+            if (!Directory.Exists(destination) && Directory.Exists(backup))
+                Directory.Move(backup, destination);
+            throw;
+        }
+        TryRemoveDirectory(backup);
+    }
+
+    private static void TryRemoveDirectory(string path)
+    {
+        try { if (Directory.Exists(path)) Directory.Delete(path, true); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            System.Diagnostics.Debug.WriteLine(error.Message);
         }
     }
 
@@ -542,7 +563,8 @@ public sealed class ServicePackageInstaller
         CancellationToken cancellationToken,
         HttpClient? downloadClient = null,
         int maximumAttempts = 4,
-        Func<int, TimeSpan>? delayFactory = null
+        Func<int, TimeSpan>? delayFactory = null,
+        IProgress<ServiceInstallationProgress>? progress = null
     )
     {
         if (maximumAttempts < 1) throw new ArgumentOutOfRangeException(nameof(maximumAttempts));
@@ -558,6 +580,7 @@ public sealed class ServicePackageInstaller
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (File.Exists(destination)) File.Delete(destination);
+            var verified = false;
             try
             {
                 using var attemptCancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -565,25 +588,42 @@ public sealed class ServicePackageInstaller
                 );
                 attemptCancellation.CancelAfter(DownloadAttemptTimeout);
                 var attemptToken = attemptCancellation.Token;
+                progress?.Report(new(release.DefinitionId, ServiceInstallationStage.Downloading, Attempt: attempt));
                 using var response = await downloadClient.GetAsync(
                     release.DownloadUri,
                     HttpCompletionOption.ResponseHeadersRead,
                     attemptToken
                 );
                 response.EnsureSuccessStatusCode();
+                // Bound inactivity, not the total transfer time, for large packages on slow links.
+                attemptCancellation.CancelAfter(Timeout.InfiniteTimeSpan);
+                var total = response.Content.Headers.ContentLength;
+                var elapsed = System.Diagnostics.Stopwatch.StartNew();
+                long received = 0;
+                var reportedAt = TimeSpan.Zero;
                 await using var source = await response.Content.ReadAsStreamAsync(attemptToken);
                 await using var output = File.Create(destination);
                 using var hash = IncrementalHash.CreateHash(algorithm);
                 var buffer = new byte[128 * 1_024];
                 while (true)
                 {
-                    var count = await source.ReadAsync(buffer, attemptToken)
-                        .AsTask()
-                        .WaitAsync(DownloadIdleTimeout, attemptToken);
+                    attemptCancellation.CancelAfter(DownloadIdleTimeout);
+                    var count = await source.ReadAsync(buffer, attemptToken);
                     if (count == 0) break;
                     await output.WriteAsync(buffer.AsMemory(0, count), attemptToken);
                     hash.AppendData(buffer, 0, count);
+                    received += count;
+                    if (elapsed.Elapsed - reportedAt >= TimeSpan.FromMilliseconds(200))
+                    {
+                        reportedAt = elapsed.Elapsed;
+                        progress?.Report(new(release.DefinitionId, ServiceInstallationStage.Downloading,
+                            received, total, attempt, received / Math.Max(elapsed.Elapsed.TotalSeconds, 0.001)));
+                    }
                 }
+                progress?.Report(new(release.DefinitionId, ServiceInstallationStage.Verifying, received, total, attempt));
+                cancellationToken.ThrowIfCancellationRequested();
+                if (total is { } expectedLength && received != expectedLength)
+                    throw new IOException("The package response ended before its advertised length.");
                 var actual = Convert.ToHexString(hash.GetHashAndReset());
                 if (!actual.Equals(release.Checksum, StringComparison.OrdinalIgnoreCase))
                 {
@@ -592,6 +632,7 @@ public sealed class ServicePackageInstaller
                         + $"{release.ChecksumAlgorithm} verification."
                     );
                 }
+                verified = true;
                 return;
             }
             catch (Exception error) when (
@@ -601,9 +642,14 @@ public sealed class ServicePackageInstaller
             {
                 lastFailure = error;
                 if (attempt == maximumAttempts) break;
+                progress?.Report(new(release.DefinitionId, ServiceInstallationStage.Retrying, Attempt: attempt + 1));
                 var delay = delayFactory?.Invoke(attempt)
                     ?? TimeSpan.FromMilliseconds(Math.Min(8_000, 500 * Math.Pow(2, attempt - 1)));
                 if (delay > TimeSpan.Zero) await Task.Delay(delay, cancellationToken);
+            }
+            finally
+            {
+                if (!verified) File.Delete(destination);
             }
         }
         if (File.Exists(destination)) File.Delete(destination);

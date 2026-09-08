@@ -141,6 +141,18 @@
   <data name="CommonDelete" xml:space="preserve"><value>حذف</value></data>
   <data name="CommonCancel" xml:space="preserve"><value>إلغاء</value></data>
   <data name="ServicesCancelled" xml:space="preserve"><value>أُلغي</value></data>
+  <data name="ServicesCancelButton.Text" xml:space="preserve"><value>إلغاء</value></data>
+  <data name="ServicesResolving" xml:space="preserve"><value>جارٍ تجهيز التحميل</value></data>
+  <data name="ServicesDownloading" xml:space="preserve"><value>جارٍ التحميل</value></data>
+  <data name="ServicesRetrying" xml:space="preserve"><value>إعادة محاولة التحميل</value></data>
+  <data name="ServicesVerifying" xml:space="preserve"><value>جارٍ التحقق من التحميل</value></data>
+  <data name="ServicesExtracting" xml:space="preserve"><value>جارٍ فك الضغط</value></data>
+  <data name="ServicesCompleted" xml:space="preserve"><value>تم التثبيت</value></data>
+  <data name="ServicesFailed" xml:space="preserve"><value>فشل التثبيت</value></data>
+  <data name="ServicesRetry" xml:space="preserve"><value>إعادة محاولة التثبيت</value></data>
+  <data name="ServicesTransfer" xml:space="preserve"><value>{0:0.0} م.ب / {1:0.0} م.ب، {2:0.0} م.ب/ث</value></data>
+  <data name="ServicesTransferUnknown" xml:space="preserve"><value>{0:0.0} م.ب، {1:0.0} م.ب/ث</value></data>
+  <data name="ServicesAttempt" xml:space="preserve"><value>المحاولة {0}</value></data>
   <data name="ServicesCancelling" xml:space="preserve"><value>جارٍ الإلغاء...</value></data>
   <data name="PhpCheckingStatus" xml:space="preserve"><value>جارٍ التحقق</value></data>
   <data name="PhpNoUsableExecutable" xml:space="preserve"><value>لم يُعثر على ملف PHP تنفيذي صالح للاستخدام.</value></data>
@@ -166,7 +178,6 @@
   <data name="NodeActive" xml:space="preserve"><value>نشط</value></data>
   <data name="NodeInstalled" xml:space="preserve"><value>مثبّت</value></data>
   <data name="ServicesPageTitle.Text" xml:space="preserve"><value>الخدمات</value></data>
-  <data name="ServicesPageDescription.Text" xml:space="preserve"><value>بيئات تشغيل مفتوحة المصدر لـ Windows مع التحقق من بصماتها</value></data>
   <data name="ServicesRefreshTooltip.Text" xml:space="preserve"><value>تحديث حالة الخدمات</value></data>
   <data name="ServicesTypeField.Header" xml:space="preserve"><value>الخدمة</value></data>
   <data name="ServicesNameField.Header" xml:space="preserve"><value>الاسم</value></data>

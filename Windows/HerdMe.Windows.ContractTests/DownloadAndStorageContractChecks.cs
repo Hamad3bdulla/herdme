@@ -115,6 +115,7 @@ internal static partial class ContractChecks
         );
         using (var packageClient = new HttpClient(interruptedPackageHandler))
         {
+            var progressEvents = new List<ServiceInstallationProgress>();
             var packagePath = Path.Combine(supportRoot, "retried-service-package.zip");
             Directory.CreateDirectory(Path.GetDirectoryName(packagePath)!);
             await ServicePackageInstaller.DownloadAndVerifyAsync(
@@ -131,13 +132,40 @@ internal static partial class ContractChecks
                 CancellationToken.None,
                 packageClient,
                 maximumAttempts: 2,
-                delayFactory: _ => TimeSpan.Zero
+                delayFactory: _ => TimeSpan.Zero,
+                progress: new CallbackProgress<ServiceInstallationProgress>(progressEvents.Add)
             );
             Check(
                 File.ReadAllBytes(packagePath).SequenceEqual(packageBytes)
                     && interruptedPackageHandler.CallCount == 2,
                 "service downloads discard incomplete files and retry checksum verification"
             );
+            Check(progressEvents.Select(value => value.Stage).SequenceEqual(new[]
+                {
+                    ServiceInstallationStage.Downloading, ServiceInstallationStage.Verifying,
+                    ServiceInstallationStage.Retrying, ServiceInstallationStage.Downloading,
+                    ServiceInstallationStage.Verifying
+                }) && progressEvents[^1].BytesReceived == packageBytes.Length
+                && progressEvents[^1].Percentage == 100 && progressEvents[^1].Attempt == 2,
+                "service download progress includes retry, verification, attempt, and exact byte totals");
+            using var cancellation = new CancellationTokenSource();
+            using var cancelledClient = new HttpClient(new SequenceHttpMessageHandler(
+                _ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(packageBytes) }));
+            var cancelledPath = Path.Combine(supportRoot, "cancelled-service-package.zip");
+            try
+            {
+                await ServicePackageInstaller.DownloadAndVerifyAsync(
+                    new ServicePackageRelease("mysql", "1", "mysql.zip", ServicePackageChecksumAlgorithm.Sha256,
+                        packageChecksum, new Uri("https://downloads.example.test/mysql.zip"), true),
+                    cancelledPath, cancellation.Token, cancelledClient,
+                    progress: new CallbackProgress<ServiceInstallationProgress>(value =>
+                    {
+                        if (value.Stage == ServiceInstallationStage.Verifying) cancellation.Cancel();
+                    }));
+                Check(false, "cancelled service download fails promptly");
+            }
+            catch (OperationCanceledException) { }
+            Check(!File.Exists(cancelledPath), "cancelled service downloads remove incomplete output");
         }
         var networkFailureHandler = new SequenceHttpMessageHandler(
             _ => throw new HttpRequestException("temporary connection failure"),

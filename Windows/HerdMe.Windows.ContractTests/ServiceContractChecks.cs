@@ -761,6 +761,56 @@ internal static partial class ContractChecks
             !operationManager.IsInstalling("mysql") && operationChanges >= 2,
             "service installation publishes its completed state to a returning page"
         );
+        Check(operationManager.InstallationStates.Single().Stage == ServiceInstallationStage.Completed,
+            "service installation retains its completed progress for returning pages");
+
+        var attempts = 0;
+        var retryRelease = await firstInstall;
+        await using var cancellingManager = new WindowsServiceManager(
+            Path.Combine(supportRoot, "cancel-service-install"),
+            installPackage: async (_, token) =>
+            {
+                var attempt = Interlocked.Increment(ref attempts);
+                if (attempt == 1) await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                if (attempt == 2) throw new IOException("fixture download failure");
+                return retryRelease;
+            });
+        using var waiterCancellation = new CancellationTokenSource();
+        var sharedInstall = cancellingManager.InstallAsync("mysql");
+        var cancelledWaiter = cancellingManager.InstallAsync("MYSQL", waiterCancellation.Token);
+        waiterCancellation.Cancel();
+        try { await cancelledWaiter; Check(false, "a cancelled page wait completes promptly"); }
+        catch (OperationCanceledException) { }
+        Check(cancellingManager.IsInstalling("mysql") && !sharedInstall.IsCompleted && attempts == 1,
+            "leaving a page cancels only its wait and preserves the shared installation");
+        cancellingManager.CancelInstallation("MYSQL");
+        try { await sharedInstall; Check(false, "explicit download cancellation reaches the installer"); }
+        catch (OperationCanceledException) { }
+        Check(!cancellingManager.IsInstalling("mysql")
+            && cancellingManager.InstallationStates.Single().Stage == ServiceInstallationStage.Cancelled,
+            "explicit cancellation clears the active installation and retains its cancelled state");
+        try { await cancellingManager.InstallAsync("mysql"); Check(false, "fixture retry fails"); }
+        catch (IOException) { }
+        Check(cancellingManager.InstallationStates.Single() is
+        { Stage: ServiceInstallationStage.Failed, Error: "fixture download failure" },
+            "failed installation exposes its error for retry");
+        Check(await cancellingManager.InstallAsync("mysql") == retryRelease && attempts == 3
+            && cancellingManager.InstallationStates.Single().Stage == ServiceInstallationStage.Completed,
+            "cancelled and failed installations can be retried without a stale shared task");
+
+        var promotionRoot = Path.Combine(supportRoot, "service-promotion");
+        var previousRuntime = Path.Combine(promotionRoot, "mysql");
+        var backupRuntime = Path.Combine(promotionRoot, "backup");
+        Directory.CreateDirectory(previousRuntime);
+        await File.WriteAllTextAsync(Path.Combine(previousRuntime, "server.exe"), "previous runtime");
+        try
+        {
+            ServicePackageInstaller.PromoteRuntime(Path.Combine(promotionRoot, "missing-stage"), previousRuntime, backupRuntime);
+            Check(false, "missing staged runtime fails promotion");
+        }
+        catch (IOException) { }
+        Check(await File.ReadAllTextAsync(Path.Combine(previousRuntime, "server.exe")) == "previous runtime"
+            && !Directory.Exists(backupRuntime), "failed service promotion restores the previous runtime");
         var editorProject = Path.Combine(supportRoot, "environment-editor-project");
         Directory.CreateDirectory(editorProject);
         await File.WriteAllTextAsync(

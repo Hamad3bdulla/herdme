@@ -141,6 +141,18 @@
   <data name="CommonDelete" xml:space="preserve"><value>Delete</value></data>
   <data name="CommonCancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="ServicesCancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="ServicesCancelButton.Text" xml:space="preserve"><value>Cancel</value></data>
+  <data name="ServicesResolving" xml:space="preserve"><value>Preparing download</value></data>
+  <data name="ServicesDownloading" xml:space="preserve"><value>Downloading</value></data>
+  <data name="ServicesRetrying" xml:space="preserve"><value>Retrying download</value></data>
+  <data name="ServicesVerifying" xml:space="preserve"><value>Verifying download</value></data>
+  <data name="ServicesExtracting" xml:space="preserve"><value>Extracting</value></data>
+  <data name="ServicesCompleted" xml:space="preserve"><value>Installed</value></data>
+  <data name="ServicesFailed" xml:space="preserve"><value>Installation failed</value></data>
+  <data name="ServicesRetry" xml:space="preserve"><value>Retry installation</value></data>
+  <data name="ServicesTransfer" xml:space="preserve"><value>{0:0.0} MB / {1:0.0} MB, {2:0.0} MB/s</value></data>
+  <data name="ServicesTransferUnknown" xml:space="preserve"><value>{0:0.0} MB, {1:0.0} MB/s</value></data>
+  <data name="ServicesAttempt" xml:space="preserve"><value>Attempt {0}</value></data>
   <data name="ServicesCancelling" xml:space="preserve"><value>Cancelling...</value></data>
   <data name="PhpCheckingStatus" xml:space="preserve"><value>Checking</value></data>
   <data name="PhpNoUsableExecutable" xml:space="preserve"><value>No usable PHP executable was found.</value></data>
@@ -166,7 +178,6 @@
   <data name="NodeActive" xml:space="preserve"><value>Active</value></data>
   <data name="NodeInstalled" xml:space="preserve"><value>Installed</value></data>
   <data name="ServicesPageTitle.Text" xml:space="preserve"><value>Services</value></data>
-  <data name="ServicesPageDescription.Text" xml:space="preserve"><value>Checksum-verified open-source Windows service runtimes</value></data>
   <data name="ServicesRefreshTooltip.Text" xml:space="preserve"><value>Refresh service status</value></data>
   <data name="ServicesTypeField.Header" xml:space="preserve"><value>Service</value></data>
   <data name="ServicesNameField.Header" xml:space="preserve"><value>Name</value></data>

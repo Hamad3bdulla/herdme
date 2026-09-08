@@ -11,6 +11,11 @@ using System.Xml.Linq;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
 
+sealed class CallbackProgress<T>(Action<T> callback) : IProgress<T>
+{
+    public void Report(T value) => callback(value);
+}
+
 sealed record HttpTestResponse(
     string StatusLine,
     IReadOnlyDictionary<string, string> Headers,
@@ -198,4 +203,3 @@ sealed class MemoryCredentialBackend : IWindowsCredentialBackend
         Secrets.Remove(target);
     }
 }
-

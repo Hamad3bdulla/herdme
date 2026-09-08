@@ -130,3 +130,34 @@ public sealed record ServiceLaunchSpec(
     IReadOnlyList<string> Arguments,
     IReadOnlyDictionary<string, string> Environment
 );
+
+public enum ServiceInstallationStage
+{
+    Resolving,
+    Downloading,
+    Retrying,
+    Verifying,
+    Extracting,
+    Installing,
+    Completed,
+    Cancelled,
+    Failed
+}
+
+public sealed record ServiceInstallationProgress(
+    string DefinitionId,
+    ServiceInstallationStage Stage,
+    long BytesReceived = 0,
+    long? TotalBytes = null,
+    int Attempt = 1,
+    double BytesPerSecond = 0,
+    string? Error = null
+)
+{
+    public bool IsActive => Stage is not (ServiceInstallationStage.Completed
+        or ServiceInstallationStage.Cancelled or ServiceInstallationStage.Failed);
+
+    public double? Percentage => TotalBytes is > 0
+        ? Math.Clamp(100.0 * BytesReceived / TotalBytes.Value, 0, 100)
+        : null;
+}

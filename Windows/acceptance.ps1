@@ -403,6 +403,9 @@ function Assert-WinUiNavigation(
         }
         Write-Host "Verified WinUI page: $($page.Page)"
         Save-WindowEvidence $window $page.Page
+        if ($page.Page -eq "ServicesPageRoot") {
+            Assert-ServiceDownloadControls $window
+        }
     }
 
     if ($CaptureScreenshots) {
@@ -424,9 +427,48 @@ function Assert-WinUiNavigation(
                 throw "The sites search control is clipped in a compact window."
             }
             Save-WindowEvidence $window "SitesPageRoot-compact"
+            $services = Wait-AutomationElementById $navigation "NavServices"
+            Select-AutomationElement $services "NavServices"
+            $null = Wait-AutomationElementById $window "ServicesPageRoot"
+            Start-Sleep -Milliseconds 500
+            foreach ($id in @("ServiceTypeBox", "ServiceNameBox", "ServicePortBox", "AddServiceButton", "RetryServiceDownload")) {
+                $control = Wait-AutomationElementById $window $id
+                $bounds = $control.Current.BoundingRectangle
+                if ($control.Current.IsOffscreen -or $bounds.Width -le 0 -or
+                    $bounds.Left -lt $windowBounds.Left -or $bounds.Right -gt $windowBounds.Right -or
+                    $bounds.Bottom -gt $windowBounds.Bottom) {
+                    throw "The service control '$id' is clipped in a compact window."
+                }
+            }
+            Save-WindowEvidence $window "ServicesPageRoot-compact"
         }
         finally { $transform.Resize($originalBounds.Width, $originalBounds.Height) }
     }
+}
+
+function Assert-ServiceDownloadControls(
+    [System.Windows.Automation.AutomationElement]$Window
+) {
+    $add = Wait-AutomationElementById $Window "AddServiceButton"
+    Select-AutomationElement $add "AddServiceButton"
+    $cancel = Wait-AutomationElementById $Window "CancelOperationButton"
+    if (-not $cancel.Current.IsEnabled) {
+        throw "The service operation disables its own cancel button."
+    }
+    Select-AutomationElement $cancel "CancelOperationButton"
+    $retry = Wait-AutomationElementById $Window "RetryServiceDownload"
+    $deadline = [DateTime]::UtcNow.AddSeconds(10)
+    while (-not $add.Current.IsEnabled -and [DateTime]::UtcNow -lt $deadline) {
+        Start-Sleep -Milliseconds 100
+    }
+    if (-not $add.Current.IsEnabled) { throw "The service form remains disabled after cancellation." }
+    Save-WindowEvidence $Window "ServicesPageRoot-cancelled"
+    Select-AutomationElement $retry "RetryServiceDownload"
+    $cancelDownload = Wait-AutomationElementById $Window "CancelServiceDownload"
+    if (-not $cancelDownload.Current.IsEnabled) { throw "The download cancel control is disabled." }
+    Select-AutomationElement $cancelDownload "CancelServiceDownload"
+    $null = Wait-AutomationElementById $Window "RetryServiceDownload"
+    Write-Host "Verified service installation cancellation and retry controls."
 }
 
 function Assert-ResponsePrefix(

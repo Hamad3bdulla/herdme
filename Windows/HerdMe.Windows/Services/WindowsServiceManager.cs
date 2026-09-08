@@ -20,9 +20,11 @@ public sealed class WindowsServiceManager : IAsyncDisposable
     private readonly Dictionary<string, Task<ServicePackageRelease>> installations = new(
         StringComparer.OrdinalIgnoreCase
     );
+    private readonly Dictionary<string, CancellationTokenSource> installationCancellations = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ServiceInstallationProgress> installationStates = new(StringComparer.OrdinalIgnoreCase);
     private readonly ServicePackageInstaller installer;
     private readonly WindowsServiceCredentialStore credentialStore;
-    private readonly Func<string, CancellationToken, Task<ServicePackageRelease>> installPackage;
+    private readonly Func<string, CancellationToken, Task<ServicePackageRelease>>? installPackage;
     private IReadOnlyList<ManagedServiceInstance> lastKnownInstances = [];
     private bool hasLoadedInstances;
 
@@ -38,10 +40,12 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         );
         installer = new ServicePackageInstaller(SupportRoot);
         this.credentialStore = credentialStore ?? new WindowsServiceCredentialStore();
-        this.installPackage = installPackage ?? installer.InstallAsync;
+        this.installPackage = installPackage;
     }
 
     public event EventHandler? Changed;
+
+    public event EventHandler<ServiceInstallationProgress>? InstallationProgress;
 
     public string SupportRoot { get; }
 
@@ -159,6 +163,30 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         lock (installationSync) return installations.ContainsKey(definitionId);
     }
 
+    public IReadOnlyList<ServiceInstallationProgress> InstallationStates
+    {
+        get { lock (installationSync) return installationStates.Values.ToArray(); }
+    }
+
+    public void CancelInstallation(string definitionId)
+    {
+        lock (installationSync)
+        {
+            if (installationCancellations.TryGetValue(definitionId, out var cancellation)) cancellation.Cancel();
+        }
+    }
+
+    private void ReportInstallation(ServiceInstallationProgress progress)
+    {
+        lock (installationSync) installationStates[progress.DefinitionId] = progress;
+        InstallationProgress?.Invoke(this, progress);
+    }
+
+    private sealed class InstallationReporter(WindowsServiceManager manager) : IProgress<ServiceInstallationProgress>
+    {
+        public void Report(ServiceInstallationProgress value) => manager.ReportInstallation(value);
+    }
+
     public Task<ServicePackageRelease> InstallAsync(
         string definitionId,
         CancellationToken cancellationToken = default
@@ -181,6 +209,8 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                 );
                 operation = completion.Task;
                 installations[normalizedDefinitionId] = operation;
+                installationCancellations[normalizedDefinitionId] = new CancellationTokenSource();
+                installationStates[normalizedDefinitionId] = new(normalizedDefinitionId, ServiceInstallationStage.Resolving);
             }
         }
 
@@ -199,13 +229,24 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         TaskCompletionSource<ServicePackageRelease> completion
     )
     {
+        CancellationTokenSource cancellation;
+        lock (installationSync) cancellation = installationCancellations[definitionId];
+        ServicePackageRelease? release = null;
+        Exception? failure = null;
         try
         {
-            completion.TrySetResult(await installPackage(definitionId, CancellationToken.None));
+            release = installPackage is null
+                ? await installer.InstallAsync(definitionId, cancellation.Token, new InstallationReporter(this))
+                : await installPackage(definitionId, cancellation.Token);
+            ReportInstallation(new(definitionId, ServiceInstallationStage.Completed));
         }
         catch (Exception error)
         {
-            completion.TrySetException(error);
+            failure = error;
+            ReportInstallation(new(definitionId,
+                error is OperationCanceledException && cancellation.IsCancellationRequested
+                    ? ServiceInstallationStage.Cancelled : ServiceInstallationStage.Failed,
+                Error: error is OperationCanceledException ? null : error.Message));
         }
         finally
         {
@@ -215,10 +256,15 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                     && ReferenceEquals(current, completion.Task))
                 {
                     installations.Remove(definitionId);
+                    installationCancellations.Remove(definitionId);
                 }
             }
+            cancellation.Dispose();
             RaiseChanged();
         }
+        if (failure is OperationCanceledException) completion.TrySetCanceled();
+        else if (failure is not null) completion.TrySetException(failure);
+        else completion.TrySetResult(release!);
     }
 
     public Task<ServicePackageRelease> ResolveReleaseAsync(

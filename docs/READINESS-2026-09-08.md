@@ -7,6 +7,22 @@ or public release has been created.
 
 Branch: `codex/release-readiness-2026-09-08`.
 
+## Windows Service Download Follow-up
+
+The current delivery scope is Windows only. The service page now retains
+download progress across navigation, reports transfer size/speed and retry
+attempts, supports explicit cancellation and retry, and adapts its form to
+compact windows. Progress updates preserve keyboard focus on download controls.
+Cancellation leaves configured service instances available for a later retry.
+
+Release WinUI compilation, Release contract execution, C# formatting (86 files),
+and PowerShell parsing (9 Windows scripts) passed locally for these changes.
+New contracts exercise shared requests, page-wait cancellation, installer
+cancellation, retry after failure, byte totals, incomplete download cleanup,
+and restoration of the previous runtime after promotion failure.
+Hosted bilingual acceptance for the current changes remains pending. It now
+exercises both cancellation controls, retry, and the compact service layout.
+
 ## Implemented
 
 - Upgrade SQLitePCLRaw from 2.1.6 to 2.1.13 and enable transitive NuGet audits.
