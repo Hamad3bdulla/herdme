@@ -5,6 +5,8 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-09-08
+
 ### Fixed
 
 - Update the Windows SQLite native bundle to 2.1.13 to address
@@ -21,11 +23,18 @@ Semantic Versioning for public releases.
 - Run the Windows socket load probe without worker-thread PowerShell runspaces.
 - Require an empty, regular extraction directory for managed ZIP packages and
   reject directory links before writing package contents.
+- Drain macOS database export diagnostics while the client runs, stop cancelled
+  exports, and promote private staging files only after a successful export.
+  Use unique backup names and preserve existing files if a destination exists.
+- Prepare generated source output before WinUI's early compilation pass so
+  CodeQL can analyze the Windows application with source generators enabled.
+- Align Swift and portable C++ source formatting with the hosted release gate.
 
 ### Changed
 
 - Give Windows site previews a responsive height, distinguish terminal and
   database actions, tighten site navigation, and wrap long runtime descriptions.
+- Capture Windows onboarding and navigation screenshots during hosted acceptance.
 
 ## [0.1.18] - 2026-09-07
 

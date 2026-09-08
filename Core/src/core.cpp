@@ -104,9 +104,8 @@ std::string framework_at(const std::filesystem::path &root) {
 
 bool looks_like_project(const std::filesystem::path &root) {
     static const std::array markers = {
-        "artisan", "wp-config.php", "package.json", "composer.json", "pyproject.toml",
-        "requirements.txt", "index.php", "index.html", "public", "src", "frontend", "backend"
-    };
+        "artisan",   "wp-config.php", "package.json", "composer.json", "pyproject.toml", "requirements.txt",
+        "index.php", "index.html",    "public",       "src",           "frontend",       "backend"};
     return std::any_of(markers.begin(), markers.end(), [&](const char *marker) {
         std::error_code error;
         return std::filesystem::exists(root / marker, error) && !error;

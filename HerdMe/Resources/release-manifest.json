@@ -1,6 +1,16 @@
 {
   "releases": [
     {
+      "version": "0.1.19",
+      "build": 1,
+      "channel": "stable",
+      "notes": "Protects database backups on Windows and macOS against failed and cancelled exports, preserves SQL values during import repair, and recovers invalid Windows settings safely. Updates the Windows SQLite native dependency, hardens package extraction, improves the Sites layout, and repairs cross-platform release validation.",
+      "downloadURLs": {
+        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.19/HerdMe-0.1.19-macOS.zip",
+        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/v0.1.19/HerdMe-0.1.19-win-x64-setup.exe"
+      }
+    },
+    {
       "version": "0.1.18",
       "build": 1,
       "channel": "stable",
