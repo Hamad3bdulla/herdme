@@ -94,7 +94,8 @@ final class SiteDevelopmentServer: @unchecked Sendable {
         if !fileManager.fileExists(atPath: log.path) { fileManager.createFile(atPath: log.path, contents: nil) }
 
         let processCancellation = SiteOperationCancellation()
-        let hotPath = selectedMode == .laravelAssets
+        let hotPath =
+            selectedMode == .laravelAssets
             ? Self.laravelHotFile(for: site)
             : nil
         if selectedMode == .laravelAssets {
@@ -151,7 +152,8 @@ final class SiteDevelopmentServer: @unchecked Sendable {
     }
 
     func stop() async {
-        let current = lock.withLock { () -> (Task<Void, Never>?, SiteOperationCancellation?, Task<Void, Never>?, SiteOperationCancellation?, URL?) in
+        let current = lock.withLock {
+            () -> (Task<Void, Never>?, SiteOperationCancellation?, Task<Void, Never>?, SiteOperationCancellation?, URL?) in
             let value = (task, cancellation, backendTask, backendCancellation, managedHotPath)
             task = nil
             cancellation = nil
@@ -195,7 +197,8 @@ final class SiteDevelopmentServer: @unchecked Sendable {
                 }
                 _ = try await RuntimeInstaller(rootURL: rootURL).installNode(cycle: major)
             }
-            try? await RuntimeInstaller(rootURL: rootURL).activateNode(cycle: normalized.split(separator: ".", maxSplits: 1).first.map(String.init) ?? normalized)
+            try? await RuntimeInstaller(rootURL: rootURL).activateNode(
+                cycle: normalized.split(separator: ".", maxSplits: 1).first.map(String.init) ?? normalized)
             return
         }
         guard !installed.isEmpty else {
@@ -320,7 +323,8 @@ final class SiteDevelopmentServer: @unchecked Sendable {
         let message = String(decoding: data, as: UTF8.self)
         guard !message.isEmpty else { return }
         let lock = Self.logLock
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         guard let handle = try? FileHandle(forWritingTo: logURL) else { return }
         defer { try? handle.close() }
         _ = try? handle.seekToEnd()
@@ -356,17 +360,20 @@ enum SiteDevelopmentServerError: LocalizedError, Equatable {
         switch self {
         case .noDevScript: String(localized: "This site has no runnable npm dev script.")
         case .dependenciesMissing: String(localized: "Install the frontend dependencies before starting development mode.")
-        case .invalidNodeVersion(let version): String.localizedStringWithFormat(String(localized: "The requested Node.js version %@ is invalid."), version)
-        case .startTimedOut(let port): String.localizedStringWithFormat(String(localized: "The development server did not open port %lld."), Int64(port))
+        case .invalidNodeVersion(let version):
+            String.localizedStringWithFormat(String(localized: "The requested Node.js version %@ is invalid."), version)
+        case .startTimedOut(let port):
+            String.localizedStringWithFormat(String(localized: "The development server did not open port %lld."), Int64(port))
         case .hotFileTimedOut: String(localized: "Laravel Vite did not publish its hot-file endpoint.")
         case .cameraBackendTimedOut: String(localized: "The detected camera backend did not open port 8000.")
         }
     }
 }
 
-private extension NSLock {
-    func withLock<T>(_ body: () -> T) -> T {
-        lock(); defer { unlock() }
+extension NSLock {
+    fileprivate func withLock<T>(_ body: () -> T) -> T {
+        lock()
+        defer { unlock() }
         return body()
     }
 }

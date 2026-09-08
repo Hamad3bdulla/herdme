@@ -57,12 +57,15 @@ final class SiteOperationCancellation: @unchecked Sendable {
     private var cancelled = false
 
     var isCancelled: Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return cancelled
     }
 
     func cancel() {
-        lock.lock(); cancelled = true; lock.unlock()
+        lock.lock()
+        cancelled = true
+        lock.unlock()
     }
 }
 
@@ -123,7 +126,8 @@ struct SiteToolchain: @unchecked Sendable {
         )
     }
 
-    func composer(site: SiteProject, defaultPHP: String, arguments: [String], timeout: TimeInterval = 45 * 60) throws -> SiteToolInvocation {
+    func composer(site: SiteProject, defaultPHP: String, arguments: [String], timeout: TimeInterval = 45 * 60) throws -> SiteToolInvocation
+    {
         let composer = rootURL.appendingPathComponent("Composer/composer.phar")
         guard fileManager.isReadableFile(atPath: composer.path) else { throw SiteWorkflowError.composerMissing }
         return SiteToolInvocation(
@@ -152,7 +156,8 @@ struct SiteToolchain: @unchecked Sendable {
             throw SiteWorkflowError.nodeMissing
         }
         var environment = baseEnvironment
-        environment["PATH"] = [bin.path, rootURL.appendingPathComponent("bin").path, "/usr/bin", "/bin", "/usr/sbin", "/sbin"].joined(separator: ":")
+        environment["PATH"] = [bin.path, rootURL.appendingPathComponent("bin").path, "/usr/bin", "/bin", "/usr/sbin", "/sbin"].joined(
+            separator: ":")
         environment["npm_config_cache"] = rootURL.appendingPathComponent("Cache/npm", isDirectory: true).path
         environment["npm_config_update_notifier"] = "false"
         return SiteToolInvocation(
@@ -214,61 +219,101 @@ struct SiteWorkflowRunner: @unchecked Sendable {
         case .update:
             let backup = try await archive(site: site, label: "before-update", cancellation: cancellation, progress: progress)
             if fileManager.fileExists(atPath: site.path.appendingPathComponent("composer.json").path) {
-                try await execute(try tools.composer(site: site, defaultPHP: defaultPHP, arguments: ["update", "--no-interaction", "--with-all-dependencies"]), name: "composer update", cancellation: cancellation, progress: progress)
+                try await execute(
+                    try tools.composer(
+                        site: site, defaultPHP: defaultPHP, arguments: ["update", "--no-interaction", "--with-all-dependencies"]),
+                    name: "composer update", cancellation: cancellation, progress: progress)
             }
             if fileManager.fileExists(atPath: site.path.appendingPathComponent("package.json").path) {
-                try await execute(try tools.npm(site: site, arguments: ["update", "--no-audit", "--no-fund"]), name: "npm update", cancellation: cancellation, progress: progress)
+                try await execute(
+                    try tools.npm(site: site, arguments: ["update", "--no-audit", "--no-fund"]), name: "npm update",
+                    cancellation: cancellation, progress: progress)
                 if hasNPMScript("build", at: site.path) {
-                    try await execute(try tools.npm(site: site, arguments: ["run", "build"]), name: "npm run build", cancellation: cancellation, progress: progress)
+                    try await execute(
+                        try tools.npm(site: site, arguments: ["run", "build"]), name: "npm run build", cancellation: cancellation,
+                        progress: progress)
                 }
             }
             if fileManager.isReadableFile(atPath: site.path.appendingPathComponent("artisan").path) {
-                try await execute(try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["migrate", "--force", "--no-interaction"]), name: "artisan migrate", cancellation: cancellation, progress: progress)
-                try await execute(try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["optimize:clear", "--no-interaction"]), name: "artisan optimize:clear", cancellation: cancellation, progress: progress)
+                try await execute(
+                    try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["migrate", "--force", "--no-interaction"]),
+                    name: "artisan migrate", cancellation: cancellation, progress: progress)
+                try await execute(
+                    try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["optimize:clear", "--no-interaction"]),
+                    name: "artisan optimize:clear", cancellation: cancellation, progress: progress)
             }
-            return SiteWorkflowResult(title: operation.title, output: "Project updated successfully.\nBackup: \(backup.path)", artifactURL: backup)
+            return SiteWorkflowResult(
+                title: operation.title, output: "Project updated successfully.\nBackup: \(backup.path)", artifactURL: backup)
 
         case .clean:
             let backup = try await archive(site: site, label: "before-clean", cancellation: cancellation, progress: progress)
             try await cleanAndRebuild(site: site, defaultPHP: defaultPHP, tools: tools, cancellation: cancellation, progress: progress)
-            return SiteWorkflowResult(title: operation.title, output: "Project dependencies were rebuilt.\nBackup: \(backup.path)", artifactURL: backup)
+            return SiteWorkflowResult(
+                title: operation.title, output: "Project dependencies were rebuilt.\nBackup: \(backup.path)", artifactURL: backup)
 
         case .reset:
             let backup = try await archive(site: site, label: "before-reset", cancellation: cancellation, progress: progress)
-            try await execute(try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["migrate:fresh", "--seed", "--force", "--no-interaction"]), name: "artisan migrate:fresh", cancellation: cancellation, progress: progress)
-            try await execute(try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["optimize:clear", "--no-interaction"]), name: "artisan optimize:clear", cancellation: cancellation, progress: progress)
-            return SiteWorkflowResult(title: operation.title, output: "The local database was reset and seeded.\nBackup: \(backup.path)", artifactURL: backup)
+            try await execute(
+                try tools.artisan(
+                    site: site, defaultPHP: defaultPHP, arguments: ["migrate:fresh", "--seed", "--force", "--no-interaction"]),
+                name: "artisan migrate:fresh", cancellation: cancellation, progress: progress)
+            try await execute(
+                try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["optimize:clear", "--no-interaction"]),
+                name: "artisan optimize:clear", cancellation: cancellation, progress: progress)
+            return SiteWorkflowResult(
+                title: operation.title, output: "The local database was reset and seeded.\nBackup: \(backup.path)", artifactURL: backup)
 
         case .export:
             let archiveURL = try await archive(site: site, label: "export", cancellation: cancellation, progress: progress)
-            return SiteWorkflowResult(title: operation.title, output: "Transferable package created at:\n\(archiveURL.path)", artifactURL: archiveURL)
+            return SiteWorkflowResult(
+                title: operation.title, output: "Transferable package created at:\n\(archiveURL.path)", artifactURL: archiveURL)
 
         case .configureMail:
             let environmentURL = try configureMail(site: site, smtpPort: smtpPort)
             progress("[OK] Updated \(environmentURL.path)\n")
-            return SiteWorkflowResult(title: operation.title, output: "Local mail capture is configured in .env.", artifactURL: environmentURL)
+            return SiteWorkflowResult(
+                title: operation.title, output: "Local mail capture is configured in .env.", artifactURL: environmentURL)
 
         case .audit:
             var report: [String] = []
             if fileManager.fileExists(atPath: site.path.appendingPathComponent("composer.json").path) {
-                report.append(try await audit(try tools.composer(site: site, defaultPHP: defaultPHP, arguments: ["validate", "--no-interaction"]), name: "composer validate", cancellation: cancellation, progress: progress))
-                report.append(try await audit(try tools.composer(site: site, defaultPHP: defaultPHP, arguments: ["audit", "--no-interaction"]), name: "composer audit", cancellation: cancellation, progress: progress))
+                report.append(
+                    try await audit(
+                        try tools.composer(site: site, defaultPHP: defaultPHP, arguments: ["validate", "--no-interaction"]),
+                        name: "composer validate", cancellation: cancellation, progress: progress))
+                report.append(
+                    try await audit(
+                        try tools.composer(site: site, defaultPHP: defaultPHP, arguments: ["audit", "--no-interaction"]),
+                        name: "composer audit", cancellation: cancellation, progress: progress))
             }
             if fileManager.fileExists(atPath: site.path.appendingPathComponent("package.json").path) {
-                report.append(try await audit(try tools.npm(site: site, arguments: ["audit", "--audit-level=high"]), name: "npm audit", cancellation: cancellation, progress: progress))
+                report.append(
+                    try await audit(
+                        try tools.npm(site: site, arguments: ["audit", "--audit-level=high"]), name: "npm audit",
+                        cancellation: cancellation, progress: progress))
             }
             if fileManager.isReadableFile(atPath: site.path.appendingPathComponent("artisan").path) {
-                report.append(try await audit(try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["test", "--no-interaction"], timeout: 60 * 60), name: "artisan test", cancellation: cancellation, progress: progress))
+                report.append(
+                    try await audit(
+                        try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["test", "--no-interaction"], timeout: 60 * 60),
+                        name: "artisan test", cancellation: cancellation, progress: progress))
             }
-            return SiteWorkflowResult(title: operation.title, output: report.isEmpty ? "No supported audit tools were found." : report.joined(separator: "\n"), artifactURL: nil)
+            return SiteWorkflowResult(
+                title: operation.title, output: report.isEmpty ? "No supported audit tools were found." : report.joined(separator: "\n"),
+                artifactURL: nil)
 
         case .repair:
             try await repair(site: site, defaultPHP: defaultPHP, tools: tools, cancellation: cancellation, progress: progress)
-            return SiteWorkflowResult(title: operation.title, output: "Site files, dependencies, application key, storage link, and caches were repaired.", artifactURL: nil)
+            return SiteWorkflowResult(
+                title: operation.title, output: "Site files, dependencies, application key, storage link, and caches were repaired.",
+                artifactURL: nil)
         }
     }
 
-    private func execute(_ invocation: SiteToolInvocation, name: String, cancellation: SiteOperationCancellation, progress: @escaping @Sendable (String) -> Void) async throws {
+    private func execute(
+        _ invocation: SiteToolInvocation, name: String, cancellation: SiteOperationCancellation,
+        progress: @escaping @Sendable (String) -> Void
+    ) async throws {
         progress("Running \(name)...\n")
         let result = try await SiteCommandRunner.run(invocation, cancellation: cancellation) { data in
             progress(String(decoding: data, as: UTF8.self))
@@ -277,7 +322,10 @@ struct SiteWorkflowRunner: @unchecked Sendable {
         progress("[OK] \(name)\n")
     }
 
-    private func audit(_ invocation: SiteToolInvocation, name: String, cancellation: SiteOperationCancellation, progress: @escaping @Sendable (String) -> Void) async throws -> String {
+    private func audit(
+        _ invocation: SiteToolInvocation, name: String, cancellation: SiteOperationCancellation,
+        progress: @escaping @Sendable (String) -> Void
+    ) async throws -> String {
         progress("Running \(name)...\n")
         let result = try await SiteCommandRunner.run(invocation, cancellation: cancellation)
         let summary = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -285,7 +333,10 @@ struct SiteWorkflowRunner: @unchecked Sendable {
         return "[\(result.status == 0 ? "OK" : "FAIL")] \(name)\n\(summary.prefix(4_000))"
     }
 
-    private func cleanAndRebuild(site: SiteProject, defaultPHP: String, tools: SiteToolchain, cancellation: SiteOperationCancellation, progress: @escaping @Sendable (String) -> Void) async throws {
+    private func cleanAndRebuild(
+        site: SiteProject, defaultPHP: String, tools: SiteToolchain, cancellation: SiteOperationCancellation,
+        progress: @escaping @Sendable (String) -> Void
+    ) async throws {
         let staging = rootURL.appendingPathComponent("Cache/site-clean-\(UUID().uuidString)", isDirectory: true)
         try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
         var moved: [(URL, URL)] = []
@@ -298,16 +349,24 @@ struct SiteWorkflowRunner: @unchecked Sendable {
                 moved.append((source, target))
             }
             if fileManager.fileExists(atPath: site.path.appendingPathComponent("composer.json").path) {
-                try await execute(try tools.composer(site: site, defaultPHP: defaultPHP, arguments: ["install", "--no-interaction", "--prefer-dist"]), name: "composer install", cancellation: cancellation, progress: progress)
+                try await execute(
+                    try tools.composer(site: site, defaultPHP: defaultPHP, arguments: ["install", "--no-interaction", "--prefer-dist"]),
+                    name: "composer install", cancellation: cancellation, progress: progress)
             }
             if fileManager.fileExists(atPath: site.path.appendingPathComponent("package.json").path) {
-                try await execute(try tools.npm(site: site, arguments: ["install", "--no-audit", "--no-fund"]), name: "npm install", cancellation: cancellation, progress: progress)
+                try await execute(
+                    try tools.npm(site: site, arguments: ["install", "--no-audit", "--no-fund"]), name: "npm install",
+                    cancellation: cancellation, progress: progress)
                 if hasNPMScript("build", at: site.path) {
-                    try await execute(try tools.npm(site: site, arguments: ["run", "build"]), name: "npm run build", cancellation: cancellation, progress: progress)
+                    try await execute(
+                        try tools.npm(site: site, arguments: ["run", "build"]), name: "npm run build", cancellation: cancellation,
+                        progress: progress)
                 }
             }
             if fileManager.isReadableFile(atPath: site.path.appendingPathComponent("artisan").path) {
-                try await execute(try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["optimize:clear", "--no-interaction"]), name: "artisan optimize:clear", cancellation: cancellation, progress: progress)
+                try await execute(
+                    try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["optimize:clear", "--no-interaction"]),
+                    name: "artisan optimize:clear", cancellation: cancellation, progress: progress)
             }
             try? fileManager.removeItem(at: staging)
         } catch {
@@ -320,7 +379,10 @@ struct SiteWorkflowRunner: @unchecked Sendable {
         }
     }
 
-    private func repair(site: SiteProject, defaultPHP: String, tools: SiteToolchain, cancellation: SiteOperationCancellation, progress: @escaping @Sendable (String) -> Void) async throws {
+    private func repair(
+        site: SiteProject, defaultPHP: String, tools: SiteToolchain, cancellation: SiteOperationCancellation,
+        progress: @escaping @Sendable (String) -> Void
+    ) async throws {
         let envURL = site.path.appendingPathComponent(".env")
         if !fileManager.fileExists(atPath: envURL.path) {
             let example = site.path.appendingPathComponent(".env.example")
@@ -329,22 +391,31 @@ struct SiteWorkflowRunner: @unchecked Sendable {
             progress("[OK] Created .env\n")
         }
         for relative in ["storage/framework/cache", "storage/framework/sessions", "storage/framework/views", "storage/logs"] {
-            try fileManager.createDirectory(at: site.path.appendingPathComponent(relative, isDirectory: true), withIntermediateDirectories: true)
+            try fileManager.createDirectory(
+                at: site.path.appendingPathComponent(relative, isDirectory: true), withIntermediateDirectories: true)
         }
         if fileManager.fileExists(atPath: site.path.appendingPathComponent("composer.json").path),
             !fileManager.fileExists(atPath: site.path.appendingPathComponent("vendor/autoload.php").path)
         {
-            try await execute(try tools.composer(site: site, defaultPHP: defaultPHP, arguments: ["install", "--no-interaction", "--prefer-dist"]), name: "composer install", cancellation: cancellation, progress: progress)
+            try await execute(
+                try tools.composer(site: site, defaultPHP: defaultPHP, arguments: ["install", "--no-interaction", "--prefer-dist"]),
+                name: "composer install", cancellation: cancellation, progress: progress)
         }
         guard fileManager.isReadableFile(atPath: site.path.appendingPathComponent("artisan").path) else { return }
         let contents = (try? String(contentsOf: envURL, encoding: .utf8)) ?? ""
         if SiteHealthInspector.environmentValue(contents, key: "APP_KEY")?.isEmpty != false {
-            try await execute(try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["key:generate", "--force", "--no-interaction"]), name: "artisan key:generate", cancellation: cancellation, progress: progress)
+            try await execute(
+                try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["key:generate", "--force", "--no-interaction"]),
+                name: "artisan key:generate", cancellation: cancellation, progress: progress)
         }
         if !fileManager.fileExists(atPath: site.path.appendingPathComponent("public/storage").path) {
-            try await execute(try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["storage:link", "--no-interaction"]), name: "artisan storage:link", cancellation: cancellation, progress: progress)
+            try await execute(
+                try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["storage:link", "--no-interaction"]),
+                name: "artisan storage:link", cancellation: cancellation, progress: progress)
         }
-        try await execute(try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["optimize:clear", "--no-interaction"]), name: "artisan optimize:clear", cancellation: cancellation, progress: progress)
+        try await execute(
+            try tools.artisan(site: site, defaultPHP: defaultPHP, arguments: ["optimize:clear", "--no-interaction"]),
+            name: "artisan optimize:clear", cancellation: cancellation, progress: progress)
     }
 
     private func configureMail(site: SiteProject, smtpPort: Int) throws -> URL {
@@ -361,19 +432,23 @@ struct SiteWorkflowRunner: @unchecked Sendable {
         } else {
             original = ""
         }
-        let merged = ServiceEnvironmentFile.merging(original, variables: [
-            ServiceEnvironmentVariable(key: "MAIL_MAILER", value: "smtp"),
-            ServiceEnvironmentVariable(key: "MAIL_HOST", value: "127.0.0.1"),
-            ServiceEnvironmentVariable(key: "MAIL_PORT", value: String(smtpPort)),
-            ServiceEnvironmentVariable(key: "MAIL_USERNAME", value: "null"),
-            ServiceEnvironmentVariable(key: "MAIL_PASSWORD", value: "null"),
-            ServiceEnvironmentVariable(key: "MAIL_ENCRYPTION", value: "null")
-        ], serviceName: "HerdMe Mail")
+        let merged = ServiceEnvironmentFile.merging(
+            original,
+            variables: [
+                ServiceEnvironmentVariable(key: "MAIL_MAILER", value: "smtp"),
+                ServiceEnvironmentVariable(key: "MAIL_HOST", value: "127.0.0.1"),
+                ServiceEnvironmentVariable(key: "MAIL_PORT", value: String(smtpPort)),
+                ServiceEnvironmentVariable(key: "MAIL_USERNAME", value: "null"),
+                ServiceEnvironmentVariable(key: "MAIL_PASSWORD", value: "null"),
+                ServiceEnvironmentVariable(key: "MAIL_ENCRYPTION", value: "null")
+            ], serviceName: "HerdMe Mail")
         try Data(merged.contents.utf8).write(to: envURL, options: .atomic)
         return envURL
     }
 
-    private func archive(site: SiteProject, label: String, cancellation: SiteOperationCancellation, progress: @escaping @Sendable (String) -> Void) async throws -> URL {
+    private func archive(
+        site: SiteProject, label: String, cancellation: SiteOperationCancellation, progress: @escaping @Sendable (String) -> Void
+    ) async throws -> URL {
         let directory = rootURL.appendingPathComponent("Backups", isDirectory: true)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         let formatter = DateFormatter()

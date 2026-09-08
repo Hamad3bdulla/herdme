@@ -241,8 +241,8 @@ private struct WindowSizeController: NSViewRepresentable {
     }
 }
 
-private extension SidebarPage {
-    var minimumContentSize: NSSize {
+extension SidebarPage {
+    fileprivate var minimumContentSize: NSSize {
         switch self {
         case .dashboard: NSSize(width: 980, height: 527)
         case .sites: NSSize(width: 1_100, height: 600)

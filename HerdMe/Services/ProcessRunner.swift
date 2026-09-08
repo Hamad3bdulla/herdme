@@ -38,6 +38,7 @@ enum ProcessRunner {
         currentDirectory: URL? = nil,
         environment: [String: String]? = nil,
         standardInput: Data? = nil,
+        standardOutputFile: FileHandle? = nil,
         timeout: TimeInterval = 15 * 60,
         cancellationRequested: @Sendable () -> Bool = { false },
         outputReceived: @escaping @Sendable (Data) -> Void = { _ in }
@@ -57,7 +58,11 @@ enum ProcessRunner {
         process.arguments = arguments
         process.currentDirectoryURL = currentDirectory
         if let environment { process.environment = environment }
-        process.standardOutput = pipe
+        if let standardOutputFile {
+            process.standardOutput = standardOutputFile
+        } else {
+            process.standardOutput = pipe
+        }
         process.standardError = pipe
         let inputPipe = standardInput.map { _ in Pipe() }
         process.standardInput = inputPipe

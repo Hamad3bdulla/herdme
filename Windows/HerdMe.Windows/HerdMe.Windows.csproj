@@ -27,8 +27,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NuGetAuditMode>all</NuGetAuditMode>
-    <!-- CodeQL emits generator output; use an absolute path for the WinUI compiler passes. -->
-    <CompilerGeneratedFilesOutputPath>$(MSBuildProjectDirectory)\obj\generated\$(Platform)\$(Configuration)</CompilerGeneratedFilesOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -84,6 +82,13 @@
     </Content>
     <EmbeddedResource Include="..\..\HerdMe\Resources\runtime-catalog.json" LogicalName="HerdMe.runtime-catalog.json" />
   </ItemGroup>
+
+  <!-- WinUI compiles before CoreCompile, where Roslyn normally creates this directory. -->
+  <Target
+    Name="PrepareWinUiCompilerGeneratedFiles"
+    BeforeTargets="XamlPreCompile"
+    DependsOnTargets="CreateCompilerGeneratedFilesOutputPath"
+    Condition="'$(EmitCompilerGeneratedFiles)' == 'true'" />
 
   <Target
     Name="CopyProjectPriToPublishDirectory"

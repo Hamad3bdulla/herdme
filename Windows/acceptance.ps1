@@ -2,6 +2,7 @@ param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release",
     [switch]$LeaveRunning,
+    [switch]$CaptureScreenshots,
     [switch]$SkipLiveReleaseChecks
 )
 
@@ -312,6 +313,33 @@ function Assert-ResizableMainWindow(
     }
 }
 
+function Save-WindowEvidence(
+    [System.Windows.Automation.AutomationElement]$Window,
+    [string]$Name
+) {
+    if (-not $CaptureScreenshots) { return }
+    Add-Type -AssemblyName System.Drawing
+    $bounds = $Window.Current.BoundingRectangle
+    if ($bounds.Width -le 0 -or $bounds.Height -le 0) {
+        throw "Cannot capture the empty window for $Name."
+    }
+    $directory = Join-Path $repoRoot "build\windows-ui-evidence"
+    New-Item -ItemType Directory -Force -Path $directory | Out-Null
+    $bitmap = [System.Drawing.Bitmap]::new([int]$bounds.Width, [int]$bounds.Height)
+    try {
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        try {
+            $graphics.CopyFromScreen(
+                [int]$bounds.Left, [int]$bounds.Top, 0, 0, $bitmap.Size,
+                [System.Drawing.CopyPixelOperation]::SourceCopy
+            )
+        }
+        finally { $graphics.Dispose() }
+        $bitmap.Save((Join-Path $directory "$Name.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally { $bitmap.Dispose() }
+}
+
 function Assert-OnboardingLayout(
     [System.Diagnostics.Process]$Process
 ) {
@@ -335,6 +363,7 @@ function Assert-OnboardingLayout(
     ) {
         throw "The onboarding start button is clipped or outside the window."
     }
+    Save-WindowEvidence $window "Onboarding"
 }
 
 function Assert-WinUiNavigation(
@@ -373,6 +402,7 @@ function Assert-WinUiNavigation(
             throw "HerdMe exited while opening '$($page.Navigation)'."
         }
         Write-Host "Verified WinUI page: $($page.Page)"
+        Save-WindowEvidence $window $page.Page
     }
 }
 

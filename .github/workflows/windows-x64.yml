@@ -59,7 +59,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path (Split-Path -Parent $transcript) | Out-Null
           Start-Transcript -Path $transcript -Force -UseMinimalHeader | Out-Null
           try {
-              & ./Windows/acceptance.ps1 -Configuration Release -SkipLiveReleaseChecks
+              & ./Windows/acceptance.ps1 -Configuration Release -SkipLiveReleaseChecks -CaptureScreenshots
           }
           catch {
               $message = $_.Exception.Message
@@ -70,6 +70,15 @@ jobs:
           finally {
               Stop-Transcript | Out-Null
           }
+
+      - name: Upload Windows UI evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: HerdMe-${{ github.run_number }}-win-x64-UI
+          path: build/windows-ui-evidence
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Collect Windows failure diagnostics
         if: failure()
