@@ -26,6 +26,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <!-- CodeQL emits generator output; use an absolute path for the WinUI compiler passes. -->
+    <CompilerGeneratedFilesOutputPath>$(MSBuildProjectDirectory)\obj\generated\$(Platform)\$(Configuration)</CompilerGeneratedFilesOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -34,7 +37,7 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.260224002" />
     <PackageReference Include="System.Formats.Nrbf" Version="9.0.1" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.28" />
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.6" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
     <PackageDownload Include="System.Security.Permissions" Version="[6.0.0]" />
   </ItemGroup>
 

@@ -58,7 +58,7 @@ public partial class App : Application
             "--acceptance-onboarding",
             StringComparer.OrdinalIgnoreCase
         );
-        var onboardingAfterReinstall = !acceptanceRun
+        var onboardingAfterReinstall = !acceptanceRun && !onboardingAcceptance
             && services.SiteSettings.ApplyOnboardingAfterReinstallRequest();
         suppressAutomaticUpdateCheck = acceptanceRun || onboardingAcceptance;
         MainWindow = new MainWindow(

@@ -60,6 +60,23 @@ internal static partial class ContractChecks
             "initial setup stages keep dependency order"
         );
 
+        foreach (var invalidSettings in new[]
+        {
+            "null", "[]", "42", "{\"Roots\":null}", "{\"LinkedSites\":null}",
+            "{\"Tld\":null}", "{\"UpdateChannel\":null}"
+        })
+        {
+            var invalidStore = new SiteConfigurationStore(Path.Combine(
+                supportRoot, "invalid-settings-" + Guid.NewGuid().ToString("N")
+            ));
+            Directory.CreateDirectory(Path.GetDirectoryName(invalidStore.SettingsPath)!);
+            File.WriteAllText(invalidStore.SettingsPath, invalidSettings);
+            Check(!invalidStore.Load().OnboardingCompleted
+                && invalidStore.LastBackupPath is { } invalidBackup
+                && File.ReadAllText(invalidBackup) == invalidSettings,
+                "invalid JSON shapes and null settings are preserved without crashing startup");
+        }
+
         var corruptSiteStore = new SiteConfigurationStore(Path.Combine(supportRoot, "corrupt-sites"));
         Directory.CreateDirectory(Path.GetDirectoryName(corruptSiteStore.SettingsPath)!);
         const string corruptSiteJson = "{ invalid site settings";

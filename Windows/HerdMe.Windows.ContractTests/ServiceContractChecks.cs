@@ -13,8 +13,81 @@ using HerdMe.Windows.Services;
 
 internal static partial class ContractChecks
 {
+    private static async Task VerifyDatabaseTransferContractsAsync(string supportRoot)
+    {
+        var directory = Path.Combine(supportRoot, "database-transfer");
+        Directory.CreateDirectory(directory);
+        var destination = Path.Combine(directory, "backup.sql");
+        var marker = Path.Combine(directory, "process.txt");
+        const string original = "previous verified backup";
+        await File.WriteAllTextAsync(destination, original);
+
+        Task Transfer(string mode, CancellationToken cancellationToken = default) =>
+            SiteDatabaseProvisioner.RunFileTransferAsync(
+                ContractExecutablePath(),
+                ["--database-transfer-fixture", mode, marker],
+                new Dictionary<string, string?>(),
+                inputPath: null,
+                outputPath: destination,
+                progress: null,
+                normalizeSql: false,
+                mysql: false,
+                mergeExisting: false,
+                cancellationToken
+            );
+
+        await ThrowsAsync<InvalidOperationException>(
+            () => Transfer("failure").WaitAsync(TimeSpan.FromSeconds(10)),
+            "a failed database dump reports failure"
+        );
+        Check(await File.ReadAllTextAsync(destination) == original,
+            "a failed database dump preserves the previous backup");
+        File.Delete(marker);
+        using (var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+        {
+            var transfer = Transfer("delay", cancellation.Token);
+            while (!File.Exists(marker))
+            {
+                await Task.Delay(20, cancellation.Token);
+            }
+            cancellation.Cancel();
+            await ThrowsAsync<OperationCanceledException>(
+                () => transfer.WaitAsync(TimeSpan.FromSeconds(5)),
+                "cancelling a dump terminates the running client promptly"
+            );
+        }
+        Check(await File.ReadAllTextAsync(destination) == original,
+            "cancelling a dump preserves the previous backup");
+        Check(!Directory.EnumerateFiles(directory, "*.tmp").Any(),
+            "failed and cancelled dumps remove only their staged output");
+
+        await Transfer("success").WaitAsync(TimeSpan.FromSeconds(10));
+        Check(await File.ReadAllTextAsync(destination) == "verified SQL backup\n",
+            "a successful dump atomically replaces the previous backup");
+
+        File.Delete(destination);
+        Directory.CreateDirectory(destination);
+        var promotionFailed = false;
+        try { await Transfer("success").WaitAsync(TimeSpan.FromSeconds(10)); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            promotionFailed = true;
+        }
+        Check(promotionFailed, "a failed backup promotion reports the filesystem failure");
+        Check(Directory.Exists(destination)
+            && !Directory.EnumerateFiles(directory, "*.tmp").Any(),
+            "a failed backup promotion cleans up its temporary file");
+
+        destination = Path.Combine(marker, "backup.sql");
+        await ThrowsAsync<InvalidOperationException>(
+            () => Transfer("delay").WaitAsync(TimeSpan.FromSeconds(10)),
+            "an output-open failure terminates a client blocked on its output pipe"
+        );
+    }
+
     internal static async Task VerifyServiceContractsAsync(string supportRoot)
     {
+        await VerifyDatabaseTransferContractsAsync(supportRoot);
         var favoriteStore = new SiteCommandFavoritesStore(
             Path.Combine(supportRoot, "command-favorites")
         );
@@ -126,6 +199,34 @@ internal static partial class ContractChecks
                 && compatibleSql.Contains("SELECT 'utf8mb4_0900_ai_ci'", StringComparison.Ordinal),
             "database imports repair unsupported MySQL collations without changing data values"
         );
+        const string literalSql = "INSERT INTO notes VALUES ('COLLATE=utf8mb4_0900_ai_ci', "
+            + "'it''s COLLATE utf8mb4_uca1400_ai_ci');\n"
+            + "-- COLLATE=utf8mb4_0900_ai_ci\n"
+            + "/* COLLATE=utf8mb4_0900_ai_ci */\n";
+        var literalFixes = 0;
+        Check(SiteDatabaseProvisioner.NormalizeMySql(literalSql, ref literalFixes) == literalSql
+            && literalFixes == 0,
+            "collation compatibility never rewrites quoted data or SQL comments");
+        var streamingSql = literalSql + "CREATE TABLE demo (id int) COLLATE=utf8mb4_0900_ai_ci;"
+            + " DROP TABLE obsolete; INSERT INTO demo VALUES (1);\n"
+            + new string(' ', 300);
+        var streamFixes = 0;
+        var expectedStream = SiteDatabaseProvisioner.NormalizeMySql(
+            streamingSql, ref streamFixes, mergeExisting: true
+        );
+        for (var split = 1; split < streamingSql.Length; split++)
+        {
+            var streamNormalizer = new SiteDatabaseProvisioner.MySqlStreamNormalizer(true);
+            var actual = streamNormalizer.RewriteChunk(streamingSql[..split])
+                + streamNormalizer.RewriteChunk(streamingSql[split..])
+                + streamNormalizer.RewriteChunk(string.Empty, final: true);
+            Check(actual == expectedStream && streamNormalizer.Fixes == streamFixes,
+                "SQL import rewriting is independent of the stream chunk boundary");
+        }
+        Check(!expectedStream.Contains("DROP TABLE obsolete", StringComparison.Ordinal)
+            && expectedStream.Contains("INSERT IGNORE INTO demo", StringComparison.Ordinal),
+            "merge import recognizes multiple statements on a single line");
+
         var mergeNormalizer = new SiteDatabaseProvisioner.MySqlStreamNormalizer(
             mergeExisting: true
         );

@@ -164,11 +164,11 @@
 
         <Grid Grid.Row="2" ColumnSpacing="14">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*" MinWidth="220" MaxWidth="280" />
+                <ColumnDefinition Width="240" MinWidth="220" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border Padding="12" Style="{StaticResource SitesToolSurfaceStyle}">
+            <Border Padding="0,0,14,0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
                 <Grid RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -250,7 +250,7 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <Grid Grid.Row="0" Padding="16,14,16,8" ColumnSpacing="12">
+                        <Grid Grid.Row="0" Padding="8,4,8,8" ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
@@ -275,6 +275,7 @@
                         <CommandBar
                             Grid.Row="1"
                             Margin="8,0"
+                            HorizontalAlignment="Left"
                             Background="Transparent"
                             DefaultLabelPosition="Collapsed"
                             IsDynamicOverflowEnabled="True">
@@ -295,7 +296,7 @@
                                     <AppBarButton.Icon><SymbolIcon Symbol="Folder" /></AppBarButton.Icon>
                                 </AppBarButton>
                                 <AppBarButton x:Uid="SitesOpenTerminalCommand" Label="Open terminal" Click="OpenTerminal_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="OpenLocal" /></AppBarButton.Icon>
+                                    <AppBarButton.Icon><FontIcon Glyph="&#xE756;" /></AppBarButton.Icon>
                                 </AppBarButton>
                                 <AppBarButton x:Uid="SitesEditEnvironmentCommand" Label="Edit .env" Click="EditEnvironment_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Edit" /></AppBarButton.Icon>
@@ -304,7 +305,7 @@
                                     <AppBarButton.Icon><SymbolIcon Symbol="Add" /></AppBarButton.Icon>
                                 </AppBarButton>
                                 <AppBarButton x:Uid="SitesOpenDatabaseCommand" Label="Open in TablePlus" Click="OpenDatabase_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="OpenLocal" /></AppBarButton.Icon>
+                                    <AppBarButton.Icon><FontIcon Glyph="&#xE968;" /></AppBarButton.Icon>
                                 </AppBarButton>
                             </CommandBar.PrimaryCommands>
                             <CommandBar.SecondaryCommands>
@@ -345,7 +346,7 @@
                             </CommandBar.SecondaryCommands>
                         </CommandBar>
 
-                        <ScrollViewer Grid.Row="2" Padding="16,6,16,16" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer Grid.Row="2" Padding="8,6,8,16" VerticalScrollBarVisibility="Auto">
                             <StackPanel Spacing="14">
                                 <StackPanel Spacing="8">
                                     <Grid ColumnSpacing="8">
@@ -408,7 +409,7 @@
                                             ScrollViewer.VerticalScrollBarVisibility="Auto" />
                                     </StackPanel>
                                 </Border>
-                                <Border x:Name="PreviewBorder" Height="160" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6">
+                                <Border x:Name="PreviewBorder" Height="280" SizeChanged="PreviewBorder_SizeChanged" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6">
                                     <Grid>
                                         <WebView2
                                             x:Name="SitePreview"
@@ -461,7 +462,7 @@
                                 <TextBlock x:Uid="SitesFrameworkLabel" Text="Framework" Padding="0,10" FontWeight="SemiBold" />
                                 <TextBlock x:Name="FrameworkText" Grid.Column="1" Padding="0,10" />
                                 <TextBlock x:Uid="SitesRuntimeLabel" Grid.Row="1" Text="Runtime" Padding="0,10" FontWeight="SemiBold" />
-                                <TextBlock x:Name="RuntimeText" Grid.Row="1" Grid.Column="1" Padding="0,10" />
+                                <TextBlock x:Name="RuntimeText" Grid.Row="1" Grid.Column="1" Padding="0,10" TextWrapping="Wrap" />
                                 <TextBlock x:Uid="SitesRegistrationLabel" Grid.Row="2" Text="Registration" Padding="0,10" FontWeight="SemiBold" />
                                 <TextBlock x:Name="RegistrationText" Grid.Row="2" Grid.Column="1" Padding="0,10" />
                                 <TextBlock x:Uid="SitesPathLabel" Grid.Row="3" Text="Path" Padding="0,10" FontWeight="SemiBold" />

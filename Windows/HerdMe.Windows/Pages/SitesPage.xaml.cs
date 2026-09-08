@@ -1232,6 +1232,12 @@ public sealed partial class SitesPage : Page
         }
     }
 
+    private void PreviewBorder_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var height = SitePresentation.DesktopPreviewDisplayHeight(e.NewSize.Width);
+        if (Math.Abs(PreviewBorder.Height - height) > 1) PreviewBorder.Height = height;
+    }
+
     private void PreviewToggle_Toggled(object sender, RoutedEventArgs e)
     {
         if (!suppressPreviewToggle)

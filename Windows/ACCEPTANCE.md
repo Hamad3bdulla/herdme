@@ -4,6 +4,10 @@ Run this checklist on Windows 10 2004 or newer using an x64 machine. A workflow
 counts toward the 99% target only after its checkbox is completed on real
 Windows hardware.
 
+Use a clean Windows user profile for installer acceptance. The automated suite
+refuses to stop an existing HerdMe session or overwrite installation and startup
+registration belonging to the current user.
+
 ## Automated gate
 
 - [ ] Run `Windows\acceptance.ps1 -Configuration Release -LeaveRunning` from

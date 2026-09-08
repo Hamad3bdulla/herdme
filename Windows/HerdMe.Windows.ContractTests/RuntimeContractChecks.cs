@@ -589,43 +589,7 @@ internal static partial class ContractChecks
         string reparseEscape;
         try
         {
-            try
-            {
-                Directory.CreateSymbolicLink(externalLink, externalRoot);
-            }
-            catch (Exception error) when (
-                OperatingSystem.IsWindows()
-                && error is IOException or UnauthorizedAccessException or PlatformNotSupportedException
-            )
-            {
-                using var junction = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe")
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    ArgumentList =
-                    {
-                        "/d",
-                        "/s",
-                        "/c",
-                        "mklink",
-                        "/J",
-                        externalLink,
-                        externalRoot
-                    }
-                }) ?? throw new InvalidOperationException("Windows could not start mklink for the junction contract.");
-                var junctionOutput = await junction.StandardOutput.ReadToEndAsync();
-                var junctionError = await junction.StandardError.ReadToEndAsync();
-                await junction.WaitForExitAsync();
-                if (junction.ExitCode != 0 || !Directory.Exists(externalLink))
-                {
-                    throw new InvalidOperationException(
-                        $"Windows could not create the junction contract (exit {junction.ExitCode}): "
-                        + junctionOutput + junctionError
-                    );
-                }
-            }
+            await CreateDirectoryLinkAsync(externalLink, externalRoot);
 
             reparseEscape = await SendHttpRequestAsync(
                 port,

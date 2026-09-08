@@ -12,6 +12,23 @@ using static ContractChecks;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
 
+if (args.Length == 3 && args[0] == "--database-transfer-fixture")
+{
+    await File.WriteAllTextAsync(args[2], Environment.ProcessId.ToString());
+    Console.Write("verified SQL backup\n");
+    await Console.Out.FlushAsync();
+    if (args[1] == "failure")
+    {
+        Console.Error.WriteLine("fixture database export failed");
+        Environment.ExitCode = 42;
+    }
+    else if (args[1] == "delay")
+    {
+        await Task.Delay(TimeSpan.FromSeconds(30));
+    }
+    return;
+}
+
 var npmRunnerFixture = Environment.GetEnvironmentVariable("HERDME_NPM_RUNNER_FIXTURE");
 if (Environment.GetEnvironmentVariable("HERDME_CORE_CLIENT_FAILURE_FIXTURE") == "1")
 {

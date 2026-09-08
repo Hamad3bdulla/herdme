@@ -55,7 +55,13 @@ public static class SafeZipExtractor
         }
 
         var destinationRoot = Path.GetFullPath(destinationPath);
+        cancellationToken.ThrowIfCancellationRequested();
         Directory.CreateDirectory(destinationRoot);
+        EnsureRegularDirectories(destinationRoot, destinationRoot);
+        if (Directory.EnumerateFileSystemEntries(destinationRoot).Any())
+        {
+            throw new InvalidDataException("ZIP extraction requires an empty destination directory.");
+        }
         var destinationPrefix = destinationRoot.EndsWith(Path.DirectorySeparatorChar)
             ? destinationRoot
             : destinationRoot + Path.DirectorySeparatorChar;
@@ -96,11 +102,16 @@ public static class SafeZipExtractor
 
             if (IsDirectory(entry))
             {
+                EnsureRegularDirectories(destinationRoot, destination);
                 Directory.CreateDirectory(destination);
+                EnsureRegularDirectories(destinationRoot, destination);
                 continue;
             }
 
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            var parent = Path.GetDirectoryName(destination)!;
+            EnsureRegularDirectories(destinationRoot, parent);
+            Directory.CreateDirectory(parent);
+            EnsureRegularDirectories(destinationRoot, parent);
             await using var input = entry.Open();
             await using var output = new FileStream(
                 destination,
@@ -153,6 +164,22 @@ public static class SafeZipExtractor
             throw new InvalidDataException("The ZIP archive contains an unsafe path.");
         }
         return string.Join('/', segments) + (IsDirectoryPath(normalized) ? "/" : string.Empty);
+    }
+
+    private static void EnsureRegularDirectories(string root, string path)
+    {
+        var directory = new DirectoryInfo(path);
+        while (true)
+        {
+            if ((directory.Attributes & FileAttributes.ReparsePoint) != 0 && directory.Exists)
+            {
+                throw new InvalidDataException("ZIP extraction cannot write through a directory link.");
+            }
+            if (Path.TrimEndingDirectorySeparator(directory.FullName).Equals(
+                Path.TrimEndingDirectorySeparator(root), StringComparison.OrdinalIgnoreCase)) return;
+            directory = directory.Parent
+                ?? throw new InvalidDataException("ZIP extraction left the destination directory.");
+        }
     }
 
     private static bool IsReservedWindowsDeviceName(string segment)

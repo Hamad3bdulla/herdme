@@ -13,6 +13,35 @@ using HerdMe.Windows.Services;
 
 internal static partial class ContractChecks
 {
+    private static async Task CreateDirectoryLinkAsync(string link, string target)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(link, target);
+        }
+        catch (Exception error) when (OperatingSystem.IsWindows()
+            && error is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            using var junction = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                ArgumentList = { "/d", "/s", "/c", "mklink", "/J", link, target }
+            }) ?? throw new InvalidOperationException("Windows could not start the junction fixture.");
+            var output = junction.StandardOutput.ReadToEndAsync();
+            var errors = junction.StandardError.ReadToEndAsync();
+            await junction.WaitForExitAsync();
+            if (junction.ExitCode != 0 || !Directory.Exists(link))
+            {
+                throw new InvalidOperationException(
+                    $"Windows could not create the junction fixture: {await output} {await errors}"
+                );
+            }
+        }
+    }
+
     internal static async Task VerifyDownloadAndStorageContractsAsync(string supportRoot)
     {
         var coreExecutable = Environment.GetEnvironmentVariable("HERDME_CORE_TEST_EXECUTABLE");
@@ -392,6 +421,28 @@ internal static partial class ContractChecks
         );
 
         var traversalZip = Path.Combine(zipPolicyRoot, "traversal.zip");
+        await ThrowsAsync<InvalidDataException>(
+            () => SafeZipExtractor.ExtractAsync(validZip, validExtraction),
+            "safe ZIP extraction never merges into an existing runtime"
+        );
+        var outsideDirectory = Path.Combine(zipPolicyRoot, "outside");
+        Directory.CreateDirectory(outsideDirectory);
+        var linkedExtraction = Path.Combine(zipPolicyRoot, "linked-output");
+        await CreateDirectoryLinkAsync(linkedExtraction, outsideDirectory);
+        try
+        {
+            await ThrowsAsync<InvalidDataException>(
+                () => SafeZipExtractor.ExtractAsync(validZip, linkedExtraction),
+                "safe ZIP extraction rejects a destination directory link"
+            );
+            Check(!Directory.EnumerateFileSystemEntries(outsideDirectory).Any(),
+                "rejected ZIP extraction leaves the directory link target untouched");
+        }
+        finally
+        {
+            Directory.Delete(linkedExtraction);
+        }
+
         using (var archive = ZipFile.Open(traversalZip, ZipArchiveMode.Create))
         {
             archive.CreateEntry("../outside.exe");

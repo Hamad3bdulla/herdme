@@ -50,6 +50,10 @@ public sealed class SiteConfigurationStore
         {
             var json = File.ReadAllText(SettingsPath);
             using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                throw new JsonException("The site settings document must be an object.");
+            }
             var sourceSchemaVersion = 0;
             if (document.RootElement.TryGetProperty(
                 nameof(WindowsSiteSettings.SchemaVersion),
@@ -70,6 +74,11 @@ public sealed class SiteConfigurationStore
             }
             var settings = JsonSerializer.Deserialize<WindowsSiteSettings>(json)
                 ?? throw new JsonException("The site settings document is empty.");
+            if (settings.Roots is null || settings.LinkedSites is null
+                || settings.Tld is null || settings.UpdateChannel is null)
+            {
+                throw new JsonException("The site settings contain null required fields.");
+            }
             if (!document.RootElement.TryGetProperty(
                 nameof(WindowsSiteSettings.OnboardingCompleted),
                 out _

@@ -5,6 +5,28 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+### Fixed
+
+- Update the Windows SQLite native bundle to 2.1.13 to address
+  GHSA-2m69-gcr7-jv3q, and audit transitive NuGet dependencies during restore.
+- Preserve existing SQL backups when exports fail, are cancelled, or cannot be
+  committed; terminate database clients promptly when an output stream fails.
+- Preserve quoted SQL values and comments during MySQL collation repair, and
+  handle import tokens split across input buffers and same-line merge commands.
+- Recover safely from non-object settings JSON and null required settings,
+  retaining the original file for recovery instead of crashing during startup.
+- Keep native acceptance from terminating an active development session or
+  replacing an existing install/startup registration. Onboarding acceptance no
+  longer applies the user's reinstall marker.
+- Run the Windows socket load probe without worker-thread PowerShell runspaces.
+- Require an empty, regular extraction directory for managed ZIP packages and
+  reject directory links before writing package contents.
+
+### Changed
+
+- Give Windows site previews a responsive height, distinguish terminal and
+  database actions, tighten site navigation, and wrap long runtime descriptions.
+
 ## [0.1.18] - 2026-09-07
 
 ### Added

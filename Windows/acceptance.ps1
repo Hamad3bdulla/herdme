@@ -67,12 +67,13 @@ function Get-HerdMeStartupValue {
 
 $preExistingProcesses = @(Get-Process -Name "HerdMe.Windows" -ErrorAction SilentlyContinue)
 if ($preExistingProcesses.Count -gt 0) {
-    $preExistingProcesses | Stop-Process -Force
-    foreach ($process in $preExistingProcesses) {
-        if (-not $process.WaitForExit(5000)) {
-            throw "HerdMe process $($process.Id) did not exit before the Windows build."
-        }
-    }
+    throw "Quit HerdMe before acceptance. The suite will not terminate an existing development session."
+}
+$existingInstall = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6C053A4F-1FF3-4B94-A6DF-17CAF32FAC5F}_is1"
+$startupShortcut = Join-Path ([Environment]::GetFolderPath("Startup")) "HerdMe.lnk"
+if ((Test-Path -LiteralPath $existingInstall) -or (Test-Path -LiteralPath $startupShortcut) -or
+    $null -ne (Get-HerdMeStartupValue)) {
+    throw "Run installer acceptance on a clean Windows user profile to preserve existing installation and startup registration."
 }
 
 & (Join-Path $PSScriptRoot "package-portable.ps1") `
