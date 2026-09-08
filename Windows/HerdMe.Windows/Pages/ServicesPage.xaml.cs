@@ -17,6 +17,7 @@ public sealed partial class ServicesPage : Page
     private bool loaded;
     private bool working;
     private CancellationTokenSource? refreshCancellation;
+    private CancellationTokenSource? operationCancellation;
 
     public IReadOnlyList<ManagedServiceDefinition> Definitions { get; } = ManagedServiceCatalog.All;
 
@@ -61,6 +62,7 @@ public sealed partial class ServicesPage : Page
         loaded = false;
         manager.Changed -= Manager_Changed;
         Interlocked.Exchange(ref refreshCancellation, null)?.Cancel();
+        Interlocked.Exchange(ref operationCancellation, null)?.Cancel();
     }
 
     private void Manager_Changed(object? sender, EventArgs e)
@@ -132,15 +134,21 @@ public sealed partial class ServicesPage : Page
         };
         instances.Add(instance);
         manager.SaveInstances(instances);
-        SetWorking(true, AppLocalization.Format("ServicesInstalling", instance.Name));
+        using var cancellation = BeginOperation(
+            AppLocalization.Format("ServicesInstalling", instance.Name)
+        );
         try
         {
             if (!manager.IsInstalled(definition.Id))
             {
-                await manager.InstallAsync(instance.DefinitionId);
+                await manager.InstallAsync(instance.DefinitionId, cancellation.Token);
             }
             OperationStatusText.Text = AppLocalization.Format("ServicesStarting", instance.Name);
-            await manager.StartAsync(instance.Id);
+            await manager.StartAsync(instance.Id, cancellation.Token);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            OperationStatusText.Text = AppLocalization.Get("ServicesCancelled");
         }
         catch (Exception error)
         {
@@ -148,7 +156,7 @@ public sealed partial class ServicesPage : Page
         }
         finally
         {
-            SetWorking(false, string.Empty);
+            EndOperation(cancellation);
             await RefreshRowsAsync();
         }
     }
@@ -161,15 +169,21 @@ public sealed partial class ServicesPage : Page
             await ShowErrorAsync(AppLocalization.Get("ServicesStopBeforeUpdate"));
             return;
         }
-        SetWorking(true, AppLocalization.Format("ServicesInstalling", instance.Name));
+        using var cancellation = BeginOperation(
+            AppLocalization.Format("ServicesInstalling", instance.Name)
+        );
         try
         {
-            var release = await manager.InstallAsync(instance.DefinitionId);
+            var release = await manager.InstallAsync(instance.DefinitionId, cancellation.Token);
             OperationStatusText.Text = AppLocalization.Format(
                 "ServicesVersionInstalled",
                 instance.Name,
                 release.Version
             );
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            OperationStatusText.Text = AppLocalization.Get("ServicesCancelled");
         }
         catch (Exception error)
         {
@@ -177,7 +191,7 @@ public sealed partial class ServicesPage : Page
         }
         finally
         {
-            SetWorking(false, string.Empty);
+            EndOperation(cancellation);
             await RefreshRowsAsync();
         }
     }
@@ -624,6 +638,29 @@ public sealed partial class ServicesPage : Page
         OperationProgress.IsActive = working;
         OperationStatusText.Text = status;
         IsEnabled = !working;
+        CancelOperationButton.Visibility = working ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private CancellationTokenSource BeginOperation(string status)
+    {
+        var cancellation = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(ref operationCancellation, cancellation);
+        previous?.Cancel();
+        SetWorking(true, status);
+        return cancellation;
+    }
+
+    private void EndOperation(CancellationTokenSource cancellation)
+    {
+        Interlocked.CompareExchange(ref operationCancellation, null, cancellation);
+        SetWorking(false, string.Empty);
+    }
+
+    private void CancelOperation_Click(object sender, RoutedEventArgs e)
+    {
+        Interlocked.CompareExchange(ref operationCancellation, null, null)?.Cancel();
+        OperationStatusText.Text = AppLocalization.Get("ServicesCancelling");
+        CancelOperationButton.IsEnabled = false;
     }
 
     private static string StateLabel(ManagedServiceState state)

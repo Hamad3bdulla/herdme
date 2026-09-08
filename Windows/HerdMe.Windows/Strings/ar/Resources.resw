@@ -140,6 +140,8 @@
   <data name="CommonNotInstalled" xml:space="preserve"><value>غير مثبت</value></data>
   <data name="CommonDelete" xml:space="preserve"><value>حذف</value></data>
   <data name="CommonCancel" xml:space="preserve"><value>إلغاء</value></data>
+  <data name="ServicesCancelled" xml:space="preserve"><value>أُلغي</value></data>
+  <data name="ServicesCancelling" xml:space="preserve"><value>جارٍ الإلغاء...</value></data>
   <data name="PhpCheckingStatus" xml:space="preserve"><value>جارٍ التحقق</value></data>
   <data name="PhpNoUsableExecutable" xml:space="preserve"><value>لم يُعثر على ملف PHP تنفيذي صالح للاستخدام.</value></data>
   <data name="PhpUnavailable" xml:space="preserve"><value>PHP غير متوفر</value></data>

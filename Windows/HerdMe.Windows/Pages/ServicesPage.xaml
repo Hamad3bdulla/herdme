@@ -25,6 +25,12 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <ProgressRing x:Name="OperationProgress" Width="18" Height="18" />
                 <TextBlock x:Name="OperationStatusText" VerticalAlignment="Center" MaxWidth="180" TextWrapping="Wrap" />
+                <Button x:Name="CancelOperationButton" Click="CancelOperation_Click" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <SymbolIcon Symbol="Cancel" />
+                        <TextBlock x:Uid="CommonCancel" Text="Cancel" />
+                    </StackPanel>
+                </Button>
                 <Button Click="Refresh_Click" Style="{StaticResource ToolbarIconButtonStyle}">
                     <ToolTipService.ToolTip>
                         <ToolTip><TextBlock x:Uid="ServicesRefreshTooltip" Text="Refresh service status" /></ToolTip>
@@ -53,7 +59,7 @@
                     ItemsSource="{x:Bind Definitions}"
                     DisplayMemberPath="Name"
                     SelectionChanged="ServiceType_SelectionChanged" />
-                <TextBox x:Uid="ServicesNameField" x:Name="ServiceNameBox" Grid.Column="1" Header="Name" />
+                <TextBox x:Uid="ServicesNameField" x:Name="ServiceNameBox" Grid.Column="1" Header="Name" TextWrapping="Wrap" />
                 <NumberBox x:Uid="ServicesPortField" x:Name="ServicePortBox" Grid.Column="2" Header="Port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Compact" />
                 <Button
                     x:Name="AddServiceButton"
