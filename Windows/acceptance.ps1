@@ -245,7 +245,7 @@ function Wait-AutomationElementById(
             [System.Windows.Automation.TreeScope]::Descendants,
             $condition
         )
-        if ($null -ne $element) { return $element }
+        if ($null -ne $element -and -not $element.Current.IsOffscreen) { return $element }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
 
@@ -317,6 +317,15 @@ function Save-WindowEvidence(
     [System.Windows.Automation.AutomationElement]$Window,
     [string]$Name
 ) {
+    $dialog = $Window.FindFirst(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::ClassNameProperty, "ContentDialog"
+        )
+    )
+    if ($null -ne $dialog -and -not $dialog.Current.IsOffscreen) {
+        throw "An unexpected dialog covers the Windows surface '$Name': $($dialog.Current.Name)"
+    }
     if (-not $CaptureScreenshots) { return }
     Add-Type -AssemblyName System.Drawing
     $bounds = $Window.Current.BoundingRectangle
@@ -462,6 +471,7 @@ function Assert-ServiceDownloadControls(
         Start-Sleep -Milliseconds 100
     }
     if (-not $add.Current.IsEnabled) { throw "The service form remains disabled after cancellation." }
+    Start-Sleep -Milliseconds 300
     Save-WindowEvidence $Window "ServicesPageRoot-cancelled"
     Select-AutomationElement $retry "RetryServiceDownload"
     $cancelDownload = Wait-AutomationElementById $Window "CancelServiceDownload"

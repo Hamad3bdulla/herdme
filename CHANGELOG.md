@@ -35,6 +35,11 @@ Semantic Versioning for public releases.
 - Give Windows site previews a responsive height, distinguish terminal and
   database actions, tighten site navigation, and wrap long runtime descriptions.
 - Capture Windows onboarding and navigation screenshots during hosted acceptance.
+- Show Windows service download stages, transfer totals and speed, and retry
+  attempts. Keep progress visible after navigation, allow cancellation and
+  retry, and adapt the service form to compact windows.
+- Preserve the previous service runtime if replacement fails and remove
+  incomplete downloads after cancellation or failed verification.
 
 ## [0.1.18] - 2026-09-07
 

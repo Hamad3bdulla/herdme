@@ -646,6 +646,7 @@ public sealed partial class SitesPage : Page
 
     private async Task ScanAsync(bool throwOnError = false)
     {
+        ScanErrorBar.IsOpen = false;
         var generation = siteScanGeneration.Begin();
         CancelGitInspection();
         var selectedPath = selectedSite?.Path;
@@ -692,7 +693,8 @@ public sealed partial class SitesPage : Page
         {
             if (!siteScanGeneration.IsCurrent(generation)) return;
             if (throwOnError) throw;
-            await ShowErrorAsync(error.Message);
+            ScanErrorBar.Message = error.Message;
+            ScanErrorBar.IsOpen = true;
         }
         finally
         {
