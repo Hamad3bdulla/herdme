@@ -187,7 +187,7 @@ public sealed class WindowsHostsManager
             }
             var flush = new ProcessStartInfo
             {
-                FileName = "ipconfig.exe",
+                FileName = Path.Combine(Environment.SystemDirectory, "ipconfig.exe"),
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,

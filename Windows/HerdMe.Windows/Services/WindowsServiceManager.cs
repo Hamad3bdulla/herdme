@@ -436,14 +436,21 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                     cancellationToken
                 );
             }
-            lock (sync)
-            {
-                active[instance.Id] = new ActiveService(
+            ActiveService activeService = new(
                     process,
                     job,
                     consolePort > 0 ? consolePort : null
                 );
+            lock (sync)
+            {
+                if (active.Remove(instance.Id, out var previous))
+                {
+                    previous.Process.Dispose();
+                    previous.Job.Dispose();
+                }
+                active[instance.Id] = activeService;
             }
+            process.Exited += (_, _) => RemoveExitedService(instance.Id, process);
             RaiseChanged();
         }
         catch
@@ -452,6 +459,22 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             process.Dispose();
             job?.Dispose();
             throw;
+        }
+    }
+
+    private void RemoveExitedService(Guid id, Process process)
+    {
+        ActiveService? service = null;
+        lock (sync)
+        {
+            if (active.TryGetValue(id, out var current) && ReferenceEquals(current.Process, process))
+                active.Remove(id, out service);
+        }
+        if (service is not null)
+        {
+            service.Process.Dispose();
+            service.Job.Dispose();
+            RaiseChanged();
         }
     }
 
