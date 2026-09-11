@@ -150,6 +150,28 @@
   <data name="ServicesCompleted" xml:space="preserve"><value>Installed</value></data>
   <data name="ServicesFailed" xml:space="preserve"><value>Installation failed</value></data>
   <data name="ServicesRetry" xml:space="preserve"><value>Retry installation</value></data>
+  <data name="DoctorProject" xml:space="preserve"><value>Project</value></data>
+  <data name="DoctorEnvironment" xml:space="preserve"><value>Environment</value></data>
+  <data name="DoctorDependencies" xml:space="preserve"><value>Dependencies</value></data>
+  <data name="DoctorExtensions" xml:space="preserve"><value>PHP extensions</value></data>
+  <data name="DoctorStorage" xml:space="preserve"><value>Storage directories</value></data>
+  <data name="DoctorKey" xml:space="preserve"><value>Application key</value></data>
+  <data name="DoctorDatabase" xml:space="preserve"><value>Database configuration</value></data>
+  <data name="ServicesBackupsAction.Text" xml:space="preserve"><value>Data backups</value></data>
+  <data name="ServicesBackupsTitle" xml:space="preserve"><value>Service data backups</value></data>
+  <data name="ServicesRestoreData" xml:space="preserve"><value>Restore data</value></data>
+  <data name="ServicesRestoreNotice" xml:space="preserve"><value>Restore replaces the selected service's data. The service must be stopped and use the backup's runtime version. Current data is backed up first. Runtime files remain unchanged.</value></data>
+  <data name="ErrorNetwork" xml:space="preserve"><value>The download could not connect. Check the connection and retry.</value></data>
+  <data name="ErrorAccess" xml:space="preserve"><value>Access was denied. Check folder permissions and whether another process is using the files.</value></data>
+  <data name="ErrorMissingRuntime" xml:space="preserve"><value>A required file is missing. Install or repair the runtime.</value></data>
+  <data name="ErrorPackage" xml:space="preserve"><value>The package could not be verified. Retry the download.</value></data>
+  <data name="ErrorOperation" xml:space="preserve"><value>The operation failed. Review the details below before retrying.</value></data>
+  <data name="ServicesUseInstalled" xml:space="preserve"><value>Installed version: {0}</value></data>
+  <data name="ServicesUseLatest" xml:space="preserve"><value>Latest supported version: {0}</value></data>
+  <data name="SitesFavoriteAction.Text" xml:space="preserve"><value>Toggle favorite</value></data>
+  <data name="ServicesBackingUp" xml:space="preserve"><value>Backing up service data</value></data>
+  <data name="DownloadsTitle.Text" xml:space="preserve"><value>Downloads</value></data>
+  <data name="DownloadsClear.Text" xml:space="preserve"><value>Clear completed history</value></data>
   <data name="ServicesTransfer" xml:space="preserve"><value>{0:0.0} MB / {1:0.0} MB, {2:0.0} MB/s</value></data>
   <data name="ServicesTransferUnknown" xml:space="preserve"><value>{0:0.0} MB, {1:0.0} MB/s</value></data>
   <data name="ServicesAttempt" xml:space="preserve"><value>Attempt {0}</value></data>

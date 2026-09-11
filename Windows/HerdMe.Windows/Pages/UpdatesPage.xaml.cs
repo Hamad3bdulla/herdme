@@ -26,6 +26,7 @@ public sealed partial class UpdatesPage : Page
     private AppUpdateCheck? latestApplication;
     private bool loaded;
     private bool busy;
+    private readonly Dictionary<string, (Grid Grid, TextBlock Detail, TextBlock Error, ProgressBar Progress, Button Action)> downloadControls = [];
 
     public UpdatesPage(
         SiteConfigurationStore settingsStore,
@@ -62,13 +63,80 @@ public sealed partial class UpdatesPage : Page
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         loaded = true;
+        RuntimeOperations.Shared.Changed += Downloads_Changed;
+        RenderDownloads();
         await RefreshAsync();
     }
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
         loaded = false;
+        RuntimeOperations.Shared.Changed -= Downloads_Changed;
         Interlocked.Exchange(ref refreshCancellation, null)?.Cancel();
+    }
+
+    private void Downloads_Changed(object? sender, EventArgs e)
+        => DispatcherQueue.TryEnqueue(() => { if (loaded) RenderDownloads(); });
+
+    private void ClearDownloads_Click(object sender, RoutedEventArgs e) => RuntimeOperations.Shared.ClearCompleted();
+
+    private void RenderDownloads()
+    {
+        var snapshot = RuntimeOperations.Shared.Snapshot();
+        foreach (var id in downloadControls.Keys.Except(snapshot.Select(item => item.Id)).ToArray())
+        {
+            DownloadRows.Children.Remove(downloadControls[id].Grid);
+            downloadControls.Remove(id);
+        }
+        foreach (var operation in snapshot)
+        {
+            var row = ServiceDownloadRow.From(operation.Progress, operation.Name);
+            if (downloadControls.TryGetValue(operation.Id, out var controls))
+            {
+                controls.Detail.Text = row.Detail;
+                controls.Error.Text = row.Error;
+                controls.Progress.Value = row.Percentage;
+                controls.Progress.IsIndeterminate = row.IsIndeterminate;
+                controls.Progress.Visibility = row.IsActive;
+                controls.Action.Visibility = operation.Progress.Stage == ServiceInstallationStage.Completed ? Visibility.Collapsed : Visibility.Visible;
+                controls.Action.Content = new SymbolIcon(operation.Progress.IsActive ? Symbol.Cancel : Symbol.Refresh);
+                ToolTipService.SetToolTip(controls.Action, operation.Progress.IsActive ? row.CancelLabel : row.RetryLabel);
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(controls.Action, operation.Progress.IsActive ? row.CancelLabel : row.RetryLabel);
+                continue;
+            }
+            var grid = new Grid { ColumnSpacing = 12 };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var text = new StackPanel { Spacing = 4 };
+            text.Children.Add(new TextBlock { Text = operation.Name, TextWrapping = TextWrapping.Wrap });
+            var detail = new TextBlock { Text = row.Detail, TextWrapping = TextWrapping.Wrap };
+            var error = new TextBlock { Text = row.Error, TextWrapping = TextWrapping.Wrap };
+            var progress = new ProgressBar { Value = row.Percentage, IsIndeterminate = row.IsIndeterminate, Visibility = row.IsActive };
+            text.Children.Add(detail);
+            text.Children.Add(progress);
+            text.Children.Add(error);
+            grid.Children.Add(text);
+            {
+                var button = new Button { Content = new SymbolIcon(operation.Progress.IsActive ? Symbol.Cancel : Symbol.Refresh),
+                    Visibility = operation.Progress.Stage == ServiceInstallationStage.Completed ? Visibility.Collapsed : Visibility.Visible };
+                ToolTipService.SetToolTip(button, operation.Progress.IsActive ? row.CancelLabel : row.RetryLabel);
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, operation.Progress.IsActive ? row.CancelLabel : row.RetryLabel);
+                button.Click += async (_, _) =>
+                {
+                    if (RuntimeOperations.Shared.Snapshot().FirstOrDefault(item => item.Id == operation.Id)?.Progress.IsActive == true)
+                        RuntimeOperations.Shared.Cancel(operation.Id);
+                    else
+                    {
+                        try { await RuntimeOperations.Shared.RetryAsync(operation.Id); }
+                        catch (Exception) { RenderDownloads(); }
+                    }
+                };
+                Grid.SetColumn(button, 1);
+                grid.Children.Add(button);
+                downloadControls[operation.Id] = (grid, detail, error, progress, button);
+            }
+            DownloadRows.Children.Add(grid);
+        }
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e)

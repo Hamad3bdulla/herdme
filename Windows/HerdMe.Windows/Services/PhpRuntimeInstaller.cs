@@ -373,11 +373,17 @@ public sealed class PhpRuntimeInstaller
         return result;
     }
 
-    public async Task<PhpWindowsRelease> InstallAsync(
+    public Task<PhpWindowsRelease> InstallAsync(string cycle, CancellationToken cancellationToken = default)
+        => RuntimeOperations.Shared.RunAsync("php:" + cycle, "PHP " + cycle,
+            (token, progress) => InstallCoreAsync(cycle, token, progress), cancellationToken);
+
+    private async Task<PhpWindowsRelease> InstallCoreAsync(
         string cycle,
-        CancellationToken cancellationToken = default
+        CancellationToken cancellationToken,
+        IProgress<ServiceInstallationProgress> progress
     )
     {
+        InstallationPreflight.EnsureStorage(RuntimeRoot);
         EnsureSupportedCycle(cycle);
         if (!OperatingSystem.IsWindows())
         {
@@ -398,7 +404,10 @@ public sealed class PhpRuntimeInstaller
         var backupPath = Path.Combine(RuntimeRoot, $".backup-{Guid.NewGuid():N}");
         try
         {
-            await DownloadAndVerifyAsync(release, archivePath, cancellationToken);
+            await ServicePackageInstaller.DownloadAndVerifyAsync(new ServicePackageRelease(
+                "php:" + cycle, release.Version, "php.zip", ServicePackageChecksumAlgorithm.Sha256,
+                release.Sha256, release.DownloadUri, true), archivePath, cancellationToken, progress: progress);
+            progress.Report(new("php:" + cycle, ServiceInstallationStage.Extracting));
             await SafeZipExtractor.ExtractAsync(
                 archivePath,
                 stagingPath,
@@ -636,7 +645,7 @@ public sealed class PhpRuntimeInstaller
         }
     }
 
-    private async Task<PhpExtensionReport> ManagedExtensionReportAsync(
+    internal async Task<PhpExtensionReport> ManagedExtensionReportAsync(
         string phpExecutable,
         CancellationToken cancellationToken
     )

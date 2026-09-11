@@ -3,7 +3,8 @@ param(
     [string]$Configuration = "Release",
     [switch]$LeaveRunning,
     [switch]$CaptureScreenshots,
-    [switch]$SkipLiveReleaseChecks
+    [switch]$SkipLiveReleaseChecks,
+    [string]$PreviousInstallerPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -137,6 +138,47 @@ if (Test-Path -LiteralPath $installerTestDirectory) {
 if ($null -ne (Get-HerdMeStartupValue)) {
     throw "Windows installer acceptance requires no pre-existing HerdMe startup value."
 }
+$upgradeSnapshot = @{}
+$upgradeFixtureRoot = $null
+if ($PreviousInstallerPath) {
+    $previousInstaller = (Resolve-Path -LiteralPath $PreviousInstallerPath).Path
+    $expected = ((Get-Content -LiteralPath "$previousInstaller.sha256" -Raw).Trim() -split '\s+')[0]
+    if ((Get-FileHash -LiteralPath $previousInstaller -Algorithm SHA256).Hash -ne $expected) {
+        throw "The previous release installer does not match its checksum."
+    }
+    $previousInstall = Start-Process -FilePath $previousInstaller -WindowStyle Hidden -ArgumentList @(
+        '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installerTestDirectory`""
+    ) -Wait -PassThru
+    if ($previousInstall.ExitCode -ne 0) { throw "The previous release installer failed." }
+    $upgradeFixtureRoot = Join-Path $env:LOCALAPPDATA 'HerdMe'
+    $upgradeId = [Guid]::NewGuid().ToString('D')
+    $fixturePaths = @(
+        (Join-Path $upgradeFixtureRoot "Config\upgrade-$upgradeId.json"),
+        (Join-Path $upgradeFixtureRoot "Services\$upgradeId\data\database.bin"),
+        (Join-Path $repoRoot "build\upgrade-project-$upgradeId\.env")
+    )
+    foreach ($path in $fixturePaths) {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
+        [IO.File]::WriteAllText($path, '{"preserve":"upgrade-fixture","version":1}')
+        $upgradeSnapshot[$path] = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+    }
+    $configPath = Join-Path $upgradeFixtureRoot 'Config'
+    $siteConfig = Join-Path $configPath 'sites.json'
+    if (-not (Test-Path -LiteralPath $siteConfig)) {
+        @{ SchemaVersion = 1; Roots = @((Join-Path $env:USERPROFILE 'HerdMe')); LinkedSites = @();
+           Tld = 'test'; OnboardingCompleted = $true; StartAutomatically = $false; ShowPreviews = $false;
+           AutomaticUpdates = $false; UpdateChannel = 'Stable' } |
+            ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $siteConfig -Encoding UTF8
+    }
+    $serviceConfig = Join-Path $configPath 'services.json'
+    if (-not (Test-Path -LiteralPath $serviceConfig)) {
+        ConvertTo-Json -InputObject @(@{ Id = $upgradeId; DefinitionId = 'mysql'; Name = 'Upgrade fixture';
+            Port = 63306; StartAutomatically = $false }) | Set-Content -LiteralPath $serviceConfig -Encoding UTF8
+    }
+    foreach ($file in Get-ChildItem -LiteralPath $configPath -File -Recurse) {
+        $upgradeSnapshot[$file.FullName] = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
+    }
+}
 $installProcess = Start-Process `
     -FilePath $installer `
     -ArgumentList @(
@@ -150,6 +192,13 @@ $installProcess = Start-Process `
 if ($installProcess.ExitCode -ne 0) {
     throw "The Windows installer acceptance run failed with exit code $($installProcess.ExitCode)."
 }
+foreach ($path in $upgradeSnapshot.Keys) {
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $upgradeSnapshot[$path]) {
+        throw "The application upgrade changed user data: $path"
+    }
+}
+if ($PreviousInstallerPath) { Write-Host 'Verified upgrade preserves configuration, project files, and service data.' }
 if ($null -ne (Get-HerdMeStartupValue)) {
     throw "The Windows installer enabled launch at login without user consent."
 }

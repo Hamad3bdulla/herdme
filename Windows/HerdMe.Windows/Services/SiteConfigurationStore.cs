@@ -252,6 +252,17 @@ public sealed class SiteConfigurationStore
         )));
     }
 
+    public void ToggleFavorite(string path)
+    {
+        var normalized = Path.GetFullPath(path);
+        Update(settings =>
+        {
+            settings.FavoriteSites ??= [];
+            if (settings.FavoriteSites.RemoveAll(item => item.Equals(normalized, StringComparison.OrdinalIgnoreCase)) == 0)
+                settings.FavoriteSites.Add(normalized);
+        });
+    }
+
     private void Update(Action<WindowsSiteSettings> update)
     {
         lock (SettingsLock())
@@ -325,6 +336,8 @@ public sealed class SiteConfigurationStore
             SchemaVersion = CurrentSchemaVersion,
             Roots = roots,
             LinkedSites = linkedSites,
+            FavoriteSites = (settings.FavoriteSites ?? []).Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             Tld = tld,
             StartAutomatically = settings.StartAutomatically,
             ShowPreviews = settings.ShowPreviews,

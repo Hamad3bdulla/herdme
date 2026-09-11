@@ -6,8 +6,9 @@
     AutomationProperties.AutomationId="UpdatesPageRoot"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
-    <Grid>
-        <ScrollViewer>
+    <Grid RowSpacing="8">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+        <ScrollViewer Grid.Row="1">
             <StackPanel Padding="{StaticResource PagePadding}" Spacing="20">
                 <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
@@ -39,6 +40,17 @@
                     IsClosable="True"
                     IsOpen="False"
                     Severity="Informational" />
+
+                <StackPanel Spacing="8">
+                    <Grid>
+                        <TextBlock x:Uid="DownloadsTitle" Text="Downloads" Style="{StaticResource SectionTitleStyle}" />
+                        <Button HorizontalAlignment="Right" Click="ClearDownloads_Click" Style="{StaticResource ToolbarIconButtonStyle}">
+                            <ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="DownloadsClear" Text="Clear completed history" /></ToolTip></ToolTipService.ToolTip>
+                            <SymbolIcon Symbol="Clear" />
+                        </Button>
+                    </Grid>
+                    <StackPanel x:Name="DownloadRows" Spacing="8" />
+                </StackPanel>
 
                 <StackPanel Spacing="10">
                     <TextBlock Text="HerdMe" Style="{StaticResource SectionTitleStyle}" />
@@ -94,9 +106,9 @@
             </StackPanel>
         </ScrollViewer>
 
-        <Grid x:Name="BusyOverlay" Background="{ThemeResource SolidBackgroundFillColorBase}" Opacity="0.92" Visibility="Collapsed">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-                <ProgressRing Width="36" Height="36" IsActive="True" />
+        <Grid x:Name="BusyOverlay" Visibility="Collapsed" Padding="28,12,28,0">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <ProgressRing Width="18" Height="18" IsActive="True" />
                 <TextBlock x:Name="BusyText" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="440" />
             </StackPanel>
         </Grid>

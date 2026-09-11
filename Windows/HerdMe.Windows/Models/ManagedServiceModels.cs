@@ -133,6 +133,7 @@ public sealed record ServiceLaunchSpec(
 
 public enum ServiceInstallationStage
 {
+    BackingUp,
     Resolving,
     Downloading,
     Retrying,

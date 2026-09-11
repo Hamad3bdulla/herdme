@@ -43,6 +43,8 @@ public sealed partial class SitesPage : Page
     private readonly MailCaptureService mail;
     private readonly SiteScanGeneration siteScanGeneration = new();
     private bool loaded;
+    private readonly Dictionary<string, string> lastSiteErrors = new(StringComparer.OrdinalIgnoreCase);
+    private DispatcherTimer? searchDebounce;
     private bool suppressPreviewToggle = true;
     private SiteRecord? selectedSite;
     private CancellationTokenSource? artisanCancellation;
@@ -114,6 +116,7 @@ public sealed partial class SitesPage : Page
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
         loaded = false;
+        searchDebounce?.Stop();
         siteScanGeneration.Invalidate();
         CancelGitInspection();
         projectCreationCancellation?.Cancel();
@@ -675,6 +678,8 @@ public sealed partial class SitesPage : Page
             if (!siteScanGeneration.IsCurrent(generation)) return;
             foreach (var site in scanned)
             {
+                site.IsFavorite = normalizedSettings.FavoriteSites.Contains(site.Path, StringComparer.OrdinalIgnoreCase);
+                site.LastError = lastSiteErrors.GetValueOrDefault(site.Path);
                 Sites.Add(site);
             }
             ApplyFilter(selectedPath);
@@ -693,7 +698,7 @@ public sealed partial class SitesPage : Page
         {
             if (!siteScanGeneration.IsCurrent(generation)) return;
             if (throwOnError) throw;
-            ScanErrorBar.Message = error.Message;
+            ScanErrorBar.Message = UserErrorPresentation.Describe(error);
             ScanErrorBar.IsOpen = true;
         }
         finally
@@ -770,6 +775,24 @@ public sealed partial class SitesPage : Page
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
+        searchDebounce ??= CreateSearchTimer();
+        searchDebounce.Stop();
+        searchDebounce.Start();
+    }
+
+    private DispatcherTimer CreateSearchTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+        timer.Tick += (_, _) => { timer.Stop(); if (loaded) ApplyFilter(selectedSite?.Path); };
+        return timer;
+    }
+
+    private void FavoriteSite_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string path }) return;
+        settingsStore.ToggleFavorite(path);
+        var favorites = settingsStore.Load().FavoriteSites;
+        foreach (var site in Sites) site.IsFavorite = favorites.Contains(site.Path, StringComparer.OrdinalIgnoreCase);
         ApplyFilter(selectedSite?.Path);
     }
 
@@ -784,8 +807,14 @@ public sealed partial class SitesPage : Page
     {
         var query = SearchBox.Text.Trim();
         VisibleSites.Clear();
-        foreach (var site in SitePresentation.Filter(Sites, query))
+        foreach (var site in SitePresentation.Filter(Sites, query).OrderByDescending(site => site.IsFavorite))
         {
+            var process = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Development);
+            site.WorkflowStatus = process.Running ? AppLocalization.Get("SitesRunning")
+                : process.ExitCode is not null and not 0 ? AppLocalization.Get("SitesOperationFailed")
+                : AppLocalization.Get("SitesStopped");
+            if (process.ExitCode is not null and not 0 && !string.IsNullOrWhiteSpace(process.Output))
+                site.LastError = LatestOperationStatus(process.Output);
             VisibleSites.Add(site);
         }
         EmptyState.Visibility = VisibleSites.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -855,7 +884,12 @@ public sealed partial class SitesPage : Page
 
     private void SiteProcesses_Changed(object? sender, EventArgs e)
     {
-        DispatcherQueue.TryEnqueue(UpdateBackgroundProcessState);
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!loaded) return;
+            ApplyFilter(selectedSite?.Path);
+            UpdateBackgroundProcessState();
+        });
     }
 
     private void UpdateBackgroundProcessState()
@@ -3053,21 +3087,52 @@ public sealed partial class SitesPage : Page
             checks.Count(check => check.Healthy),
             checks.Count
         );
+        using var repairCancellation = new CancellationTokenSource();
+        var checkRows = new StackPanel { Spacing = 12 };
+        foreach (var check in checks)
+        {
+            var panel = new StackPanel { Spacing = 4 };
+            var label = new TextBlock { Text = $"{(check.Healthy ? "[OK]" : "[!]")} {DoctorCheckName(check.Name)}: {check.Detail}", TextWrapping = TextWrapping.Wrap };
+            panel.Children.Add(label);
+            if (!check.Healthy && check.Name is "PHP" or "PHP extensions" or "Composer" or "HTTPS")
+            {
+                var repair = new Button { Content = new SymbolIcon(Symbol.Repair), HorizontalAlignment = HorizontalAlignment.Left };
+                ToolTipService.SetToolTip(repair, AppLocalization.Get("SitesRepair"));
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(repair, AppLocalization.Get("SitesRepair") + " " + DoctorCheckName(check.Name));
+                repair.Click += async (_, _) =>
+                {
+                    repair.IsEnabled = false;
+                    try
+                    {
+                        switch (check.Name)
+                        {
+                            case "PHP": await phpInstaller.InstallAsync(cycle, repairCancellation.Token); break;
+                            case "PHP extensions": await phpInstaller.EnsureManagedConfigurationAsync(cycle, repairCancellation.Token); break;
+                            case "Composer": await composerTools.InstallOrUpdateAsync(cycle, repairCancellation.Token); break;
+                            case "HTTPS": certificates.TrustAuthority(); break;
+                        }
+                        var refreshed = await SiteHealthInspector.InspectAsync(site.Path, site.Domain, cycle, phpInstaller, composerTools,
+                            certificates, site.NodeVersion, repairCancellation.Token);
+                        var result = refreshed.First(item => item.Name == check.Name);
+                        label.Text = $"{(result.Healthy ? "[OK]" : "[!]")} {DoctorCheckName(result.Name)}: {result.Detail}";
+                        repair.IsEnabled = !result.Healthy;
+                    }
+                    catch (OperationCanceledException) { }
+                    catch (Exception error) { label.Text = UserErrorPresentation.Describe(error); repair.IsEnabled = true; }
+                };
+                panel.Children.Add(repair);
+            }
+            checkRows.Children.Add(panel);
+        }
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
             Title = AppLocalization.Format("SitesDoctorTitle", site.Name),
-            Content = new TextBox
-            {
-                Text = report,
-                IsReadOnly = true,
-                AcceptsReturn = true,
-                TextWrapping = TextWrapping.Wrap,
-                Height = 300
-            },
+            Content = new ScrollViewer { Content = checkRows, MaxHeight = 360 },
             PrimaryButtonText = AppLocalization.Get("SitesRepair"),
             CloseButtonText = AppLocalization.Get("SitesDone")
         };
+        dialog.Closed += (_, _) => repairCancellation.Cancel();
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         await RunSiteOperationAsync(
             AppLocalization.Get("SitesRepairing"),
@@ -3187,6 +3252,18 @@ public sealed partial class SitesPage : Page
             }
         );
     }
+
+    private static string DoctorCheckName(string name) => name switch
+    {
+        "Project" => AppLocalization.Get("DoctorProject"),
+        "Environment" => AppLocalization.Get("DoctorEnvironment"),
+        "Dependencies" => AppLocalization.Get("DoctorDependencies"),
+        "PHP extensions" => AppLocalization.Get("DoctorExtensions"),
+        "Storage directories" => AppLocalization.Get("DoctorStorage"),
+        "Application key" => AppLocalization.Get("DoctorKey"),
+        "Database configuration" => AppLocalization.Get("DoctorDatabase"),
+        _ => name
+    };
 
     private static IReadOnlyList<string> LaravelWritableDirectories(string sitePath) =>
     [
@@ -3960,6 +4037,12 @@ public sealed partial class SitesPage : Page
 
     private async Task ShowErrorAsync(string message)
     {
+        if (selectedSite is { } site)
+        {
+            lastSiteErrors[site.Path] = message;
+            site.LastError = message;
+        }
+        if (!loaded || XamlRoot is null) return;
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,

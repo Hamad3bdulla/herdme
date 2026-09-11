@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="WorkflowImprovementChecks.cs" />
     <Compile Include="DownloadAndStorageContractChecks.cs" />
     <Compile Include="SiteContractChecks.cs" />
     <Compile Include="ServiceContractChecks.cs" />
@@ -45,6 +46,9 @@
     <Compile Include="../HerdMe.Windows/Services/MailCaptureService.cs" Link="Services/MailCaptureService.cs" />
     <Compile Include="../HerdMe.Windows/Services/ManagedComponentUpdateManager.cs" Link="Services/ManagedComponentUpdateManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/ManagedDownloadClient.cs" Link="Services/ManagedDownloadClient.cs" />
+    <Compile Include="../HerdMe.Windows/Services/RuntimeOperations.cs" Link="Services/RuntimeOperations.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ServiceBackupStore.cs" Link="Services/ServiceBackupStore.cs" />
+    <Compile Include="../HerdMe.Windows/Services/InstallationPreflight.cs" Link="Services/InstallationPreflight.cs" />
     <Compile Include="../HerdMe.Windows/Services/ServicePackageInstaller.cs" Link="Services/ServicePackageInstaller.cs" />
     <Compile Include="../HerdMe.Windows/Services/ServiceEnvironmentFile.cs" Link="Services/ServiceEnvironmentFile.cs" />
     <Compile Include="../HerdMe.Windows/Services/ProjectEnvironmentFile.cs" Link="Services/ProjectEnvironmentFile.cs" />

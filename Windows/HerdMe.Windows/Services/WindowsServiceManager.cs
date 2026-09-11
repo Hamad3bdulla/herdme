@@ -49,6 +49,8 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     public string SupportRoot { get; }
 
+    public ServiceBackupStore Backups => new(SupportRoot);
+
     public string ConfigurationPath => Path.Combine(SupportRoot, "Config", "services.json");
 
     public string? LastLoadWarning { get; private set; }
@@ -182,9 +184,13 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         InstallationProgress?.Invoke(this, progress);
     }
 
-    private sealed class InstallationReporter(WindowsServiceManager manager) : IProgress<ServiceInstallationProgress>
+    private sealed class InstallationReporter(WindowsServiceManager manager, IProgress<ServiceInstallationProgress>? shared = null) : IProgress<ServiceInstallationProgress>
     {
-        public void Report(ServiceInstallationProgress value) => manager.ReportInstallation(value);
+        public void Report(ServiceInstallationProgress value)
+        {
+            manager.ReportInstallation(value);
+            shared?.Report(value);
+        }
     }
 
     public Task<ServicePackageRelease> InstallAsync(
@@ -236,7 +242,9 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         try
         {
             release = installPackage is null
-                ? await installer.InstallAsync(definitionId, cancellation.Token, new InstallationReporter(this))
+                ? await RuntimeOperations.Shared.RunAsync("service:" + definitionId, ManagedServiceCatalog.Get(definitionId).Name,
+                    (token, progress) => InstallWithBackupAsync(definitionId, token, new InstallationReporter(this, progress)), cancellation.Token,
+                    async () => { await InstallAsync(definitionId); })
                 : await installPackage(definitionId, cancellation.Token);
             ReportInstallation(new(definitionId, ServiceInstallationStage.Completed));
         }
@@ -244,7 +252,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         {
             failure = error;
             ReportInstallation(new(definitionId,
-                error is OperationCanceledException && cancellation.IsCancellationRequested
+                error is OperationCanceledException
                     ? ServiceInstallationStage.Cancelled : ServiceInstallationStage.Failed,
                 Error: error is OperationCanceledException ? null : error.Message));
         }
@@ -267,12 +275,49 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         else completion.TrySetResult(release!);
     }
 
+    private async Task<ServicePackageRelease> InstallWithBackupAsync(string definitionId,
+        CancellationToken cancellationToken, IProgress<ServiceInstallationProgress> progress)
+    {
+        await lifecycle.WaitAsync(cancellationToken);
+        try
+        {
+            var instances = LoadInstances().Where(item => item.DefinitionId == definitionId).ToArray();
+            if (instances.Any(item => State(item.Id, definitionId) == ManagedServiceState.Running))
+                throw new InvalidOperationException("Stop all instances of this service before updating its runtime.");
+            if (installer.IsInstalled(definitionId))
+            {
+                progress.Report(new(definitionId, ServiceInstallationStage.BackingUp));
+                await Backups.CreateAsync(definitionId, instances, cancellationToken, installer.InstalledVersion(definitionId));
+            }
+            return await installer.InstallAsync(definitionId, cancellationToken, progress);
+        }
+        finally { lifecycle.Release(); }
+    }
+
     public Task<ServicePackageRelease> ResolveReleaseAsync(
         string definitionId,
         CancellationToken cancellationToken = default
     ) => installer.ResolveReleaseAsync(definitionId, cancellationToken);
 
     public string DataDirectory(Guid id) => Path.Combine(SupportRoot, "Services", id.ToString("D"), "data");
+
+    public async Task RestoreDataAsync(Guid instanceId, ServiceBackup backup, CancellationToken cancellationToken = default)
+    {
+        await lifecycle.WaitAsync(cancellationToken);
+        try
+        {
+            var instance = LoadInstances().Single(item => item.Id == instanceId);
+            if (instance.DefinitionId != backup.DefinitionId
+                || State(instanceId, instance.DefinitionId) == ManagedServiceState.Running
+                || IsInstalling(instance.DefinitionId))
+                throw new InvalidOperationException("Stop the selected service and finish its installation before restoring data.");
+            if (backup.RuntimeVersion != installer.InstalledVersion(instance.DefinitionId))
+                throw new InvalidOperationException("Data recovery requires the same runtime version as the backup.");
+            await Backups.CreateAsync(instance.DefinitionId, [instance], cancellationToken, backup.RuntimeVersion);
+            await Backups.RestoreInstanceAsync(backup, instanceId, cancellationToken);
+        }
+        finally { lifecycle.Release(); }
+    }
 
     public int? ConsolePort(Guid id)
     {

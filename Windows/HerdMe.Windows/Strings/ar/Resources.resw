@@ -150,6 +150,28 @@
   <data name="ServicesCompleted" xml:space="preserve"><value>تم التثبيت</value></data>
   <data name="ServicesFailed" xml:space="preserve"><value>فشل التثبيت</value></data>
   <data name="ServicesRetry" xml:space="preserve"><value>إعادة محاولة التثبيت</value></data>
+  <data name="DoctorProject" xml:space="preserve"><value>المشروع</value></data>
+  <data name="DoctorEnvironment" xml:space="preserve"><value>بيئة المشروع</value></data>
+  <data name="DoctorDependencies" xml:space="preserve"><value>الاعتماديات</value></data>
+  <data name="DoctorExtensions" xml:space="preserve"><value>إضافات PHP</value></data>
+  <data name="DoctorStorage" xml:space="preserve"><value>مجلدات التخزين</value></data>
+  <data name="DoctorKey" xml:space="preserve"><value>مفتاح التطبيق</value></data>
+  <data name="DoctorDatabase" xml:space="preserve"><value>إعدادات قاعدة البيانات</value></data>
+  <data name="ServicesBackupsAction.Text" xml:space="preserve"><value>النسخ الاحتياطية للبيانات</value></data>
+  <data name="ServicesBackupsTitle" xml:space="preserve"><value>نسخ بيانات الخدمة الاحتياطية</value></data>
+  <data name="ServicesRestoreData" xml:space="preserve"><value>استعادة البيانات</value></data>
+  <data name="ServicesRestoreNotice" xml:space="preserve"><value>الاستعادة تستبدل بيانات الخدمة المحددة. يجب إيقاف الخدمة واستخدام إصدار التشغيل نفسه الموجود في النسخة الاحتياطية. تُحفظ نسخة من البيانات الحالية أولاً، ولا تتغير ملفات التشغيل.</value></data>
+  <data name="ErrorNetwork" xml:space="preserve"><value>تعذر الاتصال بمصدر التحميل. تحقق من الاتصال ثم أعد المحاولة.</value></data>
+  <data name="ErrorAccess" xml:space="preserve"><value>رُفض الوصول. تحقق من صلاحيات المجلد ومن عدم استخدام الملفات بواسطة عملية أخرى.</value></data>
+  <data name="ErrorMissingRuntime" xml:space="preserve"><value>ملف مطلوب غير موجود. ثبّت بيئة التشغيل أو أصلحها.</value></data>
+  <data name="ErrorPackage" xml:space="preserve"><value>تعذر التحقق من الحزمة. أعد محاولة التحميل.</value></data>
+  <data name="ErrorOperation" xml:space="preserve"><value>فشلت العملية. راجع التفاصيل أدناه قبل إعادة المحاولة.</value></data>
+  <data name="ServicesUseInstalled" xml:space="preserve"><value>الإصدار المثبت: {0}</value></data>
+  <data name="ServicesUseLatest" xml:space="preserve"><value>أحدث إصدار مدعوم: {0}</value></data>
+  <data name="SitesFavoriteAction.Text" xml:space="preserve"><value>إضافة أو إزالة من المفضلة</value></data>
+  <data name="ServicesBackingUp" xml:space="preserve"><value>جارٍ نسخ بيانات الخدمة احتياطياً</value></data>
+  <data name="DownloadsTitle.Text" xml:space="preserve"><value>التنزيلات</value></data>
+  <data name="DownloadsClear.Text" xml:space="preserve"><value>مسح سجل العمليات المنتهية</value></data>
   <data name="ServicesTransfer" xml:space="preserve"><value>{0:0.0} م.ب / {1:0.0} م.ب، {2:0.0} م.ب/ث</value></data>
   <data name="ServicesTransferUnknown" xml:space="preserve"><value>{0:0.0} م.ب، {1:0.0} م.ب/ث</value></data>
   <data name="ServicesAttempt" xml:space="preserve"><value>المحاولة {0}</value></data>

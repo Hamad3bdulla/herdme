@@ -67,6 +67,8 @@ jobs:
 
       - name: Run automated Windows x64 acceptance
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = "Stop"
           $transcript = Join-Path $env:GITHUB_WORKSPACE "build\windows-acceptance.log"
@@ -76,7 +78,10 @@ jobs:
           Set-Content -LiteralPath (Join-Path $fixture "index.html") -Value '<!doctype html><title>Readiness site</title><h1>Readiness site</h1>'
           Start-Transcript -Path $transcript -Force -UseMinimalHeader | Out-Null
           try {
-              & ./Windows/acceptance.ps1 -Configuration Release -SkipLiveReleaseChecks -CaptureScreenshots
+              $baseline = Join-Path $env:GITHUB_WORKSPACE 'build\upgrade-baseline'
+              gh release download v0.1.18 --repo $env:GITHUB_REPOSITORY --pattern '*win-x64-setup.exe*' --dir $baseline
+              if ($LASTEXITCODE -ne 0) { throw 'Could not download the previous installer for upgrade acceptance.' }
+              & ./Windows/acceptance.ps1 -Configuration Release -SkipLiveReleaseChecks -CaptureScreenshots -PreviousInstallerPath (Join-Path $baseline 'HerdMe-0.1.18-win-x64-setup.exe')
           }
           catch {
               $message = $_.Exception.Message

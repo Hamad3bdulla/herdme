@@ -81,6 +81,15 @@ public sealed class SiteRecord
     [JsonIgnore]
     public string? GitSummary { get; set; }
 
+    [JsonIgnore]
+    public bool IsFavorite { get; set; }
+
+    [JsonIgnore]
+    public string? LastError { get; set; }
+
+    [JsonIgnore]
+    public string? WorkflowStatus { get; set; }
+
     public string Runtime => PhpVersion is not null
         ? $"PHP {PhpVersion}"
         : NodeVersion is not null ? $"Node {NodeVersion}" : "Default";

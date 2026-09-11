@@ -195,6 +195,7 @@
                                 <Grid Padding="10,7" ColumnSpacing="10">
                                     <Grid.ContextFlyout>
                                         <MenuFlyout>
+                                            <MenuFlyoutItem x:Uid="SitesFavoriteAction" Text="Toggle favorite" Tag="{x:Bind Path}" Click="FavoriteSite_Click" />
                                             <MenuFlyoutItem x:Uid="SitesContextCopyLink" Text="Copy link" Tag="{x:Bind Path}" Click="CopySiteLinkFromMenu_Click" />
                                             <MenuFlyoutItem x:Uid="SitesContextCopyPath" Text="Copy path" Tag="{x:Bind Path}" Click="CopySitePathFromMenu_Click" />
                                             <MenuFlyoutSeparator />
@@ -214,7 +215,10 @@
                                         <SymbolIcon Symbol="Globe" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                     </Border>
                                     <StackPanel Grid.Column="1" Spacing="2">
+                                        <SymbolIcon Symbol="Favorite" Visibility="{x:Bind IsFavorite}" HorizontalAlignment="Left" Width="12" Height="12" />
                                         <TextBlock Text="{x:Bind Domain}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind LastError}" MaxLines="2" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                                        <TextBlock Text="{x:Bind WorkflowStatus}" FontSize="12" />
                                         <Grid ColumnSpacing="8">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto" />
@@ -469,7 +473,7 @@
                                 <TextBlock x:Uid="SitesRegistrationLabel" Grid.Row="2" Text="Registration" Padding="0,10" FontWeight="SemiBold" />
                                 <TextBlock x:Name="RegistrationText" Grid.Row="2" Grid.Column="1" Padding="0,10" />
                                 <TextBlock x:Uid="SitesPathLabel" Grid.Row="3" Text="Path" Padding="0,10" FontWeight="SemiBold" />
-                                <TextBlock x:Name="PathText" Grid.Row="3" Grid.Column="1" Padding="0,10" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                                <TextBlock x:Name="PathText" Grid.Row="3" Grid.Column="1" Padding="0,10" TextWrapping="Wrap" IsTextSelectionEnabled="True" FlowDirection="LeftToRight" />
                                 <TextBlock x:Uid="SitesUrlLabel" Grid.Row="4" Text="URL" Padding="0,10" FontWeight="SemiBold" />
                                 <HyperlinkButton x:Name="UrlButton" Grid.Row="4" Grid.Column="1" Padding="0,10" Click="OpenSite_Click" />
                                 <TextBlock x:Uid="SitesEnvironmentFileLabel" Grid.Row="5" Text="Environment file" Padding="0,10" FontWeight="SemiBold" />

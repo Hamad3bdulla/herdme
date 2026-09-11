@@ -82,6 +82,7 @@ public sealed class ServicePackageInstaller
         }
 
         progress?.Report(new(definitionId, ServiceInstallationStage.Resolving));
+        InstallationPreflight.EnsureStorage(RuntimeRoot);
         var release = await ResolveReleaseAsync(definitionId, cancellationToken);
         Directory.CreateDirectory(RuntimeRoot);
         var cache = Path.Combine(SupportRoot, "Cache", "services");
@@ -99,6 +100,8 @@ public sealed class ServicePackageInstaller
             Directory.CreateDirectory(stagingContainer);
             if (release.IsZipArchive)
             {
+                using (var archive = System.IO.Compression.ZipFile.OpenRead(download))
+                    InstallationPreflight.EnsureStorage(RuntimeRoot, checked(archive.Entries.Sum(entry => entry.Length) + 64L * 1024 * 1024));
                 await SafeZipExtractor.ExtractAsync(
                     download,
                     stagingContainer,
@@ -576,11 +579,13 @@ public sealed class ServicePackageInstaller
             _ => throw new InvalidDataException("The service package uses an unsupported checksum algorithm.")
         };
         Exception? lastFailure = null;
+        System.Net.Http.Headers.EntityTagHeaderValue? validator = null;
+        if (File.Exists(destination)) File.Delete(destination);
         for (var attempt = 1; attempt <= maximumAttempts; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (File.Exists(destination)) File.Delete(destination);
             var verified = false;
+            var retainPartial = false;
             try
             {
                 using var attemptCancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -589,22 +594,52 @@ public sealed class ServicePackageInstaller
                 attemptCancellation.CancelAfter(DownloadAttemptTimeout);
                 var attemptToken = attemptCancellation.Token;
                 progress?.Report(new(release.DefinitionId, ServiceInstallationStage.Downloading, Attempt: attempt));
-                using var response = await downloadClient.GetAsync(
-                    release.DownloadUri,
+                var offset = validator is not null && File.Exists(destination) ? new FileInfo(destination).Length : 0;
+                using var request = new HttpRequestMessage(HttpMethod.Get, release.DownloadUri);
+                if (offset > 0)
+                {
+                    request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(offset, null);
+                    request.Headers.IfRange = new System.Net.Http.Headers.RangeConditionHeaderValue(validator!);
+                }
+                using var response = await downloadClient.SendAsync(
+                    request,
                     HttpCompletionOption.ResponseHeadersRead,
                     attemptToken
                 );
+                if (offset > 0 && response.StatusCode == System.Net.HttpStatusCode.RequestedRangeNotSatisfiable)
+                {
+                    validator = null;
+                    throw new IOException("The partial package is no longer available; restarting the download.");
+                }
                 response.EnsureSuccessStatusCode();
+                var resumed = response.StatusCode == System.Net.HttpStatusCode.PartialContent;
+                if (resumed && (offset == 0 || response.Content.Headers.ContentRange?.From != offset
+                    || response.Content.Headers.ContentRange?.Length is null
+                    || response.Headers.ETag?.Tag != validator?.Tag))
+                {
+                    validator = null;
+                    throw new IOException("The resumed package response did not match the original download.");
+                }
+                if (!resumed) offset = 0;
+                validator = response.Headers.ETag is { IsWeak: false } etag ? etag : null;
                 // Bound inactivity, not the total transfer time, for large packages on slow links.
                 attemptCancellation.CancelAfter(Timeout.InfiniteTimeSpan);
-                var total = response.Content.Headers.ContentLength;
+                var total = resumed ? response.Content.Headers.ContentRange!.Length : response.Content.Headers.ContentLength;
                 var elapsed = System.Diagnostics.Stopwatch.StartNew();
-                long received = 0;
+                long received = offset;
                 var reportedAt = TimeSpan.Zero;
                 await using var source = await response.Content.ReadAsStreamAsync(attemptToken);
-                await using var output = File.Create(destination);
                 using var hash = IncrementalHash.CreateHash(algorithm);
                 var buffer = new byte[128 * 1_024];
+                if (offset > 0)
+                {
+                    await using var prefix = File.OpenRead(destination);
+                    int prefixCount;
+                    while ((prefixCount = await prefix.ReadAsync(buffer, attemptToken)) > 0)
+                        hash.AppendData(buffer, 0, prefixCount);
+                }
+                await using var output = new FileStream(destination, offset > 0 ? FileMode.Append : FileMode.Create,
+                    FileAccess.Write, FileShare.None, buffer.Length, true);
                 while (true)
                 {
                     attemptCancellation.CancelAfter(DownloadIdleTimeout);
@@ -617,7 +652,7 @@ public sealed class ServicePackageInstaller
                     {
                         reportedAt = elapsed.Elapsed;
                         progress?.Report(new(release.DefinitionId, ServiceInstallationStage.Downloading,
-                            received, total, attempt, received / Math.Max(elapsed.Elapsed.TotalSeconds, 0.001)));
+                            received, total, attempt, (received - offset) / Math.Max(elapsed.Elapsed.TotalSeconds, 0.001)));
                     }
                 }
                 progress?.Report(new(release.DefinitionId, ServiceInstallationStage.Verifying, received, total, attempt));
@@ -627,6 +662,7 @@ public sealed class ServicePackageInstaller
                 var actual = Convert.ToHexString(hash.GetHashAndReset());
                 if (!actual.Equals(release.Checksum, StringComparison.OrdinalIgnoreCase))
                 {
+                    validator = null;
                     throw new IOException(
                         $"The {release.DefinitionId} download was incomplete or failed "
                         + $"{release.ChecksumAlgorithm} verification."
@@ -642,6 +678,7 @@ public sealed class ServicePackageInstaller
             {
                 lastFailure = error;
                 if (attempt == maximumAttempts) break;
+                retainPartial = validator is not null;
                 progress?.Report(new(release.DefinitionId, ServiceInstallationStage.Retrying, Attempt: attempt + 1));
                 var delay = delayFactory?.Invoke(attempt)
                     ?? TimeSpan.FromMilliseconds(Math.Min(8_000, 500 * Math.Pow(2, attempt - 1)));
@@ -649,7 +686,7 @@ public sealed class ServicePackageInstaller
             }
             finally
             {
-                if (!verified) File.Delete(destination);
+                if (!verified && (!retainPartial || cancellationToken.IsCancellationRequested)) File.Delete(destination);
             }
         }
         if (File.Exists(destination)) File.Delete(destination);

@@ -47,6 +47,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition x:Name="ServiceTypeColumn" Width="180" />
@@ -76,12 +77,13 @@
                 </Button>
                 <TextBlock
                     x:Name="ServiceAvailabilityText"
-                    Grid.Row="2"
+                    Grid.Row="3"
                     Grid.ColumnSpan="4"
                     Margin="0,10,0,0"
                     Foreground="{ThemeResource SystemFillColorCautionBrush}"
                     TextWrapping="Wrap"
                     Visibility="Collapsed" />
+                <ComboBox x:Name="ServiceVersionBox" Grid.Row="2" Grid.ColumnSpan="4" HorizontalAlignment="Stretch" />
             </Grid>
         </Border>
 
@@ -155,8 +157,8 @@
                                     <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Name}" />
                                     <TextBlock Text="{x:Bind Subtitle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Subtitle}" />
                                 </StackPanel>
-                                <TextBlock Grid.Column="1" Text="{x:Bind Port}" VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="2" Text="{x:Bind Version}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="1" Text="{x:Bind Port}" VerticalAlignment="Center" FlowDirection="LeftToRight" />
+                                <TextBlock Grid.Column="2" Text="{x:Bind Version}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FlowDirection="LeftToRight" />
                                 <TextBlock Grid.Column="3" Text="{x:Bind Status}" VerticalAlignment="Center" TextWrapping="Wrap" />
                                 <StackPanel Grid.Column="4" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="6">
                                     <Button Style="{StaticResource ToolbarIconButtonStyle}"
@@ -179,6 +181,7 @@
                                         <SymbolIcon Symbol="More" />
                                         <Button.Flyout>
                                             <MenuFlyout>
+                                                <MenuFlyoutItem x:Uid="ServicesBackupsAction" Text="Data backups" Tag="{x:Bind Id}" Click="Backups_Click" />
                                                 <ToggleMenuFlyoutItem
                                                     x:Uid="ServicesAutomaticStartMenu"
                                                     Text="Start automatically"

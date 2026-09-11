@@ -142,8 +142,9 @@ public static class SiteHealthInspector
         {
             try
             {
-                await phpInstaller.EnsureManagedConfigurationAsync(phpCycle, cancellationToken);
-                checks.Add(new SiteHealthCheck("PHP extensions", true, "Ready"));
+                var report = await phpInstaller.ManagedExtensionReportAsync(phpInstaller.PhpExecutable(phpCycle), cancellationToken);
+                checks.Add(new SiteHealthCheck("PHP extensions", report.Missing.Count == 0,
+                    report.Missing.Count == 0 ? "Ready" : string.Join(", ", report.Missing)));
             }
             catch (Exception error) when (error is IOException or InvalidDataException
                 or InvalidOperationException)
