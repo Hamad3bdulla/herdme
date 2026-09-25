@@ -5,6 +5,15 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.22] - 2026-09-25
+
+### Fixed
+
+- Windows Setup requests graceful shutdown before updating and terminates remaining
+  HerdMe processes and their descendants. Scope cleanup to this user session and
+  the installation/managed runtime directories; preserve unrelated programs.
+- Remove the early running-app mutex blocker so older tray-only versions can update.
+
 ## [0.1.21] - 2026-09-25
 
 ### Fixed

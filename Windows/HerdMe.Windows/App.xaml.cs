@@ -220,6 +220,11 @@ public partial class App : Application
             {
                 if (!singleInstance.WaitForActivation()) return;
                 if (exitRequested) return;
+                if (singleInstance.ShutdownRequested)
+                {
+                    MainWindow.DispatcherQueue.TryEnqueue(async () => await RequestExitAsync());
+                    return;
+                }
                 MainWindow.DispatcherQueue.TryEnqueue(() =>
                 {
                     if (exitRequested) return;

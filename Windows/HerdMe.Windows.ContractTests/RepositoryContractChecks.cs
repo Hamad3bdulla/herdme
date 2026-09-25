@@ -383,8 +383,9 @@ internal static partial class ContractChecks
         );
         Check(
             setup.GetValueOrDefault("MinVersion") == "10.0.19041"
-                && setup.GetValueOrDefault("AppMutex") == SingleInstanceCoordinator.MutexName,
-            "the Windows installer matches the supported OS and runtime mutex"
+                && !setup.ContainsKey("AppMutex")
+                && installerText.Contains("function PrepareToInstall", StringComparison.Ordinal),
+            "the Windows installer stops the app before replacing files instead of blocking on its mutex"
         );
         Check(
             setup.GetValueOrDefault("CloseApplications") == "yes"

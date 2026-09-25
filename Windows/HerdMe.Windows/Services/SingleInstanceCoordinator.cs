@@ -10,6 +10,8 @@ public sealed class SingleInstanceCoordinator : IDisposable
 
     private readonly Mutex mutex;
     private readonly EventWaitHandle? activationEvent;
+    private readonly EventWaitHandle? shutdownEvent;
+    public bool ShutdownRequested { get; private set; }
     private bool ownsMutex;
 
     public SingleInstanceCoordinator()
@@ -32,6 +34,8 @@ public sealed class SingleInstanceCoordinator : IDisposable
             mode: EventResetMode.AutoReset,
             name: ActivationEventName
         );
+        shutdownEvent = new EventWaitHandle(false, EventResetMode.AutoReset,
+            @"Local\HerdMe.Desktop.Shutdown");
     }
 
     public bool IsPrimary { get; }
@@ -39,7 +43,7 @@ public sealed class SingleInstanceCoordinator : IDisposable
     public bool WaitForActivation()
     {
         if (activationEvent is null) return false;
-        activationEvent.WaitOne();
+        ShutdownRequested = WaitHandle.WaitAny([activationEvent, shutdownEvent!]) == 1;
         return true;
     }
 
@@ -48,6 +52,7 @@ public sealed class SingleInstanceCoordinator : IDisposable
     public void Dispose()
     {
         activationEvent?.Dispose();
+        shutdownEvent?.Dispose();
         if (ownsMutex)
         {
             mutex.ReleaseMutex();
