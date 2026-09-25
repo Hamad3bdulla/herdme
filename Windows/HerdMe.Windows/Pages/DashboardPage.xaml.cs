@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
 using Microsoft.UI.Xaml;
@@ -8,6 +9,13 @@ namespace HerdMe.Windows.Pages;
 
 public sealed partial class DashboardPage : Page
 {
+    // Endpoint probes send a real GET / through the local server, which boots the whole
+    // application. Healthy results are reused for a short time (the page is recreated on every
+    // navigation), failures are always re-probed, and the Refresh button bypasses the cache.
+    private static readonly TimeSpan EndpointProbeCacheLifetime = TimeSpan.FromSeconds(60);
+    private const int MaximumConcurrentEndpointProbes = 2;
+    private static readonly ConcurrentDictionary<string, (DateTimeOffset CheckedAt, RuntimeHealthResult Result)>
+        EndpointProbeCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly CoreClient coreClient;
     private readonly SiteConfigurationStore settingsStore;
     private readonly WindowsLocalEnvironment environment;
@@ -24,6 +32,7 @@ public sealed partial class DashboardPage : Page
     private readonly OperationJournal repairJournal;
     private CancellationTokenSource? refreshCancellation;
     private bool? usesCompactLayout;
+    private bool? compactModeSetting;
     private readonly HashSet<string> failedSiteNames = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<string> lastHealthWarnings = [];
     private readonly DispatcherTimer environmentRefreshTimer = new()
@@ -86,7 +95,8 @@ public sealed partial class DashboardPage : Page
     private void Page_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         var compact = e.NewSize.Width < 820;
-        var compactMode = settingsStore.Load().CompactMode;
+        // SizeChanged fires continuously while resizing; read the settings file only once.
+        var compactMode = compactModeSetting ??= settingsStore.Load().CompactMode;
         if (usesCompactLayout == compact && !compactMode) return;
         usesCompactLayout = compact;
 
@@ -190,10 +200,10 @@ public sealed partial class DashboardPage : Page
 
     private async void Refresh_Click(object sender, RoutedEventArgs e)
     {
-        await RefreshAsync();
+        await RefreshAsync(forceEndpointProbes: true);
     }
 
-    private async Task RefreshAsync()
+    private async Task RefreshAsync(bool forceEndpointProbes = false)
     {
         refreshCancellation?.Cancel();
         refreshCancellation?.Dispose();
@@ -205,6 +215,7 @@ public sealed partial class DashboardPage : Page
         try
         {
             var settings = settingsStore.Load();
+            compactModeSetting = settings.CompactMode;
             var sitesTask = coreClient.ScanAsync(
                 settings.Roots,
                 settings.Tld,
@@ -234,6 +245,24 @@ public sealed partial class DashboardPage : Page
             var domainsConfigured = await domainsTask;
             var certificateTrusted = await certificateTask;
             var defaultPhpCycle = runtimePolicy.Load().PhpCycle;
+            var certificateExpiryTask = Task.Run(
+                certificateManager.ServerCertificateExpiresAt,
+                cancellation.Token
+            );
+            // Sites usually share one or two PHP versions; validate each php.exe once per
+            // refresh instead of spawning php/core for every site.
+            var extensionReports = new ConcurrentDictionary<string, Lazy<Task<PhpExtensionReport>>>(
+                StringComparer.OrdinalIgnoreCase
+            );
+            Task<PhpExtensionReport> SharedExtensionReport(string phpExecutable, CancellationToken token)
+            {
+                return extensionReports.GetOrAdd(
+                    phpExecutable,
+                    path => new Lazy<Task<PhpExtensionReport>>(
+                        () => phpInstaller.ManagedExtensionReportAsync(path, token)
+                    )
+                ).Value;
+            }
             // SiteHealthInspector performs bounded filesystem and JSON reads
             // before its asynchronous PHP checks. Keep that work off the UI
             // thread when several sites are present.
@@ -246,6 +275,7 @@ public sealed partial class DashboardPage : Page
                     composerTools,
                     certificateManager,
                     site.NodeVersion,
+                    SharedExtensionReport,
                     cancellation.Token
                 ),
                 cancellation.Token
@@ -257,19 +287,44 @@ public sealed partial class DashboardPage : Page
                 .ToArray();
             if (environment.IsRunning)
             {
+                using var probeGate = new SemaphoreSlim(MaximumConcurrentEndpointProbes);
+                var https = environment.HttpsPort is not null;
+                var probeScope = $"{environment.HttpPort}|{environment.HttpsPort}|{https}";
+                async Task<RuntimeHealthResult> ProbeEndpointAsync(string domain)
+                {
+                    var key = $"{probeScope}|{domain}";
+                    if (!forceEndpointProbes
+                        && EndpointProbeCache.TryGetValue(key, out var cached)
+                        && DateTimeOffset.UtcNow - cached.CheckedAt < EndpointProbeCacheLifetime)
+                    {
+                        return cached.Result;
+                    }
+                    await probeGate.WaitAsync(cancellation.Token);
+                    try
+                    {
+                        var result = await RuntimeHealthInspector.InspectSiteAsync(
+                            domain,
+                            https,
+                            cancellation.Token
+                        );
+                        if (result.Healthy) EndpointProbeCache[key] = (DateTimeOffset.UtcNow, result);
+                        else EndpointProbeCache.TryRemove(key, out _);
+                        return result;
+                    }
+                    finally
+                    {
+                        probeGate.Release();
+                    }
+                }
                 var endpointResults = await Task.WhenAll(sites.Select(site =>
-                    RuntimeHealthInspector.InspectSiteAsync(
-                        site.Domain,
-                        environment.HttpsPort is not null,
-                        cancellation.Token
-                    )));
+                    ProbeEndpointAsync(site.Domain)));
                 siteHealth = siteHealth.Concat(endpointResults
                     .Select((result, index) => (result, index))
                     .Where(item => !item.result.Healthy)
                     .Select(item => $"{sites[item.index].Name}: {item.result.Name} - {item.result.Detail}"))
                     .ToArray();
             }
-            var certificateExpiry = certificateManager.ServerCertificateExpiresAt();
+            var certificateExpiry = await certificateExpiryTask;
             if (certificateExpiry is { } expiry && expiry <= DateTimeOffset.UtcNow.AddDays(30))
             {
                 siteHealth = siteHealth.Append($"HTTPS certificate expires {expiry:d}").ToArray();
@@ -923,7 +978,7 @@ public sealed partial class DashboardPage : Page
         }
         finally
         {
-            await RefreshAsync();
+            await RefreshAsync(forceEndpointProbes: true);
             RepairAllButton.IsEnabled = true;
             RefreshButton.IsEnabled = true;
             RefreshProgress.IsActive = false;
@@ -1023,7 +1078,7 @@ public sealed partial class DashboardPage : Page
         }
         finally
         {
-            await RefreshAsync();
+            await RefreshAsync(forceEndpointProbes: true);
         }
     }
 

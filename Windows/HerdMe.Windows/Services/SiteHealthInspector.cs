@@ -1,4 +1,5 @@
 using System.Text.Json;
+using HerdMe.Windows.Models;
 
 namespace HerdMe.Windows.Services;
 
@@ -6,7 +7,7 @@ public sealed record SiteHealthCheck(string Name, bool Healthy, string Detail);
 
 public static class SiteHealthInspector
 {
-    public static async Task<IReadOnlyList<SiteHealthCheck>> InspectAsync(
+    public static Task<IReadOnlyList<SiteHealthCheck>> InspectAsync(
         string sitePath,
         string domain,
         string phpCycle,
@@ -14,6 +15,34 @@ public static class SiteHealthInspector
         ComposerToolManager composerTools,
         WindowsCertificateManager certificates,
         string? nodeVersion = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return InspectAsync(
+            sitePath,
+            domain,
+            phpCycle,
+            phpInstaller,
+            composerTools,
+            certificates,
+            nodeVersion,
+            extensionReport: null,
+            cancellationToken
+        );
+    }
+
+    // extensionReport is an optional shared lookup keyed by php.exe path. Callers that inspect
+    // many sites at once (the dashboard) pass a memoized lookup so each PHP version is
+    // validated once per refresh instead of once per site.
+    public static async Task<IReadOnlyList<SiteHealthCheck>> InspectAsync(
+        string sitePath,
+        string domain,
+        string phpCycle,
+        PhpRuntimeInstaller phpInstaller,
+        ComposerToolManager composerTools,
+        WindowsCertificateManager certificates,
+        string? nodeVersion,
+        Func<string, CancellationToken, Task<PhpExtensionReport>>? extensionReport,
         CancellationToken cancellationToken = default
     )
     {
@@ -142,7 +171,10 @@ public static class SiteHealthInspector
         {
             try
             {
-                var report = await phpInstaller.ManagedExtensionReportAsync(phpInstaller.PhpExecutable(phpCycle), cancellationToken);
+                var phpExecutable = phpInstaller.PhpExecutable(phpCycle);
+                var report = extensionReport is null
+                    ? await phpInstaller.ManagedExtensionReportAsync(phpExecutable, cancellationToken)
+                    : await extensionReport(phpExecutable, cancellationToken);
                 checks.Add(new SiteHealthCheck("PHP extensions", report.Missing.Count == 0,
                     report.Missing.Count == 0 ? "Ready" : string.Join(", ", report.Missing)));
             }

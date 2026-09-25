@@ -5,6 +5,25 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+### Changed
+
+- Keep Windows HTTP/1.1 connections alive for PHP responses without a
+  Content-Length (typical for Laravel) by framing them with chunked encoding,
+  avoiding a new TCP/TLS handshake for every page, XHR, and Livewire request.
+- Enable TCP_NODELAY on Windows FastCGI connections and coalesce the begin,
+  parameter, and stdin records into buffered writes to avoid Nagle stalls.
+- Send ETag and Last-Modified for Windows static files and answer conditional
+  requests (If-None-Match, If-Modified-Since, If-Range) with 304 or a full body.
+- Validate each PHP runtime's extensions once per Windows dashboard refresh,
+  reuse healthy site endpoint probes for 60 seconds (Refresh bypasses the cache),
+  limit concurrent probes, and move certificate and settings reads off hot paths.
+
+### Fixed
+
+- Apply the 5-second Windows request timeout only to headers and idle
+  connections; request bodies now use a 30-second inactivity timeout so slow or
+  large uploads are no longer cancelled.
+
 ## [0.1.22] - 2026-09-25
 
 ### Fixed

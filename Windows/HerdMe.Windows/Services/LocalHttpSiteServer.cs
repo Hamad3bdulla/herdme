@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
@@ -44,6 +45,9 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     private const int MaximumBodySize = 32 * 1_024 * 1_024;
     private const int MaximumPersistentRequests = 100;
     private static readonly TimeSpan PersistentIdleTimeout = TimeSpan.FromSeconds(5);
+    // Request bodies (uploads) are not bound by the 5s header/idle window; instead the
+    // connection is dropped only if the client stops sending body bytes for this long.
+    private static readonly TimeSpan RequestBodyIdleTimeout = TimeSpan.FromSeconds(30);
     private readonly FastCgiClient fastCgiClient = new();
     private readonly HttpClient phpHttpClient = new(new SocketsHttpHandler
     {
@@ -208,7 +212,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                     {
                         request = await reader.ReadAsync(
                             allowCleanEndOfStream: requestCount > 0,
-                            requestCancellation.Token
+                            requestCancellation
                         );
                     }
                     catch (OperationCanceledException) when (
@@ -377,7 +381,8 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         var writer = new FastCgiHttpResponseWriter(
             destination,
             request.Method == "HEAD",
-            keepAlive
+            keepAlive,
+            allowChunkedEncoding: request.Protocol == "HTTP/1.1"
         );
         try
         {
@@ -388,7 +393,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 writer.WriteAsync,
                 cancellationToken
             );
-            await writer.CompleteAsync();
+            await writer.CompleteAsync(cancellationToken);
             if (result.StandardError.Length > 0) WritePhpLog(result.StandardError);
             return new LocalResponseResult(writer.KeepsConnectionAlive, writer.StatusCode);
         }
@@ -581,7 +586,30 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             throw new HttpRequestException("403 Forbidden");
         }
         var fileSize = file.Length;
-        if (!TrySelectByteRange(request.Header("Range"), fileSize, out var selectedRange))
+        var lastWriteUtc = File.GetLastWriteTimeUtc(file.SafeFileHandle);
+        var lastModified = TruncateToSeconds(lastWriteUtc);
+        var entityTag = StaticEntityTag(fileSize, lastWriteUtc);
+        var lastModifiedText = lastModified.ToString("R", CultureInfo.InvariantCulture);
+        if (IsNotModified(request, entityTag, lastModified))
+        {
+            await destination.WriteAsync(
+                MakeResponseHead(
+                    "304 Not Modified",
+                    [
+                        ("ETag", entityTag),
+                        ("Last-Modified", lastModifiedText),
+                        ("Cache-Control", "no-cache"),
+                        ("Connection", keepAlive ? "keep-alive" : "close")
+                    ]
+                ),
+                cancellationToken
+            );
+            return new LocalResponseResult(keepAlive, 304);
+        }
+        var rangeHeader = RangeValidatorMatches(request.Header("If-Range"), entityTag, lastModified)
+            ? request.Header("Range")
+            : null;
+        if (!TrySelectByteRange(rangeHeader, fileSize, out var selectedRange))
         {
             await destination.WriteAsync(
                 MakeResponseHead(
@@ -605,6 +633,8 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             ("Content-Length", selectedRange.Length.ToString()),
             ("Accept-Ranges", "bytes"),
             ("Cache-Control", "no-cache"),
+            ("ETag", entityTag),
+            ("Last-Modified", lastModifiedText),
             ("Connection", keepAlive ? "keep-alive" : "close")
         };
         if (selectedRange.IsPartial)
@@ -641,6 +671,63 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             remaining -= count;
         }
         return new LocalResponseResult(keepAlive, statusCode);
+    }
+
+    private static DateTime TruncateToSeconds(DateTime value)
+    {
+        return new DateTime(value.Ticks - value.Ticks % TimeSpan.TicksPerSecond, DateTimeKind.Utc);
+    }
+
+    private static string StaticEntityTag(long fileSize, DateTime lastWriteUtc)
+    {
+        // Size plus full-precision write time: cheap to compute and changes on every save.
+        return "\""
+            + fileSize.ToString("x", CultureInfo.InvariantCulture)
+            + "-"
+            + lastWriteUtc.Ticks.ToString("x", CultureInfo.InvariantCulture)
+            + "\"";
+    }
+
+    private static bool IsNotModified(HttpRequestData request, string entityTag, DateTime lastModified)
+    {
+        var ifNoneMatch = request.Header("If-None-Match");
+        if (ifNoneMatch is not null)
+        {
+            // If-None-Match takes precedence over If-Modified-Since and uses weak comparison.
+            return ifNoneMatch
+                .Split(',')
+                .Select(value => value.Trim())
+                .Any(value => value == "*" || WithoutWeakPrefix(value) == entityTag);
+        }
+        var ifModifiedSince = request.Header("If-Modified-Since");
+        return ifModifiedSince is not null
+            && TryParseHttpDate(ifModifiedSince, out var since)
+            && lastModified <= since;
+    }
+
+    private static bool RangeValidatorMatches(string? ifRange, string entityTag, DateTime lastModified)
+    {
+        if (ifRange is null) return true;
+        var validator = ifRange.Trim();
+        if (validator.StartsWith("W/", StringComparison.Ordinal)) return false;
+        if (validator.StartsWith('"')) return validator == entityTag;
+        return TryParseHttpDate(validator, out var date) && date == lastModified;
+    }
+
+    private static string WithoutWeakPrefix(string entityTag)
+    {
+        return entityTag.StartsWith("W/", StringComparison.Ordinal) ? entityTag[2..] : entityTag;
+    }
+
+    private static bool TryParseHttpDate(string value, out DateTime date)
+    {
+        return DateTime.TryParseExact(
+            value.Trim(),
+            "R",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal,
+            out date
+        );
     }
 
     private static bool TrySelectByteRange(string? value, long fileSize, out ByteRange selectedRange)
@@ -904,7 +991,8 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     private static ParsedFastCgiHead ParseFastCgiResponseHead(
         ReadOnlySpan<byte> response,
         bool allowKeepAlive,
-        bool headOnly
+        bool headOnly,
+        bool allowChunkedEncoding
     )
     {
         string headerText;
@@ -962,13 +1050,22 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             headers.Add(("Content-Type", "text/html; charset=utf-8"));
         var statusCode = int.Parse(status.AsSpan(0, 3), CultureInfo.InvariantCulture);
         var bodyForbidden = statusCode is >= 100 and < 200 or 204 or 304;
-        var keepAlive = allowKeepAlive && (contentLength is not null || bodyForbidden || headOnly);
+        // Laravel and most PHP apps never send Content-Length. For HTTP/1.1 clients the body is
+        // framed with chunked encoding so the connection (and its TLS session) can be reused.
+        var chunked = allowKeepAlive
+            && allowChunkedEncoding
+            && contentLength is null
+            && !bodyForbidden
+            && !headOnly;
+        var keepAlive = allowKeepAlive && (contentLength is not null || bodyForbidden || headOnly || chunked);
+        if (chunked) headers.Add(("Transfer-Encoding", "chunked"));
         headers.Add(("Connection", keepAlive ? "keep-alive" : "close"));
         return new ParsedFastCgiHead(
             MakeResponseHead(status, headers),
             contentLength,
             bodyForbidden,
             keepAlive,
+            chunked,
             statusCode
         );
     }
@@ -1108,23 +1205,28 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     {
         private static readonly byte[] HeaderDelimiter = "\r\n\r\n"u8.ToArray();
         private static readonly byte[] AlternateHeaderDelimiter = "\n\n"u8.ToArray();
+        private static readonly byte[] LastChunk = "0\r\n\r\n"u8.ToArray();
         private readonly Stream destination;
         private readonly bool headOnly;
         private readonly bool allowKeepAlive;
+        private readonly bool allowChunkedEncoding;
         private readonly MemoryStream headerBuffer = new();
         private long? declaredContentLength;
         private long bodyBytes;
         private bool bodyForbidden;
+        private bool chunked;
 
         public FastCgiHttpResponseWriter(
             Stream destination,
             bool headOnly,
-            bool allowKeepAlive
+            bool allowKeepAlive,
+            bool allowChunkedEncoding
         )
         {
             this.destination = destination;
             this.headOnly = headOnly;
             this.allowKeepAlive = allowKeepAlive;
+            this.allowChunkedEncoding = allowChunkedEncoding;
         }
 
         public bool HasStarted { get; private set; }
@@ -1162,10 +1264,12 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             var parsed = ParseFastCgiResponseHead(
                 buffered.AsSpan(0, delimiter.Index),
                 allowKeepAlive,
-                headOnly
+                headOnly,
+                allowChunkedEncoding
             );
             declaredContentLength = parsed.ContentLength;
             bodyForbidden = parsed.BodyForbidden;
+            chunked = parsed.Chunked;
             KeepsConnectionAlive = parsed.KeepAlive;
             StatusCode = parsed.StatusCode;
             var bodyOffset = delimiter.Index + delimiter.Length;
@@ -1176,7 +1280,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             await WriteBodyAsync(bufferedBody, cancellationToken);
         }
 
-        public Task CompleteAsync()
+        public async Task CompleteAsync(CancellationToken cancellationToken)
         {
             if (!HasStarted)
             {
@@ -1189,7 +1293,10 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             {
                 throw new InvalidDataException("PHP returned a body that did not match Content-Length.");
             }
-            return Task.CompletedTask;
+            if (chunked)
+            {
+                await destination.WriteAsync(LastChunk, cancellationToken);
+            }
         }
 
         private async ValueTask WriteBodyAsync(
@@ -1207,9 +1314,38 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             {
                 throw new InvalidDataException("PHP returned a body larger than Content-Length.");
             }
-            if (!headOnly && !bodyForbidden)
+            if (headOnly || bodyForbidden) return;
+            if (chunked)
             {
-                await destination.WriteAsync(content, cancellationToken);
+                await WriteChunkAsync(content, cancellationToken);
+                return;
+            }
+            await destination.WriteAsync(content, cancellationToken);
+        }
+
+        private async ValueTask WriteChunkAsync(
+            ReadOnlyMemory<byte> content,
+            CancellationToken cancellationToken
+        )
+        {
+            // One contiguous write per chunk keeps the size line, data, and CRLF in the same
+            // TCP segment / TLS record instead of three tiny ones.
+            var sizeLine = Encoding.ASCII.GetBytes(
+                content.Length.ToString("X", CultureInfo.InvariantCulture) + "\r\n"
+            );
+            var frameLength = sizeLine.Length + content.Length + 2;
+            var frame = ArrayPool<byte>.Shared.Rent(frameLength);
+            try
+            {
+                sizeLine.CopyTo(frame, 0);
+                content.Span.CopyTo(frame.AsSpan(sizeLine.Length));
+                frame[frameLength - 2] = (byte)'\r';
+                frame[frameLength - 1] = (byte)'\n';
+                await destination.WriteAsync(frame.AsMemory(0, frameLength), cancellationToken);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(frame);
             }
         }
 
@@ -1228,6 +1364,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         long? ContentLength,
         bool BodyForbidden,
         bool KeepAlive,
+        bool Chunked,
         int StatusCode
     );
 
@@ -1276,6 +1413,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         private byte[] buffered = new byte[16 * 1_024];
         private int start;
         private int count;
+        private CancellationTokenSource? bodyProgressTimeout;
 
         public HttpRequestReader(Stream stream)
         {
@@ -1284,9 +1422,10 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
 
         public async Task<HttpRequestData?> ReadAsync(
             bool allowCleanEndOfStream,
-            CancellationToken cancellationToken
+            CancellationTokenSource timeout
         )
         {
+            var cancellationToken = timeout.Token;
             var headerEnd = FindHeaderEnd();
             while (headerEnd < 0)
             {
@@ -1405,9 +1544,19 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             }
 
             Consume(headerEnd + 4);
-            var body = transferCodings.Length == 1
-                ? await ReadChunkedBodyAsync(this, cancellationToken)
-                : await ReadExactlyAsync(contentLength, cancellationToken);
+            byte[] body;
+            timeout.CancelAfter(RequestBodyIdleTimeout);
+            bodyProgressTimeout = timeout;
+            try
+            {
+                body = transferCodings.Length == 1
+                    ? await ReadChunkedBodyAsync(this, cancellationToken)
+                    : await ReadExactlyAsync(contentLength, cancellationToken);
+            }
+            finally
+            {
+                bodyProgressTimeout = null;
+            }
             return new HttpRequestData(
                 requestLine[0].ToUpperInvariant(),
                 requestLine[1],
@@ -1493,6 +1642,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 }
                 var read = await stream.ReadAsync(output.AsMemory(offset), cancellationToken);
                 if (read == 0) throw new HttpRequestException("400 Bad Request");
+                bodyProgressTimeout?.CancelAfter(RequestBodyIdleTimeout);
                 offset += read;
             }
             return output;
@@ -1506,6 +1656,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 cancellationToken
             );
             count += read;
+            if (read > 0) bodyProgressTimeout?.CancelAfter(RequestBodyIdleTimeout);
             return read > 0;
         }
 

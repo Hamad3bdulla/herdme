@@ -499,6 +499,53 @@ internal static partial class ContractChecks
             );
         }
 
+        var validatorLines = get.Split("\r\n", StringSplitOptions.None);
+        var entityTag = validatorLines
+            .FirstOrDefault(line => line.StartsWith("ETag: \"", StringComparison.Ordinal))?.Substring("ETag: ".Length);
+        var lastModified = validatorLines
+            .FirstOrDefault(line => line.StartsWith("Last-Modified: ", StringComparison.Ordinal))?.Substring("Last-Modified: ".Length);
+        Check(
+            entityTag is not null && lastModified is not null,
+            "static responses include ETag and Last-Modified validators"
+        );
+        var notModified = await SendHttpRequestAsync(
+            port,
+            $"GET / HTTP/1.1\r\nHost: demo.local-test\r\nIf-None-Match: {entityTag}\r\nConnection: close\r\n\r\n"
+        );
+        Check(
+            notModified.StartsWith("HTTP/1.1 304 Not Modified\r\n", StringComparison.Ordinal)
+                && notModified.Contains($"ETag: {entityTag}\r\n", StringComparison.Ordinal)
+                && notModified.EndsWith("\r\n\r\n", StringComparison.Ordinal)
+                && !notModified.Contains("HerdMe static site", StringComparison.Ordinal),
+            "static revalidation with a matching ETag returns 304 without a body"
+        );
+        var weakNotModified = await SendHttpRequestAsync(
+            port,
+            $"GET / HTTP/1.1\r\nHost: demo.local-test\r\nIf-None-Match: \"other\", W/{entityTag}\r\nConnection: close\r\n\r\n"
+        );
+        Check(
+            weakNotModified.StartsWith("HTTP/1.1 304 Not Modified\r\n", StringComparison.Ordinal),
+            "static revalidation accepts weak ETags in an If-None-Match list"
+        );
+        var staleTag = await SendHttpRequestAsync(
+            port,
+            "GET / HTTP/1.1\r\nHost: demo.local-test\r\nIf-None-Match: \"stale\"\r\n"
+                + $"If-Modified-Since: {lastModified}\r\nConnection: close\r\n\r\n"
+        );
+        Check(
+            staleTag.StartsWith("HTTP/1.1 200 OK\r\n", StringComparison.Ordinal)
+                && staleTag.EndsWith("HerdMe static site", StringComparison.Ordinal),
+            "static revalidation with a stale ETag returns the full file even if the date matches"
+        );
+        var notModifiedSince = await SendHttpRequestAsync(
+            port,
+            $"GET / HTTP/1.1\r\nHost: demo.local-test\r\nIf-Modified-Since: {lastModified}\r\nConnection: close\r\n\r\n"
+        );
+        Check(
+            notModifiedSince.StartsWith("HTTP/1.1 304 Not Modified\r\n", StringComparison.Ordinal),
+            "static revalidation with If-Modified-Since returns 304 for unchanged files"
+        );
+
         var absoluteGet = await SendHttpRequestAsync(
             port,
             "GET http://demo.local-test/ HTTP/1.1\r\nHost: demo.local-test\r\nConnection: close\r\n\r\n"
@@ -562,6 +609,17 @@ internal static partial class ContractChecks
         Check(rangeHead.StartsWith("HTTP/1.1 206 Partial Content\r\n", StringComparison.Ordinal), "HEAD honors static byte ranges");
         Check(rangeHead.Contains("Content-Length: 10\r\n", StringComparison.Ordinal), "ranged HEAD reports the selected length");
         Check(rangeHead.EndsWith("\r\n\r\n", StringComparison.Ordinal), "ranged HEAD omits the response body");
+
+        var staleIfRange = await SendHttpRequestAsync(
+            port,
+            "GET /large.bin HTTP/1.1\r\nHost: demo.local-test\r\nRange: bytes=10-19\r\n"
+                + "If-Range: \"stale\"\r\nConnection: close\r\n\r\n"
+        );
+        Check(
+            staleIfRange.StartsWith("HTTP/1.1 200 OK\r\n", StringComparison.Ordinal)
+                && staleIfRange.Contains($"Content-Length: {largeAsset.Length}\r\n", StringComparison.Ordinal),
+            "static byte ranges are ignored when If-Range does not match"
+        );
 
         var unsatisfiable = await SendHttpRequestAsync(
             port,
@@ -751,7 +809,7 @@ internal static partial class ContractChecks
             await streamingClient.ConnectAsync(IPAddress.Loopback, streamingHttpPort);
             await using var streamingResponse = streamingClient.GetStream();
             await streamingResponse.WriteAsync(Encoding.ASCII.GetBytes(
-                "GET /stream.php HTTP/1.1\r\nHost: stream.local-test\r\n\r\n"
+                "GET /stream.php HTTP/1.1\r\nHost: stream.local-test\r\nConnection: close\r\n\r\n"
             ));
             using var received = new MemoryStream();
             using (var firstChunkTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(2)))
@@ -781,7 +839,7 @@ internal static partial class ContractChecks
             );
             Check(
                 responseHeader.Contains("Connection: close", StringComparison.OrdinalIgnoreCase),
-                "local HTTP closes streaming FastCGI responses without a framing length"
+                "local HTTP closes streaming FastCGI responses when the client requests closure"
             );
 
             allowFastCgiCompletion.TrySetResult(true);
@@ -797,6 +855,61 @@ internal static partial class ContractChecks
         {
             allowFastCgiCompletion.TrySetResult(true);
             streamingFastCgiListener.Stop();
+        }
+
+        var chunkedFastCgiListener = new TcpListener(IPAddress.Loopback, 0);
+        chunkedFastCgiListener.Start(1);
+        var chunkedFastCgiPort = ((IPEndPoint)chunkedFastCgiListener.LocalEndpoint).Port;
+        var chunkedFixture = HandleStreamingFastCgiFixtureAsync(
+            chunkedFastCgiListener,
+            Task.CompletedTask
+        );
+        try
+        {
+            var chunkedHttpReservation = new TcpListener(IPAddress.Loopback, 0);
+            chunkedHttpReservation.Start();
+            var chunkedHttpPort = ((IPEndPoint)chunkedHttpReservation.LocalEndpoint).Port;
+            chunkedHttpReservation.Stop();
+            await using var chunkedServer = new LocalHttpSiteServer();
+            await chunkedServer.StartAsync(
+                [new LocalSiteDefinition("chunked.local-test", siteRoot)],
+                phpFastCgiPort: chunkedFastCgiPort,
+                preferredPort: chunkedHttpPort
+            );
+
+            using var chunkedClient = new TcpClient();
+            await chunkedClient.ConnectAsync(IPAddress.Loopback, chunkedHttpPort);
+            await using var chunkedStream = chunkedClient.GetStream();
+            var chunkedReader = new HttpTestResponseReader(chunkedStream);
+            using var chunkedTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await chunkedStream.WriteAsync(Encoding.ASCII.GetBytes(
+                "GET /stream.php HTTP/1.1\r\nHost: chunked.local-test\r\n\r\n"
+                    + "GET /first.txt HTTP/1.1\r\nHost: chunked.local-test\r\nConnection: close\r\n\r\n"
+            ));
+            var chunkedResponse = await chunkedReader.ReadAsync(chunkedTimeout.Token);
+            Check(
+                chunkedResponse.StatusLine == "HTTP/1.1 200 OK"
+                    && chunkedResponse.Header("Transfer-Encoding") == "chunked"
+                    && chunkedResponse.Header("Content-Length") is null
+                    && chunkedResponse.Header("Connection") == "keep-alive"
+                    && chunkedResponse.BodyText == "first-second",
+                "local HTTP keeps unframed FastCGI responses alive with chunked encoding"
+            );
+            var afterChunked = await chunkedReader.ReadAsync(chunkedTimeout.Token);
+            Check(
+                afterChunked.Header("Connection") == "close"
+                    && afterChunked.BodyText == "first response",
+                "local HTTP serves the next request after a chunked FastCGI response"
+            );
+            Check(
+                await chunkedReader.ReachesEndOfStreamAsync(TimeSpan.FromSeconds(2)),
+                "local HTTP closes the chunked FastCGI session after its terminal response"
+            );
+            await chunkedFixture.WaitAsync(TimeSpan.FromSeconds(3));
+        }
+        finally
+        {
+            chunkedFastCgiListener.Stop();
         }
 
         var movedLaravelRoot = Path.Combine(supportRoot, "moved-laravel-site");
