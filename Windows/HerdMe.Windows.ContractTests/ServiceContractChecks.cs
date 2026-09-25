@@ -13,6 +13,69 @@ using HerdMe.Windows.Services;
 
 internal static partial class ContractChecks
 {
+    private static async Task VerifySiteProcessLifecycleAsync(string supportRoot)
+    {
+        var project = Path.Combine(supportRoot, "site-process-lifecycle");
+        Directory.CreateDirectory(project);
+        await File.WriteAllTextAsync(Path.Combine(project, "artisan"), "fixture");
+        var executable = ContractExecutablePath();
+        var argumentsEnvironment = NpmFixtureEnvironment("arguments");
+        var delayEnvironment = NpmFixtureEnvironment("delay");
+        await using var manager = new SiteProcessManager();
+
+        Throws<ArgumentOutOfRangeException>(
+            () => manager.Start(project, SiteBackgroundProcessKind.Queue, executable,
+                argumentsEnvironment, new SiteQueueWorkerOptions(Tries: 0)),
+            "invalid worker options fail before publishing a running process"
+        );
+        Check(!manager.State(project, SiteBackgroundProcessKind.Queue).Running,
+            "rejected worker options cannot leave a phantom queue worker");
+        Throws<ArgumentOutOfRangeException>(
+            () => manager.Start(project, (SiteBackgroundProcessKind)99, executable,
+                argumentsEnvironment),
+            "unsupported background process kinds are rejected synchronously"
+        );
+
+        manager.Start(project, SiteBackgroundProcessKind.Queue, executable, argumentsEnvironment);
+        using (var completion = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+        {
+            while (manager.State(project, SiteBackgroundProcessKind.Queue).Running)
+            {
+                await Task.Delay(20, completion.Token);
+            }
+        }
+        var completed = manager.State(project, SiteBackgroundProcessKind.Queue);
+        var receivedArguments = JsonSerializer.Deserialize<string[]>(completed.Output) ?? [];
+        Check(completed.ExitCode == 0 && receivedArguments.Contains("queue:work"),
+            "a corrected worker starts successfully and retains all output before completion");
+
+        for (var attempt = 0; attempt < 8; attempt++)
+        {
+            manager.Start(project, SiteBackgroundProcessKind.Queue, executable, delayEnvironment);
+            var original = manager.State(project, SiteBackgroundProcessKind.Queue);
+            await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
+                manager.Start(project, SiteBackgroundProcessKind.Queue, executable, delayEnvironment))));
+            Check(manager.State(project, SiteBackgroundProcessKind.Queue) == original,
+                "duplicate concurrent starts preserve the active worker state");
+            await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
+                manager.StopAsync(project, SiteBackgroundProcessKind.Queue))))
+                .WaitAsync(TimeSpan.FromSeconds(10));
+            Check(!manager.State(project, SiteBackgroundProcessKind.Queue).Running,
+                "concurrent stops finish before an immediate worker restart");
+        }
+
+        manager.Start(project, SiteBackgroundProcessKind.Queue, executable, delayEnvironment);
+        manager.Start(project, SiteBackgroundProcessKind.Scheduler, executable, delayEnvironment);
+        await manager.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        Check(!manager.State(project, SiteBackgroundProcessKind.Queue).Running
+                && !manager.State(project, SiteBackgroundProcessKind.Scheduler).Running,
+            "disposing the manager waits for every managed worker to stop");
+        Throws<ObjectDisposedException>(
+            () => manager.Start(project, SiteBackgroundProcessKind.Queue, executable, delayEnvironment),
+            "disposed process managers cannot launch orphan workers"
+        );
+    }
+
     private static async Task VerifyDatabaseTransferContractsAsync(string supportRoot)
     {
         var directory = Path.Combine(supportRoot, "database-transfer");
@@ -87,6 +150,7 @@ internal static partial class ContractChecks
 
     internal static async Task VerifyServiceContractsAsync(string supportRoot)
     {
+        await VerifySiteProcessLifecycleAsync(supportRoot);
         await VerifyDatabaseTransferContractsAsync(supportRoot);
         var favoriteStore = new SiteCommandFavoritesStore(
             Path.Combine(supportRoot, "command-favorites")

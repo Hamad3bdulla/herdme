@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-
 namespace HerdMe.Windows.Services;
 
 public enum SiteBackgroundProcessKind
@@ -59,29 +57,35 @@ public sealed record SiteBackgroundProcessState(
 
 public sealed class SiteProcessManager : IAsyncDisposable
 {
-    private sealed class RunningProcess(
-        CancellationTokenSource cancellation,
-        DateTimeOffset startedAt
-    )
+    private sealed class RunningProcess(CancellationTokenSource cancellation)
     {
         public CancellationTokenSource Cancellation { get; } = cancellation;
-        public DateTimeOffset StartedAt { get; } = startedAt;
         public Task Task { get; set; } = Task.CompletedTask;
     }
 
-    private readonly ConcurrentDictionary<string, RunningProcess> running =
+    private sealed class OutputProgress(Action<string> report) : IProgress<string>
+    {
+        public void Report(string value) => report(value);
+    }
+
+    private readonly object sync = new();
+    private readonly Dictionary<string, RunningProcess> running =
         new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, SiteBackgroundProcessState> states =
+    private readonly Dictionary<string, SiteBackgroundProcessState> states =
         new(StringComparer.OrdinalIgnoreCase);
+    private bool disposed;
 
     public event EventHandler? Changed;
 
     public SiteBackgroundProcessState State(string sitePath, SiteBackgroundProcessKind kind)
     {
         var path = Path.GetFullPath(sitePath);
-        return states.TryGetValue(Key(path, kind), out var state)
-            ? state
-            : new SiteBackgroundProcessState(path, kind, false, null, null, string.Empty);
+        lock (sync)
+        {
+            return states.TryGetValue(Key(path, kind), out var state)
+                ? state
+                : new SiteBackgroundProcessState(path, kind, false, null, null, string.Empty);
+        }
     }
 
     public void Start(
@@ -99,29 +103,38 @@ public sealed class SiteProcessManager : IAsyncDisposable
             throw new InvalidOperationException("This site does not contain Laravel Artisan.");
         }
         var key = Key(path, kind);
-        if (running.ContainsKey(key)) return;
-
-        var cancellation = new CancellationTokenSource();
-        var startedAt = DateTimeOffset.UtcNow;
-        states[key] = new SiteBackgroundProcessState(path, kind, true, startedAt, null, string.Empty);
-        var process = new RunningProcess(cancellation, startedAt);
-        if (!running.TryAdd(key, process))
+        var command = CreateCommand(kind, queueOptions);
+        lock (sync)
         {
-            cancellation.Dispose();
-            return;
+            ObjectDisposedException.ThrowIf(disposed, this);
+            if (running.ContainsKey(key)) return;
+
+            var process = new RunningProcess(new CancellationTokenSource());
+            running.Add(key, process);
+            states[key] = new SiteBackgroundProcessState(
+                path, kind, true, DateTimeOffset.UtcNow, null, string.Empty
+            );
+            // Publish the task before a concurrent stop can observe this process.
+            process.Task = Task.Run(() => RunAsync(
+                key, path, phpExecutable, environment, command, process
+            ));
         }
-        process.Task = RunAsync(key, path, kind, phpExecutable, environment, queueOptions, cancellation.Token);
         RaiseChanged();
     }
 
     public async Task StopAsync(string sitePath, SiteBackgroundProcessKind kind)
     {
         var key = Key(Path.GetFullPath(sitePath), kind);
-        if (!running.TryGetValue(key, out var process)) return;
-        process.Cancellation.Cancel();
+        Task task;
+        lock (sync)
+        {
+            if (!running.TryGetValue(key, out var process)) return;
+            process.Cancellation.Cancel();
+            task = process.Task;
+        }
         try
         {
-            await process.Task;
+            await task;
         }
         catch (OperationCanceledException)
         {
@@ -130,28 +143,26 @@ public sealed class SiteProcessManager : IAsyncDisposable
 
     public async Task StopAllAsync()
     {
-        var processes = running.Values.ToArray();
-        foreach (var process in processes) process.Cancellation.Cancel();
+        Task[] tasks;
+        lock (sync)
+        {
+            tasks = CancelAll();
+        }
         try
         {
-            await Task.WhenAll(processes.Select(process => process.Task));
+            await Task.WhenAll(tasks);
         }
         catch (OperationCanceledException)
         {
         }
     }
 
-    private async Task RunAsync(
-        string key,
-        string sitePath,
+    private static ArtisanCommandSpec CreateCommand(
         SiteBackgroundProcessKind kind,
-        string phpExecutable,
-        IReadOnlyDictionary<string, string> environment,
-        SiteQueueWorkerOptions? queueOptions,
-        CancellationToken cancellationToken
+        SiteQueueWorkerOptions? queueOptions
     )
     {
-        var command = kind switch
+        return kind switch
         {
             SiteBackgroundProcessKind.Queue => new ArtisanCommandSpec(
                 (queueOptions ?? new SiteQueueWorkerOptions()).Arguments(),
@@ -167,10 +178,24 @@ public sealed class SiteProcessManager : IAsyncDisposable
             ),
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
-        var output = new Progress<string>(text => UpdateOutput(key, text));
+    }
+
+    private async Task RunAsync(
+        string key,
+        string sitePath,
+        string phpExecutable,
+        IReadOnlyDictionary<string, string> environment,
+        ArtisanCommandSpec command,
+        RunningProcess process
+    )
+    {
+        var cancellationToken = process.Cancellation.Token;
+        // Deliver output before completion so queued UI callbacks cannot leak into a restart.
+        var output = new OutputProgress(text => UpdateOutput(key, text));
         int? exitCode = null;
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var result = await ArtisanCommandRunner.RunAsync(
                 phpExecutable,
                 sitePath,
@@ -192,10 +217,13 @@ public sealed class SiteProcessManager : IAsyncDisposable
         }
         finally
         {
-            running.TryRemove(key, out var process);
-            process?.Cancellation.Dispose();
-            var previous = states[key];
-            states[key] = previous with { Running = false, ExitCode = exitCode };
+            lock (sync)
+            {
+                var previous = states[key];
+                states[key] = previous with { Running = false, ExitCode = exitCode };
+                running.Remove(key);
+                process.Cancellation.Dispose();
+            }
             RaiseChanged();
         }
     }
@@ -203,16 +231,13 @@ public sealed class SiteProcessManager : IAsyncDisposable
     private void UpdateOutput(string key, string text)
     {
         const int maximumCharacters = 256 * 1_024;
-        states.AddOrUpdate(
-            key,
-            _ => throw new InvalidOperationException("The site process state is missing."),
-            (_, previous) =>
-            {
-                var combined = previous.Output + text;
-                if (combined.Length > maximumCharacters) combined = combined[^maximumCharacters..];
-                return previous with { Output = combined };
-            }
-        );
+        lock (sync)
+        {
+            var previous = states[key];
+            var combined = previous.Output + text;
+            if (combined.Length > maximumCharacters) combined = combined[^maximumCharacters..];
+            states[key] = previous with { Output = combined };
+        }
         RaiseChanged();
     }
 
@@ -223,7 +248,20 @@ public sealed class SiteProcessManager : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await StopAllAsync();
+        Task[] tasks;
+        lock (sync)
+        {
+            disposed = true;
+            tasks = CancelAll();
+        }
+        await Task.WhenAll(tasks);
         GC.SuppressFinalize(this);
+    }
+
+    private Task[] CancelAll()
+    {
+        var processes = running.Values.ToArray();
+        foreach (var process in processes) process.Cancellation.Cancel();
+        return processes.Select(process => process.Task).ToArray();
     }
 }

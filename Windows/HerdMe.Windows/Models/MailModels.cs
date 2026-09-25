@@ -27,6 +27,12 @@ public sealed class CapturedMail
     [JsonIgnore]
     public string ReceivedText => ReceivedAt.LocalDateTime.ToString("g");
 
+    [JsonIgnore]
+    public string SenderPreview => CapturePreview.LimitText(Sender, 512).Text;
+
+    [JsonIgnore]
+    public string SubjectPreview => CapturePreview.LimitText(Subject, 512).Text;
+
     public bool MatchesSearch(string? query)
     {
         var normalized = query?.Trim();

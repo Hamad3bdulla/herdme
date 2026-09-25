@@ -117,8 +117,11 @@ public sealed partial class UpdatesPage : Page
             text.Children.Add(error);
             grid.Children.Add(text);
             {
-                var button = new Button { Content = new SymbolIcon(operation.Progress.IsActive ? Symbol.Cancel : Symbol.Refresh),
-                    Visibility = operation.Progress.Stage == ServiceInstallationStage.Completed ? Visibility.Collapsed : Visibility.Visible };
+                var button = new Button
+                {
+                    Content = new SymbolIcon(operation.Progress.IsActive ? Symbol.Cancel : Symbol.Refresh),
+                    Visibility = operation.Progress.Stage == ServiceInstallationStage.Completed ? Visibility.Collapsed : Visibility.Visible
+                };
                 ToolTipService.SetToolTip(button, operation.Progress.IsActive ? row.CancelLabel : row.RetryLabel);
                 Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, operation.Progress.IsActive ? row.CancelLabel : row.RetryLabel);
                 button.Click += async (_, _) =>

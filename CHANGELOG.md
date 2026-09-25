@@ -5,6 +5,56 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-09-25
+
+### Fixed
+
+- Restart the Windows site environment after Windows resumes from sleep, even
+  when PHP processes and listener handles still appear to be running. Coalesce
+  resume notifications, serialize recovery, and preserve manually stopped sites.
+- Refresh the dashboard when the site environment changes state so a recovered
+  environment no longer remains displayed as "0 of 6 running" or "Recovering".
+
+## [0.1.20] - 2026-09-23
+
+### Fixed
+
+- Bound Windows VarDumper parsing depth, node counts, string sizes, and numeric
+  tokens; reject malformed lengths without overflowing and retain rejected payloads.
+- Keep Windows mail HTML previews below WebView2's navigation size limit and
+  preserve Unicode characters at preview boundaries.
+- Acknowledge Windows SMTP messages only after they are stored, report temporary
+  storage failures to senders, and keep capture workers usable after a failed save
+  or a failing event subscriber. Prevent queued captures from undoing clear/delete.
+- Serialize Windows mail and VarDumper start/stop operations, recover immediately
+  after port conflicts, and close accepted connections when shutting down.
+- Cancel and drain Windows background startup before disposing application
+  services; ignore late activation requests and navigation during shutdown.
+  Drain pending service installations and reject delayed runtime restarts.
+- Ignore stale mail and VarDumper events after navigation, avoid duplicate
+  captures on reload, and keep replaced mail previews from showing old errors.
+- Keep Windows log content tied to the selected file and source, cancel reads
+  when leaving the page, and avoid queuing automatic refreshes behind slow I/O.
+  Read bounded tails without blocking log rotation or breaking Arabic text,
+  UTF-8 boundaries, or BOM-marked Windows Unicode logs.
+- Validate Windows queue options before reporting a worker as running, retain
+  completed process output, and synchronize concurrent starts, stops, and disposal.
+- Recover Windows operation history after torn writes, retain recent rotated
+  records, and keep locked diagnostic files from failing backend operations.
+- Preserve cancellation and distinguish timeouts while waiting for the Windows
+  hosts helper without forcibly terminating it during a hosts-file write.
+
+### Changed
+
+- Show bounded Windows mail and dump previews with a localized size notice.
+  Export full captured messages as EML and dumps as JSON through the save picker;
+  preserve existing exports if writing or replacement fails.
+- Load and delete Windows mail and VarDumper captures in the background, coalesce
+  capture bursts, and reconcile retained rows without resetting the selection or
+  preview. Add loading, empty, refresh, and recoverable error states in both languages.
+- Search Windows logs in the background with a short typing delay. Show loading,
+  empty-directory, and truncated-tail states in English and Arabic.
+
 ## [0.1.19] - 2026-09-08
 
 ### Fixed

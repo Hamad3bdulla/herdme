@@ -302,14 +302,25 @@ public sealed partial class ServicesPage : Page
     {
         if (!TryGetInstance(sender, out var instance)) return;
         var backups = manager.Backups.List(instance.DefinitionId).Where(item => item.Instances.Contains(instance.Id)).ToArray();
-        var picker = new ComboBox { ItemsSource = backups.Select(item => $"{item.CreatedAt.LocalDateTime:g} - {item.RuntimeVersion}").ToArray(),
-            SelectedIndex = backups.Length > 0 ? 0 : -1, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var picker = new ComboBox
+        {
+            ItemsSource = backups.Select(item => $"{item.CreatedAt.LocalDateTime:g} - {item.RuntimeVersion}").ToArray(),
+            SelectedIndex = backups.Length > 0 ? 0 : -1,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
         var content = new StackPanel { Spacing = 12 };
         content.Children.Add(new TextBlock { Text = AppLocalization.Get("ServicesRestoreNotice"), TextWrapping = TextWrapping.Wrap });
         content.Children.Add(picker);
-        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = AppLocalization.Get("ServicesBackupsTitle"), Content = content,
-            PrimaryButtonText = AppLocalization.Get("ServicesRestoreData"), CloseButtonText = AppLocalization.Get("CommonCancel"),
-            IsPrimaryButtonEnabled = backups.Length > 0, DefaultButton = ContentDialogButton.Close };
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Get("ServicesBackupsTitle"),
+            Content = content,
+            PrimaryButtonText = AppLocalization.Get("ServicesRestoreData"),
+            CloseButtonText = AppLocalization.Get("CommonCancel"),
+            IsPrimaryButtonEnabled = backups.Length > 0,
+            DefaultButton = ContentDialogButton.Close
+        };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary || picker.SelectedIndex < 0) return;
         using var cancellation = BeginOperation(AppLocalization.Get("ServicesRestoreData"));
         try { await manager.RestoreDataAsync(instance.Id, backups[picker.SelectedIndex], cancellation.Token); }
@@ -567,46 +578,41 @@ public sealed partial class ServicesPage : Page
 
     private async Task RefreshRowsAsync()
     {
+        if (!loaded) return;
         foreach (var progress in manager.InstallationStates)
             Manager_InstallationProgress(manager, progress);
         var cancellation = new CancellationTokenSource();
         var previous = Interlocked.Exchange(ref refreshCancellation, cancellation);
         previous?.Cancel();
-        var instances = manager.LoadInstances();
-        if (!loaded)
-        {
-            Interlocked.CompareExchange(ref refreshCancellation, null, cancellation);
-            cancellation.Dispose();
-            return;
-        }
-        RenderRows(
-            instances,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        );
-        var installedDefinitionIds = instances
-            .Select(instance => instance.DefinitionId)
-            .Where(manager.IsInstalled)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var releaseTasks = installedDefinitionIds.Select(async definitionId =>
-        {
-            try
-            {
-                var release = await manager.ResolveReleaseAsync(
-                    definitionId,
-                    cancellation.Token
-                );
-                return (DefinitionId: definitionId, Version: release.Version);
-            }
-            catch (Exception error) when (
-                error is not OperationCanceledException || !cancellation.IsCancellationRequested
-            )
-            {
-                return (DefinitionId: definitionId, Version: (string?)null);
-            }
-        });
         try
         {
+            var instances = manager.LoadInstances();
+            RenderRows(
+                instances,
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            );
+            var installedDefinitionIds = instances
+                .Select(instance => instance.DefinitionId)
+                .Where(manager.IsInstalled)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var releaseTasks = installedDefinitionIds.Select(async definitionId =>
+            {
+                try
+                {
+                    var release = await manager.ResolveReleaseAsync(
+                        definitionId,
+                        cancellation.Token
+                    );
+                    return (DefinitionId: definitionId, Version: release.Version);
+                }
+                catch (Exception error) when (
+                    error is not OperationCanceledException || !cancellation.IsCancellationRequested
+                )
+                {
+                    return (DefinitionId: definitionId, Version: (string?)null);
+                }
+            });
             var latestVersions = (await Task.WhenAll(releaseTasks))
                 .Where(result => result.Version is not null)
                 .ToDictionary(

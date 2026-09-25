@@ -10,6 +10,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid ColumnSpacing="16">
@@ -45,7 +46,13 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2" ColumnSpacing="16">
+        <InfoBar x:Name="CaptureErrorBar" Grid.Row="2" IsOpen="False" Severity="Error">
+            <InfoBar.ActionButton>
+                <Button x:Uid="MailCaptureRetryButton" Content="Reload" Click="RetryLoad_Click" />
+            </InfoBar.ActionButton>
+        </InfoBar>
+
+        <Grid Grid.Row="3" ColumnSpacing="16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*" MinWidth="220" MaxWidth="340" />
                 <ColumnDefinition Width="*" />
@@ -63,12 +70,21 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Uid="MailInboxTitle" Text="Inbox" Style="{StaticResource SectionTitleStyle}" />
-                        <Button Grid.Column="1" Click="Clear_Click" Style="{StaticResource ToolbarIconButtonStyle}">
-                            <ToolTipService.ToolTip>
-                                <ToolTip><TextBlock x:Uid="MailClearTooltip" Text="Delete all messages" /></ToolTip>
-                            </ToolTipService.ToolTip>
-                            <SymbolIcon Symbol="Delete" />
-                        </Button>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                            <ProgressRing x:Name="CaptureProgress" x:Uid="MailCaptureProgress" Width="18" Height="18" IsActive="False" Visibility="Collapsed" AutomationProperties.Name="Loading captured data" />
+                            <Button x:Uid="MailCaptureRefreshButton" Click="RetryLoad_Click" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Refresh captured data">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip><TextBlock x:Uid="MailCaptureRefreshTooltip" Text="Refresh" /></ToolTip>
+                                </ToolTipService.ToolTip>
+                                <SymbolIcon Symbol="Refresh" />
+                            </Button>
+                            <Button x:Name="ClearButton" Click="Clear_Click" Style="{StaticResource ToolbarIconButtonStyle}">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip><TextBlock x:Uid="MailClearTooltip" Text="Delete all messages" /></ToolTip>
+                                </ToolTipService.ToolTip>
+                                <SymbolIcon Symbol="Delete" />
+                            </Button>
+                        </StackPanel>
                     </Grid>
                     <TextBox
                         x:Name="SearchBox"
@@ -85,18 +101,20 @@
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:CapturedMail">
                                 <StackPanel Padding="6" Spacing="3">
-                                    <TextBlock Text="{x:Bind Sender}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{x:Bind Subject}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{x:Bind SenderPreview}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{x:Bind SubjectPreview}" TextTrimming="CharacterEllipsis" />
                                     <TextBlock Text="{x:Bind ReceivedText}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
                                 </StackPanel>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
+                    <TextBlock x:Name="EmptyState" Grid.Row="2" Visibility="Collapsed" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" IsHitTestVisible="False" />
                 </Grid>
             </Border>
             <Border Grid.Column="1" Padding="4,12">
                 <Grid RowSpacing="8">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -107,23 +125,33 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="SubjectText" x:Uid="MailSelectMessageInitial" Text="Select a message" Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" />
-                        <Button x:Name="DeleteButton" Grid.Column="1" Click="Delete_Click" IsEnabled="False" Style="{StaticResource ToolbarIconButtonStyle}">
-                            <ToolTipService.ToolTip>
-                                <ToolTip><TextBlock x:Uid="MailDeleteTooltip" Text="Delete message" /></ToolTip>
-                            </ToolTipService.ToolTip>
-                            <SymbolIcon Symbol="Delete" />
-                        </Button>
+                        <TextBlock x:Name="SubjectText" x:Uid="MailSelectMessageInitial" Text="Select a message" Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                            <Button x:Name="ExportButton" x:Uid="MailExportButton" Click="Export_Click" IsEnabled="False" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Export full message">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip><TextBlock x:Uid="MailExportTooltip" Text="Export full message" /></ToolTip>
+                                </ToolTipService.ToolTip>
+                                <SymbolIcon Symbol="Save" />
+                            </Button>
+                            <Button x:Name="DeleteButton" Click="Delete_Click" IsEnabled="False" Style="{StaticResource ToolbarIconButtonStyle}">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip><TextBlock x:Uid="MailDeleteTooltip" Text="Delete message" /></ToolTip>
+                                </ToolTipService.ToolTip>
+                                <SymbolIcon Symbol="Delete" />
+                            </Button>
+                        </StackPanel>
                     </Grid>
-                    <TextBlock x:Name="SenderText" Grid.Row="1" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                    <TextBlock x:Name="RecipientText" Grid.Row="2" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                    <TabView Grid.Row="3" Margin="0,8,0,0" IsAddTabButtonVisible="False">
+                    <TextBlock x:Name="SenderText" Grid.Row="1" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="RecipientText" Grid.Row="2" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                    <InfoBar x:Name="PreviewSizeNotice" x:Uid="MailPreviewSizeNotice" Grid.Row="3" IsOpen="False" IsClosable="False" Severity="Informational" Message="This view is shortened. Export the message to save its full contents." />
+                    <TabView Grid.Row="4" Margin="0,8,0,0" IsAddTabButtonVisible="False">
                         <TabViewItem x:Uid="MailPreviewTab" Header="Preview" IsClosable="False">
                             <Grid>
                                 <WebView2
                                     x:Name="HtmlPreview"
                                     Visibility="Collapsed"
                                     NavigationCompleted="HtmlPreview_NavigationCompleted" />
+                                <ProgressRing x:Name="MailPreviewProgress" x:Uid="MailPreviewProgress" Width="32" Height="32" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" AutomationProperties.Name="Preparing message preview" />
                                 <StackPanel
                                     x:Name="MailPreviewFailureState"
                                     Visibility="Collapsed"

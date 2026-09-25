@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.Win32;
 
 namespace HerdMe.Windows;
 
@@ -14,6 +15,10 @@ public partial class App : Application
     public static MainWindow MainWindow { get; private set; } = null!;
     private readonly AppServices services = null!;
     private readonly SingleInstanceCoordinator singleInstance = null!;
+    private readonly ApplicationTaskLifetime backgroundTasks = new();
+    private readonly TaskCompletionSource shutdownCompletion = new(
+        TaskCreationOptions.RunContinuationsAsynchronously
+    );
     private TaskbarIcon? trayIcon;
     private volatile bool exitRequested;
     private int backgroundServicesStarted;
@@ -23,6 +28,7 @@ public partial class App : Application
     private int shutdownStarted;
     private bool suppressAutomaticUpdateCheck;
     private Task<AutomaticUpdateCheck>? automaticUpdateCheck;
+    private Task activationListener = Task.CompletedTask;
 
     public App()
     {
@@ -69,6 +75,7 @@ public partial class App : Application
         MainWindow.InitialSetupCompleted += MainWindow_InitialSetupCompleted;
         MainWindow.Activated += MainWindow_Activated;
         MainWindow.Closed += MainWindow_Closed;
+        SystemEvents.PowerModeChanged += System_PowerModeChanged;
         if (!MainWindow.RequiresOnboarding
             && Environment.GetCommandLineArgs().Contains("--background", StringComparer.OrdinalIgnoreCase))
         {
@@ -78,7 +85,7 @@ public partial class App : Application
         {
             MainWindow.Activate();
         }
-        _ = ListenForActivationAsync();
+        activationListener = ListenForActivationAsync();
         if (!MainWindow.RequiresOnboarding)
         {
             _ = StartBackgroundServicesOnceAsync();
@@ -91,6 +98,12 @@ public partial class App : Application
         _ = StartBackgroundServicesOnceAsync();
         StartAutomaticUpdateCheckOnce();
         StartAutomaticUpdatePromptOnce();
+    }
+
+    private void System_PowerModeChanged(object sender, PowerModeChangedEventArgs args)
+    {
+        if (args.Mode == PowerModes.Resume && !exitRequested)
+            services.Environment.RequestResumeRecovery();
     }
 
     private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
@@ -209,6 +222,7 @@ public partial class App : Application
                 if (exitRequested) return;
                 MainWindow.DispatcherQueue.TryEnqueue(() =>
                 {
+                    if (exitRequested) return;
                     MainWindow.AppWindow.Show();
                     MainWindow.Activate();
                 });
@@ -225,6 +239,7 @@ public partial class App : Application
         };
         openCommand.ExecuteRequested += (_, _) =>
         {
+            if (exitRequested) return;
             MainWindow.AppWindow.Show();
             MainWindow.Activate();
         };
@@ -287,7 +302,12 @@ public partial class App : Application
 
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
-        if (exitRequested) return;
+        if (exitRequested)
+        {
+            // Keep the dispatcher alive until asynchronous shutdown finishes.
+            args.Handled = !shutdownCompletion.Task.IsCompleted;
+            return;
+        }
         args.Handled = true;
         MainWindow.AppWindow.Hide();
     }
@@ -299,16 +319,24 @@ public partial class App : Application
 
     internal async Task RequestExitAsync()
     {
-        if (Interlocked.Exchange(ref shutdownStarted, 1) != 0) return;
+        if (Interlocked.Exchange(ref shutdownStarted, 1) != 0)
+        {
+            await shutdownCompletion.Task;
+            return;
+        }
         exitRequested = true;
         singleInstance.WakeListener();
+        SystemEvents.PowerModeChanged -= System_PowerModeChanged;
+        MainWindow.PrepareForShutdown();
         trayIcon?.Dispose();
         trayIcon = null;
-        await StopAndLogAsync("dump capture", services.Dumps.StopAsync);
-        await StopAndLogAsync("mail capture", services.Mail.StopAsync);
-        await StopAndLogAsync("site processes", services.SiteProcesses.StopAllAsync);
-        await StopAndLogAsync("sites environment", services.Environment.StopAsync);
-        await StopAndLogAsync("managed services", services.Services.StopAllAsync);
+        await StopAndLogAsync("background operations", backgroundTasks.StopAsync);
+        await StopAndLogAsync("activation listener", () => activationListener);
+        await StopAndLogAsync(
+            "application services",
+            () => services.DisposeAsync().AsTask()
+        );
+        shutdownCompletion.TrySetResult();
         MainWindow.Close();
         singleInstance.Dispose();
     }
@@ -330,31 +358,40 @@ public partial class App : Application
 
     private async void StartCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)
     {
-        services.SiteSettings.UpdateStartAutomatically(true);
-        await StartConfiguredEnvironmentAsync();
-        await services.Services.StartEnabledAsync();
+        await backgroundTasks.RunAsync(async cancellationToken =>
+        {
+            services.SiteSettings.UpdateStartAutomatically(true);
+            await StartConfiguredEnvironmentAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            await services.Services.StartEnabledAsync(cancellationToken);
+        });
     }
 
     private async void StopCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)
     {
-        services.SiteSettings.UpdateStartAutomatically(false);
-        await services.Environment.StopAsync();
-        await services.Services.StopAllAsync();
+        await backgroundTasks.RunAsync(async _ =>
+        {
+            services.SiteSettings.UpdateStartAutomatically(false);
+            await services.Environment.StopAsync();
+            await services.Services.StopAllAsync();
+        });
     }
 
-    private async Task StartConfiguredEnvironmentAsync()
+    private async Task StartConfiguredEnvironmentAsync(CancellationToken cancellationToken)
     {
         try
         {
-            await services.Environment.StartConfiguredAsync(services.SiteSettings);
+            cancellationToken.ThrowIfCancellationRequested();
+            await services.Environment.StartConfiguredAsync(services.SiteSettings, cancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception error)
         {
             await ApplicationDiagnostics.WriteEnvironmentStartupFailureAsync(error);
         }
     }
 
-    private async Task StartBackgroundServicesAsync()
+    private async Task StartBackgroundServicesAsync(CancellationToken cancellationToken)
     {
         await StartAndLogAsync("command-line path", () =>
         {
@@ -365,30 +402,49 @@ public partial class App : Application
                 )
             );
             return Task.CompletedTask;
-        });
-        await StartAndLogAsync("mail capture", () => services.Mail.StartAsync());
-        await StartAndLogAsync("dump capture", () => services.Dumps.StartAsync());
-        await StartAndLogAsync("managed services", () => services.Services.StartEnabledAsync());
-        await StartConfiguredEnvironmentAsync();
+        }, cancellationToken);
+        await StartAndLogAsync(
+            "mail capture",
+            () => services.Mail.StartAsync(cancellationToken: cancellationToken),
+            cancellationToken
+        );
+        await StartAndLogAsync(
+            "dump capture",
+            () => services.Dumps.StartAsync(cancellationToken: cancellationToken),
+            cancellationToken
+        );
+        await StartAndLogAsync(
+            "managed services",
+            () => services.Services.StartEnabledAsync(cancellationToken),
+            cancellationToken
+        );
+        await StartConfiguredEnvironmentAsync(cancellationToken);
         await StartAndLogAsync(
             "command-line tools",
-            () => services.InitialSetup.EnsureCommandLineToolsAsync()
+            () => services.InitialSetup.EnsureCommandLineToolsAsync(cancellationToken: cancellationToken),
+            cancellationToken
         );
     }
 
     private Task StartBackgroundServicesOnceAsync()
     {
         return Interlocked.Exchange(ref backgroundServicesStarted, 1) == 0
-            ? StartBackgroundServicesAsync()
+            ? backgroundTasks.RunAsync(StartBackgroundServicesAsync)
             : Task.CompletedTask;
     }
 
-    private static async Task StartAndLogAsync(string component, Func<Task> operation)
+    private static async Task StartAndLogAsync(
+        string component,
+        Func<Task> operation,
+        CancellationToken cancellationToken
+    )
     {
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await operation();
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception error)
         {
             await LogStartupFailureAsync(component, error);

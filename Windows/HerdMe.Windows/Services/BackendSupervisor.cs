@@ -25,10 +25,34 @@ public sealed class BackendSupervisor : IAsyncDisposable
         await lifecycle.WaitAsync(cancellationToken);
         try
         {
+            var mailWasRunning = mail.IsRunning;
+            var dumpsWereRunning = dumps.IsRunning;
             journal.Append("capture-services", "starting");
-            await mail.StartAsync(mailPort, cancellationToken);
-            await dumps.StartAsync(dumpPort, cancellationToken);
-            journal.Append("capture-services", "running");
+            try
+            {
+                await mail.StartAsync(mailPort, cancellationToken);
+                await dumps.StartAsync(dumpPort, cancellationToken);
+                journal.Append("capture-services", "running");
+            }
+            catch
+            {
+                // Starting the pair is transactional. Preserve services that
+                // were already running, but roll back anything started here.
+                try
+                {
+                    if (!dumpsWereRunning && dumps.IsRunning) await dumps.StopAsync();
+                    if (!mailWasRunning && mail.IsRunning) await mail.StopAsync();
+                }
+                catch (Exception rollbackError)
+                {
+                    journal.Append(
+                        "capture-services",
+                        "rollback-failed",
+                        rollbackError.Message
+                    );
+                }
+                throw;
+            }
         }
         catch (Exception error)
         {

@@ -15,6 +15,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
     private readonly object sync = new();
     private readonly object configurationSync = new();
     private readonly object installationSync = new();
+    private readonly object disposalSync = new();
     private readonly SemaphoreSlim lifecycle = new(1, 1);
     private readonly Dictionary<Guid, ActiveService> active = [];
     private readonly Dictionary<string, Task<ServicePackageRelease>> installations = new(
@@ -27,6 +28,8 @@ public sealed class WindowsServiceManager : IAsyncDisposable
     private readonly Func<string, CancellationToken, Task<ServicePackageRelease>>? installPackage;
     private IReadOnlyList<ManagedServiceInstance> lastKnownInstances = [];
     private bool hasLoadedInstances;
+    private int disposalRequested;
+    private Task? disposalTask;
 
     public WindowsServiceManager(
         string? supportRoot = null,
@@ -198,6 +201,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
+        ThrowIfDisposing();
         if (cancellationToken.IsCancellationRequested)
         {
             return Task.FromCanceled<ServicePackageRelease>(cancellationToken);
@@ -208,6 +212,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         TaskCompletionSource<ServicePackageRelease>? completion = null;
         lock (installationSync)
         {
+            ThrowIfDisposing();
             if (!installations.TryGetValue(normalizedDefinitionId, out operation!))
             {
                 completion = new TaskCompletionSource<ServicePackageRelease>(
@@ -278,9 +283,11 @@ public sealed class WindowsServiceManager : IAsyncDisposable
     private async Task<ServicePackageRelease> InstallWithBackupAsync(string definitionId,
         CancellationToken cancellationToken, IProgress<ServiceInstallationProgress> progress)
     {
+        ThrowIfDisposing();
         await lifecycle.WaitAsync(cancellationToken);
         try
         {
+            ThrowIfDisposing();
             var instances = LoadInstances().Where(item => item.DefinitionId == definitionId).ToArray();
             if (instances.Any(item => State(item.Id, definitionId) == ManagedServiceState.Running))
                 throw new InvalidOperationException("Stop all instances of this service before updating its runtime.");
@@ -303,9 +310,11 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     public async Task RestoreDataAsync(Guid instanceId, ServiceBackup backup, CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposing();
         await lifecycle.WaitAsync(cancellationToken);
         try
         {
+            ThrowIfDisposing();
             var instance = LoadInstances().Single(item => item.Id == instanceId);
             if (instance.DefinitionId != backup.DefinitionId
                 || State(instanceId, instance.DefinitionId) == ManagedServiceState.Running
@@ -338,9 +347,11 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     public async Task StartAsync(Guid id, CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposing();
         await lifecycle.WaitAsync(cancellationToken);
         try
         {
+            ThrowIfDisposing();
             await StartCoreAsync(id, cancellationToken);
         }
         finally
@@ -517,12 +528,24 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     public async Task StartEnabledAsync(CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposing();
+        cancellationToken.ThrowIfCancellationRequested();
         foreach (var instance in LoadInstances().Where(instance => instance.StartAutomatically))
         {
+            ThrowIfDisposing();
+            cancellationToken.ThrowIfCancellationRequested();
             if (!installer.IsInstalled(instance.DefinitionId)) continue;
             try
             {
                 await StartAsync(instance.Id, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (ObjectDisposedException) when (Volatile.Read(ref disposalRequested) != 0)
+            {
+                throw;
             }
             catch (Exception error)
             {
@@ -542,16 +565,44 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     public async Task StopAllAsync()
     {
+        await lifecycle.WaitAsync();
+        try
+        {
+            await StopAllCoreAsync();
+        }
+        finally
+        {
+            lifecycle.Release();
+        }
+    }
+
+    private async Task StopAllCoreAsync()
+    {
         Guid[] identifiers;
         lock (sync) identifiers = active.Keys.ToArray();
-        foreach (var identifier in identifiers) await StopAsync(identifier);
+        List<Exception>? failures = null;
+        foreach (var identifier in identifiers)
+        {
+            try
+            {
+                await StopCoreAsync(identifier);
+            }
+            catch (Exception error)
+            {
+                (failures ??= []).Add(error);
+            }
+        }
+        if (failures is not null)
+            throw new AggregateException("One or more managed services could not be stopped.", failures);
     }
 
     public async Task RemoveAsync(Guid id, bool deleteData)
     {
+        ThrowIfDisposing();
         await lifecycle.WaitAsync();
         try
         {
+            ThrowIfDisposing();
             await StopCoreAsync(id);
             SaveInstances(LoadInstances().Where(instance => instance.Id != id));
             credentialStore.Delete(id);
@@ -925,12 +976,41 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     private void RaiseChanged() => Changed?.Invoke(this, EventArgs.Empty);
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
+        lock (disposalSync)
+        {
+            Volatile.Write(ref disposalRequested, 1);
+            return new ValueTask(disposalTask ??= DisposeCoreAsync());
+        }
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        Task[] pendingInstallations;
+        lock (installationSync)
+        {
+            var cancellations = installationCancellations.Values
+                .Select(cancellation => cancellation.CancelAsync()).ToArray();
+            pendingInstallations = installations.Values.Cast<Task>().Concat(cancellations).ToArray();
+        }
+        try
+        {
+            await Task.WhenAll(pendingInstallations);
+        }
+        catch (Exception)
+        {
+            // Callers observe installation failures on their original tasks.
+            // Shutdown still waits for every installer and stops every process.
+        }
         await StopAllAsync();
-        lifecycle.Dispose();
+        // A UI continuation may still be queued at the gate. Keep the managed
+        // semaphore usable so it can enter, reject disposal, and release safely.
         GC.SuppressFinalize(this);
     }
+
+    private void ThrowIfDisposing() =>
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref disposalRequested) != 0, this);
 
     private async Task InitializeMariaDbAsync(
         string dataDirectory,

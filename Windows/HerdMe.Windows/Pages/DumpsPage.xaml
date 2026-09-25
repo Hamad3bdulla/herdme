@@ -10,6 +10,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <TextBlock x:Uid="DumpsPageTitle" AutomationProperties.AutomationId="DumpsPageRoot" Text="Dumps" Style="{StaticResource PageTitleStyle}" />
@@ -33,7 +34,13 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2" ColumnSpacing="16">
+        <InfoBar x:Name="CaptureErrorBar" Grid.Row="2" IsOpen="False" Severity="Error">
+            <InfoBar.ActionButton>
+                <Button x:Uid="DumpsCaptureRetryButton" Content="Reload" Click="RetryLoad_Click" />
+            </InfoBar.ActionButton>
+        </InfoBar>
+
+        <Grid Grid.Row="3" ColumnSpacing="16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*" MinWidth="220" MaxWidth="340" />
                 <ColumnDefinition Width="*" />
@@ -50,12 +57,21 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Uid="DumpsCapturedTitle" Text="Captured" Style="{StaticResource SectionTitleStyle}" />
-                        <Button Grid.Column="1" Click="Clear_Click" Style="{StaticResource ToolbarIconButtonStyle}">
-                            <ToolTipService.ToolTip>
-                                <ToolTip><TextBlock x:Uid="DumpsClearTooltip" Text="Delete all dumps" /></ToolTip>
-                            </ToolTipService.ToolTip>
-                            <SymbolIcon Symbol="Delete" />
-                        </Button>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                            <ProgressRing x:Name="CaptureProgress" x:Uid="DumpsCaptureProgress" Width="18" Height="18" IsActive="False" Visibility="Collapsed" AutomationProperties.Name="Loading captured data" />
+                            <Button x:Uid="DumpsCaptureRefreshButton" Click="RetryLoad_Click" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Refresh captured data">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip><TextBlock x:Uid="DumpsCaptureRefreshTooltip" Text="Refresh" /></ToolTip>
+                                </ToolTipService.ToolTip>
+                                <SymbolIcon Symbol="Refresh" />
+                            </Button>
+                            <Button x:Name="ClearButton" Click="Clear_Click" Style="{StaticResource ToolbarIconButtonStyle}">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip><TextBlock x:Uid="DumpsClearTooltip" Text="Delete all dumps" /></ToolTip>
+                                </ToolTipService.ToolTip>
+                                <SymbolIcon Symbol="Delete" />
+                            </Button>
+                        </StackPanel>
                     </Grid>
                     <ListView
                         x:Name="DumpList"
@@ -65,23 +81,38 @@
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:CapturedDump">
                                 <StackPanel Padding="6" Spacing="3">
-                                    <TextBlock Text="{x:Bind Source}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{x:Bind Summary}" MaxLines="2" TextTrimming="CharacterEllipsis" FontFamily="Consolas" FontSize="12" />
+                                    <TextBlock Text="{x:Bind SourcePreview}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{x:Bind SummaryPreview}" MaxLines="2" TextTrimming="CharacterEllipsis" FontFamily="Consolas" FontSize="12" />
                                     <TextBlock Text="{x:Bind ReceivedText}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
                                 </StackPanel>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
+                    <TextBlock x:Name="EmptyState" x:Uid="DumpsInboxEmpty" Grid.Row="1" Text="No captured dumps yet" Visibility="Collapsed" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" IsHitTestVisible="False" />
                 </Grid>
             </Border>
             <Border Grid.Column="1" Padding="4,12">
                 <Grid RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <TextBlock x:Name="SourceText" x:Uid="DumpsSelectDumpInitial" Text="Select a dump" Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" />
-                    <ScrollViewer Grid.Row="1" Margin="0,8,0,0">
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="SourceText" x:Uid="DumpsSelectDumpInitial" Text="Select a dump" Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                        <Button x:Name="ExportButton" x:Uid="DumpsExportButton" Grid.Column="1" Click="Export_Click" IsEnabled="False" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Export full dump">
+                            <ToolTipService.ToolTip>
+                                <ToolTip><TextBlock x:Uid="DumpsExportTooltip" Text="Export full dump" /></ToolTip>
+                            </ToolTipService.ToolTip>
+                            <SymbolIcon Symbol="Save" />
+                        </Button>
+                    </Grid>
+                    <InfoBar x:Name="PreviewSizeNotice" x:Uid="DumpsPreviewSizeNotice" Grid.Row="1" IsOpen="False" IsClosable="False" Severity="Informational" Message="This view is shortened. Export the dump to save its full contents." />
+                    <ScrollViewer Grid.Row="2" Margin="0,8,0,0">
                         <TextBlock x:Name="SummaryText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontFamily="Consolas" FontSize="14" />
                     </ScrollViewer>
                 </Grid>

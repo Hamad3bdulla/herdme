@@ -19,6 +19,7 @@ public sealed partial class MainWindow : Window
     private readonly Dictionary<string, Page> persistentPages = new(StringComparer.Ordinal);
     private string? pendingLogSitePath;
     private string? configurationLoadWarning;
+    private bool shuttingDown;
 
     public MainWindow(
         AppServices services,
@@ -55,6 +56,16 @@ public sealed partial class MainWindow : Window
     public bool RequiresOnboarding { get; private set; }
 
     public event EventHandler? InitialSetupCompleted;
+
+    internal void PrepareForShutdown()
+    {
+        shuttingDown = true;
+        AppWindow.Hide();
+        RootLayout.IsHitTestVisible = false;
+        ContentFrame.Content = null;
+        persistentPages.Clear();
+        Content = null;
+    }
 
     private async void ShowConfigurationLoadWarning(object sender, WindowActivatedEventArgs args)
     {
@@ -126,6 +137,7 @@ public sealed partial class MainWindow : Window
 
     private void ShowPage(string tag)
     {
+        if (shuttingDown) return;
         if (persistentPages.TryGetValue(tag, out var existingPage))
         {
             ContentFrame.Content = existingPage;
@@ -291,6 +303,7 @@ public sealed partial class MainWindow : Window
 
     public void NavigateToLogs(string sitePath)
     {
+        if (shuttingDown) return;
         pendingLogSitePath = sitePath;
         var logsItem = Navigation.MenuItems
             .OfType<NavigationViewItem>()
@@ -312,6 +325,7 @@ public sealed partial class MainWindow : Window
 
     public void NavigateToPage(string tag)
     {
+        if (shuttingDown) return;
         var item = Navigation.MenuItems
             .Concat(Navigation.FooterMenuItems)
             .OfType<NavigationViewItem>()
@@ -325,6 +339,7 @@ public sealed partial class MainWindow : Window
 
     private void Onboarding_SetupCompleted(object sender, EventArgs e)
     {
+        if (shuttingDown) return;
         RequiresOnboarding = false;
         Onboarding.Visibility = Visibility.Collapsed;
         Navigation.Visibility = Visibility.Visible;

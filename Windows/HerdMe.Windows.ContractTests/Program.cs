@@ -110,6 +110,9 @@ VerifyArtisanCommandContracts(repositoryRoot);
 await VerifyNpmScriptContractsAsync(repositoryRoot);
 await VerifySiteWorkflowArchiveContractsAsync();
 VerifyRuntimeCatalogContracts(repositoryRoot);
+await VerifyApplicationLifecycleContractsAsync();
+await VerifyCapturePresentationAsync();
+VerifyDumpParsing();
 
 var supportRoot = Path.Combine(
     Path.GetTempPath(),
@@ -123,11 +126,17 @@ try
         journal.ReadRecent().FirstOrDefault()?.Detail == "bounded-backend",
         "operation journal durably records backend transitions"
     );
+    await VerifyDiagnosticsContractsAsync(supportRoot);
+    await VerifyCaptureLifecycleContractsAsync(supportRoot);
+    await VerifyCapturePersistenceContractsAsync(supportRoot);
+    await VerifyCapturePreviewExportsAsync(supportRoot);
+    await VerifyManagerShutdownContractsAsync(supportRoot);
     await VerifyDownloadAndStorageContractsAsync(supportRoot);
     await VerifyWorkflowImprovementsAsync(supportRoot);
     await VerifyPhpPromotionAsync(supportRoot);
 
     VerifySiteContracts(supportRoot);
+    await VerifyLogContractsAsync(supportRoot);
 
     await VerifyServiceContractsAsync(supportRoot);
 

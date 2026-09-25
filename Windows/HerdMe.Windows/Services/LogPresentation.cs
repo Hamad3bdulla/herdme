@@ -7,15 +7,21 @@ public static class LogPresentation
         return Path.Combine(Path.GetFullPath(sitePath), "storage", "logs");
     }
 
-    public static string FilterLines(string content, string? query)
+    public static string FilterLines(string content, string? query, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var value = query?.Trim() ?? string.Empty;
         if (value.Length == 0) return content;
 
-        return string.Join("\n", content
-            .Replace("\r\n", "\n", StringComparison.Ordinal)
-            .Replace('\r', '\n')
-            .Split('\n')
-            .Where(line => line.Contains(value, StringComparison.OrdinalIgnoreCase)));
+        var result = new System.Text.StringBuilder();
+        using var reader = new StringReader(content);
+        while (reader.ReadLine() is { } line)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!line.Contains(value, StringComparison.OrdinalIgnoreCase)) continue;
+            if (result.Length > 0) result.Append('\n');
+            result.Append(line);
+        }
+        return result.ToString();
     }
 }

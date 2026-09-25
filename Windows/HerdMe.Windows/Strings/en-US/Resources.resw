@@ -500,6 +500,9 @@
   <data name="LogsSourceWarning.Message" xml:space="preserve"><value>Some log sources could not be loaded. HerdMe application logs remain available.</value></data>
   <data name="LogsSelectLogInitial.Text" xml:space="preserve"><value>Select a log</value></data>
   <data name="LogsSelectLog" xml:space="preserve"><value>Select a log</value></data>
+  <data name="LogsReadProgress.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Loading logs</value></data>
+  <data name="LogsEmpty.Text" xml:space="preserve"><value>No log files here yet.</value></data>
+  <data name="LogsTailNotice.Text" xml:space="preserve"><value>Showing the latest 4 MB. Search applies to this portion of the log.</value></data>
   <data name="AboutPageRoot.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>About HerdMe</value></data>
   <data name="AboutPageDescription.Text" xml:space="preserve"><value>Open-source local development for PHP and Laravel</value></data>
   <data name="AboutIndependentTitle.Text" xml:space="preserve"><value>Independent implementation</value></data>
@@ -940,4 +943,26 @@ Recovery backup: {1}</value></data>
   <data name="SitesDatabaseNoAvailablePort" xml:space="preserve"><value>No local port is available for the database service.</value></data>
   <data name="NavEnvironmentGroup.Content" xml:space="preserve"><value>Environment</value></data>
   <data name="NavToolsGroup.Content" xml:space="preserve"><value>Tools</value></data>
+  <data name="CaptureLoadFailed" xml:space="preserve"><value>Captured data could not be loaded</value></data>
+  <data name="CaptureOperationFailed" xml:space="preserve"><value>Captured data could not be deleted</value></data>
+  <data name="MailCaptureRetryButton.Content" xml:space="preserve"><value>Reload</value></data>
+  <data name="DumpsCaptureRetryButton.Content" xml:space="preserve"><value>Reload</value></data>
+  <data name="MailCaptureRefreshTooltip.Text" xml:space="preserve"><value>Refresh</value></data>
+  <data name="DumpsCaptureRefreshTooltip.Text" xml:space="preserve"><value>Refresh</value></data>
+  <data name="MailCaptureRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Refresh captured data</value></data>
+  <data name="DumpsCaptureRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Refresh captured data</value></data>
+  <data name="MailCaptureProgress.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Loading captured data</value></data>
+  <data name="DumpsCaptureProgress.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Loading captured data</value></data>
+  <data name="MailInboxEmpty" xml:space="preserve"><value>No captured messages yet</value></data>
+  <data name="MailSearchEmpty" xml:space="preserve"><value>No messages match your search</value></data>
+  <data name="DumpsInboxEmpty.Text" xml:space="preserve"><value>No captured dumps yet</value></data>
+  <data name="CaptureExportFailed" xml:space="preserve"><value>The capture could not be exported</value></data>
+  <data name="MailExportFileType" xml:space="preserve"><value>Email message</value></data>
+  <data name="MailExportButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Export full message</value></data>
+  <data name="MailExportTooltip.Text" xml:space="preserve"><value>Export full message</value></data>
+  <data name="MailPreviewSizeNotice.Message" xml:space="preserve"><value>This view is shortened. Export the message to save its full contents.</value></data>
+  <data name="MailPreviewProgress.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Preparing message preview</value></data>
+  <data name="DumpsExportButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Export full dump</value></data>
+  <data name="DumpsExportTooltip.Text" xml:space="preserve"><value>Export full dump</value></data>
+  <data name="DumpsPreviewSizeNotice.Message" xml:space="preserve"><value>This view is shortened. Export the dump to save its full contents.</value></data>
 </root>

@@ -940,4 +940,29 @@
   <data name="SitesDatabaseNoAvailablePort" xml:space="preserve"><value>لا يوجد منفذ محلي متاح لخدمة قاعدة البيانات.</value></data>
   <data name="NavEnvironmentGroup.Content" xml:space="preserve"><value>البيئة</value></data>
   <data name="NavToolsGroup.Content" xml:space="preserve"><value>الأدوات</value></data>
+  <data name="LogsReadProgress.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>جارٍ تحميل السجلات</value></data>
+  <data name="LogsEmpty.Text" xml:space="preserve"><value>لا توجد ملفات سجلات هنا بعد.</value></data>
+  <data name="LogsTailNotice.Text" xml:space="preserve"><value>يُعرض آخر 4 ميغابايت من السجل فقط. يقتصر البحث على هذا الجزء.</value></data>
+  <data name="CaptureLoadFailed" xml:space="preserve"><value>تعذر تحميل البيانات الملتقطة</value></data>
+  <data name="CaptureOperationFailed" xml:space="preserve"><value>تعذر حذف البيانات الملتقطة</value></data>
+  <data name="MailCaptureRetryButton.Content" xml:space="preserve"><value>إعادة التحميل</value></data>
+  <data name="DumpsCaptureRetryButton.Content" xml:space="preserve"><value>إعادة التحميل</value></data>
+  <data name="MailCaptureRefreshTooltip.Text" xml:space="preserve"><value>تحديث</value></data>
+  <data name="DumpsCaptureRefreshTooltip.Text" xml:space="preserve"><value>تحديث</value></data>
+  <data name="MailCaptureRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تحديث البيانات الملتقطة</value></data>
+  <data name="DumpsCaptureRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تحديث البيانات الملتقطة</value></data>
+  <data name="MailCaptureProgress.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>جارٍ تحميل البيانات الملتقطة</value></data>
+  <data name="DumpsCaptureProgress.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>جارٍ تحميل البيانات الملتقطة</value></data>
+  <data name="MailInboxEmpty" xml:space="preserve"><value>لا توجد رسائل ملتقطة بعد</value></data>
+  <data name="MailSearchEmpty" xml:space="preserve"><value>لا توجد رسائل تطابق البحث</value></data>
+  <data name="DumpsInboxEmpty.Text" xml:space="preserve"><value>لا توجد بيانات VarDumper ملتقطة بعد</value></data>
+  <data name="CaptureExportFailed" xml:space="preserve"><value>تعذر تصدير البيانات الملتقطة</value></data>
+  <data name="MailExportFileType" xml:space="preserve"><value>رسالة بريد إلكتروني</value></data>
+  <data name="MailExportButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تصدير الرسالة كاملة</value></data>
+  <data name="MailExportTooltip.Text" xml:space="preserve"><value>تصدير الرسالة كاملة</value></data>
+  <data name="MailPreviewSizeNotice.Message" xml:space="preserve"><value>يُعرض جزء من المحتوى فقط. صدّر الرسالة لحفظ محتواها كاملًا.</value></data>
+  <data name="MailPreviewProgress.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>جارٍ تجهيز معاينة الرسالة</value></data>
+  <data name="DumpsExportButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تصدير بيانات VarDumper كاملة</value></data>
+  <data name="DumpsExportTooltip.Text" xml:space="preserve"><value>تصدير بيانات VarDumper كاملة</value></data>
+  <data name="DumpsPreviewSizeNotice.Message" xml:space="preserve"><value>يُعرض جزء من المحتوى فقط. صدّر بيانات VarDumper لحفظ محتواها كاملًا.</value></data>
 </root>

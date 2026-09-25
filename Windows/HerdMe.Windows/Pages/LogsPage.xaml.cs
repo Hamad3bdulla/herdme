@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
@@ -10,25 +11,26 @@ namespace HerdMe.Windows.Pages;
 public sealed partial class LogsPage : Page
 {
     private readonly DispatcherTimer refreshTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly DispatcherTimer searchTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private readonly CoreClient coreClient;
     private readonly SiteConfigurationStore siteSettings;
     private string currentContent = string.Empty;
-    private string? requestedSitePath;
+    private readonly string? requestedSitePath;
     private bool loadingSources;
+    private bool pageActive;
+    private bool updatingLogList;
+    private bool sourceDiscoveryFailed;
+    private CancellationTokenSource? pageCancellation;
+    private CancellationTokenSource? reloadCancellation;
+    private CancellationTokenSource? contentCancellation;
+    private CancellationTokenSource? searchCancellation;
 
     public ObservableCollection<LogSourceRecord> Sources { get; } = [];
     public ObservableCollection<LogFileRecord> Logs { get; } = [];
 
-    private string ApplicationLogRoot => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "HerdMe",
-        "Log"
-    );
+    private string ApplicationLogRoot => Path.Combine(siteSettings.SupportRoot, "Log");
 
-    private LogSourceRecord SelectedSource => SourceBox.SelectedItem as LogSourceRecord
-        ?? Sources.First();
-
-    private string LogRoot => SelectedSource.RootPath;
+    private LogSourceRecord? SelectedSource => SourceBox.SelectedItem as LogSourceRecord;
 
     public LogsPage(
         CoreClient coreClient,
@@ -41,143 +43,250 @@ public sealed partial class LogsPage : Page
         this.requestedSitePath = requestedSitePath;
         InitializeComponent();
         refreshTimer.Tick += RefreshTimer_Tick;
+        searchTimer.Tick += SearchTimer_Tick;
     }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
-        await ReloadSourcesAsync();
-        Reload(force: true);
-        refreshTimer.Start();
+        pageCancellation?.Cancel();
+        pageCancellation?.Dispose();
+        pageCancellation = new CancellationTokenSource();
+        var cancellationToken = pageCancellation.Token;
+        pageActive = true;
+        ClearContent();
+        try
+        {
+            await ReloadSourcesAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            await ReloadAsync(force: true);
+            cancellationToken.ThrowIfCancellationRequested();
+            refreshTimer.Start();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
     }
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
         refreshTimer.Stop();
+        searchTimer.Stop();
+        pageActive = false;
+        pageCancellation?.Cancel();
+        pageCancellation?.Dispose();
+        pageCancellation = null;
+        reloadCancellation?.Cancel();
+        contentCancellation?.Cancel();
+        searchCancellation?.Cancel();
+        UpdateReadProgress();
     }
 
-    private void Refresh_Click(object sender, RoutedEventArgs e)
+    private async void Refresh_Click(object sender, RoutedEventArgs e)
     {
-        Reload(force: true);
+        await ReloadAsync(force: true);
     }
 
-    private void RefreshTimer_Tick(object? sender, object e)
+    private async void RefreshTimer_Tick(object? sender, object e)
     {
-        if (LiveRefreshToggle.IsOn) Reload(force: false);
+        if (LiveRefreshToggle.IsOn) await ReloadAsync(force: false);
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        ApplySearch();
+        if (!pageActive) return;
+        searchCancellation?.Cancel();
+        searchTimer.Stop();
+        searchTimer.Start();
     }
 
-    private void SourceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void SearchTimer_Tick(object? sender, object e)
     {
-        if (loadingSources || SourceBox.SelectedItem is null) return;
-        currentContent = string.Empty;
-        Logs.Clear();
-        Reload(force: true);
+        searchTimer.Stop();
+        await ApplySearchAsync();
     }
 
-    private void OpenFolder_Click(object sender, RoutedEventArgs e)
+    private async void SourceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!pageActive || loadingSources || SourceBox.SelectedItem is null) return;
+        reloadCancellation?.Cancel();
+        ClearContent();
+        Logs.Clear();
+        await ReloadAsync(force: true);
+    }
+
+    private async void OpenFolder_Click(object sender, RoutedEventArgs e)
     {
         var source = SelectedSource;
-        if (source.IsApplication) Directory.CreateDirectory(source.RootPath);
-        var directory = Directory.Exists(source.RootPath) ? source.RootPath : source.FallbackPath;
-        var startInfo = new ProcessStartInfo("explorer.exe") { UseShellExecute = true };
-        startInfo.ArgumentList.Add(directory);
-        Process.Start(startInfo);
+        if (source is null) return;
+        try
+        {
+            if (source.IsApplication) Directory.CreateDirectory(source.RootPath);
+            var directory = Directory.Exists(source.RootPath) ? source.RootPath : source.FallbackPath;
+            var startInfo = new ProcessStartInfo("explorer.exe") { UseShellExecute = true };
+            startInfo.ArgumentList.Add(directory);
+            Process.Start(startInfo);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException
+            or Win32Exception or InvalidOperationException)
+        {
+            SourceWarning.IsOpen = true;
+            await DiagnosticLog.WriteFailureAsync("logs", "open-folder",
+                "The log directory could not be opened.", error.ToString());
+        }
     }
 
-    private void LogList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void LogList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (!pageActive || updatingLogList) return;
+        ClearContent();
         if (LogList.SelectedItem is not LogFileRecord log)
         {
-            LogTitleText.Text = AppLocalization.Get("LogsSelectLog");
-            currentContent = string.Empty;
-            LogContentText.Text = string.Empty;
             return;
         }
         LogTitleText.Text = log.Name;
-        LoadSelectedContent(log);
+        await LoadSelectedContentAsync(log);
     }
 
-    private void LoadSelectedContent(LogFileRecord log)
+    private async Task LoadSelectedContentAsync(LogFileRecord log)
     {
+        contentCancellation?.Cancel();
+        using var cancellation = new CancellationTokenSource();
+        contentCancellation = cancellation;
+        UpdateReadProgress();
         try
         {
-            const int maximumBytes = 4 * 1_024 * 1_024;
-            using var stream = new FileStream(log.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            if (stream.Length > maximumBytes) stream.Seek(-maximumBytes, SeekOrigin.End);
-            using var reader = new StreamReader(stream);
-            currentContent = reader.ReadToEnd();
+            var result = await Task.Run(() => LogFileReader.ReadTailAsync(log.Path, cancellation.Token),
+                cancellation.Token);
+            if (!pageActive || cancellation.IsCancellationRequested
+                || !ReferenceEquals(LogList.SelectedItem, log)) return;
+            currentContent = result.Text;
+            TailNoticeText.Visibility = result.Truncated ? Visibility.Visible : Visibility.Collapsed;
+            await ApplySearchAsync();
         }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            currentContent = error.Message;
+            if (!pageActive || cancellation.IsCancellationRequested
+                || !ReferenceEquals(LogList.SelectedItem, log)) return;
+            TailNoticeText.Visibility = Visibility.Collapsed;
+            currentContent = string.Empty;
+            searchCancellation?.Cancel();
+            LogContentText.Text = UserErrorPresentation.Describe(error);
         }
-        ApplySearch();
+        finally
+        {
+            if (ReferenceEquals(contentCancellation, cancellation))
+            {
+                contentCancellation = null;
+                UpdateReadProgress();
+            }
+        }
     }
 
-    private void ApplySearch()
+    private async Task ApplySearchAsync()
     {
-        LogContentText.Text = LogPresentation.FilterLines(currentContent, SearchBox.Text);
-    }
-
-    private void Reload(bool force)
-    {
-        if (SelectedSource.IsApplication) Directory.CreateDirectory(LogRoot);
-        var selectedPath = (LogList.SelectedItem as LogFileRecord)?.Path;
-        IReadOnlyList<string> paths;
+        if (!pageActive) return;
+        searchTimer.Stop();
+        searchCancellation?.Cancel();
+        using var cancellation = new CancellationTokenSource();
+        searchCancellation = cancellation;
+        var text = currentContent;
+        var query = SearchBox.Text;
         try
         {
-            paths = Directory.Exists(LogRoot)
-                ? Directory.EnumerateFiles(LogRoot, "*", SearchOption.AllDirectories).ToList()
-                : [];
+            var filtered = await Task.Run(() => LogPresentation.FilterLines(text, query, cancellation.Token),
+                cancellation.Token);
+            if (pageActive && !cancellation.IsCancellationRequested) LogContentText.Text = filtered;
         }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        finally
+        {
+            if (ReferenceEquals(searchCancellation, cancellation)) searchCancellation = null;
+        }
+    }
+
+    private void ClearContent()
+    {
+        contentCancellation?.Cancel();
+        searchCancellation?.Cancel();
+        searchTimer.Stop();
+        currentContent = string.Empty;
+        LogContentText.Text = string.Empty;
+        LogTitleText.Text = AppLocalization.Get("LogsSelectLog");
+        TailNoticeText.Visibility = Visibility.Collapsed;
+    }
+
+    private void UpdateReadProgress()
+    {
+        LogReadProgress.IsActive = pageActive && (reloadCancellation is not null || contentCancellation is not null);
+    }
+
+    private async Task ReloadAsync(bool force)
+    {
+        if (!pageActive || loadingSources || SelectedSource is not { } source) return;
+        // Timer ticks skip an in-flight read; manual refresh supersedes it.
+        if (!force && (reloadCancellation is not null || contentCancellation is not null)) return;
+        reloadCancellation?.Cancel();
+        using var cancellation = new CancellationTokenSource();
+        reloadCancellation = cancellation;
+        var cancellationToken = cancellation.Token;
+        UpdateReadProgress();
+        try
+        {
+            var discovered = await Task.Run(() => LogFileReader.Discover(source.RootPath, cancellationToken),
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!pageActive || !ReferenceEquals(SelectedSource, source)) return;
+            SourceWarning.IsOpen = sourceDiscoveryFailed;
+            EmptyLogsText.Visibility = discovered.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            var previous = LogList.SelectedItem as LogFileRecord;
+            var wasReading = contentCancellation is not null;
+            var changed = force
+                || discovered.Count != Logs.Count
+                || discovered.Where((record, index) => !SameRecord(record, Logs[index])).Any();
+            if (!changed) return;
+
+            updatingLogList = true;
+            try
+            {
+                Logs.Clear();
+                foreach (var record in discovered) Logs.Add(record);
+                LogList.SelectedItem = Logs.FirstOrDefault(log => log.Path.Equals(
+                    previous?.Path,
+                    StringComparison.OrdinalIgnoreCase
+                )) ?? Logs.FirstOrDefault();
+            }
+            finally { updatingLogList = false; }
+            if (LogList.SelectedItem is LogFileRecord selected)
+            {
+                if (previous?.Path != selected.Path) ClearContent();
+                LogTitleText.Text = selected.Name;
+                if (force || wasReading || previous is null || !SameRecord(previous, selected))
+                    await LoadSelectedContentAsync(selected);
+            }
+            else
+            {
+                ClearContent();
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            paths = [];
+            if (!pageActive || cancellationToken.IsCancellationRequested
+                || !ReferenceEquals(SelectedSource, source)) return;
             SourceWarning.IsOpen = true;
             _ = DiagnosticLog.WriteFailureAsync(
                 "logs",
                 "enumerate-files",
-                $"The log directory {LogRoot} could not be enumerated.",
+                $"The log directory {source.RootPath} could not be enumerated.",
                 error.ToString()
             );
         }
-        var discovered = paths
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .Select(path =>
+        finally
         {
-            var info = new FileInfo(path);
-            return new LogFileRecord
+            if (ReferenceEquals(reloadCancellation, cancellation))
             {
-                Name = Path.GetRelativePath(LogRoot, path),
-                Path = path,
-                Size = info.Length,
-                ModifiedAt = info.LastWriteTimeUtc
-            };
-        }).ToList();
-        var changed = force
-            || discovered.Count != Logs.Count
-            || discovered.Where((record, index) => !SameRecord(record, Logs[index])).Any();
-        if (!changed) return;
-
-        Logs.Clear();
-        foreach (var record in discovered) Logs.Add(record);
-        LogList.SelectedItem = Logs.FirstOrDefault(log => log.Path.Equals(
-            selectedPath,
-            StringComparison.OrdinalIgnoreCase
-        )) ?? Logs.FirstOrDefault();
-        if (LogList.SelectedItem is LogFileRecord selected)
-        {
-            LoadSelectedContent(selected);
-        }
-        else
-        {
-            LogTitleText.Text = AppLocalization.Get("LogsSelectLog");
-            currentContent = string.Empty;
-            ApplySearch();
+                reloadCancellation = null;
+                UpdateReadProgress();
+            }
         }
     }
 
@@ -188,9 +297,10 @@ public sealed partial class LogsPage : Page
             && left.ModifiedAt == right.ModifiedAt;
     }
 
-    private async Task ReloadSourcesAsync()
+    private async Task ReloadSourcesAsync(CancellationToken cancellationToken)
     {
         loadingSources = true;
+        sourceDiscoveryFailed = false;
         SourceWarning.IsOpen = false;
         var preferredRoot = requestedSitePath is null
             ? ApplicationLogRoot
@@ -215,15 +325,19 @@ public sealed partial class LogsPage : Page
         try
         {
             var settings = siteSettings.Load();
-            var sites = await coreClient.ScanAsync(settings.Roots, settings.Tld, settings.LinkedSites);
+            var sites = await coreClient.ScanAsync(settings.Roots, settings.Tld, settings.LinkedSites, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             foreach (var site in sites.Where(site =>
                          site.Framework.Equals("Laravel", StringComparison.OrdinalIgnoreCase)))
             {
                 AddSiteSource(site.Name, site.Path);
             }
         }
-        catch (Exception error) when (error is IOException or InvalidOperationException)
+        catch (Exception error) when (error is IOException or InvalidOperationException
+            or UnauthorizedAccessException or TimeoutException)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            sourceDiscoveryFailed = true;
             SourceWarning.IsOpen = true;
             await DiagnosticLog.WriteFailureAsync(
                 "logs",
@@ -233,6 +347,7 @@ public sealed partial class LogsPage : Page
             );
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         SourceBox.SelectedItem = Sources.FirstOrDefault(source => source.RootPath.Equals(
             preferredRoot,
             StringComparison.OrdinalIgnoreCase

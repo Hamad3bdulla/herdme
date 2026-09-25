@@ -19,11 +19,24 @@
     <Compile Include="WorkflowImprovementChecks.cs" />
     <Compile Include="DownloadAndStorageContractChecks.cs" />
     <Compile Include="SiteContractChecks.cs" />
+    <Compile Include="LogContractChecks.cs" />
     <Compile Include="ServiceContractChecks.cs" />
     <Compile Include="ToolAndUpdateContractChecks.cs" />
     <Compile Include="RepositoryContractChecks.cs" />
     <Compile Include="RuntimeContractChecks.cs" />
     <Compile Include="ContractTestSupport.cs" />
+    <Compile Include="DiagnosticsContractChecks.cs" />
+    <Compile Include="CaptureLifecycleContractChecks.cs" />
+    <Compile Include="LifecycleContractChecks.cs" />
+    <Compile Include="ShutdownRaceChecks.cs" />
+    <Compile Include="CapturePresentationChecks.cs" />
+    <Compile Include="DumpParsingContractChecks.cs" />
+    <Compile Include="CapturePreviewExportChecks.cs" />
+    <Compile Include="../HerdMe.Windows/Services/CapturePreview.cs" Link="Services/CapturePreview.cs" />
+    <Compile Include="../HerdMe.Windows/Services/CaptureExport.cs" Link="Services/CaptureExport.cs" />
+    <Compile Include="CapturePersistenceContractChecks.cs" />
+    <Compile Include="../HerdMe.Windows/Services/CaptureRefreshSession.cs" Link="Services/CaptureRefreshSession.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ApplicationTaskLifetime.cs" Link="Services/ApplicationTaskLifetime.cs" />
     <Compile Include="../HerdMe.Windows/Models/CoreModels.cs" Link="Models/CoreModels.cs" />
     <Compile Include="../HerdMe.Windows/Models/DumpModels.cs" Link="Models/DumpModels.cs" />
     <Compile Include="../HerdMe.Windows/Models/InitialSetupModels.cs" Link="Models/InitialSetupModels.cs" />
@@ -84,6 +97,7 @@
     <Compile Include="../HerdMe.Windows/Services/SitePresentation.cs" Link="Services/SitePresentation.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteRemovalService.cs" Link="Services/SiteRemovalService.cs" />
     <Compile Include="../HerdMe.Windows/Services/LogPresentation.cs" Link="Services/LogPresentation.cs" />
+    <Compile Include="../HerdMe.Windows/Services/LogFileReader.cs" Link="Services/LogFileReader.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteRuntimeStore.cs" Link="Services/SiteRuntimeStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/StorageMaintenance.cs" Link="Services/StorageMaintenance.cs" />
     <Compile Include="../HerdMe.Windows/Services/TablePlusConnection.cs" Link="Services/TablePlusConnection.cs" />

@@ -3,9 +3,10 @@ using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using System.Net;
 using System.Runtime.InteropServices;
 using Microsoft.Web.WebView2.Core;
+using Windows.Storage.Pickers;
+using WinRT.Interop;
 
 namespace HerdMe.Windows.Pages;
 
@@ -15,9 +16,20 @@ public sealed partial class MailPage : Page
     private readonly CoreClient coreClient;
     private readonly SiteConfigurationStore siteSettings;
     private readonly List<CapturedMail> allMessages = [];
+    private readonly DispatcherTimer refreshTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private CaptureRefreshSession<IReadOnlyList<CapturedMail>>? refreshSession;
+    private CapturedMail? displayedMessage;
+    private bool mutating;
+    private bool exporting;
+    private bool updatingList;
+    private bool loadFailed;
     private bool loaded;
+    private int pageGeneration;
+    private int previewGeneration;
+    private EventHandler<CapturedMail>? messageCapturedHandler;
     private bool previewConfigured;
     private Guid? previewMessageId;
+    private ulong? previewNavigationId;
 
     public ObservableCollection<CapturedMail> Messages { get; } = [];
 
@@ -31,33 +43,49 @@ public sealed partial class MailPage : Page
         this.coreClient = coreClient;
         this.siteSettings = siteSettings;
         InitializeComponent();
+        refreshTimer.Tick += async (_, _) => await ReloadAsync();
     }
 
-    private void Page_Loaded(object sender, RoutedEventArgs e)
+    private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
+        if (loaded) return;
         loaded = true;
-        mail.MessageCaptured += Mail_MessageCaptured;
-        Reload();
+        loadFailed = false;
+        CaptureErrorBar.IsOpen = false;
+        pageGeneration++;
+        var session = new CaptureRefreshSession<IReadOnlyList<CapturedMail>>(mail.Load);
+        refreshSession = session;
+        messageCapturedHandler = (_, _) => session.RequestRefresh();
+        mail.MessageCaptured += messageCapturedHandler;
+        refreshTimer.Start();
         UpdateServerState();
+        await ReloadAsync();
     }
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
         loaded = false;
-        mail.MessageCaptured -= Mail_MessageCaptured;
-    }
-
-    private void Mail_MessageCaptured(object? sender, CapturedMail message)
-    {
-        DispatcherQueue.TryEnqueue(() =>
-        {
-            allMessages.Insert(0, message);
-            ApplyFilter(message.MatchesSearch(SearchBox.Text) ? message.Id : null);
-        });
+        refreshTimer.Stop();
+        refreshSession?.Dispose();
+        refreshSession = null;
+        pageGeneration++;
+        previewGeneration++;
+        previewMessageId = null;
+        previewNavigationId = null;
+        HtmlPreview.Visibility = Visibility.Collapsed;
+        MailPreviewFailureState.Visibility = Visibility.Collapsed;
+        MailPreviewProgress.IsActive = false;
+        MailPreviewProgress.Visibility = Visibility.Collapsed;
+        mail.MessageCaptured -= messageCapturedHandler;
+        messageCapturedHandler = null;
+        allMessages.Clear();
+        Messages.Clear();
+        ShowMessage(null);
     }
 
     private async void Server_Click(object sender, RoutedEventArgs e)
     {
+        var generation = pageGeneration;
         ServerButton.IsEnabled = false;
         try
         {
@@ -66,17 +94,18 @@ public sealed partial class MailPage : Page
         }
         catch (Exception error)
         {
-            await ShowErrorAsync(error.Message);
+            if (loaded && generation == pageGeneration) await ShowErrorAsync(error.Message);
         }
         finally
         {
             ServerButton.IsEnabled = true;
-            UpdateServerState();
+            if (loaded) UpdateServerState();
         }
     }
 
     private async void AddToEnvironment_Click(object sender, RoutedEventArgs e)
     {
+        var generation = pageGeneration;
         try
         {
             var settings = siteSettings.Load();
@@ -85,6 +114,7 @@ public sealed partial class MailPage : Page
                 settings.Tld,
                 settings.LinkedSites
             );
+            if (!loaded || generation != pageGeneration) return;
             if (sites.Count == 0)
             {
                 await ShowErrorAsync(AppLocalization.Get("ServicesAddSiteBeforeEnvironment"));
@@ -126,6 +156,7 @@ public sealed partial class MailPage : Page
                 DefaultButton = ContentDialogButton.Primary
             };
             if (await dialog.ShowAsync() != ContentDialogResult.Primary
+                || !loaded || generation != pageGeneration
                 || siteBox.SelectedItem is not SiteRecord selectedSite)
             {
                 return;
@@ -150,94 +181,224 @@ public sealed partial class MailPage : Page
         }
         catch (Exception error)
         {
-            await ShowErrorAsync(error.Message);
+            if (loaded && generation == pageGeneration) await ShowErrorAsync(error.Message);
         }
     }
 
     private void MessageList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (updatingList) return;
         ShowMessage(MessageList.SelectedItem as CapturedMail);
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
+        if (!loaded) return;
         ApplyFilter();
     }
 
-    private void Delete_Click(object sender, RoutedEventArgs e)
+    private async void Delete_Click(object sender, RoutedEventArgs e)
     {
         if (MessageList.SelectedItem is not CapturedMail message) return;
-        mail.Delete(message);
-        allMessages.Remove(message);
-        ApplyFilter();
+        await MutateAsync(() => mail.Delete(message));
     }
 
-    private void Clear_Click(object sender, RoutedEventArgs e)
+    private async void Clear_Click(object sender, RoutedEventArgs e)
     {
-        mail.Clear();
-        allMessages.Clear();
-        Messages.Clear();
-        ShowMessage(null);
+        await MutateAsync(mail.Clear);
     }
 
-    private void Reload()
+    private async void Export_Click(object sender, RoutedEventArgs e)
     {
-        allMessages.Clear();
-        allMessages.AddRange(mail.Load());
-        ApplyFilter();
-    }
-
-    private void ApplyFilter(Guid? preferredMessageId = null)
-    {
-        var selectedId = preferredMessageId ?? (MessageList.SelectedItem as CapturedMail)?.Id;
-        Messages.Clear();
-        foreach (var message in allMessages.Where(message => message.MatchesSearch(SearchBox.Text)))
+        if (exporting || MessageList.SelectedItem is not CapturedMail message) return;
+        var generation = pageGeneration;
+        exporting = true;
+        UpdateCaptureState();
+        try
         {
-            Messages.Add(message);
+            var picker = new FileSavePicker
+            {
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+                SuggestedFileName = $"mail-{message.ReceivedAt:yyyyMMdd-HHmmss}-{message.Id:N}"
+            };
+            picker.FileTypeChoices.Add(AppLocalization.Get("MailExportFileType"), [".eml"]);
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
+            var file = await picker.PickSaveFileAsync();
+            if (file is null || !loaded || generation != pageGeneration) return;
+            await Task.Run(() => CaptureExport.SaveMailAsync(message, file.Path));
         }
-        MessageList.SelectedItem = Messages.FirstOrDefault(message => message.Id == selectedId)
-            ?? Messages.FirstOrDefault();
+        catch (Exception error)
+        {
+            if (loaded && generation == pageGeneration) ShowCaptureError("CaptureExportFailed", error);
+        }
+        finally
+        {
+            exporting = false;
+            if (loaded) UpdateCaptureState();
+        }
+    }
+
+    private async Task MutateAsync(Action operation)
+    {
+        if (mutating || refreshSession is not { } session) return;
+        mutating = true;
+        session.Invalidate();
+        UpdateCaptureState();
+        try
+        {
+            await Task.Run(operation);
+            if (loaded && ReferenceEquals(session, refreshSession)) CaptureErrorBar.IsOpen = false;
+        }
+        catch (Exception error)
+        {
+            if (loaded && ReferenceEquals(session, refreshSession))
+                ShowCaptureError("CaptureOperationFailed", error);
+        }
+        finally
+        {
+            mutating = false;
+            refreshSession?.Invalidate();
+            if (loaded)
+            {
+                UpdateCaptureState();
+                await ReloadAsync();
+            }
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (!loaded || mutating || refreshSession is not { } session
+            || session.IsLoading || !session.NeedsRefresh) return;
+        var loading = session.RefreshAsync();
+        UpdateCaptureState();
+        try
+        {
+            var messages = await loading;
+            if (!loaded || !ReferenceEquals(session, refreshSession) || messages is null) return;
+            if (loadFailed) CaptureErrorBar.IsOpen = false;
+            loadFailed = false;
+            var retained = allMessages.ToDictionary(message => message.Id);
+            allMessages.Clear();
+            allMessages.AddRange(messages.Select(message => retained.GetValueOrDefault(message.Id) ?? message));
+            ApplyFilter();
+        }
+        catch (Exception error)
+        {
+            if (!loaded || !ReferenceEquals(session, refreshSession)) return;
+            loadFailed = true;
+            ShowCaptureError("CaptureLoadFailed", error);
+        }
+        finally
+        {
+            if (loaded && ReferenceEquals(session, refreshSession)) UpdateCaptureState();
+        }
+    }
+
+    private async void RetryLoad_Click(object sender, RoutedEventArgs e)
+    {
+        CaptureErrorBar.IsOpen = false;
+        refreshSession?.RequestRefresh();
+        await ReloadAsync();
+    }
+
+    private void ShowCaptureError(string titleKey, Exception error)
+    {
+        CaptureErrorBar.Title = AppLocalization.Get(titleKey);
+        CaptureErrorBar.Message = error.Message;
+        CaptureErrorBar.IsOpen = true;
+    }
+
+    private void UpdateCaptureState()
+    {
+        var busy = mutating || exporting || refreshSession?.IsLoading == true;
+        CaptureProgress.IsActive = busy;
+        CaptureProgress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+        ClearButton.IsEnabled = !mutating && allMessages.Count > 0;
+        DeleteButton.IsEnabled = !mutating && MessageList.SelectedItem is CapturedMail;
+        ExportButton.IsEnabled = !exporting && MessageList.SelectedItem is CapturedMail;
+        EmptyState.Text = AppLocalization.Get(allMessages.Count == 0 ? "MailInboxEmpty" : "MailSearchEmpty");
+        EmptyState.Visibility = Messages.Count == 0 && !busy && !loadFailed
+            ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void ApplyFilter()
+    {
+        var selectedId = (MessageList.SelectedItem as CapturedMail)?.Id;
+        updatingList = true;
+        try
+        {
+            CaptureListUpdater.Apply(Messages,
+                allMessages.Where(message => message.MatchesSearch(SearchBox.Text)).ToArray(),
+                message => message.Id);
+            MessageList.SelectedItem = Messages.FirstOrDefault(message => message.Id == selectedId)
+                ?? Messages.FirstOrDefault();
+        }
+        finally { updatingList = false; }
         ShowMessage(MessageList.SelectedItem as CapturedMail);
+        UpdateCaptureState();
     }
 
     private void ShowMessage(CapturedMail? message)
     {
-        SubjectText.Text = message?.Subject ?? AppLocalization.Get("MailSelectMessage");
+        if (ReferenceEquals(displayedMessage, message)) return;
+        displayedMessage = message;
+        SubjectText.Text = message is null ? AppLocalization.Get("MailSelectMessage")
+            : CapturePreview.LimitText(message.Subject, 2_048).Text;
         SenderText.Text = message is null
             ? string.Empty
-            : AppLocalization.Format("MailFrom", message.Sender);
+            : AppLocalization.Format("MailFrom", CapturePreview.LimitText(message.Sender, 2_048).Text);
         RecipientText.Text = message is null
             ? string.Empty
-            : AppLocalization.Format("MailTo", message.RecipientsText);
-        BodyText.Text = message?.Body ?? string.Empty;
-        RawText.Text = message?.Raw ?? string.Empty;
-        DeleteButton.IsEnabled = message is not null;
+            : AppLocalization.Format("MailTo", CapturePreview.LimitText(message.RecipientsText, 4_096).Text);
+        BodyText.Text = string.Empty;
+        RawText.Text = string.Empty;
+        PreviewSizeNotice.IsOpen = false;
+        DeleteButton.IsEnabled = !mutating && message is not null;
+        ExportButton.IsEnabled = !exporting && message is not null;
         _ = UpdatePreviewAsync(message);
     }
 
     private async Task UpdatePreviewAsync(CapturedMail? message)
     {
+        if (!loaded) return;
+        var generation = ++previewGeneration;
+        previewNavigationId = null;
         MailPreviewFailureState.Visibility = Visibility.Collapsed;
         previewMessageId = message?.Id;
+        HtmlPreview.Visibility = Visibility.Collapsed;
+        MailPreviewProgress.IsActive = message is not null;
+        MailPreviewProgress.Visibility = message is null ? Visibility.Collapsed : Visibility.Visible;
         if (message is null)
         {
-            HtmlPreview.Visibility = Visibility.Collapsed;
             return;
         }
-        HtmlPreview.Visibility = Visibility.Visible;
         try
         {
+            var preview = await Task.Run(() => CapturePreview.ForMail(message));
+            if (!loaded || generation != previewGeneration || !IsSelected(message)) return;
+            BodyText.Text = preview.Body;
+            RawText.Text = preview.Raw;
+            PreviewSizeNotice.IsOpen = preview.IsTruncated;
+            HtmlPreview.Visibility = Visibility.Visible;
             await HtmlPreview.EnsureCoreWebView2Async();
-            if (!IsSelected(message)) return;
+            if (!loaded || generation != previewGeneration || !IsSelected(message)) return;
             ConfigurePreviewOnce();
-            var html = message.HtmlBody
-                ?? $"<pre>{WebUtility.HtmlEncode(message.Body)}</pre>";
-            HtmlPreview.NavigateToString(MailMimeParser.SafeHtmlDocument(html));
+            HtmlPreview.NavigateToString(preview.HtmlDocument);
         }
         catch (Exception error) when (error is InvalidOperationException or COMException)
         {
+            if (!loaded || generation != previewGeneration) return;
             await ReportPreviewFailureAsync("initialization", message, error.ToString());
-            if (IsSelected(message)) ShowMailPreviewFailure();
+            if (loaded && generation == previewGeneration && IsSelected(message)) ShowMailPreviewFailure();
+        }
+        finally
+        {
+            if (loaded && generation == previewGeneration)
+            {
+                MailPreviewProgress.IsActive = false;
+                MailPreviewProgress.Visibility = Visibility.Collapsed;
+            }
         }
     }
 
@@ -247,6 +408,8 @@ public sealed partial class MailPage : Page
     )
     {
         if (!loaded || !IsCurrentPreviewSelection()) return;
+        if (args.NavigationId != previewNavigationId) return;
+        var generation = previewGeneration;
         if (args.IsSuccess)
         {
             MailPreviewFailureState.Visibility = Visibility.Collapsed;
@@ -259,7 +422,8 @@ public sealed partial class MailPage : Page
             MessageList.SelectedItem as CapturedMail,
             $"WebView2 status: {args.WebErrorStatus}"
         );
-        ShowMailPreviewFailure();
+        if (loaded && generation == previewGeneration
+            && args.NavigationId == previewNavigationId) ShowMailPreviewFailure();
     }
 
     private static bool IsExpectedNavigationCancellation(CoreWebView2WebErrorStatus status)
@@ -319,12 +483,17 @@ public sealed partial class MailPage : Page
         previewConfigured = true;
     }
 
-    private static void Preview_NavigationStarting(
+    private void Preview_NavigationStarting(
         CoreWebView2 sender,
         CoreWebView2NavigationStartingEventArgs args
     )
     {
-        if (!MailMimeParser.IsPreviewNavigationAllowed(args.Uri)) args.Cancel = true;
+        if (!loaded || !MailMimeParser.IsPreviewNavigationAllowed(args.Uri))
+        {
+            args.Cancel = true;
+            return;
+        }
+        previewNavigationId = args.NavigationId;
     }
 
     private static void Preview_NewWindowRequested(
@@ -358,7 +527,7 @@ public sealed partial class MailPage : Page
 
     private async Task ShowMessageAsync(string title, string message)
     {
-        if (XamlRoot is not { } xamlRoot) return;
+        if (!loaded || XamlRoot is not { } xamlRoot) return;
         var dialog = new ContentDialog
         {
             XamlRoot = xamlRoot,

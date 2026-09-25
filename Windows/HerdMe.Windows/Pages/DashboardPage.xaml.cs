@@ -26,6 +26,11 @@ public sealed partial class DashboardPage : Page
     private bool? usesCompactLayout;
     private readonly HashSet<string> failedSiteNames = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<string> lastHealthWarnings = [];
+    private readonly DispatcherTimer environmentRefreshTimer = new()
+    {
+        Interval = TimeSpan.FromSeconds(2)
+    };
+    private (bool Running, bool Degraded, int? Http, int? Https)? displayedEnvironment;
 
     public DashboardPage(
         CoreClient coreClient,
@@ -58,10 +63,23 @@ public sealed partial class DashboardPage : Page
         this.gitInstaller = gitInstaller;
         repairJournal = new OperationJournal(Path.Combine(settingsStore.SupportRoot, "Repair"));
         InitializeComponent();
+        environmentRefreshTimer.Tick += EnvironmentRefresh_Tick;
     }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
+        environmentRefreshTimer.Start();
+        await RefreshAsync();
+    }
+
+    private async void EnvironmentRefresh_Tick(object? sender, object e)
+    {
+        // A dashboard opened during startup/recovery must not keep showing
+        // "0 running" after the environment has recovered in the background.
+        var current = (environment.IsRunning, environment.IsDegraded,
+            environment.HttpPort, environment.HttpsPort);
+        if (displayedEnvironment == current || refreshCancellation is not null
+            || !RepairAllButton.IsEnabled) return;
         await RefreshAsync();
     }
 
@@ -164,6 +182,7 @@ public sealed partial class DashboardPage : Page
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
+        environmentRefreshTimer.Stop();
         refreshCancellation?.Cancel();
         refreshCancellation?.Dispose();
         refreshCancellation = null;
@@ -215,14 +234,20 @@ public sealed partial class DashboardPage : Page
             var domainsConfigured = await domainsTask;
             var certificateTrusted = await certificateTask;
             var defaultPhpCycle = runtimePolicy.Load().PhpCycle;
-            var healthTasks = sites.Select(site => SiteHealthInspector.InspectAsync(
-                site.Path,
-                site.Domain,
-                site.PhpVersion ?? defaultPhpCycle,
-                phpInstaller,
-                composerTools,
-                certificateManager,
-                site.NodeVersion,
+            // SiteHealthInspector performs bounded filesystem and JSON reads
+            // before its asynchronous PHP checks. Keep that work off the UI
+            // thread when several sites are present.
+            var healthTasks = sites.Select(site => Task.Run(
+                () => SiteHealthInspector.InspectAsync(
+                    site.Path,
+                    site.Domain,
+                    site.PhpVersion ?? defaultPhpCycle,
+                    phpInstaller,
+                    composerTools,
+                    certificateManager,
+                    site.NodeVersion,
+                    cancellation.Token
+                ),
                 cancellation.Token
             ));
             var siteHealth = (await Task.WhenAll(healthTasks))
@@ -296,6 +321,8 @@ public sealed partial class DashboardPage : Page
 
             UpdateEnvironmentStatus(domainsConfigured, certificateTrusted, settings.Tld);
             UpdateHealth(domainsConfigured, certificateTrusted, failure: null, siteHealth);
+            displayedEnvironment = (environment.IsRunning, environment.IsDegraded,
+                environment.HttpPort, environment.HttpsPort);
             RenderRecentMail(messages);
             RenderRecentDumps(dumps);
         }
@@ -305,6 +332,8 @@ public sealed partial class DashboardPage : Page
         catch (Exception error)
         {
             UpdateHealth(domainsConfigured: false, certificateTrusted: false, failure: error.Message, []);
+            displayedEnvironment = (environment.IsRunning, environment.IsDegraded,
+                environment.HttpPort, environment.HttpsPort);
         }
         finally
         {

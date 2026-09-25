@@ -17,7 +17,10 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <TextBlock x:Uid="LogsPageTitle" AutomationProperties.AutomationId="LogsPageRoot" Text="Logs" Style="{StaticResource PageTitleStyle}" />
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock x:Uid="LogsPageTitle" AutomationProperties.AutomationId="LogsPageRoot" Text="Logs" Style="{StaticResource PageTitleStyle}" />
+                <ProgressRing x:Name="LogReadProgress" x:Uid="LogsReadProgress" Width="20" Height="20" IsActive="False" AutomationProperties.Name="Loading logs" />
+            </StackPanel>
             <Grid Grid.Row="1" ColumnSpacing="10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="190" />
@@ -73,29 +76,34 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <Border Style="{StaticResource ToolPaneStyle}" Padding="12">
-                <ListView x:Name="LogList" ItemsSource="{x:Bind Logs}" SelectionChanged="LogList_SelectionChanged">
-                    <ListView.ItemTemplate>
-                        <DataTemplate x:DataType="models:LogFileRecord">
-                            <Grid Padding="6" ColumnSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Grid.Column="1" Text="{x:Bind SizeText}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            </Grid>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+                <Grid>
+                    <ListView x:Name="LogList" ItemsSource="{x:Bind Logs}" SelectionChanged="LogList_SelectionChanged">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:LogFileRecord">
+                                <Grid Padding="6" ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1" Text="{x:Bind SizeText}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <TextBlock x:Name="EmptyLogsText" x:Uid="LogsEmpty" Text="No log files here yet." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="6" Visibility="Collapsed" IsHitTestVisible="False" />
+                </Grid>
             </Border>
             <Border Grid.Column="1" Padding="4,12">
                 <Grid RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <TextBlock x:Name="LogTitleText" x:Uid="LogsSelectLogInitial" Text="Select a log" Style="{StaticResource SectionTitleStyle}" />
-                    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <TextBlock x:Name="TailNoticeText" x:Uid="LogsTailNotice" Grid.Row="1" Text="Showing the latest 4 MB. Search applies to this portion of the log." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" />
+                    <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                         <TextBlock x:Name="LogContentText" FontFamily="Consolas" FontSize="13" TextWrapping="NoWrap" IsTextSelectionEnabled="True" FlowDirection="LeftToRight" />
                     </ScrollViewer>
                 </Grid>

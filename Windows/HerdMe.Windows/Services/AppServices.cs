@@ -1,7 +1,10 @@
 namespace HerdMe.Windows.Services;
 
-public sealed class AppServices
+public sealed class AppServices : IAsyncDisposable
 {
+    private readonly object disposalSync = new();
+    private Task? disposalTask;
+
     public AppServices()
     {
         Core = new CoreClient();
@@ -116,4 +119,44 @@ public sealed class AppServices
     public SiteProcessManager SiteProcesses { get; }
 
     public InitialSetupManager InitialSetup { get; }
+
+    public ValueTask DisposeAsync()
+    {
+        Task task;
+        lock (disposalSync)
+        {
+            disposalTask ??= DisposeServicesAsync();
+            task = disposalTask;
+        }
+        return new ValueTask(task);
+    }
+
+    private async Task DisposeServicesAsync()
+    {
+        var failures = new List<Exception>();
+        await DisposeOneAsync(SiteProcesses, failures);
+        await DisposeOneAsync(Environment, failures);
+        await DisposeOneAsync(Services, failures);
+        await DisposeOneAsync(Mail, failures);
+        await DisposeOneAsync(Dumps, failures);
+        if (failures.Count > 0)
+        {
+            throw new AggregateException("One or more Windows services failed to shut down.", failures);
+        }
+    }
+
+    private static async Task DisposeOneAsync(
+        IAsyncDisposable service,
+        ICollection<Exception> failures
+    )
+    {
+        try
+        {
+            await service.DisposeAsync();
+        }
+        catch (Exception error)
+        {
+            failures.Add(error);
+        }
+    }
 }

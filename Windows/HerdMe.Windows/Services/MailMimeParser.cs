@@ -8,7 +8,8 @@ public sealed record MailMimeContent(string? PlainText = null, string? Html = nu
 
 public static partial class MailMimeParser
 {
-    private const int MaximumPreviewCharacters = 4 * 1_024 * 1_024;
+    // Even three UTF-8 bytes per UTF-16 code unit stays below WebView2's 2 MiB limit.
+    internal const int MaximumPreviewCharacters = 256 * 1_024;
     private const string PreviewStyle = "body{font:14px system-ui;margin:18px;line-height:1.45;overflow-wrap:anywhere}img{max-width:100%;height:auto}pre{white-space:pre-wrap}";
     private const string PreviewStyleHash = "48hOXKVM1rwpXip/9XRIr0XijcrNP/RHiD+a7aSGrzg=";
 
@@ -37,9 +38,7 @@ public static partial class MailMimeParser
     public static string SafeHtmlDocument(string html)
     {
         const string policy = "default-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; object-src 'none'; img-src data: cid:; font-src 'none'; style-src 'sha256-" + PreviewStyleHash + "'; sandbox";
-        var preview = html.Length <= MaximumPreviewCharacters
-            ? html
-            : html[..MaximumPreviewCharacters] + "<p>[Preview truncated]</p>";
+        var preview = CapturePreview.LimitText(html, MaximumPreviewCharacters).Text;
         return "<!doctype html><html><head><meta charset=\"utf-8\">"
             + $"<meta http-equiv=\"Content-Security-Policy\" content=\"{policy}\">"
             + "<meta name=\"color-scheme\" content=\"light dark\">"
