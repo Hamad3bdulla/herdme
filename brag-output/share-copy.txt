@@ -1,0 +1,1 @@
+We're disrupting localhost. HerdMe gives you .test domains with real HTTPS, PHP 8.0–8.5 and your databases, running natively on Windows, in English or Arabic. Our business model: there isn't one. No subscriptions, no license keys, MIT. github.com/Hamad3bdulla/herdme
