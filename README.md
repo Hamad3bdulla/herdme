@@ -7,6 +7,15 @@ macOS and Windows.
 [![Windows x64](https://github.com/Hamad3bdulla/herdme/actions/workflows/windows-x64.yml/badge.svg)](https://github.com/Hamad3bdulla/herdme/actions/workflows/windows-x64.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f855a.svg)](LICENSE)
 
+## HerdMe in action
+
+<video controls preload="metadata" poster="assets/herdme-demo.jpg" width="960">
+  <source src="assets/herdme-demo.mp4" type="video/mp4">
+  Your browser does not support the video tag. [Watch the demo video](assets/herdme-demo.mp4).
+</video>
+
+<p><a href="assets/herdme-demo.mp4"><img src="assets/herdme-demo.jpg" alt="HerdMe demo preview" width="960"></a></p>
+
 HerdMe provides the everyday tools needed to run Laravel projects locally from
 a native desktop application, without subscriptions, activation, or license
 keys. The project uses SwiftUI on macOS, WinUI 3 on Windows, and a portable
