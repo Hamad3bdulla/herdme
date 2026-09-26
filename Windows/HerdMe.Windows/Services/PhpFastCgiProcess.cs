@@ -106,12 +106,17 @@ public sealed class PhpFastCgiProcess : IAsyncDisposable
         startInfo.ArgumentList.Add("-b");
         startInfo.ArgumentList.Add($"127.0.0.1:{port}");
         startInfo.Environment["PHPRC"] = Path.GetDirectoryName(phpCgiExecutable)!;
-        startInfo.Environment["PHP_FCGI_CHILDREN"] = "4";
+        startInfo.Environment["PHP_FCGI_CHILDREN"] = FastCgiWorkerCount(Environment.ProcessorCount)
+            .ToString(System.Globalization.CultureInfo.InvariantCulture);
         // The built-in Windows FastCGI manager does not replace workers after this limit.
         // Keep HerdMe's long-lived local workers available until the supervised process stops.
         startInfo.Environment["PHP_FCGI_MAX_REQUESTS"] = "0";
         return startInfo;
     }
+
+    // One php-cgi pool serves every site, so scale workers with the machine while
+    // keeping a small floor for single-core VMs and a cap well below the HTTP gate.
+    internal static int FastCgiWorkerCount(int processorCount) => Math.Clamp(processorCount, 4, 16);
 
     private async Task StartProcessAsync(
         ProcessStartInfo startInfo,
@@ -119,6 +124,9 @@ public sealed class PhpFastCgiProcess : IAsyncDisposable
         CancellationToken cancellationToken
     )
     {
+        // php-cgi on Windows places its PHP_FCGI_CHILDREN workers in its own
+        // kill-on-close job, so workers spawned before the assignment below still
+        // terminate with their parent.
         var candidate = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
         candidate.OutputDataReceived += LogLine;
         candidate.ErrorDataReceived += LogLine;
@@ -219,25 +227,34 @@ require $script;
     public async Task StopAsync()
     {
         var active = Interlocked.Exchange(ref process, null);
+        var activeJob = Interlocked.Exchange(ref job, null);
         Port = null;
         UsesHttpFallback = false;
-        if (active is not null)
+        try
         {
-            try
+            if (active is not null)
             {
-                if (!active.HasExited) active.Kill(entireProcessTree: true);
-                await active.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(3));
-            }
-            catch (Exception) when (active.HasExited)
-            {
-            }
-            finally
-            {
-                active.Dispose();
+                try
+                {
+                    if (!active.HasExited) active.Kill(entireProcessTree: true);
+                    await active.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(3));
+                }
+                catch (Exception) when (active.HasExited)
+                {
+                }
+                finally
+                {
+                    active.Dispose();
+                }
             }
         }
-        job?.Dispose();
-        job = null;
+        finally
+        {
+            // Closing the kill-on-close job also terminates any worker that ignored Kill,
+            // even when waiting for the parent timed out.
+            activeJob?.Dispose();
+        }
+        if (logPath is not null) await QueuedLog.FlushAsync(logPath);
     }
 
     public async ValueTask DisposeAsync()
@@ -251,9 +268,9 @@ require $script;
         if (eventArgs.Data is null || logPath is null) return;
         try
         {
-            BoundedLog.AppendLine(logPath, $"[{DateTimeOffset.Now:O}] {eventArgs.Data}");
+            QueuedLog.AppendLine(logPath, $"[{DateTimeOffset.Now:O}] {eventArgs.Data}");
         }
-        catch (IOException)
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
         }
     }

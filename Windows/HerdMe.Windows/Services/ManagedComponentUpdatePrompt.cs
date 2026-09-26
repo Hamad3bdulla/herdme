@@ -48,6 +48,7 @@ internal static class ManagedComponentUpdatePrompt
 
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = xamlRoot,
             Title = AppLocalization.Get("ManagedUpdatesDialogTitle"),
             Content = new ScrollViewer

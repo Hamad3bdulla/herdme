@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
@@ -17,10 +18,17 @@ public sealed partial class ServicesPage : Page
     private bool loaded;
     private bool working;
     private CancellationTokenSource? refreshCancellation;
+    private CancellationTokenSource? operationCancellation;
+    private string? operationDefinitionId;
+    // Last resolved release versions, so a refresh renders once with the known update flags.
+    private IReadOnlyDictionary<string, string> knownLatestVersions =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyList<ManagedServiceDefinition> Definitions { get; } = ManagedServiceCatalog.All;
 
     public ObservableCollection<ManagedServiceRow> Rows { get; } = [];
+
+    public ObservableCollection<ServiceDownloadRow> Downloads { get; } = [];
 
     public ServicesPage(
         WindowsServiceManager manager,
@@ -43,7 +51,7 @@ public sealed partial class ServicesPage : Page
             ServicePortBox.IsEnabled = false;
             AddServiceButton.IsEnabled = false;
             ServiceAvailabilityText.Text = RuntimeCatalog.LoadIssue
-                ?? "The bundled service catalog could not be loaded.";
+                ?? AppLocalization.Get("ServicesCatalogUnavailable");
             ServiceAvailabilityText.Visibility = Visibility.Visible;
         }
     }
@@ -53,6 +61,8 @@ public sealed partial class ServicesPage : Page
         loaded = true;
         manager.Changed -= Manager_Changed;
         manager.Changed += Manager_Changed;
+        manager.InstallationProgress -= Manager_InstallationProgress;
+        manager.InstallationProgress += Manager_InstallationProgress;
         await RefreshRowsAsync();
     }
 
@@ -60,7 +70,35 @@ public sealed partial class ServicesPage : Page
     {
         loaded = false;
         manager.Changed -= Manager_Changed;
+        manager.InstallationProgress -= Manager_InstallationProgress;
         Interlocked.Exchange(ref refreshCancellation, null)?.Cancel();
+        Interlocked.Exchange(ref operationCancellation, null)?.Cancel();
+        operationDefinitionId = null;
+        SetWorking(false, string.Empty);
+    }
+
+    private void Manager_InstallationProgress(object? sender, ServiceInstallationProgress progress)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!loaded) return;
+            var existing = Downloads.FirstOrDefault(item =>
+                item.DefinitionId.Equals(progress.DefinitionId, StringComparison.OrdinalIgnoreCase));
+            if (existing is null) Downloads.Add(ServiceDownloadRow.From(progress));
+            else existing.Update(progress);
+            DownloadsPanel.Visibility = Downloads.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        });
+    }
+
+    private void ServicesLayout_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var compact = e.NewSize.Width < 720;
+        ServiceTypeColumn.Width = compact ? new GridLength(1, GridUnitType.Star) : new GridLength(180);
+        ServicePortColumn.Width = compact ? new GridLength(1, GridUnitType.Star) : new GridLength(130);
+        Grid.SetColumnSpan(ServiceTypeBox, compact ? 2 : 1);
+        Grid.SetRow(ServiceNameBox, compact ? 1 : 0);
+        Grid.SetColumn(ServiceNameBox, compact ? 0 : 1);
+        Grid.SetColumnSpan(ServiceNameBox, compact ? 4 : 1);
     }
 
     private void Manager_Changed(object? sender, EventArgs e)
@@ -86,6 +124,11 @@ public sealed partial class ServicesPage : Page
         ServiceAvailabilityText.Visibility = definition.IsInstallable
             ? Visibility.Collapsed
             : Visibility.Visible;
+        ServiceVersionBox.Items.Clear();
+        if (manager.IsInstalled(definition.Id))
+            ServiceVersionBox.Items.Add(AppLocalization.Format("ServicesUseInstalled", manager.InstalledVersion(definition.Id)));
+        ServiceVersionBox.Items.Add(AppLocalization.Format("ServicesUseLatest", definition.VersionChannel));
+        ServiceVersionBox.SelectedIndex = 0;
     }
 
     private async void Add_Click(object sender, RoutedEventArgs e)
@@ -130,17 +173,25 @@ public sealed partial class ServicesPage : Page
             Port = port,
             StartAutomatically = true
         };
+        var installLatest = ServiceVersionBox.SelectedIndex == ServiceVersionBox.Items.Count - 1;
         instances.Add(instance);
         manager.SaveInstances(instances);
-        SetWorking(true, AppLocalization.Format("ServicesInstalling", instance.Name));
+        using var cancellation = BeginOperation(
+            AppLocalization.Format("ServicesInstalling", instance.Name), instance.DefinitionId
+        );
         try
         {
-            if (!manager.IsInstalled(definition.Id))
+            InstallationPreflight.EnsureStorage(manager.SupportRoot);
+            if (!manager.IsInstalled(definition.Id) || installLatest)
             {
-                await manager.InstallAsync(instance.DefinitionId);
+                await manager.InstallAsync(instance.DefinitionId, cancellation.Token);
             }
             OperationStatusText.Text = AppLocalization.Format("ServicesStarting", instance.Name);
-            await manager.StartAsync(instance.Id);
+            await manager.StartAsync(instance.Id, cancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            OperationStatusText.Text = AppLocalization.Get("ServicesCancelled");
         }
         catch (Exception error)
         {
@@ -148,7 +199,7 @@ public sealed partial class ServicesPage : Page
         }
         finally
         {
-            SetWorking(false, string.Empty);
+            EndOperation(cancellation);
             await RefreshRowsAsync();
         }
     }
@@ -161,15 +212,21 @@ public sealed partial class ServicesPage : Page
             await ShowErrorAsync(AppLocalization.Get("ServicesStopBeforeUpdate"));
             return;
         }
-        SetWorking(true, AppLocalization.Format("ServicesInstalling", instance.Name));
+        using var cancellation = BeginOperation(
+            AppLocalization.Format("ServicesInstalling", instance.Name), instance.DefinitionId
+        );
         try
         {
-            var release = await manager.InstallAsync(instance.DefinitionId);
+            var release = await manager.InstallAsync(instance.DefinitionId, cancellation.Token);
             OperationStatusText.Text = AppLocalization.Format(
                 "ServicesVersionInstalled",
                 instance.Name,
                 release.Version
             );
+        }
+        catch (OperationCanceledException)
+        {
+            OperationStatusText.Text = AppLocalization.Get("ServicesCancelled");
         }
         catch (Exception error)
         {
@@ -177,7 +234,7 @@ public sealed partial class ServicesPage : Page
         }
         finally
         {
-            SetWorking(false, string.Empty);
+            EndOperation(cancellation);
             await RefreshRowsAsync();
         }
     }
@@ -244,6 +301,37 @@ public sealed partial class ServicesPage : Page
         await RefreshRowsAsync();
     }
 
+    private async void Backups_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetInstance(sender, out var instance)) return;
+        var backups = manager.Backups.List(instance.DefinitionId).Where(item => item.Instances.Contains(instance.Id)).ToArray();
+        var picker = new ComboBox
+        {
+            ItemsSource = backups.Select(item => $"{item.CreatedAt.LocalDateTime:g} - {item.RuntimeVersion}").ToArray(),
+            SelectedIndex = backups.Length > 0 ? 0 : -1,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var content = new StackPanel { Spacing = 12 };
+        content.Children.Add(new TextBlock { Text = AppLocalization.Get("ServicesRestoreNotice"), TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(picker);
+        var dialog = new ContentDialog
+        {
+            FlowDirection = AppLocalization.LayoutDirection,
+            XamlRoot = XamlRoot,
+            Title = AppLocalization.Get("ServicesBackupsTitle"),
+            Content = content,
+            PrimaryButtonText = AppLocalization.Get("ServicesRestoreData"),
+            CloseButtonText = AppLocalization.Get("CommonCancel"),
+            IsPrimaryButtonEnabled = backups.Length > 0,
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary || picker.SelectedIndex < 0) return;
+        using var cancellation = BeginOperation(AppLocalization.Get("ServicesRestoreData"));
+        try { await manager.RestoreDataAsync(instance.Id, backups[picker.SelectedIndex], cancellation.Token); }
+        catch (Exception error) { await ShowErrorAsync(UserErrorPresentation.Describe(error)); }
+        finally { EndOperation(cancellation); await RefreshRowsAsync(); }
+    }
+
     private async Task RepairPortAsync(
         ManagedServiceInstance instance,
         bool startAfterRepair
@@ -269,6 +357,7 @@ public sealed partial class ServicesPage : Page
         }
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
             Title = AppLocalization.Get("ServicesPortRepairTitle"),
             Content = AppLocalization.Format(
@@ -372,6 +461,7 @@ public sealed partial class ServicesPage : Page
             content.Children.Add(pathText);
             var dialog = new ContentDialog
             {
+                FlowDirection = AppLocalization.LayoutDirection,
                 XamlRoot = XamlRoot,
                 Title = AppLocalization.Format("ServicesEnvironmentDialogTitle", instance.Name),
                 Content = content,
@@ -473,6 +563,7 @@ public sealed partial class ServicesPage : Page
         if (!TryGetInstance(sender, out var instance)) return;
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
             Title = AppLocalization.Format("ServicesDeleteTitle", instance.Name),
             Content = AppLocalization.Get("ServicesDeleteMessage"),
@@ -494,54 +585,52 @@ public sealed partial class ServicesPage : Page
 
     private async Task RefreshRowsAsync()
     {
+        if (!loaded) return;
+        foreach (var progress in manager.InstallationStates)
+            Manager_InstallationProgress(manager, progress);
         var cancellation = new CancellationTokenSource();
         var previous = Interlocked.Exchange(ref refreshCancellation, cancellation);
         previous?.Cancel();
-        var instances = manager.LoadInstances();
-        if (!loaded)
-        {
-            Interlocked.CompareExchange(ref refreshCancellation, null, cancellation);
-            cancellation.Dispose();
-            return;
-        }
-        RenderRows(
-            instances,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        );
-        var installedDefinitionIds = instances
-            .Select(instance => instance.DefinitionId)
-            .Where(manager.IsInstalled)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var releaseTasks = installedDefinitionIds.Select(async definitionId =>
-        {
-            try
-            {
-                var release = await manager.ResolveReleaseAsync(
-                    definitionId,
-                    cancellation.Token
-                );
-                return (DefinitionId: definitionId, Version: release.Version);
-            }
-            catch (Exception error) when (
-                error is not OperationCanceledException || !cancellation.IsCancellationRequested
-            )
-            {
-                return (DefinitionId: definitionId, Version: (string?)null);
-            }
-        });
         try
         {
-            var latestVersions = (await Task.WhenAll(releaseTasks))
-                .Where(result => result.Version is not null)
-                .ToDictionary(
-                    result => result.DefinitionId,
-                    result => result.Version!,
-                    StringComparer.OrdinalIgnoreCase
-                );
+            var instances = manager.LoadInstances();
+            var knownVersions = knownLatestVersions;
+            RenderRows(instances, knownVersions);
+            var installedDefinitionIds = instances
+                .Select(instance => instance.DefinitionId)
+                .Where(manager.IsInstalled)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var releaseTasks = installedDefinitionIds.Select(async definitionId =>
+            {
+                try
+                {
+                    var release = await manager.ResolveReleaseAsync(
+                        definitionId,
+                        cancellation.Token
+                    );
+                    return (DefinitionId: definitionId, Version: release.Version);
+                }
+                catch (Exception error) when (
+                    error is not OperationCanceledException || !cancellation.IsCancellationRequested
+                )
+                {
+                    return (DefinitionId: definitionId, Version: (string?)null);
+                }
+            });
+            var latestVersions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var result in await Task.WhenAll(releaseTasks))
+            {
+                // A failed lookup keeps the last known release instead of hiding the update.
+                var version = result.Version
+                    ?? (knownVersions.TryGetValue(result.DefinitionId, out var known) ? known : null);
+                if (version is not null) latestVersions[result.DefinitionId] = version;
+            }
             cancellation.Token.ThrowIfCancellationRequested();
             if (!loaded) return;
-            RenderRows(instances, latestVersions);
+            knownLatestVersions = latestVersions;
+            // The second pass only runs when a release lookup changed an update flag.
+            if (!SameVersions(knownVersions, latestVersions)) RenderRows(instances, latestVersions);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
@@ -561,13 +650,13 @@ public sealed partial class ServicesPage : Page
         refreshing = true;
         try
         {
-            Rows.Clear();
+            var rows = new List<ManagedServiceRow>(instances.Count);
             foreach (var instance in instances)
             {
                 var installedVersion = manager.InstalledVersion(instance.DefinitionId);
                 latestVersions.TryGetValue(instance.DefinitionId, out var latestVersion);
                 var state = manager.State(instance.Id, instance.DefinitionId);
-                Rows.Add(new ManagedServiceRow
+                rows.Add(new ManagedServiceRow
                 {
                     Id = instance.Id,
                     DefinitionId = instance.DefinitionId,
@@ -591,6 +680,20 @@ public sealed partial class ServicesPage : Page
                         : null
                 });
             }
+            if (rows.Count == Rows.Count && rows.Select((row, index) => row.Id == Rows[index].Id).All(same => same))
+            {
+                // Same services in the same order: replace only changed rows so open flyouts
+                // and focus on unchanged rows survive the refresh.
+                for (var index = 0; index < rows.Count; index++)
+                {
+                    if (!SameRow(Rows[index], rows[index])) Rows[index] = rows[index];
+                }
+            }
+            else
+            {
+                Rows.Clear();
+                foreach (var row in rows) Rows.Add(row);
+            }
             ServiceList.Visibility = Rows.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
             EmptyState.Visibility = Rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             if (!working)
@@ -610,6 +713,33 @@ public sealed partial class ServicesPage : Page
         }
     }
 
+    private static bool SameVersions(
+        IReadOnlyDictionary<string, string> left,
+        IReadOnlyDictionary<string, string> right
+    )
+    {
+        return left.Count == right.Count
+            && left.All(pair => right.TryGetValue(pair.Key, out var value)
+                && string.Equals(pair.Value, value, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool SameRow(ManagedServiceRow left, ManagedServiceRow right)
+    {
+        return left.Id == right.Id
+            && left.DefinitionId == right.DefinitionId
+            && left.Name == right.Name
+            && left.Port == right.Port
+            && left.Version == right.Version
+            && left.State == right.State
+            && left.Status == right.Status
+            && left.InstallLabel == right.InstallLabel
+            && left.ToggleLabel == right.ToggleLabel
+            && left.StartAutomatically == right.StartAutomatically
+            && left.IsUpdateAvailable == right.IsUpdateAvailable
+            && left.ConsolePort == right.ConsolePort
+            && left.ConnectionDisplay == right.ConnectionDisplay;
+    }
+
     private bool TryGetInstance(object sender, out ManagedServiceInstance instance)
     {
         instance = null!;
@@ -623,7 +753,58 @@ public sealed partial class ServicesPage : Page
         this.working = working;
         OperationProgress.IsActive = working;
         OperationStatusText.Text = status;
-        IsEnabled = !working;
+        foreach (var child in ServiceForm.Children)
+        {
+            if (child is Control control) control.IsEnabled = !working;
+        }
+        AddServiceButton.IsEnabled = !working
+            && ServiceTypeBox.SelectedItem is ManagedServiceDefinition { IsInstallable: true };
+        ServiceList.IsEnabled = !working;
+        CancelOperationButton.Visibility = working && operationCancellation is not null
+            ? Visibility.Visible : Visibility.Collapsed;
+        CancelOperationButton.IsEnabled = working;
+    }
+
+    private CancellationTokenSource BeginOperation(string status, string? definitionId = null)
+    {
+        operationDefinitionId = definitionId;
+        var cancellation = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(ref operationCancellation, cancellation);
+        previous?.Cancel();
+        SetWorking(true, status);
+        return cancellation;
+    }
+
+    private void EndOperation(CancellationTokenSource cancellation)
+    {
+        if (!ReferenceEquals(Interlocked.CompareExchange(ref operationCancellation, null, cancellation), cancellation)) return;
+        operationDefinitionId = null;
+        SetWorking(false, string.Empty);
+    }
+
+    private void CancelOperation_Click(object sender, RoutedEventArgs e)
+    {
+        if (operationDefinitionId is { } definitionId) manager.CancelInstallation(definitionId);
+        Interlocked.CompareExchange(ref operationCancellation, null, null)?.Cancel();
+        OperationStatusText.Text = AppLocalization.Get("ServicesCancelling");
+        CancelOperationButton.IsEnabled = false;
+    }
+
+    private void CancelDownload_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string definitionId })
+            manager.CancelInstallation(definitionId);
+    }
+
+    private async void RetryDownload_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string definitionId }) return;
+        if (working || manager.IsInstalling(definitionId)) return;
+        using var cancellation = BeginOperation(AppLocalization.Format("ServicesInstalling", definitionId), definitionId);
+        try { await manager.InstallAsync(definitionId, cancellation.Token); }
+        catch (OperationCanceledException) { }
+        catch (Exception error) { await ShowErrorAsync(error.Message); }
+        finally { EndOperation(cancellation); await RefreshRowsAsync(); }
     }
 
     private static string StateLabel(ManagedServiceState state)
@@ -663,11 +844,91 @@ public sealed partial class ServicesPage : Page
         }
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = xamlRoot,
             Title = title,
             Content = message,
             CloseButtonText = AppLocalization.Get("CommonOk")
         };
         await dialog.ShowAsync();
+    }
+}
+
+public sealed class ServiceDownloadRow : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string DefinitionId { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string Detail { get; set; } = string.Empty;
+    public string Error { get; set; } = string.Empty;
+    public double Percentage { get; set; }
+    public bool IsIndeterminate { get; set; }
+    public Visibility IsActive { get; set; }
+    public Visibility CanCancel { get; set; }
+    public Visibility CanRetry { get; set; }
+    public string CancelLabel { get; set; } = string.Empty;
+    public string RetryLabel { get; set; } = string.Empty;
+
+    public void Update(ServiceInstallationProgress progress)
+    {
+        var updated = From(progress);
+        Title = updated.Title;
+        Detail = updated.Detail;
+        Error = updated.Error;
+        Percentage = updated.Percentage;
+        IsIndeterminate = updated.IsIndeterminate;
+        IsActive = updated.IsActive;
+        CanCancel = updated.CanCancel;
+        CanRetry = updated.CanRetry;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
+    }
+
+    public static ServiceDownloadRow From(ServiceInstallationProgress progress, string? title = null)
+    {
+        var active = progress.IsActive;
+        var label = progress.Stage switch
+        {
+            ServiceInstallationStage.BackingUp => AppLocalization.Get("ServicesBackingUp"),
+            ServiceInstallationStage.Resolving => AppLocalization.Get("ServicesResolving"),
+            ServiceInstallationStage.Downloading => AppLocalization.Get("ServicesDownloading"),
+            ServiceInstallationStage.Retrying => AppLocalization.Get("ServicesRetrying"),
+            ServiceInstallationStage.Verifying => AppLocalization.Get("ServicesVerifying"),
+            ServiceInstallationStage.Extracting => AppLocalization.Get("ServicesExtracting"),
+            ServiceInstallationStage.Installing => AppLocalization.Get("ServicesInstallingState"),
+            ServiceInstallationStage.Completed => AppLocalization.Get("ServicesCompleted"),
+            ServiceInstallationStage.Cancelled => AppLocalization.Get("ServicesCancelled"),
+            ServiceInstallationStage.Failed => AppLocalization.Get("ServicesFailed"),
+            _ => progress.Stage.ToString()
+        };
+        var detail = progress.Percentage is { } percentage
+            ? $"{percentage:0}%" : progress.Stage == ServiceInstallationStage.Downloading ? "..." : string.Empty;
+        if (progress.Stage == ServiceInstallationStage.Downloading)
+        {
+            const double megabyte = 1_048_576;
+            var transfer = progress.TotalBytes is { } total
+                ? AppLocalization.Format("ServicesTransfer", progress.BytesReceived / megabyte,
+                    total / megabyte, progress.BytesPerSecond / megabyte)
+                : AppLocalization.Format("ServicesTransferUnknown", progress.BytesReceived / megabyte,
+                    progress.BytesPerSecond / megabyte);
+            detail = $"{detail} - {transfer}";
+        }
+        if (progress.Attempt > 1)
+            detail = $"{detail} {AppLocalization.Format("ServicesAttempt", progress.Attempt)}".Trim();
+        return new ServiceDownloadRow
+        {
+            DefinitionId = progress.DefinitionId,
+            Title = title ?? ManagedServiceCatalog.Get(progress.DefinitionId).Name,
+            Detail = detail.Length == 0 ? label : $"{label} - {detail}",
+            Error = progress.Stage == ServiceInstallationStage.Failed
+                ? AppLocalization.Get("ErrorOperation") + Environment.NewLine + progress.Error : string.Empty,
+            CancelLabel = AppLocalization.Get("CommonCancel"),
+            RetryLabel = AppLocalization.Get("ServicesRetry"),
+            Percentage = progress.Percentage ?? 0,
+            IsIndeterminate = progress.Percentage is null && active,
+            IsActive = active ? Visibility.Visible : Visibility.Collapsed,
+            CanCancel = active ? Visibility.Visible : Visibility.Collapsed,
+            CanRetry = progress.Stage is ServiceInstallationStage.Failed or ServiceInstallationStage.Cancelled
+                ? Visibility.Visible : Visibility.Collapsed
+        };
     }
 }

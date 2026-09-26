@@ -63,9 +63,10 @@ public sealed class WindowsHostsManager
         if (!File.Exists(originalBackup)) File.Copy(hostsPath, originalBackup);
 
         var candidatePath = Path.Combine(cachePath, $"hosts-{Guid.NewGuid():N}");
-        await File.WriteAllTextAsync(candidatePath, updated, new UTF8Encoding(false), cancellationToken);
         try
         {
+            await File.WriteAllTextAsync(candidatePath, updated, new UTF8Encoding(false), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             var executable = Environment.ProcessPath
                 ?? throw new InvalidOperationException("The HerdMe executable path is unavailable.");
             var startInfo = new ProcessStartInfo
@@ -80,7 +81,7 @@ public sealed class WindowsHostsManager
             startInfo.ArgumentList.Add(hostsPath);
             using var process = Process.Start(startInfo)
                 ?? throw new InvalidOperationException("The Windows hosts updater could not be started.");
-            await process.WaitForExitAsync(cancellationToken);
+            await WaitForUpdaterExitAsync(process, TimeSpan.FromSeconds(30), cancellationToken);
             if (process.ExitCode != 0)
             {
                 throw new InvalidOperationException(
@@ -88,7 +89,7 @@ public sealed class WindowsHostsManager
                 );
             }
         }
-        catch (Win32Exception error) when (error.NativeErrorCode == 1_225)
+        catch (Win32Exception error) when (error.NativeErrorCode == 1_223)
         {
             throw new InvalidOperationException(
                 "Administrator approval is required to map local HerdMe domains.",
@@ -97,7 +98,37 @@ public sealed class WindowsHostsManager
         }
         finally
         {
-            if (File.Exists(candidatePath)) File.Delete(candidatePath);
+            TryDeleteStagedCandidate(candidatePath);
+        }
+    }
+
+    internal static async Task WaitForUpdaterExitAsync(
+        Process process,
+        TimeSpan timeout,
+        CancellationToken cancellationToken
+    )
+    {
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        waitCancellation.CancelAfter(timeout);
+        try
+        {
+            await process.WaitForExitAsync(waitCancellation.Token);
+        }
+        catch (OperationCanceledException error) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException("The Windows hosts updater did not finish within the allotted time.", error);
+        }
+        // Do not forcibly terminate an elevated helper: it may be writing hosts.
+        // A normal process also cannot reliably terminate an elevated process.
+    }
+
+    internal static void TryDeleteStagedCandidate(string candidatePath)
+    {
+        try { File.Delete(candidatePath); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // The helper may still hold the file after the caller stopped waiting.
+            // Cleanup must not replace the cancellation or updater error.
         }
     }
 
@@ -129,6 +160,7 @@ public sealed class WindowsHostsManager
             return true;
         }
 
+        string? replacement = null;
         try
         {
             var candidate = ReadStagedCandidate(arguments[2]);
@@ -171,33 +203,58 @@ public sealed class WindowsHostsManager
                     return true;
                 }
 
-                destination.Position = 0;
-                destination.SetLength(0);
-                using (var writer = new StreamWriter(
-                    destination,
-                    new UTF8Encoding(false),
-                    bufferSize: 4_096,
-                    leaveOpen: true
+                // Write the new content next to the hosts file first so a crash or power
+                // loss can never leave Windows with a truncated hosts file.
+                replacement = HostsReplacementPath(arguments[3]);
+                using (var staged = new FileStream(
+                    replacement,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None
                 ))
                 {
-                    writer.Write(candidate);
-                    writer.Flush();
+                    var bytes = new UTF8Encoding(false).GetBytes(candidate);
+                    staged.Write(bytes);
+                    staged.Flush(flushToDisk: true);
                 }
-                destination.Flush(flushToDisk: true);
+                try
+                {
+                    destination.Dispose();
+                    // ReplaceFile keeps the original DACL, attributes and owner.
+                    File.Replace(replacement, arguments[3], null, ignoreMetadataErrors: true);
+                    replacement = null;
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                {
+                    // Some security products block renames inside drivers\etc. Fall back to
+                    // the original in-place write rather than leaving sites unresolved.
+                    using var fallback = new FileStream(
+                        arguments[3],
+                        FileMode.Open,
+                        FileAccess.Write,
+                        FileShare.None
+                    );
+                    fallback.SetLength(0);
+                    fallback.Write(new UTF8Encoding(false).GetBytes(candidate));
+                    fallback.Flush(flushToDisk: true);
+                }
             }
             var flush = new ProcessStartInfo
             {
-                FileName = "ipconfig.exe",
+                FileName = Path.Combine(Environment.SystemDirectory, "ipconfig.exe"),
                 UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
+                CreateNoWindow = true
             };
             flush.ArgumentList.Add("/flushdns");
             using var process = Process.Start(flush)
                 ?? throw new InvalidOperationException("The Windows DNS cache could not be flushed.");
-            process.WaitForExit();
-            if (process.ExitCode != 0) exitCode = 1;
+            if (!process.WaitForExit(milliseconds: 10_000))
+            {
+                try { process.Kill(); }
+                catch (Exception error) when (error is InvalidOperationException or Win32Exception) { }
+                exitCode = 1;
+            }
+            else if (process.ExitCode != 0) exitCode = 1;
         }
         catch (Exception error) when (
             error is IOException
@@ -208,8 +265,22 @@ public sealed class WindowsHostsManager
         {
             exitCode = 1;
         }
+        finally
+        {
+            if (replacement is not null)
+            {
+                try { File.Delete(replacement); }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+            }
+        }
         return true;
     }
+
+    internal static string HostsReplacementPath(string hostsPath) =>
+        Path.Combine(
+            Path.GetDirectoryName(hostsPath) ?? throw new InvalidDataException("The hosts path has no folder."),
+            $"hosts.herdme-{Environment.ProcessId}.tmp"
+        );
 
     internal static bool IsAllowedHelperRequest(
         string source,

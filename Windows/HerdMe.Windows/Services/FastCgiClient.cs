@@ -24,6 +24,8 @@ public sealed class FastCgiClient
     private const int MaximumContentLength = 65_535;
     private const int MaximumBufferedOutputLength = 64 * 1_024 * 1_024;
     private const int MaximumStandardErrorLength = 1 * 1_024 * 1_024;
+    private const int TransportBufferSize = 32 * 1_024;
+    private static readonly byte[] WritePadding = new byte[8];
 
     public async Task<FastCgiResult> PerformAsync(
         int port,
@@ -79,9 +81,12 @@ public sealed class FastCgiClient
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> onStandardOutput,
         CancellationToken cancellationToken)
     {
-        using var client = new TcpClient();
+        // NoDelay plus a buffered writer coalesces the begin/params/stdin records into as few
+        // segments as possible, avoiding Nagle/delayed-ACK stalls between small FastCGI records.
+        using var client = new TcpClient { NoDelay = true };
         await client.ConnectAsync(IPAddress.Loopback, port, cancellationToken);
-        await using var stream = client.GetStream();
+        var networkStream = client.GetStream();
+        await using var stream = new BufferedStream(networkStream, TransportBufferSize);
         await WriteRecordAsync(
             stream,
             BeginRequest,
@@ -92,10 +97,12 @@ public sealed class FastCgiClient
         await WriteRecordAsync(stream, Parameters, ReadOnlyMemory<byte>.Empty, cancellationToken);
         await WriteRecordsAsync(stream, StandardInput, body, cancellationToken);
         await WriteRecordAsync(stream, StandardInput, ReadOnlyMemory<byte>.Empty, cancellationToken);
+        await stream.FlushAsync(cancellationToken);
 
         using var errors = new MemoryStream();
         var errorsWereTruncated = false;
         var header = new byte[8];
+        var paddingBuffer = new byte[byte.MaxValue];
         while (true)
         {
             await ReadExactlyAsync(stream, header, cancellationToken);
@@ -105,7 +112,7 @@ public sealed class FastCgiClient
             var padding = header[6];
             var content = new byte[length];
             await ReadExactlyAsync(stream, content, cancellationToken);
-            if (padding > 0) await ReadExactlyAsync(stream, new byte[padding], cancellationToken);
+            if (padding > 0) await ReadExactlyAsync(stream, paddingBuffer.AsMemory(0, padding), cancellationToken);
             if (requestId != RequestIdentifier) continue;
             switch (header[1])
             {
@@ -199,7 +206,7 @@ public sealed class FastCgiClient
         header[6] = (byte)padding;
         await stream.WriteAsync(header, cancellationToken);
         if (!content.IsEmpty) await stream.WriteAsync(content, cancellationToken);
-        if (padding > 0) await stream.WriteAsync(new byte[padding], cancellationToken);
+        if (padding > 0) await stream.WriteAsync(WritePadding.AsMemory(0, padding), cancellationToken);
     }
 
     private static async Task ReadExactlyAsync(

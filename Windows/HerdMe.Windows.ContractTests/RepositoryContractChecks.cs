@@ -252,11 +252,7 @@ internal static partial class ContractChecks
                 && xaml.Contains("Click=\"ResetProjectWorkflow_Click\"", StringComparison.Ordinal),
             "the Sites automation menu exposes the local project reset workflow"
         );
-        var pageSource = File.ReadAllText(Path.Combine(
-            projectRoot,
-            "Pages",
-            "SitesPage.xaml.cs"
-        ));
+        var pageSource = ReadSitesPageSource(Path.Combine(projectRoot, "Pages"));
         Check(
             xaml.Contains("x:Name=\"StartLaravelButton\"", StringComparison.Ordinal)
                 && xaml.Contains("Click=\"StartLaravel_Click\"", StringComparison.Ordinal)
@@ -383,8 +379,9 @@ internal static partial class ContractChecks
         );
         Check(
             setup.GetValueOrDefault("MinVersion") == "10.0.19041"
-                && setup.GetValueOrDefault("AppMutex") == SingleInstanceCoordinator.MutexName,
-            "the Windows installer matches the supported OS and runtime mutex"
+                && !setup.ContainsKey("AppMutex")
+                && installerText.Contains("function PrepareToInstall", StringComparison.Ordinal),
+            "the Windows installer stops the app before replacing files instead of blocking on its mutex"
         );
         Check(
             setup.GetValueOrDefault("CloseApplications") == "yes"
@@ -580,7 +577,7 @@ internal static partial class ContractChecks
                 && dashboardXaml.Contains("Property=\"HorizontalAlignment\" Value=\"Stretch\"", StringComparison.Ordinal)
                 && dashboardXaml.Contains("TextWrapping=\"Wrap\"", StringComparison.Ordinal)
                 && dashboardSource.Contains("e.NewSize.Width < 820", StringComparison.Ordinal)
-                && dashboardSource.Contains("SummaryStatusBrush", StringComparison.Ordinal)
+                && dashboardSource.Contains("SummaryStatusTone", StringComparison.Ordinal)
                 && dashboardSource.Contains("PositionEnvironmentRow", StringComparison.Ordinal)
                 && dashboardSource.Contains("RecentDumpsPanel", StringComparison.Ordinal),
             "the dashboard keeps polished equal-width cards and switches to a compact layout without clipping"
@@ -1252,9 +1249,7 @@ internal static partial class ContractChecks
                 ),
             "native Windows installer acceptance restores the pre-existing onboarding marker state"
         );
-        var sitesPageCodeBehind = File.ReadAllText(
-            Path.Combine(projectRoot, "Pages", "SitesPage.xaml.cs")
-        );
+        var sitesPageCodeBehind = ReadSitesPageSource(Path.Combine(projectRoot, "Pages"));
         Check(
             sitesPageCodeBehind.Contains(
                 "ScrollViewer.SetHorizontalScrollBarVisibility(editor",
@@ -1686,9 +1681,7 @@ internal static partial class ContractChecks
             "Windows Mail keeps an empty inbox neutral and ignores replaced WebView navigation"
         );
 
-        var sitesPageSource = File.ReadAllText(
-            Path.Combine(projectRoot, "Pages", "SitesPage.xaml.cs")
-        );
+        var sitesPageSource = ReadSitesPageSource(Path.Combine(projectRoot, "Pages"));
         var sitesResourceKeys = Regex.Matches(
             sitesPageSource,
             @"""(?<key>Sites[A-Za-z0-9]+)""",
@@ -1954,12 +1947,11 @@ internal static partial class ContractChecks
                 && !source.Contains("cmd.exe", StringComparison.OrdinalIgnoreCase),
             "Artisan runs without a visible console or command shell"
         );
-        var sitesSource = File.ReadAllText(Path.Combine(
+        var sitesSource = ReadSitesPageSource(Path.Combine(
             repositoryRoot,
             "Windows",
             "HerdMe.Windows",
-            "Pages",
-            "SitesPage.xaml.cs"
+            "Pages"
         ));
         Check(
             sitesSource.Contains("new AutoSuggestBox", StringComparison.Ordinal)
@@ -2217,6 +2209,22 @@ internal static partial class ContractChecks
         {
             if (Directory.Exists(root)) Directory.Delete(root, true);
         }
+    }
+
+    // SitesPage code-behind is split into partial files by feature; checks read the whole
+    // class so moving a member between partials never hides it from a contract.
+    private static string ReadSitesPageSource(string pagesDirectory)
+    {
+        var primary = Path.Combine(pagesDirectory, "SitesPage.xaml.cs");
+        var partials = Directory.GetFiles(pagesDirectory, "SitesPage.*.cs")
+            .Where(path => !string.Equals(path, primary, StringComparison.OrdinalIgnoreCase))
+            .Order(StringComparer.Ordinal);
+        var builder = new StringBuilder(File.ReadAllText(primary));
+        foreach (var partial in partials)
+        {
+            builder.Append('\n').Append(File.ReadAllText(partial));
+        }
+        return builder.ToString();
     }
 
     private static IReadOnlyDictionary<string, string> NpmFixtureEnvironment(string mode)

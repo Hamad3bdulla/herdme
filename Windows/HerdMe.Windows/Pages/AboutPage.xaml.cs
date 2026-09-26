@@ -160,13 +160,14 @@ public sealed partial class AboutPage : Page
         };
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
             Title = title,
             Content = new ScrollViewer
             {
                 Content = text,
-                MaxHeight = 520,
-                MaxWidth = 760
+                // The dialog caps its own width; a wider viewer would clip at high scale.
+                MaxHeight = 520
             },
             CloseButtonText = AppLocalization.Get("AboutDone")
         };
@@ -195,6 +196,7 @@ public sealed partial class AboutPage : Page
     {
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
             Title = title,
             Content = message,

@@ -33,6 +33,7 @@ jobs:
         run: brew install xcodegen actionlint shellcheck
 
       - name: Lint workflows, scripts, and source
+        id: lint
         run: |
           actionlint -color
           xcrun swift-format lint --strict --recursive --parallel HerdMe HerdMeTests HerdMeUITests
@@ -71,6 +72,22 @@ jobs:
           zsh -n \
             scripts/package-macos.sh \
             Tools/NetworkHelper/test-network-helper.sh
+
+      - name: Capture Swift formatting corrections
+        if: failure() && steps.lint.outcome == 'failure'
+        run: |
+          mkdir -p build
+          xcrun swift-format format --in-place --recursive --parallel HerdMe HerdMeTests HerdMeUITests
+          git diff --binary -- HerdMe HerdMeTests HerdMeUITests > build/swift-format.patch
+
+      - name: Upload Swift formatting corrections
+        if: failure() && steps.lint.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: HerdMe-${{ github.run_number }}-swift-format
+          path: build/swift-format.patch
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Verify release version metadata
         run: ./scripts/check-version.sh

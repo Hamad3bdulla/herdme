@@ -48,8 +48,13 @@ public sealed class SiteConfigurationStore
         LastBackupPath = null;
         try
         {
-            var json = File.ReadAllText(SettingsPath);
+            // Pages load settings repeatedly on the UI thread; reuse the unchanged file text.
+            var json = SettingsFileCache.ReadAllText(SettingsPath);
             using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                throw new JsonException("The site settings document must be an object.");
+            }
             var sourceSchemaVersion = 0;
             if (document.RootElement.TryGetProperty(
                 nameof(WindowsSiteSettings.SchemaVersion),
@@ -70,6 +75,11 @@ public sealed class SiteConfigurationStore
             }
             var settings = JsonSerializer.Deserialize<WindowsSiteSettings>(json)
                 ?? throw new JsonException("The site settings document is empty.");
+            if (settings.Roots is null || settings.LinkedSites is null
+                || settings.Tld is null || settings.UpdateChannel is null)
+            {
+                throw new JsonException("The site settings contain null required fields.");
+            }
             if (!document.RootElement.TryGetProperty(
                 nameof(WindowsSiteSettings.OnboardingCompleted),
                 out _
@@ -91,6 +101,7 @@ public sealed class SiteConfigurationStore
 
     private void PreserveUnreadableSettings()
     {
+        SettingsFileCache.Invalidate(SettingsPath);
         var backupPath = Path.Combine(
             Path.GetDirectoryName(SettingsPath)!,
             $"sites.corrupt-{Guid.NewGuid():N}.json"
@@ -110,6 +121,7 @@ public sealed class SiteConfigurationStore
 
     private void PreserveUnsupportedSettings(int schemaVersion)
     {
+        SettingsFileCache.Invalidate(SettingsPath);
         var backupPath = Path.Combine(
             Path.GetDirectoryName(SettingsPath)!,
             $"sites.unsupported-v{schemaVersion}-{Guid.NewGuid():N}.json"
@@ -145,6 +157,7 @@ public sealed class SiteConfigurationStore
         var temporary = SettingsPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         WriteDurably(temporary, JsonSerializer.Serialize(normalized, JsonOptions));
         File.Move(temporary, SettingsPath, true);
+        SettingsFileCache.Invalidate(SettingsPath);
     }
 
     private static void WriteDurably(string path, string contents)
@@ -243,6 +256,17 @@ public sealed class SiteConfigurationStore
         )));
     }
 
+    public void ToggleFavorite(string path)
+    {
+        var normalized = Path.GetFullPath(path);
+        Update(settings =>
+        {
+            settings.FavoriteSites ??= [];
+            if (settings.FavoriteSites.RemoveAll(item => item.Equals(normalized, StringComparison.OrdinalIgnoreCase)) == 0)
+                settings.FavoriteSites.Add(normalized);
+        });
+    }
+
     private void Update(Action<WindowsSiteSettings> update)
     {
         lock (SettingsLock())
@@ -316,6 +340,8 @@ public sealed class SiteConfigurationStore
             SchemaVersion = CurrentSchemaVersion,
             Roots = roots,
             LinkedSites = linkedSites,
+            FavoriteSites = (settings.FavoriteSites ?? []).Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             Tld = tld,
             StartAutomatically = settings.StartAutomatically,
             ShowPreviews = settings.ShowPreviews,

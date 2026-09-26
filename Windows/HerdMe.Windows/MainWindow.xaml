@@ -5,23 +5,48 @@
     xmlns:views="using:HerdMe.Windows.Views"
     Title="HerdMe">
     <Grid x:Name="RootLayout" Background="{ThemeResource ShellBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Custom title bar; the whole strip stays a drag region, so it holds no controls. -->
+        <Grid x:Name="AppTitleBar" Height="48" Padding="16,0,16,0" ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Image Source="ms-appx:///Assets/HerdMe.png" Width="20" Height="20" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="HerdMe" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <Border
+                x:Name="TitleBarStatus"
+                Grid.Column="3"
+                Style="{StaticResource StatusPillNeutralStyle}"
+                Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                    <Ellipse x:Name="TitleBarStatusDot" Style="{StaticResource StatusDotNeutralStyle}" />
+                    <TextBlock x:Name="TitleBarStatusText" FontSize="12" VerticalAlignment="Center" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
         <NavigationView
             x:Name="Navigation"
+            Grid.Row="1"
             AutomationProperties.AutomationId="NavigationRoot"
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="False"
-            IsTitleBarAutoPaddingEnabled="True"
-            OpenPaneLength="212"
+            IsTitleBarAutoPaddingEnabled="False"
+            OpenPaneLength="220"
             CompactModeThresholdWidth="640"
             ExpandedModeThresholdWidth="1100"
             PaneDisplayMode="Auto"
             SelectionChanged="Navigation_SelectionChanged">
-            <NavigationView.PaneHeader>
-                <StackPanel Orientation="Horizontal" Spacing="10" Margin="16,14,12,20">
-                    <Image Source="ms-appx:///Assets/HerdMe.png" Width="32" Height="32" />
-                    <TextBlock Text="HerdMe" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
-                </StackPanel>
-            </NavigationView.PaneHeader>
+            <NavigationView.Resources>
+                <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="Transparent" />
+            </NavigationView.Resources>
             <NavigationView.MenuItems>
             <NavigationViewItem x:Uid="NavDashboard" AutomationProperties.AutomationId="NavDashboard" Content="Dashboard" Tag="dashboard">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
@@ -64,14 +89,14 @@
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Help" /></NavigationViewItem.Icon>
             </NavigationViewItem>
             </NavigationView.FooterMenuItems>
-            <Border Background="{ThemeResource WorkspaceBackgroundBrush}" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1,0,0,0">
-                <ScrollViewer x:Name="WorkspaceScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
-                    <Frame x:Name="ContentFrame" Width="{Binding ViewportWidth, ElementName=WorkspaceScroll}" MinWidth="740" />
-                </ScrollViewer>
-            </Border>
+            <!-- NavigationView draws the raised content layer with a rounded leading corner over Mica. -->
+            <ScrollViewer x:Name="WorkspaceScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                <Frame x:Name="ContentFrame" Width="{Binding ViewportWidth, ElementName=WorkspaceScroll}" MinWidth="740" />
+            </ScrollViewer>
         </NavigationView>
         <views:OnboardingView
             x:Name="Onboarding"
+            Grid.Row="1"
             SetupCompleted="Onboarding_SetupCompleted" />
     </Grid>
 </Window>

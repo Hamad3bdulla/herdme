@@ -11,6 +11,11 @@ using System.Xml.Linq;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
 
+sealed class CallbackProgress<T>(Action<T> callback) : IProgress<T>
+{
+    public void Report(T value) => callback(value);
+}
+
 sealed record HttpTestResponse(
     string StatusLine,
     IReadOnlyDictionary<string, string> Headers,
@@ -73,6 +78,16 @@ sealed class HttpTestResponseReader(Stream stream)
                 ? existing + ", " + value
                 : value;
         }
+        if (headers.TryGetValue("Transfer-Encoding", out var transferEncoding)
+            && transferEncoding.Equals("chunked", StringComparison.OrdinalIgnoreCase))
+        {
+            if (headers.ContainsKey("Content-Length"))
+            {
+                throw new InvalidDataException("The HTTP fixture response mixed chunked and Content-Length framing.");
+            }
+            var chunkedBody = await ReadChunkedBodyAsync(cancellationToken);
+            return new HttpTestResponse(lines[0], headers, chunkedBody);
+        }
         if (!headers.TryGetValue("Content-Length", out var contentLengthText)
             || !int.TryParse(contentLengthText, out var contentLength)
             || contentLength < 0)
@@ -96,6 +111,57 @@ sealed class HttpTestResponseReader(Stream stream)
         {
             return false;
         }
+    }
+
+    private async Task<byte[]> ReadChunkedBodyAsync(CancellationToken cancellationToken)
+    {
+        using var body = new MemoryStream();
+        while (true)
+        {
+            var sizeLine = await ReadLineAsync(cancellationToken);
+            var sizeText = sizeLine.Split(';', 2)[0].Trim();
+            if (!int.TryParse(
+                    sizeText,
+                    System.Globalization.NumberStyles.AllowHexSpecifier,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var size)
+                || size < 0)
+            {
+                throw new InvalidDataException("The HTTP fixture response has an invalid chunk size.");
+            }
+            if (size == 0)
+            {
+                while ((await ReadLineAsync(cancellationToken)).Length > 0)
+                {
+                }
+                return body.ToArray();
+            }
+            body.Write(await ReadExactlyAsync(size, cancellationToken));
+            if (await ReadLineAsync(cancellationToken) != string.Empty)
+            {
+                throw new InvalidDataException("The HTTP fixture response chunk was not terminated by CRLF.");
+            }
+        }
+    }
+
+    private async Task<string> ReadLineAsync(CancellationToken cancellationToken)
+    {
+        var lineEnd = buffered.AsSpan(start, count).IndexOf("\r\n"u8);
+        while (lineEnd < 0)
+        {
+            if (count > MaximumHeaderSize)
+            {
+                throw new InvalidDataException("The HTTP fixture response line was too large.");
+            }
+            if (!await ReadMoreAsync(cancellationToken))
+            {
+                throw new EndOfStreamException("The HTTP fixture response closed inside a chunked body.");
+            }
+            lineEnd = buffered.AsSpan(start, count).IndexOf("\r\n"u8);
+        }
+        var line = Encoding.ASCII.GetString(buffered, start, lineEnd);
+        Consume(lineEnd + 2);
+        return line;
     }
 
     private int FindHeaderEnd()
@@ -198,4 +264,3 @@ sealed class MemoryCredentialBackend : IWindowsCredentialBackend
         Secrets.Remove(target);
     }
 }
-

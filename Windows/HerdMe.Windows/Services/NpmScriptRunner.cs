@@ -335,6 +335,7 @@ public static class NpmScriptRunner
                 "SitesNpmErrorStartFailed",
                 "The selected Node.js runtime could not start npm."
             );
+        using var job = WindowsJobObject.TryAttach(process);
         var capture = new BoundedOutputCapture(MaximumCapturedCharacters);
         var standardOutput = PumpAsync(process.StandardOutput, capture, outputProgress);
         var standardError = PumpAsync(process.StandardError, capture, outputProgress);
@@ -357,14 +358,14 @@ public static class NpmScriptRunner
             {
             }
             await process.WaitForExitAsync(CancellationToken.None);
-            await Task.WhenAll(standardOutput, standardError);
+            await WindowsJobObject.DrainOutputAsync(job, standardOutput, standardError);
             cancellationToken.ThrowIfCancellationRequested();
             throw new NpmScriptException(
                 "SitesNpmErrorTimedOut",
                 $"The npm command did not finish within {invocation.Timeout.TotalMinutes:0} minutes."
             );
         }
-        await Task.WhenAll(standardOutput, standardError);
+        await WindowsJobObject.DrainOutputAsync(job, standardOutput, standardError);
         return new NpmScriptResult(process.ExitCode, capture.Value);
     }
 
@@ -423,6 +424,7 @@ public static class NpmScriptRunner
                 "SitesNpmErrorStartFailed",
                 "The selected Node.js runtime could not start npm."
             );
+        using var job = WindowsJobObject.TryAttach(process);
         var capture = new BoundedOutputCapture(MaximumCapturedCharacters);
         var standardOutput = PumpAsync(process.StandardOutput, capture, outputProgress);
         var standardError = PumpAsync(process.StandardError, capture, outputProgress);
@@ -446,7 +448,7 @@ public static class NpmScriptRunner
                 // The process exited while cancellation was being delivered.
             }
             await process.WaitForExitAsync(CancellationToken.None);
-            await Task.WhenAll(standardOutput, standardError);
+            await WindowsJobObject.DrainOutputAsync(job, standardOutput, standardError);
             cancellationToken.ThrowIfCancellationRequested();
             throw new NpmScriptException(
                 "SitesNpmErrorTimedOut",
@@ -454,7 +456,7 @@ public static class NpmScriptRunner
                 invocation.Timeout.TotalMinutes
             );
         }
-        await Task.WhenAll(standardOutput, standardError);
+        await WindowsJobObject.DrainOutputAsync(job, standardOutput, standardError);
         return new NpmScriptResult(process.ExitCode, capture.Value);
     }
 

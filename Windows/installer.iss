@@ -51,7 +51,7 @@ WizardSizePercent=100
 CloseApplications=yes
 CloseApplicationsFilter=HerdMe.Windows.exe
 RestartApplications=no
-AppMutex=Local\HerdMe.Desktop.SingleInstance
+; PrepareToInstall closes older versions which otherwise only hide on WM_CLOSE.
 SetupLogging=yes
 
 [Languages]
@@ -61,6 +61,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 [Files]
+Source: "stop-for-update.ps1"; Flags: dontcopy
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
@@ -78,6 +79,23 @@ Type: files; Name: "{userstartup}\HerdMe.lnk"
 Filename: "{app}\HerdMe.Windows.exe"; Description: "Launch HerdMe"; Flags: nowait postinstall skipifsilent
 
 [Code]
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+  Parameters: String;
+begin
+  Result := '';
+  ExtractTemporaryFile('stop-for-update.ps1');
+  Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' +
+    AddQuotes(ExpandConstant('{tmp}\stop-for-update.ps1')) +
+    ' -InstallDirectory ' + AddQuotes(ExpandConstant('{app}'));
+  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    Result := 'Could not stop HerdMe. Close HerdMe and retry the update.'
+  else if ResultCode <> 0 then
+    Result := 'Some HerdMe services are still running. Close them and retry the update.';
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   MarkerPath: String;

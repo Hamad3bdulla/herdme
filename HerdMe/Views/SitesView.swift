@@ -1468,7 +1468,8 @@ private struct ArtisanRunnerView: View {
                 }
                 if output.isEmpty { appendOutput(result.output) }
                 hasFailure = result.status != 0
-                status = result.status == 0
+                status =
+                    result.status == 0
                     ? String(localized: "Completed")
                     : String.localizedStringWithFormat(
                         String(localized: "Failed (exit %lld)"),
@@ -1874,7 +1875,9 @@ private struct SiteControlCenterView: View {
                         Label("Run", systemImage: "play.fill")
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(isRunning || (composerOption == "require" && composerPackage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+                    .disabled(
+                        isRunning
+                            || (composerOption == "require" && composerPackage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
                 }
                 HStack(spacing: 10) {
                     Picker("Command", selection: $composerOption) {
@@ -1933,7 +1936,9 @@ private struct SiteControlCenterView: View {
                                     defaultPHP: model.configuration.selectedPHP
                                 )
                             } label: {
-                                Label(snapshot?.isActive == true ? "Stop" : "Start", systemImage: snapshot?.isActive == true ? "stop.fill" : "play.fill")
+                                Label(
+                                    snapshot?.isActive == true ? "Stop" : "Start",
+                                    systemImage: snapshot?.isActive == true ? "stop.fill" : "play.fill")
                             }
                             .buttonStyle(.bordered)
                             .tint(snapshot?.isActive == true ? .orange : .accentColor)
@@ -2127,9 +2132,13 @@ private struct SiteControlCenterView: View {
     private var workflowConfirmationMessage: String {
         guard let operation = pendingWorkflow else { return "" }
         switch operation {
-        case .reset: return String(localized: "This creates a backup, then rebuilds and seeds the local database. Existing local data will be replaced.")
-        case .update: return String(localized: "This creates a backup, updates project dependencies, runs migrations, and rebuilds frontend assets.")
-        case .clean: return String(localized: "This creates a backup, removes installed dependencies, and rebuilds the project from lock files.")
+        case .reset:
+            return String(
+                localized: "This creates a backup, then rebuilds and seeds the local database. Existing local data will be replaced.")
+        case .update:
+            return String(localized: "This creates a backup, updates project dependencies, runs migrations, and rebuilds frontend assets.")
+        case .clean:
+            return String(localized: "This creates a backup, removes installed dependencies, and rebuilds the project from lock files.")
         default: return String.localizedStringWithFormat(String(localized: "Run %@ for this site?"), operation.title)
         }
     }
@@ -2166,7 +2175,9 @@ private struct SiteControlCenterView: View {
                 status = String(localized: "Completed")
                 if operation == .repair { await loadHealth() }
             } catch let error as ProcessRunnerError {
-                status = error.localizedDescription == String(localized: "The command was cancelled.") ? String(localized: "Cancelled") : String(localized: "Failed")
+                status =
+                    error.localizedDescription == String(localized: "The command was cancelled.")
+                    ? String(localized: "Cancelled") : String(localized: "Failed")
                 appendOutput(error.localizedDescription + "\n")
             } catch is CancellationError {
                 status = String(localized: "Cancelled")
@@ -2216,7 +2227,10 @@ private struct SiteControlCenterView: View {
                     Task { @MainActor in appendOutput(value) }
                 }
                 if output.isEmpty { appendOutput(result.output) }
-                status = result.status == 0 ? String(localized: "Completed") : String.localizedStringWithFormat(String(localized: "Failed (exit %lld)"), Int64(result.status))
+                status =
+                    result.status == 0
+                    ? String(localized: "Completed")
+                    : String.localizedStringWithFormat(String(localized: "Failed (exit %lld)"), Int64(result.status))
             } catch is CancellationError {
                 status = String(localized: "Cancelled")
             } catch {
@@ -2395,7 +2409,8 @@ private struct SiteControlCenterView: View {
     private func saveFavorite() {
         guard let command = currentFavoriteCommand() else { return }
         do {
-            try SiteCommandFavoritesStore(rootURL: model.configurationStore.rootURL).add(site: site.path, tool: "composer", command: command)
+            try SiteCommandFavoritesStore(rootURL: model.configurationStore.rootURL).add(
+                site: site.path, tool: "composer", command: command)
             loadFavorites()
             selectedFavoriteID = favorites.first(where: { $0.command == command })?.id
         } catch {
@@ -2406,7 +2421,8 @@ private struct SiteControlCenterView: View {
     private func removeFavorite() {
         guard let favorite = favorites.first(where: { $0.id == selectedFavoriteID }) else { return }
         do {
-            try SiteCommandFavoritesStore(rootURL: model.configurationStore.rootURL).remove(site: site.path, tool: "composer", command: favorite.command)
+            try SiteCommandFavoritesStore(rootURL: model.configurationStore.rootURL).remove(
+                site: site.path, tool: "composer", command: favorite.command)
             selectedFavoriteID = nil
             loadFavorites()
         } catch {

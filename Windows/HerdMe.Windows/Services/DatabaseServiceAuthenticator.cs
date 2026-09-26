@@ -411,9 +411,10 @@ public static class DatabaseServiceAuthenticator
                 else startInfo.Environment[variable.Key] = variable.Value;
             }
         }
+        Process? process = null;
         try
         {
-            using var process = Process.Start(startInfo)
+            process = Process.Start(startInfo)
                 ?? throw new InvalidOperationException("The database client could not be started.");
             var output = process.StandardOutput.ReadToEndAsync(cancellationToken);
             var error = process.StandardError.ReadToEndAsync(cancellationToken);
@@ -425,9 +426,18 @@ public static class DatabaseServiceAuthenticator
             await process.WaitForExitAsync(cancellationToken);
             return new CommandResult(process.ExitCode, (await output) + Environment.NewLine + (await error));
         }
+        catch (OperationCanceledException)
+        {
+            try { if (process is { HasExited: false }) process.Kill(entireProcessTree: true); } catch { }
+            throw;
+        }
         catch (Exception error) when (error is not OperationCanceledException)
         {
             return new CommandResult(-1, string.Empty);
+        }
+        finally
+        {
+            process?.Dispose();
         }
     }
 

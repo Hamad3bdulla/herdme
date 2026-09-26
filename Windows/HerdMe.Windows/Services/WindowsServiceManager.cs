@@ -9,22 +9,42 @@ namespace HerdMe.Windows.Services;
 
 public sealed class WindowsServiceManager : IAsyncDisposable
 {
-    private sealed record ActiveService(Process Process, WindowsJobObject Job, int? ConsolePort);
+    private sealed record ActiveService(
+        Process Process,
+        WindowsJobObject Job,
+        int? ConsolePort,
+        ServiceStopContext? StopContext = null
+    );
+
+    private sealed record ServiceStopContext(
+        string DefinitionId,
+        string Name,
+        int Port,
+        string Executable,
+        string DataDirectory,
+        ServiceCredentials? Credentials,
+        string LogPath
+    );
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly object sync = new();
     private readonly object configurationSync = new();
     private readonly object installationSync = new();
+    private readonly object disposalSync = new();
     private readonly SemaphoreSlim lifecycle = new(1, 1);
     private readonly Dictionary<Guid, ActiveService> active = [];
     private readonly Dictionary<string, Task<ServicePackageRelease>> installations = new(
         StringComparer.OrdinalIgnoreCase
     );
+    private readonly Dictionary<string, CancellationTokenSource> installationCancellations = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ServiceInstallationProgress> installationStates = new(StringComparer.OrdinalIgnoreCase);
     private readonly ServicePackageInstaller installer;
     private readonly WindowsServiceCredentialStore credentialStore;
-    private readonly Func<string, CancellationToken, Task<ServicePackageRelease>> installPackage;
+    private readonly Func<string, CancellationToken, Task<ServicePackageRelease>>? installPackage;
     private IReadOnlyList<ManagedServiceInstance> lastKnownInstances = [];
     private bool hasLoadedInstances;
+    private int disposalRequested;
+    private Task? disposalTask;
 
     public WindowsServiceManager(
         string? supportRoot = null,
@@ -38,12 +58,16 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         );
         installer = new ServicePackageInstaller(SupportRoot);
         this.credentialStore = credentialStore ?? new WindowsServiceCredentialStore();
-        this.installPackage = installPackage ?? installer.InstallAsync;
+        this.installPackage = installPackage;
     }
 
     public event EventHandler? Changed;
 
+    public event EventHandler<ServiceInstallationProgress>? InstallationProgress;
+
     public string SupportRoot { get; }
+
+    public ServiceBackupStore Backups => new(SupportRoot);
 
     public string ConfigurationPath => Path.Combine(SupportRoot, "Config", "services.json");
 
@@ -159,11 +183,40 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         lock (installationSync) return installations.ContainsKey(definitionId);
     }
 
+    public IReadOnlyList<ServiceInstallationProgress> InstallationStates
+    {
+        get { lock (installationSync) return installationStates.Values.ToArray(); }
+    }
+
+    public void CancelInstallation(string definitionId)
+    {
+        lock (installationSync)
+        {
+            if (installationCancellations.TryGetValue(definitionId, out var cancellation)) cancellation.Cancel();
+        }
+    }
+
+    private void ReportInstallation(ServiceInstallationProgress progress)
+    {
+        lock (installationSync) installationStates[progress.DefinitionId] = progress;
+        InstallationProgress?.Invoke(this, progress);
+    }
+
+    private sealed class InstallationReporter(WindowsServiceManager manager, IProgress<ServiceInstallationProgress>? shared = null) : IProgress<ServiceInstallationProgress>
+    {
+        public void Report(ServiceInstallationProgress value)
+        {
+            manager.ReportInstallation(value);
+            shared?.Report(value);
+        }
+    }
+
     public Task<ServicePackageRelease> InstallAsync(
         string definitionId,
         CancellationToken cancellationToken = default
     )
     {
+        ThrowIfDisposing();
         if (cancellationToken.IsCancellationRequested)
         {
             return Task.FromCanceled<ServicePackageRelease>(cancellationToken);
@@ -174,6 +227,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         TaskCompletionSource<ServicePackageRelease>? completion = null;
         lock (installationSync)
         {
+            ThrowIfDisposing();
             if (!installations.TryGetValue(normalizedDefinitionId, out operation!))
             {
                 completion = new TaskCompletionSource<ServicePackageRelease>(
@@ -181,6 +235,8 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                 );
                 operation = completion.Task;
                 installations[normalizedDefinitionId] = operation;
+                installationCancellations[normalizedDefinitionId] = new CancellationTokenSource();
+                installationStates[normalizedDefinitionId] = new(normalizedDefinitionId, ServiceInstallationStage.Resolving);
             }
         }
 
@@ -199,13 +255,26 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         TaskCompletionSource<ServicePackageRelease> completion
     )
     {
+        CancellationTokenSource cancellation;
+        lock (installationSync) cancellation = installationCancellations[definitionId];
+        ServicePackageRelease? release = null;
+        Exception? failure = null;
         try
         {
-            completion.TrySetResult(await installPackage(definitionId, CancellationToken.None));
+            release = installPackage is null
+                ? await RuntimeOperations.Shared.RunAsync("service:" + definitionId, ManagedServiceCatalog.Get(definitionId).Name,
+                    (token, progress) => InstallWithBackupAsync(definitionId, token, new InstallationReporter(this, progress)), cancellation.Token,
+                    async () => { await InstallAsync(definitionId); })
+                : await installPackage(definitionId, cancellation.Token);
+            ReportInstallation(new(definitionId, ServiceInstallationStage.Completed));
         }
         catch (Exception error)
         {
-            completion.TrySetException(error);
+            failure = error;
+            ReportInstallation(new(definitionId,
+                error is OperationCanceledException
+                    ? ServiceInstallationStage.Cancelled : ServiceInstallationStage.Failed,
+                Error: error is OperationCanceledException ? null : error.Message));
         }
         finally
         {
@@ -215,10 +284,36 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                     && ReferenceEquals(current, completion.Task))
                 {
                     installations.Remove(definitionId);
+                    installationCancellations.Remove(definitionId);
                 }
             }
+            cancellation.Dispose();
             RaiseChanged();
         }
+        if (failure is OperationCanceledException) completion.TrySetCanceled();
+        else if (failure is not null) completion.TrySetException(failure);
+        else completion.TrySetResult(release!);
+    }
+
+    private async Task<ServicePackageRelease> InstallWithBackupAsync(string definitionId,
+        CancellationToken cancellationToken, IProgress<ServiceInstallationProgress> progress)
+    {
+        ThrowIfDisposing();
+        await lifecycle.WaitAsync(cancellationToken);
+        try
+        {
+            ThrowIfDisposing();
+            var instances = LoadInstances().Where(item => item.DefinitionId == definitionId).ToArray();
+            if (instances.Any(item => State(item.Id, definitionId) == ManagedServiceState.Running))
+                throw new InvalidOperationException("Stop all instances of this service before updating its runtime.");
+            if (installer.IsInstalled(definitionId))
+            {
+                progress.Report(new(definitionId, ServiceInstallationStage.BackingUp));
+                await Backups.CreateAsync(definitionId, instances, cancellationToken, installer.InstalledVersion(definitionId));
+            }
+            return await installer.InstallAsync(definitionId, cancellationToken, progress);
+        }
+        finally { lifecycle.Release(); }
     }
 
     public Task<ServicePackageRelease> ResolveReleaseAsync(
@@ -227,6 +322,26 @@ public sealed class WindowsServiceManager : IAsyncDisposable
     ) => installer.ResolveReleaseAsync(definitionId, cancellationToken);
 
     public string DataDirectory(Guid id) => Path.Combine(SupportRoot, "Services", id.ToString("D"), "data");
+
+    public async Task RestoreDataAsync(Guid instanceId, ServiceBackup backup, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposing();
+        await lifecycle.WaitAsync(cancellationToken);
+        try
+        {
+            ThrowIfDisposing();
+            var instance = LoadInstances().Single(item => item.Id == instanceId);
+            if (instance.DefinitionId != backup.DefinitionId
+                || State(instanceId, instance.DefinitionId) == ManagedServiceState.Running
+                || IsInstalling(instance.DefinitionId))
+                throw new InvalidOperationException("Stop the selected service and finish its installation before restoring data.");
+            if (backup.RuntimeVersion != installer.InstalledVersion(instance.DefinitionId))
+                throw new InvalidOperationException("Data recovery requires the same runtime version as the backup.");
+            await Backups.CreateAsync(instance.DefinitionId, [instance], cancellationToken, backup.RuntimeVersion);
+            await Backups.RestoreInstanceAsync(backup, instanceId, cancellationToken);
+        }
+        finally { lifecycle.Release(); }
+    }
 
     public int? ConsolePort(Guid id)
     {
@@ -247,9 +362,11 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     public async Task StartAsync(Guid id, CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposing();
         await lifecycle.WaitAsync(cancellationToken);
         try
         {
+            ThrowIfDisposing();
             await StartCoreAsync(id, cancellationToken);
         }
         finally
@@ -345,14 +462,30 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                     cancellationToken
                 );
             }
-            lock (sync)
-            {
-                active[instance.Id] = new ActiveService(
+            ActiveService activeService = new(
                     process,
                     job,
-                    consolePort > 0 ? consolePort : null
+                    consolePort > 0 ? consolePort : null,
+                    new ServiceStopContext(
+                        instance.DefinitionId,
+                        instance.Name,
+                        instance.Port,
+                        spec.Executable,
+                        dataDirectory,
+                        credentials,
+                        logPath
+                    )
                 );
+            lock (sync)
+            {
+                if (active.Remove(instance.Id, out var previous))
+                {
+                    previous.Process.Dispose();
+                    previous.Job.Dispose();
+                }
+                active[instance.Id] = activeService;
             }
+            process.Exited += (_, _) => RemoveExitedService(instance.Id, process);
             RaiseChanged();
         }
         catch
@@ -361,6 +494,22 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             process.Dispose();
             job?.Dispose();
             throw;
+        }
+    }
+
+    private void RemoveExitedService(Guid id, Process process)
+    {
+        ActiveService? service = null;
+        lock (sync)
+        {
+            if (active.TryGetValue(id, out var current) && ReferenceEquals(current.Process, process))
+                active.Remove(id, out service);
+        }
+        if (service is not null)
+        {
+            service.Process.Dispose();
+            service.Job.Dispose();
+            RaiseChanged();
         }
     }
 
@@ -387,6 +536,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         if (service is null) return;
         try
         {
+            await TryStopGracefullyAsync(service);
             if (!service.Process.HasExited) service.Process.Kill(entireProcessTree: true);
             await service.Process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
         }
@@ -401,14 +551,65 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         }
     }
 
+    private static async Task TryStopGracefullyAsync(ActiveService service)
+    {
+        var context = service.StopContext;
+        if (context is null || service.Process.HasExited
+            || !ManagedServiceShutdown.SupportsGracefulStop(context.DefinitionId))
+        {
+            return;
+        }
+        try
+        {
+            var accepted = await ManagedServiceShutdown.RequestAsync(
+                context.DefinitionId,
+                service.Process.Id,
+                context.Port,
+                context.Executable,
+                context.DataDirectory,
+                context.Credentials
+            );
+            if (!accepted)
+            {
+                AppendLog(context.LogPath, $"[HerdMe] {context.Name} did not accept a clean shutdown request; stopping it.");
+                return;
+            }
+            await service.Process.WaitForExitAsync().WaitAsync(ManagedServiceShutdown.GracePeriod);
+            AppendLog(context.LogPath, $"[HerdMe] {context.Name} stopped cleanly.");
+        }
+        catch (TimeoutException)
+        {
+            AppendLog(
+                context.LogPath,
+                $"[HerdMe] {context.Name} did not stop within {ManagedServiceShutdown.GracePeriod.TotalSeconds:0} seconds; stopping it."
+            );
+        }
+        catch (Exception error) when (error is not OutOfMemoryException)
+        {
+            AppendLog(context.LogPath, $"[HerdMe] Clean shutdown of {context.Name} failed: {error.Message}");
+        }
+    }
+
     public async Task StartEnabledAsync(CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposing();
+        cancellationToken.ThrowIfCancellationRequested();
         foreach (var instance in LoadInstances().Where(instance => instance.StartAutomatically))
         {
+            ThrowIfDisposing();
+            cancellationToken.ThrowIfCancellationRequested();
             if (!installer.IsInstalled(instance.DefinitionId)) continue;
             try
             {
                 await StartAsync(instance.Id, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (ObjectDisposedException) when (Volatile.Read(ref disposalRequested) != 0)
+            {
+                throw;
             }
             catch (Exception error)
             {
@@ -428,16 +629,45 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     public async Task StopAllAsync()
     {
+        await lifecycle.WaitAsync();
+        try
+        {
+            await StopAllCoreAsync();
+        }
+        finally
+        {
+            lifecycle.Release();
+        }
+    }
+
+    private async Task StopAllCoreAsync()
+    {
         Guid[] identifiers;
         lock (sync) identifiers = active.Keys.ToArray();
-        foreach (var identifier in identifiers) await StopAsync(identifier);
+        // Clean database shutdowns can take seconds each, so stop services in parallel.
+        var failures = new List<Exception>();
+        await Task.WhenAll(identifiers.Select(async identifier =>
+        {
+            try
+            {
+                await StopCoreAsync(identifier);
+            }
+            catch (Exception error)
+            {
+                lock (failures) failures.Add(error);
+            }
+        }));
+        if (failures.Count > 0)
+            throw new AggregateException("One or more managed services could not be stopped.", failures);
     }
 
     public async Task RemoveAsync(Guid id, bool deleteData)
     {
+        ThrowIfDisposing();
         await lifecycle.WaitAsync();
         try
         {
+            ThrowIfDisposing();
             await StopCoreAsync(id);
             SaveInstances(LoadInstances().Where(instance => instance.Id != id));
             credentialStore.Delete(id);
@@ -811,12 +1041,41 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     private void RaiseChanged() => Changed?.Invoke(this, EventArgs.Empty);
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
+        lock (disposalSync)
+        {
+            Volatile.Write(ref disposalRequested, 1);
+            return new ValueTask(disposalTask ??= DisposeCoreAsync());
+        }
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        Task[] pendingInstallations;
+        lock (installationSync)
+        {
+            var cancellations = installationCancellations.Values
+                .Select(cancellation => cancellation.CancelAsync()).ToArray();
+            pendingInstallations = installations.Values.Cast<Task>().Concat(cancellations).ToArray();
+        }
+        try
+        {
+            await Task.WhenAll(pendingInstallations);
+        }
+        catch (Exception)
+        {
+            // Callers observe installation failures on their original tasks.
+            // Shutdown still waits for every installer and stops every process.
+        }
         await StopAllAsync();
-        lifecycle.Dispose();
+        // A UI continuation may still be queued at the gate. Keep the managed
+        // semaphore usable so it can enter, reject disposal, and release safely.
         GC.SuppressFinalize(this);
     }
+
+    private void ThrowIfDisposing() =>
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref disposalRequested) != 0, this);
 
     private async Task InitializeMariaDbAsync(
         string dataDirectory,
@@ -842,24 +1101,19 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        foreach (var argument in BuildMariaDbInitializationArguments(
-            dataDirectory,
-            port,
-            credentials
-        ))
+        await InitializeStagedAsync(dataDirectory, async target =>
         {
-            startInfo.ArgumentList.Add(argument);
-        }
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("MariaDB's data directory could not be initialized.");
-        var standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var standardError = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        var output = (await standardOutput) + Environment.NewLine + (await standardError);
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException("MariaDB initialization failed: " + output.Trim());
-        }
+            startInfo.ArgumentList.Clear();
+            foreach (var argument in BuildMariaDbInitializationArguments(
+                target,
+                port,
+                credentials
+            ))
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+            await RunInitializerAsync(startInfo, "MariaDB", cancellationToken);
+        });
     }
 
     internal static IReadOnlyList<string> BuildMariaDbInitializationArguments(
@@ -900,20 +1154,15 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        startInfo.ArgumentList.Add("--no-defaults");
-        startInfo.ArgumentList.Add("--initialize-insecure");
-        startInfo.ArgumentList.Add($"--basedir={runtimeDirectory}");
-        startInfo.ArgumentList.Add($"--datadir={dataDirectory}");
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("MySQL's data directory could not be initialized.");
-        var standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var standardError = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        var output = (await standardOutput) + Environment.NewLine + (await standardError);
-        if (process.ExitCode != 0)
+        await InitializeStagedAsync(dataDirectory, async target =>
         {
-            throw new InvalidOperationException("MySQL initialization failed: " + output.Trim());
-        }
+            startInfo.ArgumentList.Clear();
+            startInfo.ArgumentList.Add("--no-defaults");
+            startInfo.ArgumentList.Add("--initialize-insecure");
+            startInfo.ArgumentList.Add($"--basedir={runtimeDirectory}");
+            startInfo.ArgumentList.Add($"--datadir={target}");
+            await RunInitializerAsync(startInfo, "MySQL", cancellationToken);
+        });
     }
 
     private async Task InitializePostgreSqlAsync(
@@ -939,8 +1188,6 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        startInfo.ArgumentList.Add("-D");
-        startInfo.ArgumentList.Add(dataDirectory);
         var passwordPath = Path.Combine(
             Directory.GetParent(dataDirectory)!.FullName,
             $".herdme-initdb-{Guid.NewGuid():N}.password"
@@ -953,25 +1200,150 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                 new System.Text.UTF8Encoding(false),
                 cancellationToken
             );
-            startInfo.ArgumentList.Add($"--username={credentials.Username}");
-            startInfo.ArgumentList.Add($"--pwfile={passwordPath}");
-            startInfo.ArgumentList.Add("--encoding=UTF8");
-            startInfo.ArgumentList.Add("--auth-local=scram-sha-256");
-            startInfo.ArgumentList.Add("--auth-host=scram-sha-256");
-            using var process = Process.Start(startInfo)
-                ?? throw new InvalidOperationException("PostgreSQL's data directory could not be initialized.");
-            var standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            var standardError = process.StandardError.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken);
-            var output = (await standardOutput) + Environment.NewLine + (await standardError);
-            if (process.ExitCode != 0)
+            await InitializeStagedAsync(dataDirectory, async target =>
             {
-                throw new InvalidOperationException("PostgreSQL initialization failed: " + output.Trim());
-            }
+                startInfo.ArgumentList.Clear();
+                startInfo.ArgumentList.Add("-D");
+                startInfo.ArgumentList.Add(target);
+                startInfo.ArgumentList.Add($"--username={credentials.Username}");
+                startInfo.ArgumentList.Add($"--pwfile={passwordPath}");
+                startInfo.ArgumentList.Add("--encoding=UTF8");
+                startInfo.ArgumentList.Add("--auth-local=scram-sha-256");
+                startInfo.ArgumentList.Add("--auth-host=scram-sha-256");
+                await RunInitializerAsync(startInfo, "PostgreSQL", cancellationToken);
+            });
         }
         finally
         {
             if (File.Exists(passwordPath)) File.Delete(passwordPath);
+        }
+    }
+
+    /// <summary>
+    /// Initializes a database into a sibling staging directory and only moves it into
+    /// place after the initializer succeeds, so a cancelled or failed first start can
+    /// never leave a half-initialized directory that later looks ready.
+    /// </summary>
+    internal static async Task InitializeStagedAsync(
+        string dataDirectory,
+        Func<string, Task> initialize
+    )
+    {
+        var finalDirectory = Path.GetFullPath(dataDirectory).TrimEnd(Path.DirectorySeparatorChar);
+        var canStage = !Directory.Exists(finalDirectory)
+            || !Directory.EnumerateFileSystemEntries(finalDirectory).Any();
+        if (!canStage)
+        {
+            await initialize(finalDirectory);
+            return;
+        }
+        var staging = finalDirectory + ".staging";
+        if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
+        try
+        {
+            await initialize(staging);
+            RewriteStagedConfiguration(staging, finalDirectory);
+            if (Directory.Exists(finalDirectory)) Directory.Delete(finalDirectory);
+            Directory.Move(staging, finalDirectory);
+        }
+        catch
+        {
+            try
+            {
+                if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
+            }
+            catch (Exception cleanupError) when (cleanupError is IOException or UnauthorizedAccessException)
+            {
+                Debug.WriteLine($"HerdMe could not remove a staged data directory: {cleanupError.Message}");
+            }
+            Directory.CreateDirectory(finalDirectory);
+            throw;
+        }
+    }
+
+    private static void RewriteStagedConfiguration(string staging, string finalDirectory)
+    {
+        // mariadb-install-db records its data directory in my.ini. HerdMe starts the
+        // server with --no-defaults, but keep the file truthful after the move.
+        var configuration = Path.Combine(staging, "my.ini");
+        if (!File.Exists(configuration)) return;
+        var contents = File.ReadAllText(configuration);
+        var updated = contents
+            .Replace(staging, finalDirectory, StringComparison.OrdinalIgnoreCase)
+            .Replace(
+                staging.Replace('\\', '/'),
+                finalDirectory.Replace('\\', '/'),
+                StringComparison.OrdinalIgnoreCase
+            );
+        if (!string.Equals(contents, updated, StringComparison.Ordinal))
+        {
+            File.WriteAllText(configuration, updated);
+        }
+    }
+
+    private static async Task RunInitializerAsync(
+        ProcessStartInfo startInfo,
+        string engine,
+        CancellationToken cancellationToken
+    )
+    {
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException($"{engine}'s data directory could not be initialized.");
+        WindowsJobObject? job = null;
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                job = new WindowsJobObject();
+                job.Add(process);
+            }
+        }
+        catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            job?.Dispose();
+            job = null;
+        }
+        try
+        {
+            var standardOutput = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
+            var standardError = process.StandardError.ReadToEndAsync(CancellationToken.None);
+            try
+            {
+                await process.WaitForExitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Do not leave an orphaned initializer writing into the staging directory.
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                try
+                {
+                    await process.WaitForExitAsync(CancellationToken.None)
+                        .WaitAsync(TimeSpan.FromSeconds(10), CancellationToken.None);
+                }
+                catch (TimeoutException)
+                {
+                    // The job object below still terminates anything left behind.
+                }
+                throw;
+            }
+            var output = string.Empty;
+            try
+            {
+                var pipes = await Task.WhenAll(standardOutput, standardError)
+                    .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+                output = pipes[0] + Environment.NewLine + pipes[1];
+            }
+            catch (TimeoutException)
+            {
+            }
+            if (process.ExitCode != 0)
+            {
+                throw new InvalidOperationException($"{engine} initialization failed: " + output.Trim());
+            }
+        }
+        finally
+        {
+            job?.Dispose();
         }
     }
 
@@ -1111,7 +1483,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         {
             BoundedLog.AppendLine(path, $"[{DateTimeOffset.Now:O}] {line}");
         }
-        catch (IOException)
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
         }
     }

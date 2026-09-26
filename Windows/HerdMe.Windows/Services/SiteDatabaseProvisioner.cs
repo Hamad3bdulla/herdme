@@ -29,7 +29,7 @@ public sealed record DatabaseTransferProgress(
 public static class SiteDatabaseProvisioner
 {
     private static readonly Regex UnsupportedMySqlCollation = new(
-        @"\b(COLLATE\s*=?\s*)utf8mb4_(?:(?:0900)|(?:uca\d+))[a-z0-9_]*\b",
+        @"\G\b(COLLATE\s*=?\s*)utf8mb4_(?:(?:0900)|(?:uca\d+))[a-z0-9_]*\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled
     );
     public static readonly IReadOnlySet<string> SupportedDefinitions = new HashSet<string>(
@@ -148,6 +148,8 @@ public static class SiteDatabaseProvisioner
                 "--single-transaction",
                 "--routines",
                 "--events",
+                // Binary columns (UUIDs, BLOBs) must survive a text round trip byte for byte.
+                "--hex-blob",
                 provisioning.DatabaseName
             ];
         }
@@ -681,7 +683,7 @@ public static class SiteDatabaseProvisioner
         return new CommandResult(process.ExitCode, standardOutput);
     }
 
-    private static async Task RunFileTransferAsync(
+    internal static async Task RunFileTransferAsync(
         string executable,
         IReadOnlyList<string> arguments,
         IReadOnlyDictionary<string, string?> environment,
@@ -698,6 +700,11 @@ public static class SiteDatabaseProvisioner
         {
             throw new ArgumentException("Choose exactly one SQL transfer direction.");
         }
+        cancellationToken.ThrowIfCancellationRequested();
+        // Stage exports beside the destination so only a successful dump replaces a backup.
+        var stagedOutput = outputPath is null
+            ? null
+            : Path.GetFullPath(outputPath) + $".{Guid.NewGuid():N}.tmp";
         var startInfo = new ProcessStartInfo
         {
             FileName = executable,
@@ -726,38 +733,56 @@ public static class SiteDatabaseProvisioner
                 progress,
                 cancellationToken
             )
-            : CopyOutputAsync(process, outputPath!, cancellationToken);
+            : CopyOutputAsync(process, stagedOutput!, cancellationToken);
+        var exited = process.WaitForExitAsync(cancellationToken);
         Exception? transferFailure = null;
         try
         {
-            await Task.WhenAll(process.WaitForExitAsync(cancellationToken), transfer);
-        }
-        catch (OperationCanceledException)
-        {
-            if (!process.HasExited) process.Kill(entireProcessTree: true);
-            await process.WaitForExitAsync(CancellationToken.None);
-            if (outputPath is not null && File.Exists(outputPath)) File.Delete(outputPath);
-            throw;
-        }
-        catch (Exception caught) when (caught is IOException or ObjectDisposedException)
-        {
-            transferFailure = caught;
-            if (!process.HasExited)
+            try
             {
-                process.Kill(entireProcessTree: true);
+                // Observe a failed copy immediately, even when the child is blocked on its pipe.
+                await await Task.WhenAny(exited, transfer);
+                await Task.WhenAll(exited, transfer);
+            }
+            catch (Exception caught) when (caught is IOException or ObjectDisposedException)
+            {
+                transferFailure = caught;
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
                 await process.WaitForExitAsync(CancellationToken.None);
             }
+            var errorText = await error;
+            var failureMessage = TransferFailureMessage(
+                process.ExitCode,
+                errorText,
+                transferFailure is not null
+            );
+            if (failureMessage is not null)
+            {
+                throw new InvalidOperationException(failureMessage, transferFailure);
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            if (stagedOutput is not null) File.Move(stagedOutput, outputPath!, overwrite: true);
         }
-        var errorText = await error;
-        var failureMessage = TransferFailureMessage(
-            process.ExitCode,
-            errorText,
-            transferFailure is not null
-        );
-        if (failureMessage is not null)
+        finally
         {
-            if (outputPath is not null && File.Exists(outputPath)) File.Delete(outputPath);
-            throw new InvalidOperationException(failureMessage, transferFailure);
+            try
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync(CancellationToken.None);
+                try { await Task.WhenAll(exited, transfer, error); }
+                catch (Exception) { /* The operation above reports the original failure. */ }
+            }
+            finally
+            {
+                if (stagedOutput is not null)
+                {
+                    try { File.Delete(stagedOutput); }
+                    catch (Exception cleanupError) when (cleanupError is IOException or UnauthorizedAccessException)
+                    {
+                        Debug.WriteLine($"HerdMe could not remove a staged backup: {cleanupError.Message}");
+                    }
+                }
+            }
         }
     }
 
@@ -822,21 +847,29 @@ public static class SiteDatabaseProvisioner
             Report(0, force: true);
             if (normalizeSql)
             {
+                // UTF-16 exports are transcoded to UTF-8. Everything else is passed through
+                // Latin-1, which maps every byte to exactly one char and back, so binary
+                // string literals and invalid UTF-8 reach the client unchanged. The
+                // normalizer only matches ASCII tokens, which never collide with the
+                // high bytes of UTF-8 sequences.
+                var textPreamble = DetectSqlTextPreamble(path);
+                var utf16 = textPreamble is SqlTextPreamble.Utf16LittleEndian
+                    or SqlTextPreamble.Utf16BigEndian;
                 using var reader = new StreamReader(
                     sqlSource,
-                    new UTF8Encoding(false, false),
-                    detectEncodingFromByteOrderMarks: true,
+                    utf16 ? new UTF8Encoding(false, false) : Encoding.Latin1,
+                    detectEncodingFromByteOrderMarks: utf16,
                     bufferSize: 64 * 1_024,
                     leaveOpen: true
                 );
                 await using var writer = new StreamWriter(
                     process.StandardInput.BaseStream,
-                    new UTF8Encoding(false),
+                    utf16 ? new UTF8Encoding(false) : Encoding.Latin1,
                     bufferSize: 64 * 1_024,
                     leaveOpen: true
                 );
+                var skipPreamble = textPreamble == SqlTextPreamble.Utf8 ? 3 : 0;
                 var buffer = new char[64 * 1_024];
-                var pending = string.Empty;
                 var mysqlNormalizer = mysql
                     ? new MySqlStreamNormalizer(mergeExisting)
                     : null;
@@ -844,18 +877,24 @@ public static class SiteDatabaseProvisioner
                 {
                     var count = await reader.ReadAsync(buffer.AsMemory(), cancellationToken);
                     if (count == 0) break;
-                    for (var index = 0; index < count; index++)
+                    var start = 0;
+                    while (skipPreamble > 0 && start < count)
                     {
-                        if (buffer[index] == '\uFFFD') compatibilityFixes++;
+                        start++;
+                        skipPreamble--;
                     }
-                    var combined = pending + new string(buffer, 0, count);
-                    var safeLength = Math.Max(0, combined.Length - 256);
-                    var ready = combined[..safeLength];
-                    pending = combined[safeLength..];
+                    if (utf16)
+                    {
+                        for (var index = start; index < count; index++)
+                        {
+                            if (buffer[index] == '\uFFFD') compatibilityFixes++;
+                        }
+                    }
+                    var ready = new string(buffer, start, count - start);
                     if (mysql)
                     {
                         var previousFixes = mysqlNormalizer!.Fixes;
-                        ready = mysqlNormalizer.Rewrite(ready);
+                        ready = mysqlNormalizer.RewriteChunk(ready);
                         compatibilityFixes += mysqlNormalizer.Fixes - previousFixes;
                     }
                     await writer.WriteAsync(ready.AsMemory(), cancellationToken);
@@ -864,10 +903,10 @@ public static class SiteDatabaseProvisioner
                 if (mysql)
                 {
                     var previousFixes = mysqlNormalizer!.Fixes;
-                    pending = mysqlNormalizer.Rewrite(pending);
+                    var tail = mysqlNormalizer.RewriteChunk(string.Empty, final: true);
                     compatibilityFixes += mysqlNormalizer.Fixes - previousFixes;
+                    await writer.WriteAsync(tail.AsMemory(), cancellationToken);
                 }
-                await writer.WriteAsync(pending.AsMemory(), cancellationToken);
                 await writer.FlushAsync(cancellationToken);
             }
             else
@@ -884,6 +923,31 @@ public static class SiteDatabaseProvisioner
         {
             process.StandardInput.Close();
         }
+    }
+
+    internal enum SqlTextPreamble
+    {
+        None,
+        Utf8,
+        Utf16LittleEndian,
+        Utf16BigEndian
+    }
+
+    internal static SqlTextPreamble DetectSqlTextPreamble(string path)
+    {
+        using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using Stream sqlSource = path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)
+            ? new GZipStream(source, CompressionMode.Decompress, leaveOpen: true)
+            : source;
+        Span<byte> head = stackalloc byte[3];
+        var length = sqlSource.ReadAtLeast(head, head.Length, throwOnEndOfStream: false);
+        if (length >= 3 && head[0] == 0xEF && head[1] == 0xBB && head[2] == 0xBF)
+        {
+            return SqlTextPreamble.Utf8;
+        }
+        if (length >= 2 && head[0] == 0xFF && head[1] == 0xFE) return SqlTextPreamble.Utf16LittleEndian;
+        if (length >= 2 && head[0] == 0xFE && head[1] == 0xFF) return SqlTextPreamble.Utf16BigEndian;
+        return SqlTextPreamble.None;
     }
 
     internal static string NormalizeMySql(
@@ -906,26 +970,29 @@ public static class SiteDatabaseProvisioner
         private bool inBlockComment;
         private bool inLineComment;
         private char quote;
+        private string pending = string.Empty;
 
         public int Fixes { get; private set; }
 
         public string Rewrite(string sql)
         {
-            var normalized = UnsupportedMySqlCollation.Replace(sql, match =>
-            {
-                Fixes++;
-                return match.Groups[1].Value + "utf8mb4_unicode_ci";
-            });
-            if (!mergeExisting) return normalized;
-
-            return RewriteMergeStatements(normalized);
+            return RewriteCore(sql, sql.Length, out _);
         }
 
-        private string RewriteMergeStatements(string sql)
+        public string RewriteChunk(string sql, bool final = false)
+        {
+            pending += sql;
+            var limit = final ? pending.Length : Math.Max(0, pending.Length - 256);
+            var output = RewriteCore(pending, limit, out var consumed);
+            pending = pending[consumed..];
+            return output;
+        }
+
+        private string RewriteCore(string sql, int limit, out int consumed)
         {
             var output = new StringBuilder(sql.Length);
             var index = 0;
-            while (index < sql.Length)
+            while (index < limit)
             {
                 if (skippingDestructiveStatement)
                 {
@@ -933,7 +1000,7 @@ public static class SiteDatabaseProvisioner
                     continue;
                 }
 
-                if (quote == '\0' && !inBlockComment && !inLineComment && atLineStart)
+                if (mergeExisting && quote == '\0' && !inBlockComment && !inLineComment && atLineStart)
                 {
                     var token = index;
                     while (token < sql.Length && sql[token] is ' ' or '\t') token++;
@@ -976,8 +1043,22 @@ public static class SiteDatabaseProvisioner
                     }
                 }
 
+                if (quote == '\0' && !inBlockComment && !inLineComment
+                    && (sql[index] is 'C' or 'c'))
+                {
+                    var collation = UnsupportedMySqlCollation.Match(sql, index);
+                    if (collation.Success && collation.Index == index)
+                    {
+                        output.Append(collation.Groups[1].Value).Append("utf8mb4_unicode_ci");
+                        Fixes++;
+                        index += collation.Length;
+                        atLineStart = false;
+                        continue;
+                    }
+                }
                 AppendCharacter(sql, output, ref index);
             }
+            consumed = index;
             return output.ToString();
         }
 
@@ -1017,7 +1098,7 @@ public static class SiteDatabaseProvisioner
             else if (character == ';')
             {
                 skippingDestructiveStatement = false;
-                atLineStart = false;
+                atLineStart = true;
             }
             if (character == '\n')
             {
@@ -1050,8 +1131,6 @@ public static class SiteDatabaseProvisioner
                     inBlockComment = false;
                     return;
                 }
-                if (character == '\n') atLineStart = true;
-                else if (character is not ' ' and not '\t' and not '\r') atLineStart = false;
                 index++;
                 return;
             }
@@ -1103,7 +1182,7 @@ public static class SiteDatabaseProvisioner
                 index++;
                 inBlockComment = true;
             }
-            if (character == '\n') atLineStart = true;
+            if (character is '\n' or ';') atLineStart = true;
             else if (character is not ' ' and not '\t' and not '\r') atLineStart = false;
             index++;
         }
@@ -1182,11 +1261,13 @@ public static class SiteDatabaseProvisioner
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         await using var destination = new FileStream(
             path,
-            FileMode.Create,
+            FileMode.CreateNew,
             FileAccess.Write,
             FileShare.None
         );
         await process.StandardOutput.BaseStream.CopyToAsync(destination, cancellationToken);
+        await destination.FlushAsync(cancellationToken);
+        destination.Flush(flushToDisk: true);
     }
 
     private sealed record CommandResult(int ExitCode, string Output);

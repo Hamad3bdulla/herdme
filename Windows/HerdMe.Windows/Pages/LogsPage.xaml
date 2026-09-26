@@ -6,98 +6,135 @@
     AutomationProperties.AutomationId="LogsPageRoot"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
-    <Grid Padding="{StaticResource PagePadding}" RowSpacing="16">
+    <Grid Padding="{StaticResource PagePadding}" RowSpacing="12">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <Grid RowSpacing="16">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-            <TextBlock x:Uid="LogsPageTitle" AutomationProperties.AutomationId="LogsPageRoot" Text="Logs" Style="{StaticResource PageTitleStyle}" />
-            <Grid Grid.Row="1" ColumnSpacing="10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="190" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <ComboBox
-                    x:Name="SourceBox"
-                    Width="190"
-                    ItemsSource="{x:Bind Sources}"
-                    DisplayMemberPath="Name"
-                    SelectionChanged="SourceBox_SelectionChanged" />
-                <ToggleSwitch
-                    x:Name="LiveRefreshToggle"
-                    Grid.Column="1"
-                    x:Uid="LogsLiveRefreshToggle"
-                    IsOn="True"
-                    OnContent="Live"
-                    OffContent="Paused" />
-                <TextBox
-                    x:Name="SearchBox"
-                    Grid.Column="2"
-                    x:Uid="LogsSearchField"
-                    PlaceholderText="Search current log"
-                    TextChanged="SearchBox_TextChanged" />
-                <Button Grid.Column="3" Click="OpenFolder_Click" Style="{StaticResource ToolbarIconButtonStyle}">
+        <Grid Style="{StaticResource PageHeaderStyle}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="2">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock x:Uid="LogsPageTitle" AutomationProperties.AutomationId="LogsPageRoot" Text="Logs" Style="{StaticResource PageTitleStyle}" />
+                    <ProgressRing x:Name="LogReadProgress" x:Uid="LogsReadProgress" Width="20" Height="20" VerticalAlignment="Center" IsActive="False" AutomationProperties.Name="Loading logs" />
+                </StackPanel>
+                <TextBlock x:Uid="LogsPageSubtitle" Text="Read HerdMe, PHP, web server, and service logs in one place." Style="{StaticResource PageSubtitleStyle}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <Button x:Uid="LogsOpenFolderButton" Click="OpenFolder_Click" AutomationProperties.Name="Open log folder" Style="{StaticResource ToolbarIconButtonStyle}">
                     <ToolTipService.ToolTip>
                         <ToolTip><TextBlock x:Uid="LogsOpenFolderTooltip" Text="Open log folder" /></ToolTip>
                     </ToolTipService.ToolTip>
                     <SymbolIcon Symbol="Folder" />
                 </Button>
-                <Button Grid.Column="4" Click="Refresh_Click" Style="{StaticResource ToolbarIconButtonStyle}">
+                <Button x:Uid="LogsRefreshButton" Click="Refresh_Click" AutomationProperties.Name="Refresh logs" Style="{StaticResource ToolbarIconButtonStyle}">
+                    <Button.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="F5" />
+                    </Button.KeyboardAccelerators>
                     <ToolTipService.ToolTip>
                         <ToolTip><TextBlock x:Uid="LogsRefreshTooltip" Text="Refresh logs" /></ToolTip>
                     </ToolTipService.ToolTip>
                     <SymbolIcon Symbol="Refresh" />
                 </Button>
-            </Grid>
+            </StackPanel>
         </Grid>
+
+        <Border Grid.Row="1" Style="{StaticResource ToolPaneStyle}" Padding="12,8,12,8">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ComboBox
+                    x:Name="SourceBox"
+                    x:Uid="LogsSourceBox"
+                    Width="210"
+                    VerticalAlignment="Center"
+                    AutomationProperties.Name="Log source"
+                    ItemsSource="{x:Bind Sources}"
+                    DisplayMemberPath="Name"
+                    SelectionChanged="SourceBox_SelectionChanged" />
+                <TextBox
+                    x:Name="SearchBox"
+                    Grid.Column="1"
+                    x:Uid="LogsSearchField"
+                    VerticalAlignment="Center"
+                    PlaceholderText="Search current log"
+                    TextChanged="SearchBox_TextChanged">
+                    <TextBox.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="F" Invoked="SearchAccelerator_Invoked" />
+                    </TextBox.KeyboardAccelerators>
+                </TextBox>
+                <ToggleSwitch
+                    x:Name="LiveRefreshToggle"
+                    Grid.Column="2"
+                    x:Uid="LogsLiveRefreshToggle"
+                    MinWidth="0"
+                    VerticalAlignment="Center"
+                    IsOn="True"
+                    OnContent="Live"
+                    OffContent="Paused" />
+            </Grid>
+        </Border>
+
         <InfoBar
             x:Name="SourceWarning"
             x:Uid="LogsSourceWarning"
-            Grid.Row="1"
+            Grid.Row="2"
             IsOpen="False"
             IsClosable="True"
             Severity="Warning"
             Message="Some log sources could not be loaded. HerdMe application logs remain available." />
-        <Grid Grid.Row="2" ColumnSpacing="16">
+
+        <Grid Grid.Row="3" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*" MinWidth="220" MaxWidth="300" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Border Style="{StaticResource ToolPaneStyle}" Padding="12">
-                <ListView x:Name="LogList" ItemsSource="{x:Bind Logs}" SelectionChanged="LogList_SelectionChanged">
-                    <ListView.ItemTemplate>
-                        <DataTemplate x:DataType="models:LogFileRecord">
-                            <Grid Padding="6" ColumnSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Grid.Column="1" Text="{x:Bind SizeText}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            </Grid>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+            <Border Style="{StaticResource ToolPaneStyle}" Padding="6">
+                <Grid>
+                    <ListView x:Name="LogList" ItemsSource="{x:Bind Logs}" SelectionChanged="LogList_SelectionChanged">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:LogFileRecord">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE8A5;" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="2" Text="{x:Bind SizeText}" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <StackPanel x:Name="EmptyLogsText" Spacing="8" Margin="12" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False">
+                        <FontIcon Glyph="&#xE8A5;" Style="{StaticResource EmptyStateGlyphStyle}" />
+                        <TextBlock x:Uid="LogsEmpty" Text="No log files here yet." TextAlignment="Center" Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
+                </Grid>
             </Border>
-            <Border Grid.Column="1" Padding="4,12">
-                <Grid RowSpacing="8">
+            <Border Grid.Column="1" Style="{StaticResource ToolPaneStyle}">
+                <Grid>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <TextBlock x:Name="LogTitleText" x:Uid="LogsSelectLogInitial" Text="Select a log" Style="{StaticResource SectionTitleStyle}" />
-                    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                        <TextBlock x:Name="LogContentText" FontFamily="Consolas" FontSize="13" TextWrapping="NoWrap" IsTextSelectionEnabled="True" FlowDirection="LeftToRight" />
-                    </ScrollViewer>
+                    <TextBlock x:Name="LogTitleText" x:Uid="LogsSelectLogInitial" Margin="16,12,16,8" Text="Select a log" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock x:Name="TailNoticeText" x:Uid="LogsTailNotice" Grid.Row="1" Margin="16,0,16,8" Text="Showing the latest 4 MB. Search applies to this portion of the log." Style="{StaticResource SettingsRowDescriptionStyle}" Visibility="Collapsed" />
+                    <Border Grid.Row="2" Background="{ThemeResource SubtleSurfaceBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" CornerRadius="0,0,8,8">
+                        <ScrollViewer x:Name="LogScroll" Padding="16,10,16,10" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="LogContentText" FontFamily="Cascadia Mono, Consolas" FontSize="13" TextWrapping="NoWrap" IsTextSelectionEnabled="True" FlowDirection="LeftToRight" />
+                        </ScrollViewer>
+                    </Border>
                 </Grid>
             </Border>
         </Grid>

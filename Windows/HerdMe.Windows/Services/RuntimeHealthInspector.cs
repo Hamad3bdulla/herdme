@@ -17,6 +17,10 @@ public static class RuntimeHealthInspector
         Timeout = TimeSpan.FromSeconds(6)
     };
 
+    // Also used by SiteHealthInspector to recognise the invalid-file marker in the requirement list.
+    internal static string InvalidComposerJson =>
+        ServiceText.Get("Health_ComposerJsonInvalid", "composer.json is invalid");
+
     public static async Task<RuntimeHealthResult> InspectSiteAsync(
         string domain,
         bool https,
@@ -57,12 +61,14 @@ public static class RuntimeHealthInspector
             await client.ConnectAsync("127.0.0.1", port, cancellationToken)
                 .AsTask()
                 .WaitAsync(TimeSpan.FromSeconds(3), cancellationToken);
-            return new RuntimeHealthResult(name, true, $"Port {port} accepts connections");
+            return new RuntimeHealthResult(name, true,
+                ServiceText.Format("Health_PortAccepts", "Port {0} accepts connections", port));
         }
         catch (Exception error) when (error is SocketException or TimeoutException or OperationCanceledException)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return new RuntimeHealthResult(name, false, $"Port {port}: {error.Message}");
+            return new RuntimeHealthResult(name, false,
+                ServiceText.Format("Health_PortError", "Port {0}: {1}", port, error.Message));
         }
     }
 
@@ -83,7 +89,7 @@ public static class RuntimeHealthInspector
         }
         catch (Exception error) when (error is JsonException or IOException)
         {
-            return ["composer.json is invalid"];
+            return [InvalidComposerJson];
         }
     }
 

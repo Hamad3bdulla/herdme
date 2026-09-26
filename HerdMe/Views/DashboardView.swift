@@ -165,7 +165,7 @@ struct DashboardView: View {
                             ? String(localized: "Everything is ready")
                             : String(localized: "Needs attention")
                     )
-                        .font(.headline)
+                    .font(.headline)
                 }
                 if healthIssues.isEmpty {
                     Text("Local domains, certificates, and managed services are ready.")

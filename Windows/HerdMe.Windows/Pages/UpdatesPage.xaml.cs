@@ -2,7 +2,6 @@ using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 using Windows.System;
 
 namespace HerdMe.Windows.Pages;
@@ -26,6 +25,7 @@ public sealed partial class UpdatesPage : Page
     private AppUpdateCheck? latestApplication;
     private bool loaded;
     private bool busy;
+    private readonly Dictionary<string, (Grid Grid, TextBlock Detail, TextBlock Error, ProgressBar Progress, Button Action)> downloadControls = [];
 
     public UpdatesPage(
         SiteConfigurationStore settingsStore,
@@ -62,13 +62,92 @@ public sealed partial class UpdatesPage : Page
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         loaded = true;
+        // The page is cached, so Loaded can run again; never subscribe twice.
+        RuntimeOperations.Shared.Changed -= Downloads_Changed;
+        RuntimeOperations.Shared.Changed += Downloads_Changed;
+        RenderDownloads();
         await RefreshAsync();
     }
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
         loaded = false;
+        RuntimeOperations.Shared.Changed -= Downloads_Changed;
         Interlocked.Exchange(ref refreshCancellation, null)?.Cancel();
+    }
+
+    private void Downloads_Changed(object? sender, EventArgs e)
+        => DispatcherQueue.TryEnqueue(() => { if (loaded) RenderDownloads(); });
+
+    private void ClearDownloads_Click(object sender, RoutedEventArgs e) => RuntimeOperations.Shared.ClearCompleted();
+
+    private void RenderDownloads()
+    {
+        var snapshot = RuntimeOperations.Shared.Snapshot();
+        foreach (var id in downloadControls.Keys.Except(snapshot.Select(item => item.Id)).ToArray())
+        {
+            DownloadRows.Children.Remove(downloadControls[id].Grid);
+            downloadControls.Remove(id);
+        }
+        foreach (var operation in snapshot)
+        {
+            var row = ServiceDownloadRow.From(operation.Progress, operation.Name);
+            if (downloadControls.TryGetValue(operation.Id, out var controls))
+            {
+                controls.Detail.Text = row.Detail;
+                controls.Error.Text = row.Error;
+                controls.Progress.Value = row.Percentage;
+                controls.Progress.IsIndeterminate = row.IsIndeterminate;
+                controls.Progress.Visibility = row.IsActive;
+                controls.Action.Visibility = operation.Progress.Stage == ServiceInstallationStage.Completed ? Visibility.Collapsed : Visibility.Visible;
+                controls.Action.Content = new SymbolIcon(operation.Progress.IsActive ? Symbol.Cancel : Symbol.Refresh);
+                ToolTipService.SetToolTip(controls.Action, operation.Progress.IsActive ? row.CancelLabel : row.RetryLabel);
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(controls.Action, operation.Progress.IsActive ? row.CancelLabel : row.RetryLabel);
+                continue;
+            }
+            var grid = new Grid { Style = (Style)Application.Current.Resources["ListCardStyle"] };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+            text.Children.Add(new TextBlock
+            {
+                Text = operation.Name,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Style = (Style)Application.Current.Resources["SettingsRowTitleStyle"]
+            });
+            var detail = new TextBlock { Text = row.Detail, Style = (Style)Application.Current.Resources["SettingsRowDescriptionStyle"] };
+            var error = new TextBlock { Text = row.Error, Style = (Style)Application.Current.Resources["StatusCriticalTextStyle"] };
+            var progress = new ProgressBar { Value = row.Percentage, IsIndeterminate = row.IsIndeterminate, Visibility = row.IsActive };
+            text.Children.Add(detail);
+            text.Children.Add(progress);
+            text.Children.Add(error);
+            grid.Children.Add(text);
+            {
+                var button = new Button
+                {
+                    Style = (Style)Application.Current.Resources["ToolbarIconButtonStyle"],
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Content = new SymbolIcon(operation.Progress.IsActive ? Symbol.Cancel : Symbol.Refresh),
+                    Visibility = operation.Progress.Stage == ServiceInstallationStage.Completed ? Visibility.Collapsed : Visibility.Visible
+                };
+                ToolTipService.SetToolTip(button, operation.Progress.IsActive ? row.CancelLabel : row.RetryLabel);
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, operation.Progress.IsActive ? row.CancelLabel : row.RetryLabel);
+                button.Click += async (_, _) =>
+                {
+                    if (RuntimeOperations.Shared.Snapshot().FirstOrDefault(item => item.Id == operation.Id)?.Progress.IsActive == true)
+                        RuntimeOperations.Shared.Cancel(operation.Id);
+                    else
+                    {
+                        try { await RuntimeOperations.Shared.RetryAsync(operation.Id); }
+                        catch (Exception) { RenderDownloads(); }
+                    }
+                };
+                Grid.SetColumn(button, 1);
+                grid.Children.Add(button);
+                downloadControls[operation.Id] = (grid, detail, error, progress, button);
+            }
+            DownloadRows.Children.Add(grid);
+        }
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e)
@@ -184,26 +263,26 @@ public sealed partial class UpdatesPage : Page
 
     private UIElement UpdateRow(ManagedComponentUpdate update)
     {
-        var row = new Border
-        {
-            Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
-            BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(16)
-        };
-        var grid = new Grid { ColumnSpacing = 16 };
+        var grid = new Grid { Style = (Style)Application.Current.Resources["ListCardStyle"] };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition
         {
             Width = new GridLength(1, GridUnitType.Star)
         });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var details = new StackPanel { Spacing = 5 };
+        grid.Children.Add(new FontIcon
+        {
+            Glyph = "\uE896",
+            Style = (Style)Application.Current.Resources["SettingsRowIconStyle"]
+        });
+
+        var details = new StackPanel { Style = (Style)Application.Current.Resources["SettingsRowTextStyle"] };
         details.Children.Add(new TextBlock
         {
             Text = update.Name,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Style = (Style)Application.Current.Resources["SettingsRowTitleStyle"]
         });
         details.Children.Add(new TextBlock
         {
@@ -212,13 +291,14 @@ public sealed partial class UpdatesPage : Page
                 update.InstalledVersion,
                 update.LatestVersion
             ),
-            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+            Style = (Style)Application.Current.Resources["SettingsRowDescriptionStyle"]
         });
         details.Children.Add(new TextBlock
         {
             Text = ComponentCategory(update),
-            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+            Style = (Style)Application.Current.Resources["SettingsRowDescriptionStyle"]
         });
+        Grid.SetColumn(details, 1);
         grid.Children.Add(details);
 
         var button = new Button
@@ -232,10 +312,9 @@ public sealed partial class UpdatesPage : Page
         content.Children.Add(new SymbolIcon(Symbol.Download));
         content.Children.Add(new TextBlock { Text = AppLocalization.Get("CommonUpdate") });
         button.Content = content;
-        Grid.SetColumn(button, 1);
+        Grid.SetColumn(button, 2);
         grid.Children.Add(button);
-        row.Child = grid;
-        return row;
+        return grid;
     }
 
     private async void UpdateComponent_Click(object sender, RoutedEventArgs e)

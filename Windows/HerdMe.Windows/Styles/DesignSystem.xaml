@@ -65,11 +65,19 @@
     <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
     <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
 
+    <Thickness x:Key="CardPadding">18,16,18,16</Thickness>
+    <CornerRadius x:Key="CardCornerRadius">8</CornerRadius>
+
     <Style x:Key="PageTitleStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="26" />
+        <Setter Property="FontSize" Value="28" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="PageSubtitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="16" />
@@ -77,16 +85,183 @@
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
-    <Style x:Key="SectionDividerStyle" TargetType="Border">
-        <Setter Property="BorderBrush" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
-        <Setter Property="BorderThickness" Value="0,1,0,0" />
-        <Setter Property="Padding" Value="0,20,0,4" />
+    <!-- Section headers sit above a card, like Windows Settings. -->
+    <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="2,6,2,-6" />
+        <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
-    <Style x:Key="ToolPaneStyle" TargetType="Border">
-        <Setter Property="Background" Value="{ThemeResource SubtleSurfaceBrush}" />
+    <Style x:Key="SecondaryTextStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style x:Key="CaptionTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+    </Style>
+
+    <Style x:Key="CardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}" />
+        <Setter Property="Padding" Value="{StaticResource CardPadding}" />
+    </Style>
+    <!-- Every page section is a card; the name is kept for existing pages. -->
+    <Style x:Key="SectionDividerStyle" TargetType="Border" BasedOn="{StaticResource CardStyle}" />
+    <Style x:Key="CardDividerStyle" TargetType="Rectangle">
+        <Setter Property="Height" Value="1" />
+        <Setter Property="Fill" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style x:Key="IconTileStyle" TargetType="Border">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <Style x:Key="ToolPaneStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}" />
+    </Style>
+
+    <!--
+        Status visuals are applied as styles (not brushes) from code so they follow
+        light/dark/high-contrast theme changes while the page stays open.
+    -->
+    <Style x:Key="StatusDotStyle" TargetType="Ellipse">
+        <Setter Property="Width" Value="8" />
+        <Setter Property="Height" Value="8" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Fill" Value="{ThemeResource SystemFillColorNeutralBrush}" />
+    </Style>
+    <Style x:Key="StatusDotNeutralStyle" TargetType="Ellipse" BasedOn="{StaticResource StatusDotStyle}" />
+    <Style x:Key="StatusDotSuccessStyle" TargetType="Ellipse" BasedOn="{StaticResource StatusDotStyle}">
+        <Setter Property="Fill" Value="{ThemeResource SystemFillColorSuccessBrush}" />
+    </Style>
+    <Style x:Key="StatusDotCautionStyle" TargetType="Ellipse" BasedOn="{StaticResource StatusDotStyle}">
+        <Setter Property="Fill" Value="{ThemeResource SystemFillColorCautionBrush}" />
+    </Style>
+    <Style x:Key="StatusDotCriticalStyle" TargetType="Ellipse" BasedOn="{StaticResource StatusDotStyle}">
+        <Setter Property="Fill" Value="{ThemeResource SystemFillColorCriticalBrush}" />
+    </Style>
+
+    <Style x:Key="StatusPillStyle" TargetType="Border">
+        <Setter Property="Padding" Value="10,3,10,4" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="Background" Value="{ThemeResource SystemFillColorNeutralBackgroundBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="StatusPillNeutralStyle" TargetType="Border" BasedOn="{StaticResource StatusPillStyle}" />
+    <Style x:Key="StatusPillSuccessStyle" TargetType="Border" BasedOn="{StaticResource StatusPillStyle}">
+        <Setter Property="Background" Value="{ThemeResource SystemFillColorSuccessBackgroundBrush}" />
+    </Style>
+    <Style x:Key="StatusPillCautionStyle" TargetType="Border" BasedOn="{StaticResource StatusPillStyle}">
+        <Setter Property="Background" Value="{ThemeResource SystemFillColorCautionBackgroundBrush}" />
+    </Style>
+    <Style x:Key="StatusPillCriticalStyle" TargetType="Border" BasedOn="{StaticResource StatusPillStyle}">
+        <Setter Property="Background" Value="{ThemeResource SystemFillColorCriticalBackgroundBrush}" />
+    </Style>
+
+    <Style x:Key="StatusGlyphStyle" TargetType="FontIcon">
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="Foreground" Value="{ThemeResource SystemFillColorNeutralBrush}" />
+    </Style>
+    <Style x:Key="StatusGlyphNeutralStyle" TargetType="FontIcon" BasedOn="{StaticResource StatusGlyphStyle}" />
+    <Style x:Key="StatusGlyphSuccessStyle" TargetType="FontIcon" BasedOn="{StaticResource StatusGlyphStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SystemFillColorSuccessBrush}" />
+    </Style>
+    <Style x:Key="StatusGlyphCautionStyle" TargetType="FontIcon" BasedOn="{StaticResource StatusGlyphStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+    </Style>
+    <Style x:Key="StatusGlyphCriticalStyle" TargetType="FontIcon" BasedOn="{StaticResource StatusGlyphStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCriticalBrush}" />
+    </Style>
+
+    <!--
+        Settings rows (Windows Settings pattern): a group card holds rows separated by
+        CardDividerStyle rectangles. Each row is Grid(Auto icon | * text | Auto control).
+    -->
+    <Style x:Key="SettingsGroupStyle" TargetType="Border" BasedOn="{StaticResource CardStyle}">
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style x:Key="SettingsRowStyle" TargetType="Grid">
+        <Setter Property="Padding" Value="16,12,16,12" />
+        <Setter Property="MinHeight" Value="64" />
+        <Setter Property="ColumnSpacing" Value="16" />
+    </Style>
+    <Style x:Key="SettingsRowIconStyle" TargetType="FontIcon">
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="Width" Value="24" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+    </Style>
+    <Style x:Key="SettingsRowTextStyle" TargetType="StackPanel">
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Spacing" Value="1" />
+    </Style>
+    <Style x:Key="SettingsRowTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style x:Key="SettingsRowDescriptionStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style x:Key="SettingsRowControlStyle" TargetType="StackPanel">
+        <Setter Property="Orientation" Value="Horizontal" />
+        <Setter Property="Spacing" Value="8" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+    <!-- Read-only value rows (paths, versions) align under the row title. -->
+    <Style x:Key="SettingsValueTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="IsTextSelectionEnabled" Value="True" />
+    </Style>
+    <Style x:Key="PageHeaderStyle" TargetType="Grid">
+        <Setter Property="ColumnSpacing" Value="16" />
+        <Setter Property="Margin" Value="0,0,0,4" />
+    </Style>
+    <Style x:Key="PageContentStyle" TargetType="StackPanel">
+        <Setter Property="Padding" Value="{StaticResource PagePadding}" />
+        <Setter Property="Spacing" Value="16" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style x:Key="StatusCriticalTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCriticalBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <!-- Card-looking Grid for rows that code builds and diffs in place (downloads, updates). -->
+    <Style x:Key="ListCardStyle" TargetType="Grid">
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}" />
+        <Setter Property="Padding" Value="16,12,16,12" />
+        <Setter Property="MinHeight" Value="64" />
+        <Setter Property="ColumnSpacing" Value="16" />
+    </Style>
+    <Style x:Key="EmptyStateGlyphStyle" TargetType="FontIcon">
+        <Setter Property="FontSize" Value="32" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorTertiaryBrush}" />
+    </Style>
+
+    <!-- Borderless button for secondary actions inside cards and the title bar. -->
+    <Style x:Key="SubtleButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="10,5" />
     </Style>
     <Style x:Key="ToolbarIconButtonStyle" TargetType="Button">
         <Setter Property="Width" Value="36" />

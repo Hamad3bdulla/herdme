@@ -8,6 +8,8 @@ public sealed class WindowsSiteSettings
 
     public List<string> LinkedSites { get; set; } = [];
 
+    public List<string> FavoriteSites { get; set; } = [];
+
     public string Tld { get; set; } = "test";
 
     public bool StartAutomatically { get; set; } = true;

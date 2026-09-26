@@ -13,6 +13,35 @@ using HerdMe.Windows.Services;
 
 internal static partial class ContractChecks
 {
+    private static async Task CreateDirectoryLinkAsync(string link, string target)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(link, target);
+        }
+        catch (Exception error) when (OperatingSystem.IsWindows()
+            && error is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            using var junction = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                ArgumentList = { "/d", "/s", "/c", "mklink", "/J", link, target }
+            }) ?? throw new InvalidOperationException("Windows could not start the junction fixture.");
+            var output = junction.StandardOutput.ReadToEndAsync();
+            var errors = junction.StandardError.ReadToEndAsync();
+            await junction.WaitForExitAsync();
+            if (junction.ExitCode != 0 || !Directory.Exists(link))
+            {
+                throw new InvalidOperationException(
+                    $"Windows could not create the junction fixture: {await output} {await errors}"
+                );
+            }
+        }
+    }
+
     internal static async Task VerifyDownloadAndStorageContractsAsync(string supportRoot)
     {
         var coreExecutable = Environment.GetEnvironmentVariable("HERDME_CORE_TEST_EXECUTABLE");
@@ -86,6 +115,7 @@ internal static partial class ContractChecks
         );
         using (var packageClient = new HttpClient(interruptedPackageHandler))
         {
+            var progressEvents = new List<ServiceInstallationProgress>();
             var packagePath = Path.Combine(supportRoot, "retried-service-package.zip");
             Directory.CreateDirectory(Path.GetDirectoryName(packagePath)!);
             await ServicePackageInstaller.DownloadAndVerifyAsync(
@@ -102,13 +132,40 @@ internal static partial class ContractChecks
                 CancellationToken.None,
                 packageClient,
                 maximumAttempts: 2,
-                delayFactory: _ => TimeSpan.Zero
+                delayFactory: _ => TimeSpan.Zero,
+                progress: new CallbackProgress<ServiceInstallationProgress>(progressEvents.Add)
             );
             Check(
                 File.ReadAllBytes(packagePath).SequenceEqual(packageBytes)
                     && interruptedPackageHandler.CallCount == 2,
                 "service downloads discard incomplete files and retry checksum verification"
             );
+            Check(progressEvents.Select(value => value.Stage).SequenceEqual(new[]
+                {
+                    ServiceInstallationStage.Downloading, ServiceInstallationStage.Verifying,
+                    ServiceInstallationStage.Retrying, ServiceInstallationStage.Downloading,
+                    ServiceInstallationStage.Verifying
+                }) && progressEvents[^1].BytesReceived == packageBytes.Length
+                && progressEvents[^1].Percentage == 100 && progressEvents[^1].Attempt == 2,
+                "service download progress includes retry, verification, attempt, and exact byte totals");
+            using var cancellation = new CancellationTokenSource();
+            using var cancelledClient = new HttpClient(new SequenceHttpMessageHandler(
+                _ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(packageBytes) }));
+            var cancelledPath = Path.Combine(supportRoot, "cancelled-service-package.zip");
+            try
+            {
+                await ServicePackageInstaller.DownloadAndVerifyAsync(
+                    new ServicePackageRelease("mysql", "1", "mysql.zip", ServicePackageChecksumAlgorithm.Sha256,
+                        packageChecksum, new Uri("https://downloads.example.test/mysql.zip"), true),
+                    cancelledPath, cancellation.Token, cancelledClient,
+                    progress: new CallbackProgress<ServiceInstallationProgress>(value =>
+                    {
+                        if (value.Stage == ServiceInstallationStage.Verifying) cancellation.Cancel();
+                    }));
+                Check(false, "cancelled service download fails promptly");
+            }
+            catch (OperationCanceledException) { }
+            Check(!File.Exists(cancelledPath), "cancelled service downloads remove incomplete output");
         }
         var networkFailureHandler = new SequenceHttpMessageHandler(
             _ => throw new HttpRequestException("temporary connection failure"),
@@ -392,6 +449,28 @@ internal static partial class ContractChecks
         );
 
         var traversalZip = Path.Combine(zipPolicyRoot, "traversal.zip");
+        await ThrowsAsync<InvalidDataException>(
+            () => SafeZipExtractor.ExtractAsync(validZip, validExtraction),
+            "safe ZIP extraction never merges into an existing runtime"
+        );
+        var outsideDirectory = Path.Combine(zipPolicyRoot, "outside");
+        Directory.CreateDirectory(outsideDirectory);
+        var linkedExtraction = Path.Combine(zipPolicyRoot, "linked-output");
+        await CreateDirectoryLinkAsync(linkedExtraction, outsideDirectory);
+        try
+        {
+            await ThrowsAsync<InvalidDataException>(
+                () => SafeZipExtractor.ExtractAsync(validZip, linkedExtraction),
+                "safe ZIP extraction rejects a destination directory link"
+            );
+            Check(!Directory.EnumerateFileSystemEntries(outsideDirectory).Any(),
+                "rejected ZIP extraction leaves the directory link target untouched");
+        }
+        finally
+        {
+            Directory.Delete(linkedExtraction);
+        }
+
         using (var archive = ZipFile.Open(traversalZip, ZipArchiveMode.Create))
         {
             archive.CreateEntry("../outside.exe");

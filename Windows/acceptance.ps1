@@ -2,7 +2,9 @@ param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release",
     [switch]$LeaveRunning,
-    [switch]$SkipLiveReleaseChecks
+    [switch]$CaptureScreenshots,
+    [switch]$SkipLiveReleaseChecks,
+    [string]$PreviousInstallerPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -67,12 +69,13 @@ function Get-HerdMeStartupValue {
 
 $preExistingProcesses = @(Get-Process -Name "HerdMe.Windows" -ErrorAction SilentlyContinue)
 if ($preExistingProcesses.Count -gt 0) {
-    $preExistingProcesses | Stop-Process -Force
-    foreach ($process in $preExistingProcesses) {
-        if (-not $process.WaitForExit(5000)) {
-            throw "HerdMe process $($process.Id) did not exit before the Windows build."
-        }
-    }
+    throw "Quit HerdMe before acceptance. The suite will not terminate an existing development session."
+}
+$existingInstall = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6C053A4F-1FF3-4B94-A6DF-17CAF32FAC5F}_is1"
+$startupShortcut = Join-Path ([Environment]::GetFolderPath("Startup")) "HerdMe.lnk"
+if ((Test-Path -LiteralPath $existingInstall) -or (Test-Path -LiteralPath $startupShortcut) -or
+    $null -ne (Get-HerdMeStartupValue)) {
+    throw "Run installer acceptance on a clean Windows user profile to preserve existing installation and startup registration."
 }
 
 & (Join-Path $PSScriptRoot "package-portable.ps1") `
@@ -135,6 +138,47 @@ if (Test-Path -LiteralPath $installerTestDirectory) {
 if ($null -ne (Get-HerdMeStartupValue)) {
     throw "Windows installer acceptance requires no pre-existing HerdMe startup value."
 }
+$upgradeSnapshot = @{}
+$upgradeFixtureRoot = $null
+if ($PreviousInstallerPath) {
+    $previousInstaller = (Resolve-Path -LiteralPath $PreviousInstallerPath).Path
+    $expected = ((Get-Content -LiteralPath "$previousInstaller.sha256" -Raw).Trim() -split '\s+')[0]
+    if ((Get-FileHash -LiteralPath $previousInstaller -Algorithm SHA256).Hash -ne $expected) {
+        throw "The previous release installer does not match its checksum."
+    }
+    $previousInstall = Start-Process -FilePath $previousInstaller -WindowStyle Hidden -ArgumentList @(
+        '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installerTestDirectory`""
+    ) -Wait -PassThru
+    if ($previousInstall.ExitCode -ne 0) { throw "The previous release installer failed." }
+    $upgradeFixtureRoot = Join-Path $env:LOCALAPPDATA 'HerdMe'
+    $upgradeId = [Guid]::NewGuid().ToString('D')
+    $fixturePaths = @(
+        (Join-Path $upgradeFixtureRoot "Config\upgrade-$upgradeId.json"),
+        (Join-Path $upgradeFixtureRoot "Services\$upgradeId\data\database.bin"),
+        (Join-Path $repoRoot "build\upgrade-project-$upgradeId\.env")
+    )
+    foreach ($path in $fixturePaths) {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
+        [IO.File]::WriteAllText($path, '{"preserve":"upgrade-fixture","version":1}')
+        $upgradeSnapshot[$path] = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+    }
+    $configPath = Join-Path $upgradeFixtureRoot 'Config'
+    $siteConfig = Join-Path $configPath 'sites.json'
+    if (-not (Test-Path -LiteralPath $siteConfig)) {
+        @{ SchemaVersion = 1; Roots = @((Join-Path $env:USERPROFILE 'HerdMe')); LinkedSites = @();
+           Tld = 'test'; OnboardingCompleted = $true; StartAutomatically = $false; ShowPreviews = $false;
+           AutomaticUpdates = $false; UpdateChannel = 'Stable' } |
+            ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $siteConfig -Encoding UTF8
+    }
+    $serviceConfig = Join-Path $configPath 'services.json'
+    if (-not (Test-Path -LiteralPath $serviceConfig)) {
+        ConvertTo-Json -InputObject @(@{ Id = $upgradeId; DefinitionId = 'mysql'; Name = 'Upgrade fixture';
+            Port = 63306; StartAutomatically = $false }) | Set-Content -LiteralPath $serviceConfig -Encoding UTF8
+    }
+    foreach ($file in Get-ChildItem -LiteralPath $configPath -File -Recurse) {
+        $upgradeSnapshot[$file.FullName] = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
+    }
+}
 $installProcess = Start-Process `
     -FilePath $installer `
     -ArgumentList @(
@@ -148,6 +192,13 @@ $installProcess = Start-Process `
 if ($installProcess.ExitCode -ne 0) {
     throw "The Windows installer acceptance run failed with exit code $($installProcess.ExitCode)."
 }
+foreach ($path in $upgradeSnapshot.Keys) {
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $upgradeSnapshot[$path]) {
+        throw "The application upgrade changed user data: $path"
+    }
+}
+if ($PreviousInstallerPath) { Write-Host 'Verified upgrade preserves configuration, project files, and service data.' }
 if ($null -ne (Get-HerdMeStartupValue)) {
     throw "The Windows installer enabled launch at login without user consent."
 }
@@ -243,7 +294,7 @@ function Wait-AutomationElementById(
             [System.Windows.Automation.TreeScope]::Descendants,
             $condition
         )
-        if ($null -ne $element) { return $element }
+        if ($null -ne $element -and -not $element.Current.IsOffscreen) { return $element }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
 
@@ -311,6 +362,42 @@ function Assert-ResizableMainWindow(
     }
 }
 
+function Save-WindowEvidence(
+    [System.Windows.Automation.AutomationElement]$Window,
+    [string]$Name
+) {
+    $dialog = $Window.FindFirst(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::ClassNameProperty, "ContentDialog"
+        )
+    )
+    if ($null -ne $dialog -and -not $dialog.Current.IsOffscreen) {
+        throw "An unexpected dialog covers the Windows surface '$Name': $($dialog.Current.Name)"
+    }
+    if (-not $CaptureScreenshots) { return }
+    Add-Type -AssemblyName System.Drawing
+    $bounds = $Window.Current.BoundingRectangle
+    if ($bounds.Width -le 0 -or $bounds.Height -le 0) {
+        throw "Cannot capture the empty window for $Name."
+    }
+    $directory = Join-Path $repoRoot "build\windows-ui-evidence"
+    New-Item -ItemType Directory -Force -Path $directory | Out-Null
+    $bitmap = [System.Drawing.Bitmap]::new([int]$bounds.Width, [int]$bounds.Height)
+    try {
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        try {
+            $graphics.CopyFromScreen(
+                [int]$bounds.Left, [int]$bounds.Top, 0, 0, $bitmap.Size,
+                [System.Drawing.CopyPixelOperation]::SourceCopy
+            )
+        }
+        finally { $graphics.Dispose() }
+        $bitmap.Save((Join-Path $directory "$Name.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally { $bitmap.Dispose() }
+}
+
 function Assert-OnboardingLayout(
     [System.Diagnostics.Process]$Process
 ) {
@@ -334,6 +421,7 @@ function Assert-OnboardingLayout(
     ) {
         throw "The onboarding start button is clipped or outside the window."
     }
+    Save-WindowEvidence $window "Onboarding"
 }
 
 function Assert-WinUiNavigation(
@@ -372,7 +460,74 @@ function Assert-WinUiNavigation(
             throw "HerdMe exited while opening '$($page.Navigation)'."
         }
         Write-Host "Verified WinUI page: $($page.Page)"
+        Save-WindowEvidence $window $page.Page
+        if ($page.Page -eq "ServicesPageRoot") {
+            Assert-ServiceDownloadControls $window
+        }
     }
+
+    if ($CaptureScreenshots) {
+        $originalBounds = $window.Current.BoundingRectangle
+        $transform = [System.Windows.Automation.TransformPattern]$window.GetCurrentPattern(
+            [System.Windows.Automation.TransformPattern]::Pattern
+        )
+        try {
+            $sites = Wait-AutomationElementById $navigation "NavSites"
+            Select-AutomationElement $sites "NavSites"
+            $null = Wait-AutomationElementById $window "SitesPageRoot"
+            $transform.Resize(800, 600)
+            $search = Wait-AutomationElementById $window "SearchBox"
+            Start-Sleep -Milliseconds 500
+            $windowBounds = $window.Current.BoundingRectangle
+            $searchBounds = $search.Current.BoundingRectangle
+            if ($search.Current.IsOffscreen -or $searchBounds.Width -le 0 -or
+                $searchBounds.Left -lt $windowBounds.Left -or $searchBounds.Right -gt $windowBounds.Right) {
+                throw "The sites search control is clipped in a compact window."
+            }
+            Save-WindowEvidence $window "SitesPageRoot-compact"
+            $services = Wait-AutomationElementById $navigation "NavServices"
+            Select-AutomationElement $services "NavServices"
+            $null = Wait-AutomationElementById $window "ServicesPageRoot"
+            Start-Sleep -Milliseconds 500
+            foreach ($id in @("ServiceTypeBox", "ServiceNameBox", "ServicePortBox", "AddServiceButton", "RetryServiceDownload")) {
+                $control = Wait-AutomationElementById $window $id
+                $bounds = $control.Current.BoundingRectangle
+                if ($control.Current.IsOffscreen -or $bounds.Width -le 0 -or
+                    $bounds.Left -lt $windowBounds.Left -or $bounds.Right -gt $windowBounds.Right -or
+                    $bounds.Bottom -gt $windowBounds.Bottom) {
+                    throw "The service control '$id' is clipped in a compact window."
+                }
+            }
+            Save-WindowEvidence $window "ServicesPageRoot-compact"
+        }
+        finally { $transform.Resize($originalBounds.Width, $originalBounds.Height) }
+    }
+}
+
+function Assert-ServiceDownloadControls(
+    [System.Windows.Automation.AutomationElement]$Window
+) {
+    $add = Wait-AutomationElementById $Window "AddServiceButton"
+    Select-AutomationElement $add "AddServiceButton"
+    $cancel = Wait-AutomationElementById $Window "CancelOperationButton"
+    if (-not $cancel.Current.IsEnabled) {
+        throw "The service operation disables its own cancel button."
+    }
+    Select-AutomationElement $cancel "CancelOperationButton"
+    $retry = Wait-AutomationElementById $Window "RetryServiceDownload"
+    $deadline = [DateTime]::UtcNow.AddSeconds(10)
+    while (-not $add.Current.IsEnabled -and [DateTime]::UtcNow -lt $deadline) {
+        Start-Sleep -Milliseconds 100
+    }
+    if (-not $add.Current.IsEnabled) { throw "The service form remains disabled after cancellation." }
+    Start-Sleep -Milliseconds 300
+    Save-WindowEvidence $Window "ServicesPageRoot-cancelled"
+    Select-AutomationElement $retry "RetryServiceDownload"
+    $cancelDownload = Wait-AutomationElementById $Window "CancelServiceDownload"
+    if (-not $cancelDownload.Current.IsEnabled) { throw "The download cancel control is disabled." }
+    Select-AutomationElement $cancelDownload "CancelServiceDownload"
+    $null = Wait-AutomationElementById $Window "RetryServiceDownload"
+    Write-Host "Verified service installation cancellation and retry controls."
 }
 
 function Assert-ResponsePrefix(

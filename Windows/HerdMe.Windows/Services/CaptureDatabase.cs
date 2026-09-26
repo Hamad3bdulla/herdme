@@ -6,33 +6,50 @@ namespace HerdMe.Windows.Services;
 
 public sealed class CaptureDatabase
 {
+    // Retention is enforced by the queries themselves, so pruning only has to reclaim space.
+    internal const int PruneEveryInserts = 32;
+    internal static readonly TimeSpan PruneInterval = TimeSpan.FromMinutes(5);
+    private static readonly Lazy<bool> SqliteProvider = new(
+        () =>
+        {
+            SQLitePCL.Batteries_V2.Init();
+            return true;
+        },
+        LazyThreadSafetyMode.ExecutionAndPublication
+    );
+
     private readonly string connectionString;
     private readonly object migrationSync = new();
+    private readonly object pruneSync = new();
+    private readonly Dictionary<string, PruneState> pruneStates = new(StringComparer.Ordinal);
 
     public CaptureDatabase(string supportRoot)
     {
         Directory.CreateDirectory(supportRoot);
-        SQLitePCL.Batteries_V2.Init();
+        _ = SqliteProvider.Value;
         connectionString = new SqliteConnectionStringBuilder
         {
             DataSource = Path.Combine(supportRoot, "captures.sqlite3"),
             Mode = SqliteOpenMode.ReadWriteCreate,
-            Cache = SqliteCacheMode.Shared,
-            Pooling = false
+            // Private cache: shared-cache mode is discouraged together with WAL and pooling.
+            Cache = SqliteCacheMode.Private,
+            Pooling = true
         }.ToString();
+        // Creating a database instance (re)creates a missing schema; the statements are
+        // idempotent and cheap on a pooled connection.
         Initialize();
     }
 
     public IReadOnlyList<CapturedMail> LoadMail(int limit, TimeSpan maximumAge)
     {
-        Prune("mail", limit, maximumAge);
-        return Load<CapturedMail>("mail", limit);
+        PruneIfDue("mail", limit, maximumAge, inserted: false);
+        return Load<CapturedMail>("mail", limit, maximumAge);
     }
 
     public IReadOnlyList<CapturedDump> LoadDumps(int limit, TimeSpan maximumAge)
     {
-        Prune("dumps", limit, maximumAge);
-        return Load<CapturedDump>("dumps", limit);
+        PruneIfDue("dumps", limit, maximumAge, inserted: false);
+        return Load<CapturedDump>("dumps", limit, maximumAge);
     }
 
     public void Save(CapturedMail message, int limit, TimeSpan maximumAge) =>
@@ -40,6 +57,13 @@ public sealed class CaptureDatabase
 
     public void Save(CapturedDump dump, int limit, TimeSpan maximumAge) =>
         Save("dumps", dump.Id.ToString(), dump.ReceivedAt, JsonSerializer.Serialize(dump), limit, maximumAge);
+
+    /// <summary>Closes idle pooled connections so the database file is not kept open.</summary>
+    public void ReleasePooledConnections()
+    {
+        using var connection = new SqliteConnection(connectionString);
+        SqliteConnection.ClearPool(connection);
+    }
 
     public void DeleteMail(Guid id) => Delete("mail", id.ToString());
     public void ClearMail() => Clear("mail");
@@ -61,7 +85,7 @@ public sealed class CaptureDatabase
         using var command = connection.CreateCommand();
         command.CommandText = """
             PRAGMA journal_mode=WAL;
-            PRAGMA synchronous=FULL;
+            PRAGMA synchronous=NORMAL;
             CREATE TABLE IF NOT EXISTS mail (
                 id TEXT PRIMARY KEY,
                 received_at TEXT NOT NULL,
@@ -82,14 +106,28 @@ public sealed class CaptureDatabase
     {
         var connection = new SqliteConnection(connectionString);
         connection.Open();
+        try
+        {
+            // synchronous is a per-connection setting. In WAL mode NORMAL keeps the database
+            // consistent after a crash; only the last commits may be lost on power failure.
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA synchronous=NORMAL;";
+            command.ExecuteNonQuery();
+        }
+        catch
+        {
+            connection.Dispose();
+            throw;
+        }
         return connection;
     }
 
-    private IReadOnlyList<T> Load<T>(string table, int limit)
+    private IReadOnlyList<T> Load<T>(string table, int limit, TimeSpan maximumAge)
     {
         using var connection = Open();
         using var command = connection.CreateCommand();
-        command.CommandText = $"SELECT payload FROM {table} ORDER BY received_at DESC LIMIT $limit";
+        command.CommandText = $"SELECT payload FROM {table} WHERE received_at >= $cutoff ORDER BY received_at DESC LIMIT $limit";
+        command.Parameters.AddWithValue("$cutoff", Cutoff(maximumAge));
         command.Parameters.AddWithValue("$limit", Math.Max(1, limit));
         using var reader = command.ExecuteReader();
         var result = new List<T>();
@@ -114,17 +152,45 @@ public sealed class CaptureDatabase
             command.Parameters.AddWithValue("$payload", payload);
             command.ExecuteNonQuery();
         }
-        Prune(connection, transaction, table, limit, maximumAge);
         transaction.Commit();
+        try
+        {
+            PruneIfDue(table, limit, maximumAge, inserted: true);
+        }
+        catch (SqliteException)
+        {
+            // The capture is already durable and reads enforce retention; pruning retries later.
+        }
     }
 
-    private void Prune(string table, int limit, TimeSpan maximumAge)
+    private void PruneIfDue(string table, int limit, TimeSpan maximumAge, bool inserted)
     {
-        using var connection = Open();
-        using var transaction = connection.BeginTransaction();
-        Prune(connection, transaction, table, limit, maximumAge);
-        transaction.Commit();
+        lock (pruneSync)
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (!pruneStates.TryGetValue(table, out var state))
+            {
+                state = new PruneState();
+                pruneStates[table] = state;
+            }
+            if (inserted) state.InsertsSincePrune++;
+            if (!ShouldPrune(state.LastPrunedAt, state.InsertsSincePrune, now)) return;
+            using var connection = Open();
+            using var transaction = connection.BeginTransaction();
+            Prune(connection, transaction, table, limit, maximumAge);
+            transaction.Commit();
+            state.LastPrunedAt = now;
+            state.InsertsSincePrune = 0;
+        }
     }
+
+    internal static bool ShouldPrune(DateTimeOffset? lastPrunedAt, int insertsSincePrune, DateTimeOffset now) =>
+        lastPrunedAt is not { } last
+            || insertsSincePrune >= PruneEveryInserts
+            || now - last >= PruneInterval;
+
+    private static string Cutoff(TimeSpan maximumAge) =>
+        DateTimeOffset.UtcNow.Subtract(maximumAge).UtcDateTime.ToString("O");
 
     private static void Prune(SqliteConnection connection, SqliteTransaction transaction, string table, int limit, TimeSpan maximumAge)
     {
@@ -136,7 +202,7 @@ public sealed class CaptureDatabase
                 SELECT id FROM {table} ORDER BY received_at DESC LIMIT $limit
             );
             """;
-        command.Parameters.AddWithValue("$cutoff", DateTimeOffset.UtcNow.Subtract(maximumAge).UtcDateTime.ToString("O"));
+        command.Parameters.AddWithValue("$cutoff", Cutoff(maximumAge));
         command.Parameters.AddWithValue("$limit", Math.Max(1, limit));
         command.ExecuteNonQuery();
     }
@@ -176,5 +242,12 @@ public sealed class CaptureDatabase
             }
             File.WriteAllText(marker, DateTimeOffset.UtcNow.ToString("O"));
         }
+    }
+
+    private sealed class PruneState
+    {
+        public DateTimeOffset? LastPrunedAt { get; set; }
+
+        public int InsertsSincePrune { get; set; }
     }
 }

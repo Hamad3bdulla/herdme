@@ -14,9 +14,13 @@ concurrency:
 
 jobs:
   acceptance:
-    name: Build, test, package, and run
+    name: Build, test, package, and run (${{ matrix.ui-language }})
     runs-on: windows-2022
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        ui-language: [en-US, ar-BH]
 
     steps:
       - name: Check out source
@@ -34,6 +38,16 @@ jobs:
         run: |
           dotnet --info
           cmake --version
+
+      - name: Set the acceptance profile language
+        shell: powershell
+        env:
+          UI_TEST_LANGUAGE: ${{ matrix.ui-language }}
+        run: |
+          $languages = New-WinUserLanguageList -Language $env:UI_TEST_LANGUAGE
+          Set-WinUserLanguageList -LanguageList $languages -Force
+          Set-WinUILanguageOverride -Language $env:UI_TEST_LANGUAGE
+          Set-Culture -CultureInfo $env:UI_TEST_LANGUAGE
 
       - name: Verify C# formatting
         shell: pwsh
@@ -53,13 +67,21 @@ jobs:
 
       - name: Run automated Windows x64 acceptance
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = "Stop"
           $transcript = Join-Path $env:GITHUB_WORKSPACE "build\windows-acceptance.log"
           New-Item -ItemType Directory -Force -Path (Split-Path -Parent $transcript) | Out-Null
+          $fixture = Join-Path $env:USERPROFILE "HerdMe\readiness-site\public"
+          New-Item -ItemType Directory -Force -Path $fixture | Out-Null
+          Set-Content -LiteralPath (Join-Path $fixture "index.html") -Value '<!doctype html><title>Readiness site</title><h1>Readiness site</h1>'
           Start-Transcript -Path $transcript -Force -UseMinimalHeader | Out-Null
           try {
-              & ./Windows/acceptance.ps1 -Configuration Release -SkipLiveReleaseChecks
+              $baseline = Join-Path $env:GITHUB_WORKSPACE 'build\upgrade-baseline'
+              gh release download v0.1.18 --repo $env:GITHUB_REPOSITORY --pattern '*win-x64-setup.exe*' --dir $baseline
+              if ($LASTEXITCODE -ne 0) { throw 'Could not download the previous installer for upgrade acceptance.' }
+              & ./Windows/acceptance.ps1 -Configuration Release -SkipLiveReleaseChecks -CaptureScreenshots -PreviousInstallerPath (Join-Path $baseline 'HerdMe-0.1.18-win-x64-setup.exe')
           }
           catch {
               $message = $_.Exception.Message
@@ -70,6 +92,15 @@ jobs:
           finally {
               Stop-Transcript | Out-Null
           }
+
+      - name: Upload Windows UI evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: HerdMe-${{ github.run_number }}-win-x64-${{ matrix.ui-language }}-UI
+          path: build/windows-ui-evidence
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Collect Windows failure diagnostics
         if: failure()
@@ -96,7 +127,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: HerdMe-${{ github.run_number }}-win-x64-failure-diagnostics
+          name: HerdMe-${{ github.run_number }}-win-x64-${{ matrix.ui-language }}-failure-diagnostics
           path: |
             build/windows-acceptance.log
             build/windows-diagnostics
@@ -108,6 +139,7 @@ jobs:
           retention-days: 14
 
       - name: Upload Windows artifacts
+        if: matrix.ui-language == 'en-US'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: HerdMe-${{ github.run_number }}-win-x64

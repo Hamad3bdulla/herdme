@@ -2,7 +2,8 @@
     x:Class="HerdMe.Windows.Views.OnboardingView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid Background="{ThemeResource WorkspaceBackgroundBrush}">
+    <!-- Transparent so the window backdrop (Mica or the shell brush) shows through. -->
+    <Grid Background="Transparent">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="7" />
@@ -51,13 +52,12 @@
                     HorizontalAlignment="Center"
                     MinWidth="168"
                     Padding="20,9"
-                    Background="#FFED1F2B"
                     Click="Start_Click"
                     CornerRadius="6"
-                    Foreground="White">
+                    Style="{StaticResource AccentButtonStyle}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock x:Uid="OnboardingSetupButton" Text="Set up HerdMe" />
-                        <FontIcon FontSize="13" Glyph="&#xE72A;" />
+                        <FontIcon FontSize="13" Glyph="&#xE72A;" MirroredWhenRightToLeft="True" />
                     </StackPanel>
                 </Button>
             </StackPanel>
@@ -73,7 +73,7 @@
                     Width="56"
                     Height="56"
                     HorizontalAlignment="Center"
-                    Foreground="#FFED1F2B"
+                    Foreground="{ThemeResource BrandBrush}"
                     IsActive="True" />
                 <TextBlock
                     x:Name="StageTitleText"
@@ -93,7 +93,7 @@
                     Width="320"
                     Height="4"
                     HorizontalAlignment="Center"
-                    Foreground="#FFED1F2B"
+                    Foreground="{ThemeResource BrandBrush}"
                     Maximum="100" />
                 <TextBlock
                     x:Name="StepText"
@@ -112,7 +112,7 @@
                 <FontIcon
                     HorizontalAlignment="Center"
                     FontSize="48"
-                    Foreground="#FFED1F2B"
+                    Foreground="{ThemeResource SystemFillColorCriticalBrush}"
                     Glyph="&#xE7BA;" />
                 <TextBlock
                     x:Uid="OnboardingFailureTitle"
@@ -161,10 +161,9 @@
                 <Button
                     HorizontalAlignment="Center"
                     Padding="20,9"
-                    Background="#FFED1F2B"
                     Click="Start_Click"
                     CornerRadius="6"
-                    Foreground="White">
+                    Style="{StaticResource AccentButtonStyle}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock x:Uid="OnboardingTryAgainButton" Text="Try Again" />
                         <FontIcon FontSize="13" Glyph="&#xE72C;" />
@@ -182,7 +181,7 @@
                 <FontIcon
                     HorizontalAlignment="Center"
                     FontSize="54"
-                    Foreground="#FF188038"
+                    Foreground="{ThemeResource SystemFillColorSuccessBrush}"
                     Glyph="&#xE73E;" />
                 <TextBlock
                     x:Uid="OnboardingCompletedTitle"
@@ -200,19 +199,18 @@
                 <Button
                     HorizontalAlignment="Center"
                     Padding="20,9"
-                    Background="#FFED1F2B"
                     Click="Continue_Click"
                     CornerRadius="6"
-                    Foreground="White">
+                    Style="{StaticResource AccentButtonStyle}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock x:Uid="OnboardingOpenButton" Text="Open HerdMe" />
-                        <FontIcon FontSize="13" Glyph="&#xE72A;" />
+                        <FontIcon FontSize="13" Glyph="&#xE72A;" MirroredWhenRightToLeft="True" />
                     </StackPanel>
                 </Button>
             </StackPanel>
         </Grid>
         </ScrollViewer>
 
-        <Rectangle Grid.Row="1" Fill="#FFED1F2B" />
+        <Rectangle Grid.Row="1" Fill="{ThemeResource BrandBrush}" />
     </Grid>
 </UserControl>

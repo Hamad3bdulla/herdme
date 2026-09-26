@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json.Serialization;
+using HerdMe.Windows.Services;
 
 namespace HerdMe.Windows.Models;
 
@@ -18,10 +20,20 @@ public sealed class CapturedDump
     [JsonIgnore]
     public string ReceivedText => ReceivedAt.LocalDateTime.ToString("g");
 
+    [JsonIgnore]
+    public string SourcePreview => CapturePreview.LimitText(Source, 512).Text;
+
+    [JsonIgnore]
+    public string SummaryPreview => CapturePreview.LimitText(Summary, 1_024).Text;
+
     public static CapturedDump Decode(string payload)
     {
         try
         {
+            if (payload.Length > PhpSerializationParser.MaximumEncodedLength)
+            {
+                throw new InvalidDataException("VarDumper payload exceeds the supported size.");
+            }
             var serialized = Convert.FromBase64String(payload);
             var value = new PhpSerializationParser(serialized).Parse();
             return new CapturedDump
@@ -122,8 +134,14 @@ internal sealed class PhpSerializedValue
 
 internal sealed class PhpSerializationParser
 {
+    internal const int MaximumEncodedLength = 16 * 1_024 * 1_024;
+    private const int MaximumDepth = 64;
+    private const int MaximumNodes = 100_000;
+    private const int MaximumStringBytes = 4 * 1_024 * 1_024;
+    private const int MaximumTokenLength = 64;
     private readonly byte[] bytes;
     private int index;
+    private int nodes;
 
     public PhpSerializationParser(byte[] bytes)
     {
@@ -132,6 +150,15 @@ internal sealed class PhpSerializationParser
 
     public PhpSerializedValue Parse()
     {
+        if (bytes.Length > MaximumEncodedLength / 4 * 3) throw LimitExceeded();
+        var value = ParseValue(0);
+        if (index != bytes.Length) throw Malformed();
+        return value;
+    }
+
+    private PhpSerializedValue ParseValue(int depth)
+    {
+        if (depth > MaximumDepth || ++nodes > MaximumNodes) throw LimitExceeded();
         if (index >= bytes.Length) throw Malformed();
         var marker = (char)bytes[index++];
         return marker switch
@@ -141,8 +168,8 @@ internal sealed class PhpSerializationParser
             'i' => ParseInteger(),
             'd' => ParseDouble(),
             's' => PhpSerializedValue.String(ReadString()),
-            'a' => ParseArray(),
-            'O' => ParseObject(),
+            'a' => ParseArray(depth),
+            'O' => ParseObject(depth),
             'R' or 'r' => ParseReference(),
             _ => throw new InvalidDataException($"Unsupported PHP serialized type: {marker}")
         };
@@ -157,13 +184,18 @@ internal sealed class PhpSerializationParser
     private PhpSerializedValue ParseBool()
     {
         Expect(':');
-        return PhpSerializedValue.Bool(ReadUntil(';') == "1");
+        return ReadUntil(';') switch
+        {
+            "0" => PhpSerializedValue.Bool(false),
+            "1" => PhpSerializedValue.Bool(true),
+            _ => throw Malformed()
+        };
     }
 
     private PhpSerializedValue ParseInteger()
     {
         Expect(':');
-        return long.TryParse(ReadUntil(';'), out var value)
+        return long.TryParse(ReadUntil(';'), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value)
             ? PhpSerializedValue.Integer(value)
             : throw Malformed();
     }
@@ -171,26 +203,34 @@ internal sealed class PhpSerializationParser
     private PhpSerializedValue ParseDouble()
     {
         Expect(':');
+        var token = ReadUntil(';');
+        if (token == "INF") return PhpSerializedValue.Double(double.PositiveInfinity);
+        if (token == "-INF") return PhpSerializedValue.Double(double.NegativeInfinity);
+        if (token == "NAN") return PhpSerializedValue.Double(double.NaN);
+        if (!token.Any(char.IsAsciiDigit)
+            || token.Any(character => !char.IsAsciiDigit(character) && character is not ('+' or '-' or '.' or 'e' or 'E')))
+        {
+            throw Malformed();
+        }
         return double.TryParse(
-            ReadUntil(';'),
-            System.Globalization.NumberStyles.Float,
-            System.Globalization.CultureInfo.InvariantCulture,
+            token,
+            NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent,
+            CultureInfo.InvariantCulture,
             out var value
-        ) ? PhpSerializedValue.Double(value) : throw Malformed();
+        ) && double.IsFinite(value) ? PhpSerializedValue.Double(value) : throw Malformed();
     }
 
-    private PhpSerializedValue ParseArray()
+    private PhpSerializedValue ParseArray(int depth)
     {
         Expect(':');
         var count = ReadCount(':');
         Expect('{');
-        var values = new List<(PhpSerializedValue, PhpSerializedValue)>();
-        for (var item = 0; item < count; item++) values.Add((Parse(), Parse()));
+        var values = ReadEntries(count, depth);
         Expect('}');
         return PhpSerializedValue.Array(values);
     }
 
-    private PhpSerializedValue ParseObject()
+    private PhpSerializedValue ParseObject(int depth)
     {
         Expect(':');
         var nameLength = ReadCount(':');
@@ -200,8 +240,7 @@ internal sealed class PhpSerializationParser
         Expect(':');
         var count = ReadCount(':');
         Expect('{');
-        var values = new List<(PhpSerializedValue, PhpSerializedValue)>();
-        for (var item = 0; item < count; item++) values.Add((Parse(), Parse()));
+        var values = ReadEntries(count, depth);
         Expect('}');
         return PhpSerializedValue.Object(name, values);
     }
@@ -209,9 +248,22 @@ internal sealed class PhpSerializationParser
     private PhpSerializedValue ParseReference()
     {
         Expect(':');
-        return int.TryParse(ReadUntil(';'), out var value)
+        return int.TryParse(ReadUntil(';'), NumberStyles.None, CultureInfo.InvariantCulture, out var value) && value > 0
             ? PhpSerializedValue.Reference(value)
             : throw Malformed();
+    }
+
+    private List<(PhpSerializedValue, PhpSerializedValue)> ReadEntries(int count, int depth)
+    {
+        if (count > (MaximumNodes - nodes) / 2) throw LimitExceeded();
+        var values = new List<(PhpSerializedValue, PhpSerializedValue)>();
+        for (var item = 0; item < count; item++)
+        {
+            var key = ParseValue(depth + 1);
+            if (key.Kind is not ("integer" or "string")) throw Malformed();
+            values.Add((key, ParseValue(depth + 1)));
+        }
+        return values;
     }
 
     private string ReadString()
@@ -227,14 +279,15 @@ internal sealed class PhpSerializationParser
 
     private int ReadCount(char delimiter)
     {
-        return int.TryParse(ReadUntil(delimiter), out var value) && value >= 0
+        return int.TryParse(ReadUntil(delimiter), NumberStyles.None, CultureInfo.InvariantCulture, out var value)
             ? value
             : throw Malformed();
     }
 
     private string ReadBytes(int length)
     {
-        if (length < 0 || index + length > bytes.Length) throw Malformed();
+        if (length < 0 || length > bytes.Length - index) throw Malformed();
+        if (length > MaximumStringBytes) throw LimitExceeded();
         var value = Encoding.UTF8.GetString(bytes, index, length);
         index += length;
         return value;
@@ -243,7 +296,11 @@ internal sealed class PhpSerializationParser
     private string ReadUntil(char delimiter)
     {
         var start = index;
-        while (index < bytes.Length && bytes[index] != delimiter) index++;
+        while (index < bytes.Length && bytes[index] != delimiter)
+        {
+            if (index - start >= MaximumTokenLength) throw LimitExceeded();
+            index++;
+        }
         if (index >= bytes.Length) throw Malformed();
         var value = Encoding.UTF8.GetString(bytes, start, index - start);
         index++;
@@ -256,4 +313,6 @@ internal sealed class PhpSerializationParser
     }
 
     private static InvalidDataException Malformed() => new("Malformed PHP serialized value.");
+
+    private static InvalidDataException LimitExceeded() => new("PHP serialized value exceeds the supported complexity or size.");
 }

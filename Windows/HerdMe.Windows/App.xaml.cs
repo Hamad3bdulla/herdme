@@ -1,19 +1,33 @@
 using H.NotifyIcon;
 using H.NotifyIcon.Core;
 using HerdMe.Windows.Services;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.Win32;
 
 namespace HerdMe.Windows;
 
 public partial class App : Application
 {
     public static MainWindow MainWindow { get; private set; } = null!;
+
+    // True while the main window is shown and not minimized. Pages pause polling while hidden.
+    public static bool IsMainWindowVisible { get; private set; }
+
+    // Raised on the UI thread with the new visibility when the window is hidden to the tray,
+    // shown again, minimized, or restored.
+    public static event EventHandler<bool>? MainWindowVisibilityChanged;
+
     private readonly AppServices services = null!;
     private readonly SingleInstanceCoordinator singleInstance = null!;
+    private readonly ApplicationTaskLifetime backgroundTasks = new();
+    private readonly TaskCompletionSource shutdownCompletion = new(
+        TaskCreationOptions.RunContinuationsAsynchronously
+    );
     private TaskbarIcon? trayIcon;
     private volatile bool exitRequested;
     private int backgroundServicesStarted;
@@ -23,6 +37,7 @@ public partial class App : Application
     private int shutdownStarted;
     private bool suppressAutomaticUpdateCheck;
     private Task<AutomaticUpdateCheck>? automaticUpdateCheck;
+    private Task activationListener = Task.CompletedTask;
 
     public App()
     {
@@ -41,6 +56,12 @@ public partial class App : Application
             Environment.Exit(0);
             return;
         }
+        ServiceText.Localize = key =>
+        {
+            if (string.IsNullOrWhiteSpace(key)) return null;
+            var value = AppLocalization.Get(key);
+            return value == key ? null : value;
+        };
         services = new AppServices();
         InitializeComponent();
         UnhandledException += App_UnhandledException;
@@ -58,7 +79,7 @@ public partial class App : Application
             "--acceptance-onboarding",
             StringComparer.OrdinalIgnoreCase
         );
-        var onboardingAfterReinstall = !acceptanceRun
+        var onboardingAfterReinstall = !acceptanceRun && !onboardingAcceptance
             && services.SiteSettings.ApplyOnboardingAfterReinstallRequest();
         suppressAutomaticUpdateCheck = acceptanceRun || onboardingAcceptance;
         MainWindow = new MainWindow(
@@ -69,16 +90,21 @@ public partial class App : Application
         MainWindow.InitialSetupCompleted += MainWindow_InitialSetupCompleted;
         MainWindow.Activated += MainWindow_Activated;
         MainWindow.Closed += MainWindow_Closed;
+        MainWindow.VisibilityChanged += MainWindow_VisibilityChanged;
+        MainWindow.AppWindow.Changed += MainWindow_AppWindowChanged;
+        SystemEvents.PowerModeChanged += System_PowerModeChanged;
         if (!MainWindow.RequiresOnboarding
             && Environment.GetCommandLineArgs().Contains("--background", StringComparer.OrdinalIgnoreCase))
         {
             MainWindow.AppWindow.Hide();
+            SetMainWindowVisible(false);
         }
         else
         {
             MainWindow.Activate();
+            SetMainWindowVisible(true);
         }
-        _ = ListenForActivationAsync();
+        activationListener = ListenForActivationAsync();
         if (!MainWindow.RequiresOnboarding)
         {
             _ = StartBackgroundServicesOnceAsync();
@@ -93,9 +119,16 @@ public partial class App : Application
         StartAutomaticUpdatePromptOnce();
     }
 
+    private void System_PowerModeChanged(object sender, PowerModeChangedEventArgs args)
+    {
+        if (args.Mode == PowerModes.Resume && !exitRequested)
+            services.Environment.RequestResumeRecovery();
+    }
+
     private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
     {
         if (args.WindowActivationState == WindowActivationState.Deactivated) return;
+        RefreshMainWindowVisibility();
         StartAutomaticUpdateCheckOnce();
         StartAutomaticUpdatePromptOnce();
     }
@@ -207,10 +240,15 @@ public partial class App : Application
             {
                 if (!singleInstance.WaitForActivation()) return;
                 if (exitRequested) return;
+                if (singleInstance.ShutdownRequested)
+                {
+                    MainWindow.DispatcherQueue.TryEnqueue(async () => await RequestExitAsync());
+                    return;
+                }
                 MainWindow.DispatcherQueue.TryEnqueue(() =>
                 {
-                    MainWindow.AppWindow.Show();
-                    MainWindow.Activate();
+                    if (exitRequested) return;
+                    ShowMainWindow();
                 });
             }
         });
@@ -225,8 +263,8 @@ public partial class App : Application
         };
         openCommand.ExecuteRequested += (_, _) =>
         {
-            MainWindow.AppWindow.Show();
-            MainWindow.Activate();
+            if (exitRequested) return;
+            ShowMainWindow();
         };
         var quitCommand = new XamlUICommand
         {
@@ -287,9 +325,52 @@ public partial class App : Application
 
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
-        if (exitRequested) return;
+        if (exitRequested)
+        {
+            // Keep the dispatcher alive until asynchronous shutdown finishes.
+            args.Handled = !shutdownCompletion.Task.IsCompleted;
+            return;
+        }
         args.Handled = true;
         MainWindow.AppWindow.Hide();
+        SetMainWindowVisible(false);
+    }
+
+    private static void ShowMainWindow()
+    {
+        MainWindow.AppWindow.Show();
+        MainWindow.Activate();
+        SetMainWindowVisible(true);
+    }
+
+    private void MainWindow_VisibilityChanged(object sender, WindowVisibilityChangedEventArgs args)
+    {
+        if (exitRequested) return;
+        RefreshMainWindowVisibility();
+    }
+
+    private void MainWindow_AppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        if (exitRequested) return;
+        RefreshMainWindowVisibility();
+    }
+
+    private void RefreshMainWindowVisibility()
+    {
+        if (exitRequested || MainWindow is null) return;
+        var appWindow = MainWindow.AppWindow;
+        var minimized = appWindow.Presenter is OverlappedPresenter
+        {
+            State: OverlappedPresenterState.Minimized
+        };
+        SetMainWindowVisible(appWindow.IsVisible && !minimized);
+    }
+
+    private static void SetMainWindowVisible(bool visible)
+    {
+        if (IsMainWindowVisible == visible) return;
+        IsMainWindowVisible = visible;
+        MainWindowVisibilityChanged?.Invoke(null, visible);
     }
 
     private async void QuitCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)
@@ -299,16 +380,27 @@ public partial class App : Application
 
     internal async Task RequestExitAsync()
     {
-        if (Interlocked.Exchange(ref shutdownStarted, 1) != 0) return;
+        if (Interlocked.Exchange(ref shutdownStarted, 1) != 0)
+        {
+            await shutdownCompletion.Task;
+            return;
+        }
         exitRequested = true;
         singleInstance.WakeListener();
+        SystemEvents.PowerModeChanged -= System_PowerModeChanged;
+        MainWindow.VisibilityChanged -= MainWindow_VisibilityChanged;
+        MainWindow.AppWindow.Changed -= MainWindow_AppWindowChanged;
+        MainWindow.PrepareForShutdown();
+        SetMainWindowVisible(false);
         trayIcon?.Dispose();
         trayIcon = null;
-        await StopAndLogAsync("dump capture", services.Dumps.StopAsync);
-        await StopAndLogAsync("mail capture", services.Mail.StopAsync);
-        await StopAndLogAsync("site processes", services.SiteProcesses.StopAllAsync);
-        await StopAndLogAsync("sites environment", services.Environment.StopAsync);
-        await StopAndLogAsync("managed services", services.Services.StopAllAsync);
+        await StopAndLogAsync("background operations", backgroundTasks.StopAsync);
+        await StopAndLogAsync("activation listener", () => activationListener);
+        await StopAndLogAsync(
+            "application services",
+            () => services.DisposeAsync().AsTask()
+        );
+        shutdownCompletion.TrySetResult();
         MainWindow.Close();
         singleInstance.Dispose();
     }
@@ -330,33 +422,44 @@ public partial class App : Application
 
     private async void StartCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)
     {
-        services.SiteSettings.UpdateStartAutomatically(true);
-        await StartConfiguredEnvironmentAsync();
-        await services.Services.StartEnabledAsync();
+        await backgroundTasks.RunAsync(async cancellationToken =>
+        {
+            services.SiteSettings.UpdateStartAutomatically(true);
+            await StartConfiguredEnvironmentAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            await services.Services.StartEnabledAsync(cancellationToken);
+        });
     }
 
     private async void StopCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)
     {
-        services.SiteSettings.UpdateStartAutomatically(false);
-        await services.Environment.StopAsync();
-        await services.Services.StopAllAsync();
+        await backgroundTasks.RunAsync(async _ =>
+        {
+            services.SiteSettings.UpdateStartAutomatically(false);
+            await services.Environment.StopAsync();
+            await services.Services.StopAllAsync();
+        });
     }
 
-    private async Task StartConfiguredEnvironmentAsync()
+    private async Task StartConfiguredEnvironmentAsync(CancellationToken cancellationToken)
     {
         try
         {
-            await services.Environment.StartConfiguredAsync(services.SiteSettings);
+            cancellationToken.ThrowIfCancellationRequested();
+            await services.Environment.StartConfiguredAsync(services.SiteSettings, cancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception error)
         {
             await ApplicationDiagnostics.WriteEnvironmentStartupFailureAsync(error);
         }
     }
 
-    private async Task StartBackgroundServicesAsync()
+    private async Task StartBackgroundServicesAsync(CancellationToken cancellationToken)
     {
-        await StartAndLogAsync("command-line path", () =>
+        // Independent listeners and processes start together off the UI thread. The
+        // environment orders its own certificate, hosts, and HTTP server work internally.
+        var commandLinePath = StartAndLogAsync("command-line path", () => Task.Run(() =>
         {
             services.NodeInstaller.RepairActiveCommandShims();
             services.UserPath.Synchronize(
@@ -364,31 +467,67 @@ public partial class App : Application
                     services.RuntimePolicy.Load().PhpCycle
                 )
             );
-            return Task.CompletedTask;
-        });
-        await StartAndLogAsync("mail capture", () => services.Mail.StartAsync());
-        await StartAndLogAsync("dump capture", () => services.Dumps.StartAsync());
-        await StartAndLogAsync("managed services", () => services.Services.StartEnabledAsync());
-        await StartConfiguredEnvironmentAsync();
+        }, cancellationToken), cancellationToken);
+        var mailCapture = StartAndLogAsync(
+            "mail capture",
+            () => Task.Run(
+                () => services.Mail.StartAsync(cancellationToken: cancellationToken),
+                cancellationToken
+            ),
+            cancellationToken
+        );
+        var dumpCapture = StartAndLogAsync(
+            "dump capture",
+            () => Task.Run(
+                () => services.Dumps.StartAsync(cancellationToken: cancellationToken),
+                cancellationToken
+            ),
+            cancellationToken
+        );
+        var managedServices = StartAndLogAsync(
+            "managed services",
+            () => Task.Run(
+                () => services.Services.StartEnabledAsync(cancellationToken),
+                cancellationToken
+            ),
+            cancellationToken
+        );
+        var environment = Task.Run(
+            () => StartConfiguredEnvironmentAsync(cancellationToken),
+            cancellationToken
+        );
+        await Task.WhenAll(commandLinePath, mailCapture, dumpCapture, managedServices, environment);
+        // Tool installation rewrites PHP configuration and the user PATH, so it waits for the
+        // path repair and the running environment above.
         await StartAndLogAsync(
             "command-line tools",
-            () => services.InitialSetup.EnsureCommandLineToolsAsync()
+            () => Task.Run(
+                () => services.InitialSetup.EnsureCommandLineToolsAsync(cancellationToken: cancellationToken),
+                cancellationToken
+            ),
+            cancellationToken
         );
     }
 
     private Task StartBackgroundServicesOnceAsync()
     {
         return Interlocked.Exchange(ref backgroundServicesStarted, 1) == 0
-            ? StartBackgroundServicesAsync()
+            ? backgroundTasks.RunAsync(StartBackgroundServicesAsync)
             : Task.CompletedTask;
     }
 
-    private static async Task StartAndLogAsync(string component, Func<Task> operation)
+    private static async Task StartAndLogAsync(
+        string component,
+        Func<Task> operation,
+        CancellationToken cancellationToken
+    )
     {
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await operation();
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception error)
         {
             await LogStartupFailureAsync(component, error);
@@ -421,9 +560,15 @@ public partial class App : Application
             var dialog = new Microsoft.UI.Xaml.Controls.ContentDialog
             {
                 XamlRoot = root.XamlRoot,
-                Title = "HerdMe could not complete the operation",
-                Content = UnhandledExceptionPolicy.UserMessage(error),
-                CloseButtonText = "OK"
+                FlowDirection = AppLocalization.LayoutDirection,
+                Title = AppLocalization.Get("AppUnhandledErrorTitle"),
+                Content = new TextBlock
+                {
+                    Text = UnhandledExceptionPolicy.UserMessage(error),
+                    TextWrapping = TextWrapping.Wrap,
+                    IsTextSelectionEnabled = true
+                },
+                CloseButtonText = AppLocalization.Get("CommonOk")
             };
             await dialog.ShowAsync();
         }

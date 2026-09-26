@@ -5,16 +5,27 @@
     AutomationProperties.AutomationId="DebuggerPageRoot"
     Loaded="Page_Loaded">
     <ScrollViewer>
-        <StackPanel Padding="{StaticResource PagePadding}" Spacing="16" MaxWidth="900" HorizontalAlignment="Stretch">
-            <TextBlock x:Uid="DebuggerPageTitle" AutomationProperties.AutomationId="DebuggerPageRoot" Text="Debugger" Style="{StaticResource PageTitleStyle}" />
+        <StackPanel Style="{StaticResource PageContentStyle}">
+            <StackPanel Spacing="2" Margin="0,0,0,4">
+                <TextBlock x:Uid="DebuggerPageTitle" AutomationProperties.AutomationId="DebuggerPageRoot" Text="Debugger" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock x:Uid="DebuggerPageSubtitle" Text="Install Xdebug and start step-debugging sessions for your sites." Style="{StaticResource PageSubtitleStyle}" />
+            </StackPanel>
 
-            <Border Style="{StaticResource SectionDividerStyle}">
-                <StackPanel Spacing="12">
-                    <TextBlock x:Uid="DebuggerXdebugTitle" Text="Xdebug" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock x:Name="ExtensionPathText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock x:Uid="DebuggerXdebugTitle" Text="Xdebug" Style="{StaticResource SectionHeaderStyle}" />
+            <Border Style="{StaticResource SettingsGroupStyle}">
+                <Grid Style="{StaticResource SettingsRowStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xEBE8;" Style="{StaticResource SettingsRowIconStyle}" />
+                    <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                        <TextBlock x:Name="InstallStatusText" x:Uid="DebuggerCheckingInitial" Text="Checking" Style="{StaticResource SettingsRowTitleStyle}" />
+                        <TextBlock x:Name="ExtensionPathText" Style="{StaticResource SettingsRowDescriptionStyle}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Style="{StaticResource SettingsRowControlStyle}">
                         <ProgressRing x:Name="InstallProgress" Width="16" Height="16" />
-                        <TextBlock x:Name="InstallStatusText" x:Uid="DebuggerCheckingInitial" Text="Checking" VerticalAlignment="Center" />
                         <Button x:Name="InstallButton" Click="Install_Click" IsEnabled="False">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <SymbolIcon Symbol="Download" />
@@ -22,87 +33,126 @@
                             </StackPanel>
                         </Button>
                     </StackPanel>
-                </StackPanel>
+                </Grid>
             </Border>
 
-            <Border Style="{StaticResource SectionDividerStyle}">
-                <StackPanel Spacing="14">
-                    <TextBlock x:Uid="DebuggerSessionSettingsTitle" Text="Session settings" Style="{StaticResource SectionTitleStyle}" />
-                    <Grid ColumnSpacing="16">
+            <TextBlock x:Uid="DebuggerSessionSettingsTitle" Text="Session settings" Style="{StaticResource SectionHeaderStyle}" />
+            <Border Style="{StaticResource SettingsGroupStyle}">
+                <StackPanel>
+                    <Grid Style="{StaticResource SettingsRowStyle}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="220" />
-                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Uid="DebuggerEnableLabel" Text="Enable Xdebug" VerticalAlignment="Center" />
-                        <ToggleSwitch x:Name="EnabledToggle" Grid.Column="1" />
+                        <FontIcon Glyph="&#xE7E8;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <TextBlock x:Name="EnableLabel" x:Uid="DebuggerEnableLabel" Grid.Column="1" Text="Enable Xdebug" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                        <ToggleSwitch x:Name="EnabledToggle" Grid.Column="2" MinWidth="0" AutomationProperties.LabeledBy="{Binding ElementName=EnableLabel}" />
                     </Grid>
-                    <Grid ColumnSpacing="16">
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource SettingsRowStyle}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="220" />
-                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Uid="DebuggerRequireTriggerLabel" Text="Require debug trigger" VerticalAlignment="Center" />
+                        <FontIcon Glyph="&#xE945;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Name="RequireTriggerLabel" x:Uid="DebuggerRequireTriggerLabel" Text="Require debug trigger" Style="{StaticResource SettingsRowTitleStyle}" />
+                            <TextBlock x:Uid="DebuggerRequireTriggerDescription" Text="Start Xdebug only for requests that include XDEBUG_TRIGGER." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                        </StackPanel>
                         <ToggleSwitch
                             x:Name="TriggerToggle"
-                            Grid.Column="1">
+                            Grid.Column="2"
+                            MinWidth="0"
+                            AutomationProperties.LabeledBy="{Binding ElementName=RequireTriggerLabel}">
                             <ToolTipService.ToolTip>
                                 <ToolTip><TextBlock x:Uid="DebuggerTriggerTooltip" Text="Start Xdebug only for requests that include XDEBUG_TRIGGER" /></ToolTip>
                             </ToolTipService.ToolTip>
                         </ToggleSwitch>
                     </Grid>
-                    <Grid ColumnSpacing="16">
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource SettingsRowStyle}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="220" />
-                            <ColumnDefinition Width="140" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Uid="DebuggerPortLabel" Text="Debug port" VerticalAlignment="Center" />
-                        <NumberBox x:Name="PortBox" Grid.Column="1" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Compact" />
-                    </Grid>
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="220" />
-                            <ColumnDefinition Width="220" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Uid="DebuggerIdeKeyLabel" Text="IDE key" VerticalAlignment="Center" />
-                        <TextBox x:Name="IdeKeyBox" Grid.Column="1" MaxLength="80" />
-                    </Grid>
-                    <TextBlock x:Name="EndpointText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <Button HorizontalAlignment="Left" Click="Save_Click" Style="{StaticResource AccentButtonStyle}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <SymbolIcon Symbol="Save" />
-                            <TextBlock x:Uid="DebuggerSaveButton" Text="Save" />
+                        <FontIcon Glyph="&#xE968;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Name="PortLabel" x:Uid="DebuggerPortLabel" Text="Debug port" Style="{StaticResource SettingsRowTitleStyle}" />
+                            <TextBlock x:Name="EndpointText" Style="{StaticResource SettingsRowDescriptionStyle}" />
                         </StackPanel>
-                    </Button>
-                    <TextBlock x:Name="SaveStatusText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <NumberBox x:Name="PortBox" Grid.Column="2" Width="160" VerticalAlignment="Center" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Compact" AutomationProperties.LabeledBy="{Binding ElementName=PortLabel}" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE8D7;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <TextBlock x:Name="IdeKeyLabel" x:Uid="DebuggerIdeKeyLabel" Grid.Column="1" Text="IDE key" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                        <TextBox x:Name="IdeKeyBox" Grid.Column="2" Width="220" VerticalAlignment="Center" MaxLength="80" AutomationProperties.LabeledBy="{Binding ElementName=IdeKeyLabel}" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource SettingsRowStyle}" Background="{ThemeResource SubtleFillColorTertiaryBrush}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="SaveStatusText" VerticalAlignment="Center" Style="{StaticResource SettingsRowDescriptionStyle}" />
+                        <Button Grid.Column="1" VerticalAlignment="Center" Click="Save_Click" Style="{StaticResource AccentButtonStyle}">
+                            <Button.KeyboardAccelerators>
+                                <KeyboardAccelerator Modifiers="Control" Key="S" />
+                            </Button.KeyboardAccelerators>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <SymbolIcon Symbol="Save" />
+                                <TextBlock x:Uid="DebuggerSaveButton" Text="Save" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
                 </StackPanel>
             </Border>
 
-            <Border Style="{StaticResource SectionDividerStyle}">
-                <StackPanel Spacing="14">
-                    <TextBlock x:Uid="DebuggerSessionTitle" Text="Debug session" Style="{StaticResource SectionTitleStyle}" />
-                    <Grid ColumnSpacing="16">
+            <TextBlock x:Uid="DebuggerSessionTitle" Text="Debug session" Style="{StaticResource SectionHeaderStyle}" />
+            <Border Style="{StaticResource SettingsGroupStyle}">
+                <StackPanel>
+                    <Grid Style="{StaticResource SettingsRowStyle}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="220" />
-                            <ColumnDefinition Width="360" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Uid="DebuggerSiteLabel" Text="Site" VerticalAlignment="Center" />
+                        <FontIcon Glyph="&#xE774;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <TextBlock x:Name="SiteLabel" x:Uid="DebuggerSiteLabel" Grid.Column="1" Text="Site" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
                         <ComboBox
                             x:Name="SiteBox"
-                            Grid.Column="1"
+                            Grid.Column="2"
+                            Width="300"
+                            VerticalAlignment="Center"
+                            AutomationProperties.LabeledBy="{Binding ElementName=SiteLabel}"
                             ItemsSource="{x:Bind Sites}"
                             DisplayMemberPath="Domain"
                             SelectionChanged="SiteBox_SelectionChanged" />
                     </Grid>
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <ProgressRing x:Name="SessionProgress" Width="16" Height="16" />
-                        <TextBlock x:Name="SessionStatusText" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <Button x:Name="StartSessionButton" Click="StartSession_Click" IsEnabled="False">
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ProgressRing x:Name="SessionProgress" Width="20" Height="20" VerticalAlignment="Center" />
+                        <TextBlock x:Name="SessionStatusText" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SettingsRowDescriptionStyle}" />
+                        <Button x:Name="StartSessionButton" Grid.Column="2" VerticalAlignment="Center" Click="StartSession_Click" IsEnabled="False" Style="{StaticResource AccentButtonStyle}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <SymbolIcon Symbol="Play" />
                                 <TextBlock x:Uid="DebuggerStartSessionButton" Text="Start Session" />
                             </StackPanel>
                         </Button>
-                    </StackPanel>
+                    </Grid>
                 </StackPanel>
             </Border>
         </StackPanel>

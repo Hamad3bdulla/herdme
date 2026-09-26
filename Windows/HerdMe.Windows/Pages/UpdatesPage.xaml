@@ -6,20 +6,24 @@
     AutomationProperties.AutomationId="UpdatesPageRoot"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
-    <Grid>
-        <ScrollViewer>
-            <StackPanel Padding="{StaticResource PagePadding}" Spacing="20">
-                <Grid ColumnSpacing="12">
+    <Grid RowSpacing="8">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Style="{StaticResource PageContentStyle}">
+                <Grid Style="{StaticResource PageHeaderStyle}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel Spacing="4">
+                    <StackPanel Spacing="2">
                         <TextBlock x:Uid="UpdatesTitle" Text="Updates" Style="{StaticResource PageTitleStyle}" />
-                        <TextBlock x:Name="LastCheckedText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="LastCheckedText" Style="{StaticResource PageSubtitleStyle}" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Button x:Name="RefreshButton" Click="Refresh_Click">
+                            <Button.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="F5" />
+                            </Button.KeyboardAccelerators>
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <SymbolIcon Symbol="Refresh" />
                                 <TextBlock x:Uid="UpdatesRefreshButtonText" Text="Check" />
@@ -40,63 +44,67 @@
                     IsOpen="False"
                     Severity="Informational" />
 
-                <StackPanel Spacing="10">
-                    <TextBlock Text="HerdMe" Style="{StaticResource SectionTitleStyle}" />
-                    <Border
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="16">
-                        <Grid ColumnSpacing="16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Spacing="5">
-                                <TextBlock Text="HerdMe" FontWeight="SemiBold" />
-                                <TextBlock x:Name="ApplicationVersionText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock x:Name="ApplicationStatusText" TextWrapping="Wrap" />
-                            </StackPanel>
-                            <Button
-                                x:Name="DownloadApplicationButton"
-                                Grid.Column="1"
-                                Click="DownloadApplication_Click"
-                                VerticalAlignment="Center"
-                                Visibility="Collapsed"
-                                Style="{StaticResource AccentButtonStyle}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <SymbolIcon Symbol="Download" />
-                                    <TextBlock x:Uid="UpdatesDownloadButtonText" Text="Download" />
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-                    </Border>
-                </StackPanel>
-
-                <StackPanel Spacing="10">
-                    <TextBlock x:Uid="UpdatesComponentsTitle" Text="Components and services" Style="{StaticResource SectionTitleStyle}" />
-                    <ProgressBar x:Name="ComponentCheckProgress" IsIndeterminate="True" Visibility="Collapsed" />
-                    <StackPanel x:Name="ComponentRows" Spacing="8" />
-                    <Border
-                        x:Name="EmptyState"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="20">
-                        <StackPanel HorizontalAlignment="Center" Spacing="8">
-                            <SymbolIcon Symbol="Accept" />
-                            <TextBlock x:Uid="UpdatesNoComponents" Text="All installed components are up to date." TextAlignment="Center" />
+                <TextBlock Text="HerdMe" Style="{StaticResource SectionHeaderStyle}" />
+                <Border Style="{StaticResource SettingsGroupStyle}">
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Image Source="ms-appx:///Assets/HerdMe.png" Width="32" Height="32" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Name="ApplicationStatusText" FontWeight="SemiBold" Style="{StaticResource SettingsRowTitleStyle}" />
+                            <TextBlock x:Name="ApplicationVersionText" Style="{StaticResource SettingsRowDescriptionStyle}" />
                         </StackPanel>
-                    </Border>
-                </StackPanel>
+                        <Button
+                            x:Name="DownloadApplicationButton"
+                            Grid.Column="2"
+                            Click="DownloadApplication_Click"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed"
+                            Style="{StaticResource AccentButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <SymbolIcon Symbol="Download" />
+                                <TextBlock x:Uid="UpdatesDownloadButtonText" Text="Download" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <TextBlock x:Uid="UpdatesComponentsTitle" Text="Components and services" Style="{StaticResource SectionHeaderStyle}" />
+                <ProgressBar x:Name="ComponentCheckProgress" IsIndeterminate="True" Visibility="Collapsed" />
+                <StackPanel x:Name="ComponentRows" Spacing="4" />
+                <Border x:Name="EmptyState" Style="{StaticResource SettingsGroupStyle}">
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE930;" Style="{StaticResource StatusGlyphSuccessStyle}" VerticalAlignment="Center" />
+                        <TextBlock x:Uid="UpdatesNoComponents" Grid.Column="1" Text="All installed components are up to date." VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                    </Grid>
+                </Border>
+
+                <Grid>
+                    <TextBlock x:Uid="DownloadsTitle" Text="Downloads" VerticalAlignment="Center" Style="{StaticResource SectionHeaderStyle}" Margin="2,6,2,0" />
+                    <Button
+                        x:Uid="DownloadsClearButton"
+                        HorizontalAlignment="Right"
+                        AutomationProperties.Name="Clear completed history"
+                        Click="ClearDownloads_Click"
+                        Style="{StaticResource ToolbarIconButtonStyle}">
+                        <ToolTipService.ToolTip><ToolTip><TextBlock x:Uid="DownloadsClear" Text="Clear completed history" /></ToolTip></ToolTipService.ToolTip>
+                        <SymbolIcon Symbol="Clear" />
+                    </Button>
+                </Grid>
+                <StackPanel x:Name="DownloadRows" Spacing="4" />
             </StackPanel>
         </ScrollViewer>
 
-        <Grid x:Name="BusyOverlay" Background="{ThemeResource SolidBackgroundFillColorBase}" Opacity="0.92" Visibility="Collapsed">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-                <ProgressRing Width="36" Height="36" IsActive="True" />
+        <Grid x:Name="BusyOverlay" Visibility="Collapsed" Padding="28,12,28,0">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <ProgressRing Width="18" Height="18" IsActive="True" />
                 <TextBlock x:Name="BusyText" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="440" />
             </StackPanel>
         </Grid>

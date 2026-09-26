@@ -109,6 +109,7 @@ public sealed partial class GeneralPage : Page
             loadingStartup = false;
             var dialog = new ContentDialog
             {
+                FlowDirection = AppLocalization.LayoutDirection,
                 XamlRoot = XamlRoot,
                 Title = "HerdMe",
                 Content = error.Message,
@@ -627,6 +628,7 @@ public sealed partial class GeneralPage : Page
     {
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
             Title = title,
             Content = message,

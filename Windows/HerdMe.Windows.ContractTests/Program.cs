@@ -12,6 +12,23 @@ using static ContractChecks;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
 
+if (args.Length == 3 && args[0] == "--database-transfer-fixture")
+{
+    await File.WriteAllTextAsync(args[2], Environment.ProcessId.ToString());
+    Console.Write("verified SQL backup\n");
+    await Console.Out.FlushAsync();
+    if (args[1] == "failure")
+    {
+        Console.Error.WriteLine("fixture database export failed");
+        Environment.ExitCode = 42;
+    }
+    else if (args[1] == "delay")
+    {
+        await Task.Delay(TimeSpan.FromSeconds(30));
+    }
+    return;
+}
+
 var npmRunnerFixture = Environment.GetEnvironmentVariable("HERDME_NPM_RUNNER_FIXTURE");
 if (Environment.GetEnvironmentVariable("HERDME_CORE_CLIENT_FAILURE_FIXTURE") == "1")
 {
@@ -93,6 +110,9 @@ VerifyArtisanCommandContracts(repositoryRoot);
 await VerifyNpmScriptContractsAsync(repositoryRoot);
 await VerifySiteWorkflowArchiveContractsAsync();
 VerifyRuntimeCatalogContracts(repositoryRoot);
+await VerifyApplicationLifecycleContractsAsync();
+await VerifyCapturePresentationAsync();
+VerifyDumpParsing();
 
 var supportRoot = Path.Combine(
     Path.GetTempPath(),
@@ -106,17 +126,28 @@ try
         journal.ReadRecent().FirstOrDefault()?.Detail == "bounded-backend",
         "operation journal durably records backend transitions"
     );
+    await VerifyDiagnosticsContractsAsync(supportRoot);
+    await VerifyCaptureLifecycleContractsAsync(supportRoot);
+    await VerifyCapturePersistenceContractsAsync(supportRoot);
+    await VerifyCapturePreviewExportsAsync(supportRoot);
+    await VerifyManagerShutdownContractsAsync(supportRoot);
     await VerifyDownloadAndStorageContractsAsync(supportRoot);
+    await VerifyWorkflowImprovementsAsync(supportRoot);
     await VerifyPhpPromotionAsync(supportRoot);
 
     VerifySiteContracts(supportRoot);
+    await VerifyLogContractsAsync(supportRoot);
 
     await VerifyServiceContractsAsync(supportRoot);
 
     await VerifyToolAndUpdateContractsAsync(supportRoot);
+
+    await VerifyPerformanceContractsAsync(supportRoot);
 }
 finally
 {
+    // Pooled capture database connections keep files open on Windows.
+    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
     if (Directory.Exists(supportRoot)) Directory.Delete(supportRoot, true);
 }
 

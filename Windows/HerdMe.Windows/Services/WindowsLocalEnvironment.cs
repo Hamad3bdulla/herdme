@@ -23,12 +23,16 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
     private readonly NodeRuntimeInstaller nodeInstaller;
     private readonly SemaphoreSlim operationLock = new(1, 1);
     private readonly object healthMonitorLock = new();
+    private readonly object disposalSync = new();
     private volatile IReadOnlyList<PhpFastCgiProcess> phpProcessSnapshot = [];
     private volatile IReadOnlyList<SiteRecord> configuredSites = [];
     private string? activeConfigurationKey;
     private CancellationTokenSource? healthMonitorCancellation;
     private Task? healthMonitorTask;
     private int recoveryEnabled;
+    private int resumeRecoveryRequested;
+    private int disposalRequested;
+    private Task? disposalTask;
 
     public WindowsLocalEnvironment(
         CoreClient? coreClient = null,
@@ -62,6 +66,16 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
 
     public int? HttpsPort => httpsServer.Port;
 
+    public void RequestResumeRecovery()
+    {
+        // A listening socket/process can survive sleep without remaining usable.
+        // Let the existing monitor serialize and retry the restart, including
+        // when Windows sends more than one resume notification.
+        if (Volatile.Read(ref disposalRequested) == 0
+            && Volatile.Read(ref recoveryEnabled) == 1)
+            Interlocked.Exchange(ref resumeRecoveryRequested, 1);
+    }
+
     public SitePerformanceSnapshot Performance(string domain)
     {
         return MergePerformance(httpServer.Performance(domain), httpsServer.Performance(domain));
@@ -78,6 +92,8 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
+        ThrowIfDisposing();
+        cancellationToken.ThrowIfCancellationRequested();
         var settings = store.Load();
         if (!settings.StartAutomatically)
         {
@@ -135,6 +151,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
+        ThrowIfDisposing();
         var siteList = sites.ToArray();
         if (siteList.Length == 0)
         {
@@ -143,6 +160,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         await operationLock.WaitAsync(cancellationToken);
         try
         {
+            ThrowIfDisposing();
             var settings = runtimePolicy.Load();
             var configurationKey = ConfigurationKey(siteList, settings.PhpCycle);
             if (IsRunning
@@ -162,6 +180,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
                 cancellationToken
             );
             Volatile.Write(ref recoveryEnabled, 1);
+            Interlocked.Exchange(ref resumeRecoveryRequested, 0);
             EnsureHealthMonitorStarted();
             return httpPort;
         }
@@ -176,14 +195,17 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
+        ThrowIfDisposing();
         var siteList = sites.ToArray();
         await operationLock.WaitAsync(cancellationToken);
         try
         {
+            ThrowIfDisposing();
             if (siteList.Length == 0)
             {
                 Volatile.Write(ref recoveryEnabled, 0);
                 configuredSites = [];
+                Interlocked.Exchange(ref resumeRecoveryRequested, 0);
                 await StopCoreAsync();
                 return;
             }
@@ -200,6 +222,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
             var launches = await PreparePhpLaunchesAsync(siteList, settings, cancellationToken);
             await StopCoreAsync();
             await StartCoreAsync(siteList, settings, launches, cancellationToken);
+            Interlocked.Exchange(ref resumeRecoveryRequested, 0);
         }
         finally
         {
@@ -218,6 +241,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
             // recovery and created a new monitor while StopAsync was waiting.
             Volatile.Write(ref recoveryEnabled, 0);
             configuredSites = [];
+            Interlocked.Exchange(ref resumeRecoveryRequested, 0);
             await CancelHealthMonitorAsync();
             await StopCoreAsync();
         }
@@ -227,12 +251,25 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
+    {
+        lock (disposalSync)
+        {
+            Volatile.Write(ref disposalRequested, 1);
+            return new ValueTask(disposalTask ??= DisposeCoreAsync());
+        }
+    }
+
+    private async Task DisposeCoreAsync()
     {
         await StopAsync();
-        operationLock.Dispose();
+        // Pending UI continuations must still be able to acquire the gate,
+        // observe disposal, and release it without racing SemaphoreSlim.Dispose.
         GC.SuppressFinalize(this);
     }
+
+    private void ThrowIfDisposing() =>
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref disposalRequested) != 0, this);
 
     private async Task StopCoreAsync()
     {
@@ -454,7 +491,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
             {
                 if (Volatile.Read(ref recoveryEnabled) == 0
                     || configuredSites.Count == 0
-                    || IsRunning)
+                    || (IsRunning && Volatile.Read(ref resumeRecoveryRequested) == 0))
                 {
                     continue;
                 }
@@ -464,7 +501,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
                 {
                     if (Volatile.Read(ref recoveryEnabled) == 0
                         || configuredSites.Count == 0
-                        || IsRunning)
+                        || (IsRunning && Volatile.Read(ref resumeRecoveryRequested) == 0))
                     {
                         continue;
                     }
@@ -473,6 +510,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
                     var launches = await PreparePhpLaunchesAsync(sites, settings, cancellationToken);
                     await StopCoreAsync();
                     await StartCoreAsync(sites, settings, launches, cancellationToken);
+                    Interlocked.Exchange(ref resumeRecoveryRequested, 0);
                 }
                 catch (Exception error) when (error is not OperationCanceledException)
                 {

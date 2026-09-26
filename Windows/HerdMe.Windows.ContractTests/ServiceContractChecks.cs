@@ -13,8 +13,145 @@ using HerdMe.Windows.Services;
 
 internal static partial class ContractChecks
 {
+    private static async Task VerifySiteProcessLifecycleAsync(string supportRoot)
+    {
+        var project = Path.Combine(supportRoot, "site-process-lifecycle");
+        Directory.CreateDirectory(project);
+        await File.WriteAllTextAsync(Path.Combine(project, "artisan"), "fixture");
+        var executable = ContractExecutablePath();
+        var argumentsEnvironment = NpmFixtureEnvironment("arguments");
+        var delayEnvironment = NpmFixtureEnvironment("delay");
+        await using var manager = new SiteProcessManager();
+
+        Throws<ArgumentOutOfRangeException>(
+            () => manager.Start(project, SiteBackgroundProcessKind.Queue, executable,
+                argumentsEnvironment, new SiteQueueWorkerOptions(Tries: 0)),
+            "invalid worker options fail before publishing a running process"
+        );
+        Check(!manager.State(project, SiteBackgroundProcessKind.Queue).Running,
+            "rejected worker options cannot leave a phantom queue worker");
+        Throws<ArgumentOutOfRangeException>(
+            () => manager.Start(project, (SiteBackgroundProcessKind)99, executable,
+                argumentsEnvironment),
+            "unsupported background process kinds are rejected synchronously"
+        );
+
+        manager.Start(project, SiteBackgroundProcessKind.Queue, executable, argumentsEnvironment);
+        using (var completion = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+        {
+            while (manager.State(project, SiteBackgroundProcessKind.Queue).Running)
+            {
+                await Task.Delay(20, completion.Token);
+            }
+        }
+        var completed = manager.State(project, SiteBackgroundProcessKind.Queue);
+        var receivedArguments = JsonSerializer.Deserialize<string[]>(completed.Output) ?? [];
+        Check(completed.ExitCode == 0 && receivedArguments.Contains("queue:work"),
+            "a corrected worker starts successfully and retains all output before completion");
+
+        for (var attempt = 0; attempt < 8; attempt++)
+        {
+            manager.Start(project, SiteBackgroundProcessKind.Queue, executable, delayEnvironment);
+            var original = manager.State(project, SiteBackgroundProcessKind.Queue);
+            await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
+                manager.Start(project, SiteBackgroundProcessKind.Queue, executable, delayEnvironment))));
+            Check(manager.State(project, SiteBackgroundProcessKind.Queue) == original,
+                "duplicate concurrent starts preserve the active worker state");
+            await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
+                manager.StopAsync(project, SiteBackgroundProcessKind.Queue))))
+                .WaitAsync(TimeSpan.FromSeconds(10));
+            Check(!manager.State(project, SiteBackgroundProcessKind.Queue).Running,
+                "concurrent stops finish before an immediate worker restart");
+        }
+
+        manager.Start(project, SiteBackgroundProcessKind.Queue, executable, delayEnvironment);
+        manager.Start(project, SiteBackgroundProcessKind.Scheduler, executable, delayEnvironment);
+        await manager.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        Check(!manager.State(project, SiteBackgroundProcessKind.Queue).Running
+                && !manager.State(project, SiteBackgroundProcessKind.Scheduler).Running,
+            "disposing the manager waits for every managed worker to stop");
+        Throws<ObjectDisposedException>(
+            () => manager.Start(project, SiteBackgroundProcessKind.Queue, executable, delayEnvironment),
+            "disposed process managers cannot launch orphan workers"
+        );
+    }
+
+    private static async Task VerifyDatabaseTransferContractsAsync(string supportRoot)
+    {
+        var directory = Path.Combine(supportRoot, "database-transfer");
+        Directory.CreateDirectory(directory);
+        var destination = Path.Combine(directory, "backup.sql");
+        var marker = Path.Combine(directory, "process.txt");
+        const string original = "previous verified backup";
+        await File.WriteAllTextAsync(destination, original);
+
+        Task Transfer(string mode, CancellationToken cancellationToken = default) =>
+            SiteDatabaseProvisioner.RunFileTransferAsync(
+                ContractExecutablePath(),
+                ["--database-transfer-fixture", mode, marker],
+                new Dictionary<string, string?>(),
+                inputPath: null,
+                outputPath: destination,
+                progress: null,
+                normalizeSql: false,
+                mysql: false,
+                mergeExisting: false,
+                cancellationToken
+            );
+
+        await ThrowsAsync<InvalidOperationException>(
+            () => Transfer("failure").WaitAsync(TimeSpan.FromSeconds(10)),
+            "a failed database dump reports failure"
+        );
+        Check(await File.ReadAllTextAsync(destination) == original,
+            "a failed database dump preserves the previous backup");
+        File.Delete(marker);
+        using (var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+        {
+            var transfer = Transfer("delay", cancellation.Token);
+            while (!File.Exists(marker))
+            {
+                await Task.Delay(20, cancellation.Token);
+            }
+            cancellation.Cancel();
+            await ThrowsAsync<OperationCanceledException>(
+                () => transfer.WaitAsync(TimeSpan.FromSeconds(5)),
+                "cancelling a dump terminates the running client promptly"
+            );
+        }
+        Check(await File.ReadAllTextAsync(destination) == original,
+            "cancelling a dump preserves the previous backup");
+        Check(!Directory.EnumerateFiles(directory, "*.tmp").Any(),
+            "failed and cancelled dumps remove only their staged output");
+
+        await Transfer("success").WaitAsync(TimeSpan.FromSeconds(10));
+        Check(await File.ReadAllTextAsync(destination) == "verified SQL backup\n",
+            "a successful dump atomically replaces the previous backup");
+
+        File.Delete(destination);
+        Directory.CreateDirectory(destination);
+        var promotionFailed = false;
+        try { await Transfer("success").WaitAsync(TimeSpan.FromSeconds(10)); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            promotionFailed = true;
+        }
+        Check(promotionFailed, "a failed backup promotion reports the filesystem failure");
+        Check(Directory.Exists(destination)
+            && !Directory.EnumerateFiles(directory, "*.tmp").Any(),
+            "a failed backup promotion cleans up its temporary file");
+
+        destination = Path.Combine(marker, "backup.sql");
+        await ThrowsAsync<InvalidOperationException>(
+            () => Transfer("delay").WaitAsync(TimeSpan.FromSeconds(10)),
+            "an output-open failure terminates a client blocked on its output pipe"
+        );
+    }
+
     internal static async Task VerifyServiceContractsAsync(string supportRoot)
     {
+        await VerifySiteProcessLifecycleAsync(supportRoot);
+        await VerifyDatabaseTransferContractsAsync(supportRoot);
         var favoriteStore = new SiteCommandFavoritesStore(
             Path.Combine(supportRoot, "command-favorites")
         );
@@ -126,6 +263,34 @@ internal static partial class ContractChecks
                 && compatibleSql.Contains("SELECT 'utf8mb4_0900_ai_ci'", StringComparison.Ordinal),
             "database imports repair unsupported MySQL collations without changing data values"
         );
+        const string literalSql = "INSERT INTO notes VALUES ('COLLATE=utf8mb4_0900_ai_ci', "
+            + "'it''s COLLATE utf8mb4_uca1400_ai_ci');\n"
+            + "-- COLLATE=utf8mb4_0900_ai_ci\n"
+            + "/* COLLATE=utf8mb4_0900_ai_ci */\n";
+        var literalFixes = 0;
+        Check(SiteDatabaseProvisioner.NormalizeMySql(literalSql, ref literalFixes) == literalSql
+            && literalFixes == 0,
+            "collation compatibility never rewrites quoted data or SQL comments");
+        var streamingSql = literalSql + "CREATE TABLE demo (id int) COLLATE=utf8mb4_0900_ai_ci;"
+            + " DROP TABLE obsolete; INSERT INTO demo VALUES (1);\n"
+            + new string(' ', 300);
+        var streamFixes = 0;
+        var expectedStream = SiteDatabaseProvisioner.NormalizeMySql(
+            streamingSql, ref streamFixes, mergeExisting: true
+        );
+        for (var split = 1; split < streamingSql.Length; split++)
+        {
+            var streamNormalizer = new SiteDatabaseProvisioner.MySqlStreamNormalizer(true);
+            var actual = streamNormalizer.RewriteChunk(streamingSql[..split])
+                + streamNormalizer.RewriteChunk(streamingSql[split..])
+                + streamNormalizer.RewriteChunk(string.Empty, final: true);
+            Check(actual == expectedStream && streamNormalizer.Fixes == streamFixes,
+                "SQL import rewriting is independent of the stream chunk boundary");
+        }
+        Check(!expectedStream.Contains("DROP TABLE obsolete", StringComparison.Ordinal)
+            && expectedStream.Contains("INSERT IGNORE INTO demo", StringComparison.Ordinal),
+            "merge import recognizes multiple statements on a single line");
+
         var mergeNormalizer = new SiteDatabaseProvisioner.MySqlStreamNormalizer(
             mergeExisting: true
         );
@@ -154,6 +319,83 @@ internal static partial class ContractChecks
                 && !mergedSql.Contains("ALTER TABLE `absences`", StringComparison.Ordinal)
                 && mergedSql.Contains("SELECT 'DROP TABLE existing text'", StringComparison.Ordinal),
             "existing MySQL imports preserve tables and merge only rows with missing keys"
+        );
+        var binaryPayload = Enumerable.Range(0x80, 0x80).Select(value => (byte)value)
+            .Concat(new byte[] { 0xC3, 0x28, 0xFF, 0xFE, 0x00, 0x27 }).ToArray();
+        var binarySql = Encoding.Latin1.GetString(
+            Encoding.ASCII.GetBytes("INSERT INTO `blobs` VALUES ('")
+                .Concat(binaryPayload.Where(value => value != 0x27))
+                .Concat(Encoding.ASCII.GetBytes("');\n"))
+                .ToArray()
+        );
+        var binaryFixes = 0;
+        var binaryBytes = Encoding.Latin1.GetBytes(
+            SiteDatabaseProvisioner.NormalizeMySql(binarySql, ref binaryFixes, mergeExisting: true)
+        );
+        var expectedBinary = binaryPayload.Where(value => value != 0x27).ToArray();
+        Check(
+            ((ReadOnlySpan<byte>)binaryBytes).IndexOf((ReadOnlySpan<byte>)expectedBinary) >= 0 && binaryFixes == 1,
+            "SQL import rewriting preserves binary and invalid UTF-8 bytes exactly"
+        );
+        var preambleDirectory = Path.Combine(supportRoot, "sql-preamble");
+        Directory.CreateDirectory(preambleDirectory);
+        var utf8Preamble = Path.Combine(preambleDirectory, "bom.sql");
+        await File.WriteAllBytesAsync(utf8Preamble, [0xEF, 0xBB, 0xBF, (byte)'S']);
+        var utf16Preamble = Path.Combine(preambleDirectory, "utf16.sql");
+        await File.WriteAllBytesAsync(utf16Preamble, [0xFF, 0xFE, (byte)'S', 0x00]);
+        var plainSql = Path.Combine(preambleDirectory, "plain.sql");
+        await File.WriteAllBytesAsync(plainSql, [0xFF]);
+        Check(
+            SiteDatabaseProvisioner.DetectSqlTextPreamble(utf8Preamble)
+                == SiteDatabaseProvisioner.SqlTextPreamble.Utf8
+                && SiteDatabaseProvisioner.DetectSqlTextPreamble(utf16Preamble)
+                == SiteDatabaseProvisioner.SqlTextPreamble.Utf16LittleEndian
+                && SiteDatabaseProvisioner.DetectSqlTextPreamble(plainSql)
+                == SiteDatabaseProvisioner.SqlTextPreamble.None,
+            "SQL imports only transcode files with a UTF-16 byte order mark"
+        );
+        var stagedData = Path.Combine(supportRoot, "staged-service", "data");
+        Directory.CreateDirectory(stagedData);
+        await ThrowsAsync<InvalidOperationException>(
+            () => WindowsServiceManager.InitializeStagedAsync(stagedData, target =>
+            {
+                Directory.CreateDirectory(Path.Combine(target, "mysql"));
+                throw new InvalidOperationException("initializer failed");
+            }),
+            "a failed database initializer reports its failure"
+        );
+        Check(
+            Directory.Exists(stagedData)
+                && !Directory.EnumerateFileSystemEntries(stagedData).Any()
+                && !Directory.Exists(stagedData + ".staging"),
+            "a failed database initializer never leaves a data directory that looks ready"
+        );
+        await WindowsServiceManager.InitializeStagedAsync(stagedData, target =>
+        {
+            Directory.CreateDirectory(Path.Combine(target, "mysql"));
+            File.WriteAllText(Path.Combine(target, "my.ini"), "[mysqld]\ndatadir=" + target.Replace('\\', '/') + "\n");
+            return Task.CompletedTask;
+        });
+        Check(
+            Directory.Exists(Path.Combine(stagedData, "mysql"))
+                && !Directory.Exists(stagedData + ".staging")
+                && !File.ReadAllText(Path.Combine(stagedData, "my.ini")).Contains(".staging", StringComparison.Ordinal),
+            "a successful database initializer is moved into place atomically"
+        );
+        var mongoShutdown = ManagedServiceShutdown.MongoShutdownMessage(7);
+        Check(
+            mongoShutdown.Length == 55
+                && BinaryPrimitives.ReadInt32LittleEndian(mongoShutdown) == 55
+                && BinaryPrimitives.ReadInt32LittleEndian(mongoShutdown.AsSpan(12)) == 2013
+                && BinaryPrimitives.ReadInt32LittleEndian(mongoShutdown.AsSpan(21)) == 34,
+            "MongoDB clean shutdown uses a well-formed OP_MSG command"
+        );
+        Check(
+            ManagedServiceShutdown.SupportsGracefulStop("mysql")
+                && ManagedServiceShutdown.SupportsGracefulStop("postgresql")
+                && ManagedServiceShutdown.SupportsGracefulStop("redis")
+                && !ManagedServiceShutdown.SupportsGracefulStop("minio"),
+            "databases are asked to stop cleanly before HerdMe terminates them"
         );
         var databaseProgress = new DatabaseTransferProgress(
             512,
@@ -660,6 +902,56 @@ internal static partial class ContractChecks
             !operationManager.IsInstalling("mysql") && operationChanges >= 2,
             "service installation publishes its completed state to a returning page"
         );
+        Check(operationManager.InstallationStates.Single().Stage == ServiceInstallationStage.Completed,
+            "service installation retains its completed progress for returning pages");
+
+        var attempts = 0;
+        var retryRelease = await firstInstall;
+        await using var cancellingManager = new WindowsServiceManager(
+            Path.Combine(supportRoot, "cancel-service-install"),
+            installPackage: async (_, token) =>
+            {
+                var attempt = Interlocked.Increment(ref attempts);
+                if (attempt == 1) await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                if (attempt == 2) throw new IOException("fixture download failure");
+                return retryRelease;
+            });
+        using var waiterCancellation = new CancellationTokenSource();
+        var sharedInstall = cancellingManager.InstallAsync("mysql");
+        var cancelledWaiter = cancellingManager.InstallAsync("MYSQL", waiterCancellation.Token);
+        waiterCancellation.Cancel();
+        try { await cancelledWaiter; Check(false, "a cancelled page wait completes promptly"); }
+        catch (OperationCanceledException) { }
+        Check(cancellingManager.IsInstalling("mysql") && !sharedInstall.IsCompleted && attempts == 1,
+            "leaving a page cancels only its wait and preserves the shared installation");
+        cancellingManager.CancelInstallation("MYSQL");
+        try { await sharedInstall; Check(false, "explicit download cancellation reaches the installer"); }
+        catch (OperationCanceledException) { }
+        Check(!cancellingManager.IsInstalling("mysql")
+            && cancellingManager.InstallationStates.Single().Stage == ServiceInstallationStage.Cancelled,
+            "explicit cancellation clears the active installation and retains its cancelled state");
+        try { await cancellingManager.InstallAsync("mysql"); Check(false, "fixture retry fails"); }
+        catch (IOException) { }
+        Check(cancellingManager.InstallationStates.Single() is
+        { Stage: ServiceInstallationStage.Failed, Error: "fixture download failure" },
+            "failed installation exposes its error for retry");
+        Check(await cancellingManager.InstallAsync("mysql") == retryRelease && attempts == 3
+            && cancellingManager.InstallationStates.Single().Stage == ServiceInstallationStage.Completed,
+            "cancelled and failed installations can be retried without a stale shared task");
+
+        var promotionRoot = Path.Combine(supportRoot, "service-promotion");
+        var previousRuntime = Path.Combine(promotionRoot, "mysql");
+        var backupRuntime = Path.Combine(promotionRoot, "backup");
+        Directory.CreateDirectory(previousRuntime);
+        await File.WriteAllTextAsync(Path.Combine(previousRuntime, "server.exe"), "previous runtime");
+        try
+        {
+            ServicePackageInstaller.PromoteRuntime(Path.Combine(promotionRoot, "missing-stage"), previousRuntime, backupRuntime);
+            Check(false, "missing staged runtime fails promotion");
+        }
+        catch (IOException) { }
+        Check(await File.ReadAllTextAsync(Path.Combine(previousRuntime, "server.exe")) == "previous runtime"
+            && !Directory.Exists(backupRuntime), "failed service promotion restores the previous runtime");
         var editorProject = Path.Combine(supportRoot, "environment-editor-project");
         Directory.CreateDirectory(editorProject);
         await File.WriteAllTextAsync(
@@ -1285,6 +1577,17 @@ internal static partial class ContractChecks
         Check(hostsWithoutSites.Contains("10.0.0.5 intranet.test"), "hosts cleanup preserves unrelated mappings");
         Check(WindowsHostsManager.ContainsManagedBlock(hosts), "managed hosts blocks are detected");
         Check(!WindowsHostsManager.ContainsManagedBlock(hostsWithoutSites), "removed hosts blocks are not reported");
+        var hostsReplacement = WindowsHostsManager.HostsReplacementPath(
+            Path.Combine(Path.GetTempPath(), "etc", "hosts")
+        );
+        Check(
+            string.Equals(
+                Path.GetDirectoryName(hostsReplacement),
+                Path.Combine(Path.GetTempPath(), "etc"),
+                StringComparison.OrdinalIgnoreCase
+            ) && !hostsReplacement.EndsWith(Path.DirectorySeparatorChar + "hosts", StringComparison.Ordinal),
+            "hosts updates are staged beside the hosts file so the replace is atomic"
+        );
         Check(
             WindowsHostsManager.IsAllowedHostsUpdate(originalHosts, hosts),
             "the elevated hosts helper accepts a render that changes only HerdMe's block"

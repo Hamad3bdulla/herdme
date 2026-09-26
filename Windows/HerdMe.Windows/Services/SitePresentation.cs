@@ -240,4 +240,11 @@ public static class SitePresentation
             scale
         });
     }
+
+    public static double DesktopPreviewDisplayHeight(double previewWidth)
+    {
+        return double.IsFinite(previewWidth) && previewWidth > 0
+            ? Math.Clamp(previewWidth * DesktopPreviewHeight / DesktopPreviewWidth, 220, 420)
+            : 280;
+    }
 }

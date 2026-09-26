@@ -114,14 +114,14 @@ struct SiteDatabaseManager: @unchecked Sendable {
         cancellation: SiteOperationCancellation
     ) async throws -> URL {
         let manager = self
-        return try await Task.detached(priority: .userInitiated) {
+        let operation = Task.detached(priority: .userInitiated) {
             let directory = manager.rootURL.appendingPathComponent("Backups/Databases", isDirectory: true)
             try manager.fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.dateFormat = "yyyyMMdd-HHmmss"
             let target = directory.appendingPathComponent(
-                "\(SiteProject.dnsLabel(for: site.name))-\(formatter.string(from: Date())).sql"
+                "\(SiteProject.dnsLabel(for: site.name))-\(formatter.string(from: Date()))-\(UUID().uuidString).sql"
             )
             let executable: URL
             let arguments: [String]
@@ -129,8 +129,9 @@ struct SiteDatabaseManager: @unchecked Sendable {
             switch provisioning.service.definitionID {
             case "mysql", "mariadb":
                 let names = provisioning.service.definitionID == "mariadb" ? ["mariadb-dump", "mysqldump"] : ["mysqldump"]
-                guard let dump = names.map({ client.deletingLastPathComponent().appendingPathComponent($0) })
-                    .first(where: { manager.fileManager.isExecutableFile(atPath: $0.path) })
+                guard
+                    let dump = names.map({ client.deletingLastPathComponent().appendingPathComponent($0) })
+                        .first(where: { manager.fileManager.isExecutableFile(atPath: $0.path) })
                 else { throw SiteDatabaseError.clientMissing }
                 executable = dump
                 arguments = [
@@ -152,20 +153,20 @@ struct SiteDatabaseManager: @unchecked Sendable {
             default:
                 throw SiteDatabaseError.unsupported
             }
-            do {
-                try manager.export(
-                    executable: executable,
-                    arguments: arguments,
-                    environment: environment,
-                    target: target,
-                    cancellation: cancellation
-                )
-                return target
-            } catch {
-                try? manager.fileManager.removeItem(at: target)
-                throw error
-            }
-        }.value
+            try manager.export(
+                executable: executable,
+                arguments: arguments,
+                environment: environment,
+                target: target,
+                cancellation: cancellation
+            )
+            return target
+        }
+        return try await withTaskCancellationHandler {
+            try await operation.value
+        } onCancel: {
+            cancellation.cancel()
+        }
     }
 
     func connectionURL(
@@ -305,34 +306,34 @@ struct SiteDatabaseManager: @unchecked Sendable {
         return "herdme_" + label.prefix(48)
     }
 
-    private func export(
+    func export(
         executable: URL,
         arguments: [String],
         environment: [String: String],
         target: URL,
         cancellation: SiteOperationCancellation
     ) throws {
-        _ = fileManager.createFile(atPath: target.path, contents: nil)
-        let output = try FileHandle(forWritingTo: target)
+        guard !cancellation.isCancelled else { throw CancellationError() }
+        let staged = target.deletingLastPathComponent().appendingPathComponent(".\(UUID().uuidString).sql.tmp")
+        guard fileManager.createFile(atPath: staged.path, contents: nil, attributes: [.posixPermissions: 0o600]) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        defer { try? fileManager.removeItem(at: staged) }
+        let output = try FileHandle(forWritingTo: staged)
         defer { try? output.close() }
-        let process = Process()
-        let errorPipe = Pipe()
-        process.executableURL = executable
-        process.arguments = arguments
-        process.environment = environment
-        process.standardOutput = output
-        process.standardError = errorPipe
-        try process.run()
-        while process.isRunning {
-            if cancellation.isCancelled || Task.isCancelled {
-                process.terminate()
-                throw CancellationError()
-            }
-            Thread.sleep(forTimeInterval: 0.05)
+        let result = try ProcessRunner.run(
+            executable,
+            arguments: arguments,
+            environment: environment,
+            standardOutputFile: output,
+            cancellationRequested: { cancellation.isCancelled }
+        )
+        guard result.status == 0 else {
+            throw SiteDatabaseError.commandFailed(result.output.trimmingCharacters(in: .whitespacesAndNewlines))
         }
-        let errorOutput = String(decoding: errorPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        guard process.terminationStatus == 0 else {
-            throw SiteDatabaseError.commandFailed(errorOutput.trimmingCharacters(in: .whitespacesAndNewlines))
-        }
+        guard !cancellation.isCancelled else { throw CancellationError() }
+        try output.synchronize()
+        try output.close()
+        try fileManager.moveItem(at: staged, to: target)
     }
 }

@@ -26,9 +26,25 @@ public sealed class CoreClient
         return Deserialize<DoctorResponse>(await RunAsync(["doctor"], cancellationToken));
     }
 
-    public async Task<PhpExtensionReport> ValidatePhpAsync(
+    public Task<PhpExtensionReport> ValidatePhpAsync(
         string phpExecutable,
         CancellationToken cancellationToken = default
+    )
+    {
+        // php -m plus the core report take about a second per runtime; reuse the result while
+        // php.exe, php.ini, the ext folder and the core executable are unchanged.
+        return PhpModuleProbeCache.GetOrProbeAsync(
+            phpExecutable,
+            "core-extensions:" + ExecutablePath,
+            [ExecutablePath],
+            token => ValidatePhpUncachedAsync(phpExecutable, token),
+            cancellationToken
+        );
+    }
+
+    private async Task<PhpExtensionReport> ValidatePhpUncachedAsync(
+        string phpExecutable,
+        CancellationToken cancellationToken
     )
     {
         var modules = await RunExecutableAsync(

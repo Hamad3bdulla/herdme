@@ -92,6 +92,7 @@ public sealed partial class NodePage : Page
         if (version is null) return;
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
             Title = AppLocalization.Format("NodeDeleteVersionTitle", version),
             Content = AppLocalization.Get("NodeDeleteVersionMessage"),
@@ -189,6 +190,7 @@ public sealed partial class NodePage : Page
     {
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
             Title = "HerdMe",
             Content = message,

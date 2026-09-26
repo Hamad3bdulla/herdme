@@ -5,6 +5,126 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.23] - 2026-09-26
+
+### Changed
+
+- Refresh the Windows navigation, dashboard, settings, and tool pages with a
+  consistent layout and controls that remain visible across window sizes.
+- Reduce repeated work in site, service, and runtime views so the interface
+  remains responsive during background checks and operations.
+- Keep Windows HTTP/1.1 connections alive for PHP responses without a
+  Content-Length (typical for Laravel) by framing them with chunked encoding,
+  avoiding a new TCP/TLS handshake for every page, XHR, and Livewire request.
+- Enable TCP_NODELAY on Windows FastCGI connections and coalesce the begin,
+  parameter, and stdin records into buffered writes to avoid Nagle stalls.
+- Send ETag and Last-Modified for Windows static files and answer conditional
+  requests (If-None-Match, If-Modified-Since, If-Range) with 304 or a full body.
+- Validate each PHP runtime's extensions once per Windows dashboard refresh,
+  reuse healthy site endpoint probes for 60 seconds (Refresh bypasses the cache),
+  limit concurrent probes, and move certificate and settings reads off hot paths.
+
+### Fixed
+
+- Apply the 5-second Windows request timeout only to headers and idle
+  connections; request bodies now use a 30-second inactivity timeout so slow or
+  large uploads are no longer cancelled.
+
+## [0.1.22] - 2026-09-25
+
+### Fixed
+
+- Windows Setup requests graceful shutdown before updating and terminates remaining
+  HerdMe processes and their descendants. Scope cleanup to this user session and
+  the installation/managed runtime directories; preserve unrelated programs.
+- Remove the early running-app mutex blocker so older tray-only versions can update.
+
+## [0.1.21] - 2026-09-25
+
+### Fixed
+
+- Restart the Windows site environment after Windows resumes from sleep, even
+  when PHP processes and listener handles still appear to be running. Coalesce
+  resume notifications, serialize recovery, and preserve manually stopped sites.
+- Refresh the dashboard when the site environment changes state so a recovered
+  environment no longer remains displayed as "0 of 6 running" or "Recovering".
+
+## [0.1.20] - 2026-09-23
+
+### Fixed
+
+- Bound Windows VarDumper parsing depth, node counts, string sizes, and numeric
+  tokens; reject malformed lengths without overflowing and retain rejected payloads.
+- Keep Windows mail HTML previews below WebView2's navigation size limit and
+  preserve Unicode characters at preview boundaries.
+- Acknowledge Windows SMTP messages only after they are stored, report temporary
+  storage failures to senders, and keep capture workers usable after a failed save
+  or a failing event subscriber. Prevent queued captures from undoing clear/delete.
+- Serialize Windows mail and VarDumper start/stop operations, recover immediately
+  after port conflicts, and close accepted connections when shutting down.
+- Cancel and drain Windows background startup before disposing application
+  services; ignore late activation requests and navigation during shutdown.
+  Drain pending service installations and reject delayed runtime restarts.
+- Ignore stale mail and VarDumper events after navigation, avoid duplicate
+  captures on reload, and keep replaced mail previews from showing old errors.
+- Keep Windows log content tied to the selected file and source, cancel reads
+  when leaving the page, and avoid queuing automatic refreshes behind slow I/O.
+  Read bounded tails without blocking log rotation or breaking Arabic text,
+  UTF-8 boundaries, or BOM-marked Windows Unicode logs.
+- Validate Windows queue options before reporting a worker as running, retain
+  completed process output, and synchronize concurrent starts, stops, and disposal.
+- Recover Windows operation history after torn writes, retain recent rotated
+  records, and keep locked diagnostic files from failing backend operations.
+- Preserve cancellation and distinguish timeouts while waiting for the Windows
+  hosts helper without forcibly terminating it during a hosts-file write.
+
+### Changed
+
+- Show bounded Windows mail and dump previews with a localized size notice.
+  Export full captured messages as EML and dumps as JSON through the save picker;
+  preserve existing exports if writing or replacement fails.
+- Load and delete Windows mail and VarDumper captures in the background, coalesce
+  capture bursts, and reconcile retained rows without resetting the selection or
+  preview. Add loading, empty, refresh, and recoverable error states in both languages.
+- Search Windows logs in the background with a short typing delay. Show loading,
+  empty-directory, and truncated-tail states in English and Arabic.
+
+## [0.1.19] - 2026-09-08
+
+### Fixed
+
+- Update the Windows SQLite native bundle to 2.1.13 to address
+  GHSA-2m69-gcr7-jv3q, and audit transitive NuGet dependencies during restore.
+- Preserve existing SQL backups when exports fail, are cancelled, or cannot be
+  committed; terminate database clients promptly when an output stream fails.
+- Preserve quoted SQL values and comments during MySQL collation repair, and
+  handle import tokens split across input buffers and same-line merge commands.
+- Recover safely from non-object settings JSON and null required settings,
+  retaining the original file for recovery instead of crashing during startup.
+- Keep native acceptance from terminating an active development session or
+  replacing an existing install/startup registration. Onboarding acceptance no
+  longer applies the user's reinstall marker.
+- Run the Windows socket load probe without worker-thread PowerShell runspaces.
+- Require an empty, regular extraction directory for managed ZIP packages and
+  reject directory links before writing package contents.
+- Drain macOS database export diagnostics while the client runs, stop cancelled
+  exports, and promote private staging files only after a successful export.
+  Use unique backup names and preserve existing files if a destination exists.
+- Prepare generated source output before WinUI's early compilation pass so
+  CodeQL can analyze the Windows application with source generators enabled.
+- Align Swift and portable C++ source formatting with the hosted release gate.
+
+### Changed
+
+- Give Windows site previews a responsive height, distinguish terminal and
+  database actions, tighten site navigation, and wrap long runtime descriptions.
+- Capture Windows onboarding and navigation screenshots during hosted acceptance.
+- Show Windows service download stages, transfer totals and speed, and retry
+  attempts. Keep progress visible after navigation, allow cancellation and
+  retry, and adapt the service form to compact windows.
+- Preserve the previous service runtime if replacement fails and remove
+  incomplete downloads after cancellation or failed verification.
+
 ## [0.1.18] - 2026-09-07
 
 ### Added

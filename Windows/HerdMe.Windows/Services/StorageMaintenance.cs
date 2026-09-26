@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Text;
+using System.Threading.Channels;
 
 namespace HerdMe.Windows.Services;
 
@@ -109,6 +111,126 @@ internal static class BoundedLog
             if (File.Exists(source)) File.Move(source, path + "." + (index + 1), true);
         }
         File.Move(path, path + ".1", true);
+    }
+}
+
+/// <summary>
+/// Moves log writes off request and process-output threads. Text is queued per log file and a
+/// single background writer appends it through <see cref="BoundedLog"/>, so rotation is unchanged.
+/// FlushAsync drains a file (or every file) and is called when the owning server stops; a
+/// process-exit hook drains whatever is still queued.
+/// </summary>
+internal static class QueuedLog
+{
+    internal const int QueueCapacity = 4_096;
+    private static readonly ConcurrentDictionary<string, Writer> Writers =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static int processExitHooked;
+
+    internal static void Append(string path, string text)
+    {
+        if (text.Length == 0) return;
+        HookProcessExit();
+        var key = Path.GetFullPath(path);
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var writer = Writers.GetOrAdd(key, static target => new Writer(target));
+            if (writer.TryWrite(text)) return;
+            if (!writer.IsCompleted) break;
+            // The writer is being flushed; drop it so the next attempt starts a fresh one.
+            Writers.TryRemove(new KeyValuePair<string, Writer>(key, writer));
+        }
+        // The queue is full or unavailable: write directly instead of losing the text.
+        BoundedLog.AppendText(key, text);
+    }
+
+    internal static void AppendLine(string path, string line) =>
+        Append(path, line.TrimEnd('\r', '\n') + Environment.NewLine);
+
+    internal static Task FlushAsync(string path)
+    {
+        var key = Path.GetFullPath(path);
+        return Writers.TryRemove(key, out var writer) ? writer.CompleteAsync() : Task.CompletedTask;
+    }
+
+    internal static Task FlushAllAsync()
+    {
+        var pending = new List<Task>();
+        foreach (var key in Writers.Keys)
+        {
+            if (Writers.TryRemove(key, out var writer)) pending.Add(writer.CompleteAsync());
+        }
+        return Task.WhenAll(pending);
+    }
+
+    private static void HookProcessExit()
+    {
+        if (Interlocked.Exchange(ref processExitHooked, 1) != 0) return;
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            try
+            {
+                FlushAllAsync().Wait(TimeSpan.FromSeconds(2));
+            }
+            catch (AggregateException)
+            {
+            }
+        };
+    }
+
+    private sealed class Writer
+    {
+        private readonly string path;
+        private readonly Channel<string> queue = Channel.CreateBounded<string>(
+            new BoundedChannelOptions(QueueCapacity)
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.Wait
+            }
+        );
+        private readonly Task drain;
+        private int completed;
+
+        public Writer(string path)
+        {
+            this.path = path;
+            drain = Task.Run(DrainAsync);
+        }
+
+        public bool IsCompleted => Volatile.Read(ref completed) != 0;
+
+        // FullMode.Wait makes TryWrite return false when full instead of dropping text.
+        public bool TryWrite(string text) => queue.Writer.TryWrite(text);
+
+        public Task CompleteAsync()
+        {
+            Volatile.Write(ref completed, 1);
+            queue.Writer.TryComplete();
+            return drain;
+        }
+
+        private async Task DrainAsync()
+        {
+            var batch = new StringBuilder();
+            while (await queue.Reader.WaitToReadAsync().ConfigureAwait(false))
+            {
+                batch.Clear();
+                while (batch.Length < 256 * 1_024 && queue.Reader.TryRead(out var text))
+                {
+                    batch.Append(text);
+                }
+                if (batch.Length == 0) continue;
+                try
+                {
+                    BoundedLog.AppendText(path, batch.ToString());
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                {
+                    // Logging is best effort; keep draining so the queue cannot fill up.
+                }
+            }
+        }
     }
 }
 

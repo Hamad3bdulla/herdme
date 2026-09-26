@@ -31,7 +31,7 @@ public sealed class NodeRuntimeInstaller
         try
         {
             return File.Exists(SettingsPath)
-                ? JsonSerializer.Deserialize<NodeRuntimeSettings>(File.ReadAllText(SettingsPath)) ?? new()
+                ? JsonSerializer.Deserialize<NodeRuntimeSettings>(SettingsFileCache.ReadAllText(SettingsPath)) ?? new()
                 : new();
         }
         catch (JsonException)
@@ -55,6 +55,7 @@ public sealed class NodeRuntimeInstaller
             JsonSerializer.Serialize(new NodeRuntimeSettings { ActiveVersion = version }, JsonOptions)
         );
         File.Move(temporary, SettingsPath, true);
+        SettingsFileCache.Invalidate(SettingsPath);
         EnsureCommandShims(version);
     }
 
@@ -187,11 +188,17 @@ public sealed class NodeRuntimeInstaller
         return result;
     }
 
-    public async Task<NodeWindowsRelease> InstallAsync(
+    public Task<NodeWindowsRelease> InstallAsync(string major, CancellationToken cancellationToken = default)
+        => RuntimeOperations.Shared.RunAsync("node:" + major, "Node.js " + major,
+            (token, progress) => InstallCoreAsync(major, token, progress), cancellationToken);
+
+    private async Task<NodeWindowsRelease> InstallCoreAsync(
         string major,
-        CancellationToken cancellationToken = default
+        CancellationToken cancellationToken,
+        IProgress<ServiceInstallationProgress> progress
     )
     {
+        InstallationPreflight.EnsureStorage(RuntimeRoot);
         var release = await ResolveReleaseAsync(major, cancellationToken);
         var cache = Path.Combine(SupportRoot, "Cache", "node");
         Directory.CreateDirectory(cache);
@@ -201,7 +208,10 @@ public sealed class NodeRuntimeInstaller
         var destination = Path.Combine(RuntimeRoot, release.Version);
         try
         {
-            await DownloadAndVerifyAsync(release, archive, cancellationToken);
+            await ServicePackageInstaller.DownloadAndVerifyAsync(new ServicePackageRelease(
+                "node:" + major, release.Version, "node.zip", ServicePackageChecksumAlgorithm.Sha256,
+                release.Sha256, release.DownloadUri, true), archive, cancellationToken, progress: progress);
+            progress.Report(new("node:" + major, ServiceInstallationStage.Extracting));
             await SafeZipExtractor.ExtractAsync(archive, staging, cancellationToken);
             var extracted = Directory.EnumerateDirectories(staging).SingleOrDefault()
                 ?? throw new InvalidDataException("The Node.js archive layout was invalid.");
@@ -209,8 +219,9 @@ public sealed class NodeRuntimeInstaller
             {
                 throw new InvalidDataException("The Node.js archive did not contain node.exe.");
             }
-            if (Directory.Exists(destination)) Directory.Delete(destination, true);
-            Directory.Move(extracted, destination);
+            cancellationToken.ThrowIfCancellationRequested();
+            ServicePackageInstaller.PromoteRuntime(extracted, destination,
+                Path.Combine(RuntimeRoot, $".backup-{Guid.NewGuid():N}"));
             SetActive(release.Version);
             return release;
         }
@@ -245,6 +256,7 @@ public sealed class NodeRuntimeInstaller
             SettingsPath,
             JsonSerializer.Serialize(new NodeRuntimeSettings { ActiveVersion = fallback ?? string.Empty }, JsonOptions)
         );
+        SettingsFileCache.Invalidate(SettingsPath);
         if (fallback is not null) EnsureCommandShims(fallback);
         else RemoveCommandShims();
     }
