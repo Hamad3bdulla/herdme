@@ -148,6 +148,8 @@ public static class SiteDatabaseProvisioner
                 "--single-transaction",
                 "--routines",
                 "--events",
+                // Binary columns (UUIDs, BLOBs) must survive a text round trip byte for byte.
+                "--hex-blob",
                 provisioning.DatabaseName
             ];
         }
@@ -845,19 +847,28 @@ public static class SiteDatabaseProvisioner
             Report(0, force: true);
             if (normalizeSql)
             {
+                // UTF-16 exports are transcoded to UTF-8. Everything else is passed through
+                // Latin-1, which maps every byte to exactly one char and back, so binary
+                // string literals and invalid UTF-8 reach the client unchanged. The
+                // normalizer only matches ASCII tokens, which never collide with the
+                // high bytes of UTF-8 sequences.
+                var textPreamble = DetectSqlTextPreamble(path);
+                var utf16 = textPreamble is SqlTextPreamble.Utf16LittleEndian
+                    or SqlTextPreamble.Utf16BigEndian;
                 using var reader = new StreamReader(
                     sqlSource,
-                    new UTF8Encoding(false, false),
-                    detectEncodingFromByteOrderMarks: true,
+                    utf16 ? new UTF8Encoding(false, false) : Encoding.Latin1,
+                    detectEncodingFromByteOrderMarks: utf16,
                     bufferSize: 64 * 1_024,
                     leaveOpen: true
                 );
                 await using var writer = new StreamWriter(
                     process.StandardInput.BaseStream,
-                    new UTF8Encoding(false),
+                    utf16 ? new UTF8Encoding(false) : Encoding.Latin1,
                     bufferSize: 64 * 1_024,
                     leaveOpen: true
                 );
+                var skipPreamble = textPreamble == SqlTextPreamble.Utf8 ? 3 : 0;
                 var buffer = new char[64 * 1_024];
                 var mysqlNormalizer = mysql
                     ? new MySqlStreamNormalizer(mergeExisting)
@@ -866,11 +877,20 @@ public static class SiteDatabaseProvisioner
                 {
                     var count = await reader.ReadAsync(buffer.AsMemory(), cancellationToken);
                     if (count == 0) break;
-                    for (var index = 0; index < count; index++)
+                    var start = 0;
+                    while (skipPreamble > 0 && start < count)
                     {
-                        if (buffer[index] == '\uFFFD') compatibilityFixes++;
+                        start++;
+                        skipPreamble--;
                     }
-                    var ready = new string(buffer, 0, count);
+                    if (utf16)
+                    {
+                        for (var index = start; index < count; index++)
+                        {
+                            if (buffer[index] == '\uFFFD') compatibilityFixes++;
+                        }
+                    }
+                    var ready = new string(buffer, start, count - start);
                     if (mysql)
                     {
                         var previousFixes = mysqlNormalizer!.Fixes;
@@ -903,6 +923,31 @@ public static class SiteDatabaseProvisioner
         {
             process.StandardInput.Close();
         }
+    }
+
+    internal enum SqlTextPreamble
+    {
+        None,
+        Utf8,
+        Utf16LittleEndian,
+        Utf16BigEndian
+    }
+
+    internal static SqlTextPreamble DetectSqlTextPreamble(string path)
+    {
+        using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using Stream sqlSource = path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)
+            ? new GZipStream(source, CompressionMode.Decompress, leaveOpen: true)
+            : source;
+        Span<byte> head = stackalloc byte[3];
+        var length = sqlSource.ReadAtLeast(head, head.Length, throwOnEndOfStream: false);
+        if (length >= 3 && head[0] == 0xEF && head[1] == 0xBB && head[2] == 0xBF)
+        {
+            return SqlTextPreamble.Utf8;
+        }
+        if (length >= 2 && head[0] == 0xFF && head[1] == 0xFE) return SqlTextPreamble.Utf16LittleEndian;
+        if (length >= 2 && head[0] == 0xFE && head[1] == 0xFF) return SqlTextPreamble.Utf16BigEndian;
+        return SqlTextPreamble.None;
     }
 
     internal static string NormalizeMySql(

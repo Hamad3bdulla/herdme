@@ -141,9 +141,13 @@ try
     await VerifyServiceContractsAsync(supportRoot);
 
     await VerifyToolAndUpdateContractsAsync(supportRoot);
+
+    await VerifyPerformanceContractsAsync(supportRoot);
 }
 finally
 {
+    // Pooled capture database connections keep files open on Windows.
+    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
     if (Directory.Exists(supportRoot)) Directory.Delete(supportRoot, true);
 }
 

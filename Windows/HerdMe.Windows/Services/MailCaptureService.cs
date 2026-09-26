@@ -177,6 +177,8 @@ public sealed class MailCaptureService : IAsyncDisposable
             await StopCoreAsync();
         }
         finally { lifecycleGate.Release(); }
+        // Pooled SQLite connections keep captures.sqlite3 open; release them with the service.
+        database.ReleasePooledConnections();
         GC.SuppressFinalize(this);
     }
 

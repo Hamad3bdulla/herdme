@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using HerdMe.Windows.Models;
 
@@ -62,7 +63,7 @@ public static class SiteHealthInspector
         };
         if (laravel)
         {
-            checks.Insert(1, new("Environment", environment.Exists, environment.Exists ? ".env" : ".env is missing"));
+            checks.Insert(1, new("Environment", environment.Exists, environment.Exists ? ".env" : ServiceText.Get("Health_EnvironmentMissing", ".env is missing")));
             checks.Insert(2, new("Laravel", File.Exists(Path.Combine(path, "artisan")), "artisan"));
             var coreFiles = new[]
             {
@@ -73,7 +74,9 @@ public static class SiteHealthInspector
             checks.Add(new SiteHealthCheck(
                 "Laravel core files",
                 coreFiles.All(File.Exists),
-                coreFiles.All(File.Exists) ? "Ready" : "artisan, bootstrap/app.php, or public/index.php is missing"
+                coreFiles.All(File.Exists)
+                    ? ServiceText.Get("Health_Ready", "Ready")
+                    : ServiceText.Get("Health_LaravelCoreFilesMissing", "artisan, bootstrap/app.php, or public/index.php is missing")
             ));
         }
         if (hasComposer)
@@ -85,8 +88,10 @@ public static class SiteHealthInspector
             var platformRequirements = RuntimeHealthInspector.ComposerPlatformRequirements(composerJsonPath);
             checks.Add(new SiteHealthCheck(
                 "PHP platform requirements",
-                !platformRequirements.Contains("composer.json is invalid", StringComparer.Ordinal),
-                platformRequirements.Count == 0 ? "No explicit requirements" : string.Join(", ", platformRequirements)
+                !platformRequirements.Contains(RuntimeHealthInspector.InvalidComposerJson, StringComparer.Ordinal),
+                platformRequirements.Count == 0
+                    ? ServiceText.Get("Health_NoPlatformRequirements", "No explicit requirements")
+                    : string.Join(", ", platformRequirements)
             ));
         }
         if (File.Exists(Path.Combine(path, "package.json")))
@@ -94,7 +99,9 @@ public static class SiteHealthInspector
             checks.Add(new SiteHealthCheck(
                 "Node dependencies",
                 Directory.Exists(Path.Combine(path, "node_modules")),
-                Directory.Exists(Path.Combine(path, "node_modules")) ? "node_modules" : "node_modules is missing"
+                Directory.Exists(Path.Combine(path, "node_modules"))
+                    ? "node_modules"
+                    : ServiceText.Get("Health_NodeModulesMissing", "node_modules is missing")
             ));
             checks.Add(JsonFileCheck(Path.Combine(path, "package-lock.json"), "Node lock"));
             checks.Add(NodeEngineCheck(Path.Combine(path, "package.json"), nodeVersion));
@@ -103,7 +110,12 @@ public static class SiteHealthInspector
                 "Node package manager",
                 packageManager.Equals("npm", StringComparison.Ordinal),
                 packageManager.Equals("npm", StringComparison.Ordinal)
-                    ? "npm" : $"Uses {packageManager}; HerdMe will not run npm automatically"
+                    ? "npm"
+                    : ServiceText.Format(
+                        "Health_OtherPackageManager",
+                        "Uses {0}; HerdMe will not run npm automatically",
+                        packageManager
+                    )
             ));
         }
         if (laravel)
@@ -120,7 +132,9 @@ public static class SiteHealthInspector
             checks.Add(new SiteHealthCheck(
                 "Application key",
                 !string.IsNullOrWhiteSpace(appKey),
-                string.IsNullOrWhiteSpace(appKey) ? "APP_KEY is missing" : "APP_KEY is configured"
+                string.IsNullOrWhiteSpace(appKey)
+                    ? ServiceText.Get("Health_AppKeyMissing", "APP_KEY is missing")
+                    : ServiceText.Get("Health_AppKeyConfigured", "APP_KEY is configured")
             ));
             var missingEnvironment = new[] { "APP_URL" }
                 .Where(key => string.IsNullOrWhiteSpace(EnvironmentValue(environment.Contents, key)))
@@ -128,14 +142,18 @@ public static class SiteHealthInspector
             checks.Add(new SiteHealthCheck(
                 "Environment configuration",
                 missingEnvironment.Length == 0,
-                missingEnvironment.Length == 0 ? "Ready" : $"Missing: {string.Join(", ", missingEnvironment)}"
+                missingEnvironment.Length == 0
+                    ? ServiceText.Get("Health_Ready", "Ready")
+                    : ServiceText.Format("Health_MissingEnvironment", "Missing: {0}", string.Join(", ", missingEnvironment))
             ));
             var storageReady = storageDirectories.All(directory =>
                 Directory.Exists(directory) && IsWritableDirectory(directory));
             checks.Add(new SiteHealthCheck(
                 "Storage directories",
                 storageReady,
-                storageReady ? "Ready" : "Laravel writable directories are missing or read-only"
+                storageReady
+                    ? ServiceText.Get("Health_Ready", "Ready")
+                    : ServiceText.Get("Health_StorageNotWritable", "Laravel writable directories are missing or read-only")
             ));
             checks.Add(new SiteHealthCheck(
                 "Storage link",
@@ -153,8 +171,8 @@ public static class SiteHealthInspector
                 "Database configuration",
                 databaseConfigured,
                 databaseConfigured
-                    ? databaseConnection ?? "Configured"
-                    : "Configure a site database in .env"
+                    ? databaseConnection ?? ServiceText.Get("Health_Configured", "Configured")
+                    : ServiceText.Get("Health_ConfigureDatabase", "Configure a site database in .env")
             ));
             var logDirectory = Path.Combine(path, "storage", "logs");
             var logBytes = Directory.Exists(logDirectory)
@@ -164,7 +182,11 @@ public static class SiteHealthInspector
             checks.Add(new SiteHealthCheck(
                 "Laravel logs",
                 logBytes < 100L * 1_024 * 1_024,
-                $"{logBytes / 1_024d / 1_024d:0.0} MB"
+                ServiceText.Format(
+                    "Health_LogSize",
+                    "{0} MB",
+                    (logBytes / 1_024d / 1_024d).ToString("0.0", CultureInfo.CurrentCulture)
+                )
             ));
         }
         if (phpInstaller.IsInstalled(phpCycle))
@@ -176,7 +198,9 @@ public static class SiteHealthInspector
                     ? await phpInstaller.ManagedExtensionReportAsync(phpExecutable, cancellationToken)
                     : await extensionReport(phpExecutable, cancellationToken);
                 checks.Add(new SiteHealthCheck("PHP extensions", report.Missing.Count == 0,
-                    report.Missing.Count == 0 ? "Ready" : string.Join(", ", report.Missing)));
+                    report.Missing.Count == 0
+                        ? ServiceText.Get("Health_Ready", "Ready")
+                        : string.Join(", ", report.Missing)));
             }
             catch (Exception error) when (error is IOException or InvalidDataException
                 or InvalidOperationException)
@@ -239,15 +263,16 @@ public static class SiteHealthInspector
 
     private static SiteHealthCheck JsonFileCheck(string path, string name)
     {
-        if (!File.Exists(path)) return new SiteHealthCheck(name, true, "Not present");
+        if (!File.Exists(path)) return new SiteHealthCheck(name, true, ServiceText.Get("Health_NotPresent", "Not present"));
         try
         {
             using var document = JsonDocument.Parse(File.ReadAllText(path));
-            return new SiteHealthCheck(name, document.RootElement.ValueKind == JsonValueKind.Object, "Valid");
+            return new SiteHealthCheck(name, document.RootElement.ValueKind == JsonValueKind.Object,
+                ServiceText.Get("Health_Valid", "Valid"));
         }
         catch (Exception error) when (error is JsonException or IOException)
         {
-            return new SiteHealthCheck(name, false, "Invalid JSON");
+            return new SiteHealthCheck(name, false, ServiceText.Get("Health_InvalidJson", "Invalid JSON"));
         }
     }
 
@@ -258,21 +283,29 @@ public static class SiteHealthInspector
             using var document = JsonDocument.Parse(File.ReadAllText(packagePath));
             if (!document.RootElement.TryGetProperty("engines", out var engines)
                 || !engines.TryGetProperty("node", out var node))
-                return new SiteHealthCheck("Node version", true, "No version constraint");
+                return new SiteHealthCheck("Node version", true,
+                    ServiceText.Get("Health_NoNodeConstraint", "No version constraint"));
             var requirement = node.GetString() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(configuredVersion))
-                return new SiteHealthCheck("Node version", true, $"Requires Node {requirement}");
+                return new SiteHealthCheck("Node version", true,
+                    ServiceText.Format("Health_RequiresNode", "Requires Node {0}", requirement));
             var configuredMajor = configuredVersion.Split('.', 2)[0];
             var requiredMajor = new string(requirement.SkipWhile(character => !char.IsDigit(character)).TakeWhile(char.IsDigit).ToArray());
             var compatible = string.IsNullOrWhiteSpace(requiredMajor)
                 || requirement.Contains(configuredMajor, StringComparison.Ordinal);
             return new SiteHealthCheck("Node version", compatible, compatible
-                ? $"Requires Node {requirement}"
-                : $"Requires Node {requirement}; configured {configuredVersion}");
+                ? ServiceText.Format("Health_RequiresNode", "Requires Node {0}", requirement)
+                : ServiceText.Format(
+                    "Health_RequiresNodeConfigured",
+                    "Requires Node {0}; configured {1}",
+                    requirement,
+                    configuredVersion
+                ));
         }
         catch (Exception error) when (error is JsonException or IOException)
         {
-            return new SiteHealthCheck("Node version", false, "package.json is invalid");
+            return new SiteHealthCheck("Node version", false,
+                ServiceText.Get("Health_PackageJsonInvalid", "package.json is invalid"));
         }
     }
 }

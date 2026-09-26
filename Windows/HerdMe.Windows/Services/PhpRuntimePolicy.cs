@@ -24,7 +24,7 @@ public sealed class PhpRuntimePolicy
             if (File.Exists(SettingsPath))
             {
                 var settings = JsonSerializer.Deserialize<PhpRuntimeSettings>(
-                    File.ReadAllText(SettingsPath)
+                    SettingsFileCache.ReadAllText(SettingsPath)
                 );
                 if (settings is not null)
                 {
@@ -49,6 +49,7 @@ public sealed class PhpRuntimePolicy
         var temporaryPath = SettingsPath + ".tmp";
         File.WriteAllText(temporaryPath, JsonSerializer.Serialize(normalized, JsonOptions));
         File.Move(temporaryPath, SettingsPath, true);
+        SettingsFileCache.Invalidate(SettingsPath);
     }
 
     public async Task<PhpRuntimeLaunchContract> PrepareLaunchAsync(
@@ -255,7 +256,8 @@ public sealed class PhpRuntimePolicy
         options["xdebug.idekey"] = settings.Debugger.IdeKey;
         options["xdebug.log"] = Path.Combine(xdebugLogDirectory, "xdebug.log");
         options["xdebug.log_level"] = "1";
-        options["xdebug.mode"] = "debug,develop";
+        // develop mode adds overhead to every request; step debugging only needs "debug".
+        options["xdebug.mode"] = "debug";
         options["xdebug.start_with_request"] = settings.Debugger.DetectBreakpoints ? "trigger" : "yes";
         options["xdebug.trigger_value"] = settings.Debugger.IdeKey;
         return options;

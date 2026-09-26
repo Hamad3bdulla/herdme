@@ -1,9 +1,12 @@
 using HerdMe.Windows.Pages;
 using HerdMe.Windows.Services;
+using HerdMe.Windows.Views;
 using Microsoft.UI;
+using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using System.Runtime.InteropServices;
 using Windows.Graphics;
 using WinRT.Interop;
@@ -16,10 +19,16 @@ public sealed partial class MainWindow : Window
     private const int LogicalWindowHeight = 800;
     private const int LogicalWindowMargin = 16;
     private readonly AppServices services;
-    private readonly Dictionary<string, Page> persistentPages = new(StringComparer.Ordinal);
+    // One instance per navigation tag; pages keep their state and guard Loaded/Unloaded.
+    private readonly Dictionary<string, Page> cachedPages = new(StringComparer.Ordinal);
     private string? pendingLogSitePath;
     private string? configurationLoadWarning;
     private bool shuttingDown;
+    private readonly DispatcherTimer titleBarStatusTimer = new()
+    {
+        Interval = TimeSpan.FromSeconds(2)
+    };
+    private (bool Running, bool Degraded)? displayedTitleBarStatus;
 
     public MainWindow(
         AppServices services,
@@ -32,6 +41,7 @@ public sealed partial class MainWindow : Window
         Onboarding.Configure(services.InitialSetup);
         RootLayout.Language = AppLocalization.LanguageTag;
         RootLayout.FlowDirection = AppLocalization.LayoutDirection;
+        ConfigureTitleBar();
         ResizeWindow();
         var siteSettings = services.SiteSettings.Load();
         _ = services.Services.LoadInstances();
@@ -51,6 +61,8 @@ public sealed partial class MainWindow : Window
         Onboarding.Visibility = RequiresOnboarding ? Visibility.Visible : Visibility.Collapsed;
         Navigation.SelectedItem = Navigation.MenuItems[0];
         if (ContentFrame.Content is null) ShowPage("dashboard");
+        UpdateTitleBarStatus();
+        App.MainWindowVisibilityChanged += App_MainWindowVisibilityChanged;
     }
 
     public bool RequiresOnboarding { get; private set; }
@@ -60,10 +72,12 @@ public sealed partial class MainWindow : Window
     internal void PrepareForShutdown()
     {
         shuttingDown = true;
+        App.MainWindowVisibilityChanged -= App_MainWindowVisibilityChanged;
+        titleBarStatusTimer.Stop();
         AppWindow.Hide();
         RootLayout.IsHitTestVisible = false;
         ContentFrame.Content = null;
-        persistentPages.Clear();
+        cachedPages.Clear();
         Content = null;
     }
 
@@ -79,12 +93,119 @@ public sealed partial class MainWindow : Window
         configurationLoadWarning = null;
         var dialog = new ContentDialog
         {
-            Title = "HerdMe settings could not be loaded",
+            Title = AppLocalization.Get("MainWindowSettingsLoadWarningTitle"),
             Content = warning,
-            CloseButtonText = "OK",
+            CloseButtonText = AppLocalization.Get("CommonOk"),
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = xamlRoot
         };
         await dialog.ShowAsync();
+    }
+
+    private void ConfigureTitleBar()
+    {
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+        var titleBar = AppWindow.TitleBar;
+        titleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
+        titleBar.ButtonBackgroundColor = Colors.Transparent;
+        titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+        if (MicaController.IsSupported())
+        {
+            // Mica shows through the transparent shell; older systems keep the solid shell brush.
+            SystemBackdrop = new MicaBackdrop();
+            RootLayout.Background = new SolidColorBrush(Colors.Transparent);
+        }
+
+        AppTitleBar.Loaded += (_, _) =>
+        {
+            UpdateTitleBarInsets();
+            ApplyCaptionButtonColors();
+        };
+        AppTitleBar.SizeChanged += (_, _) => UpdateTitleBarInsets();
+        RootLayout.ActualThemeChanged += (_, _) => ApplyCaptionButtonColors();
+        titleBarStatusTimer.Tick += (_, _) => UpdateTitleBarStatus();
+        // The status poll starts once App reports the window visible and pauses in the tray.
+    }
+
+    private void App_MainWindowVisibilityChanged(object? sender, bool visible)
+    {
+        if (shuttingDown) return;
+        if (visible)
+        {
+            UpdateTitleBarStatus();
+            titleBarStatusTimer.Start();
+        }
+        else
+        {
+            titleBarStatusTimer.Stop();
+        }
+    }
+
+    private void UpdateTitleBarInsets()
+    {
+        if (shuttingDown || AppTitleBar.XamlRoot is not { } xamlRoot) return;
+        var scale = xamlRoot.RasterizationScale;
+        if (scale <= 0) return;
+        var left = AppWindow.TitleBar.LeftInset / scale;
+        var right = AppWindow.TitleBar.RightInset / scale;
+        // XAML mirrors in right-to-left layouts, but the caption buttons keep their
+        // physical side, so the leading padding must use the opposite inset.
+        var rightToLeft = RootLayout.FlowDirection == FlowDirection.RightToLeft;
+        AppTitleBar.Padding = new Thickness(
+            16 + (rightToLeft ? right : left),
+            0,
+            12 + (rightToLeft ? left : right),
+            0
+        );
+    }
+
+    private void ApplyCaptionButtonColors()
+    {
+        if (shuttingDown) return;
+        var dark = RootLayout.ActualTheme == ElementTheme.Dark;
+        var titleBar = AppWindow.TitleBar;
+        titleBar.ButtonForegroundColor = dark ? Colors.White : Colors.Black;
+        titleBar.ButtonHoverForegroundColor = dark ? Colors.White : Colors.Black;
+        titleBar.ButtonPressedForegroundColor = dark ? Colors.White : Colors.Black;
+        titleBar.ButtonHoverBackgroundColor = dark
+            ? ColorHelper.FromArgb(0x18, 0xFF, 0xFF, 0xFF)
+            : ColorHelper.FromArgb(0x0F, 0x00, 0x00, 0x00);
+        titleBar.ButtonPressedBackgroundColor = dark
+            ? ColorHelper.FromArgb(0x0E, 0xFF, 0xFF, 0xFF)
+            : ColorHelper.FromArgb(0x0A, 0x00, 0x00, 0x00);
+        titleBar.ButtonInactiveForegroundColor = dark
+            ? ColorHelper.FromArgb(0xFF, 0x78, 0x78, 0x78)
+            : ColorHelper.FromArgb(0xFF, 0x9B, 0x9B, 0x9B);
+    }
+
+    private void UpdateTitleBarStatus()
+    {
+        if (shuttingDown) return;
+        if (RequiresOnboarding)
+        {
+            TitleBarStatus.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var environment = services.Environment;
+        var current = (Running: environment.IsRunning, Degraded: environment.IsDegraded);
+        if (displayedTitleBarStatus == current) return;
+        displayedTitleBarStatus = current;
+        var tone = current.Running
+            ? StatusTone.Success
+            : current.Degraded ? StatusTone.Caution : StatusTone.Critical;
+        TitleBarStatus.Style = StatusStyles.Pill(tone);
+        TitleBarStatusDot.Style = StatusStyles.Dot(tone);
+        TitleBarStatusText.Text = AppLocalization.Format(
+            "TitleBarEnvironmentStatus",
+            AppLocalization.Get(
+                current.Running
+                    ? "DashboardRunning"
+                    : current.Degraded ? "DashboardRecovering" : "DashboardStopped"
+            )
+        );
+        TitleBarStatus.Visibility = Visibility.Visible;
     }
 
     private void ResizeWindow()
@@ -138,16 +259,36 @@ public sealed partial class MainWindow : Window
     private void ShowPage(string tag)
     {
         if (shuttingDown) return;
-        if (persistentPages.TryGetValue(tag, out var existingPage))
+        tag = NormalizePageTag(tag);
+        if (!cachedPages.TryGetValue(tag, out var page))
         {
-            ContentFrame.Content = existingPage;
-            return;
+            page = CreatePage(tag);
+            cachedPages[tag] = page;
+            if (tag == "logs") pendingLogSitePath = null;
+        }
+        else if (tag == "logs" && pendingLogSitePath is { } sitePath && page is LogsPage logsPage)
+        {
+            pendingLogSitePath = null;
+            logsPage.ShowSite(sitePath);
         }
 
+        if (!ReferenceEquals(ContentFrame.Content, page)) ContentFrame.Content = page;
+    }
+
+    private static string NormalizePageTag(string tag)
+    {
+        return tag is "dashboard" or "general" or "sites" or "php" or "node" or "services"
+            or "updates" or "mail" or "dumps" or "logs" or "debugger" or "about"
+            ? tag
+            : "general";
+    }
+
+    private Page CreatePage(string tag)
+    {
         switch (tag)
         {
             case "dashboard":
-                ContentFrame.Content = new DashboardPage(
+                return new DashboardPage(
                     services.Core,
                     services.SiteSettings,
                     services.Environment,
@@ -162,9 +303,8 @@ public sealed partial class MainWindow : Window
                     services.NodeInstaller,
                     services.GitInstaller
                 );
-                break;
             case "general":
-                ContentFrame.Content = new GeneralPage(
+                return new GeneralPage(
                     services.Core,
                     services.PhpInstaller,
                     services.RuntimePolicy,
@@ -179,9 +319,8 @@ public sealed partial class MainWindow : Window
                     services.ComponentUpdates,
                     services.UserPath
                 );
-                break;
             case "sites":
-                ContentFrame.Content = new SitesPage(
+                return new SitesPage(
                     services.Core,
                     services.Environment,
                     services.SiteSettings,
@@ -197,9 +336,8 @@ public sealed partial class MainWindow : Window
                     services.Certificates,
                     services.Mail
                 );
-                break;
             case "php":
-                ContentFrame.Content = new PhpPage(
+                return new PhpPage(
                     services.Core,
                     services.RuntimePolicy,
                     services.PhpInstaller,
@@ -207,24 +345,21 @@ public sealed partial class MainWindow : Window
                     services.UserPath,
                     services.PhpExtensions
                 );
-                break;
             case "node":
-                ContentFrame.Content = new NodePage(
+                return new NodePage(
                     services.NodeInstaller,
                     services.ComposerTools,
                     services.RuntimePolicy,
                     services.UserPath
                 );
-                break;
             case "services":
-                ContentFrame.Content = new ServicesPage(
+                return new ServicesPage(
                     services.Services,
                     services.Core,
                     services.SiteSettings
                 );
-                break;
             case "updates":
-                ContentFrame.Content = new UpdatesPage(
+                return new UpdatesPage(
                     services.SiteSettings,
                     services.Updates,
                     services.ComponentUpdates,
@@ -238,27 +373,22 @@ public sealed partial class MainWindow : Window
                     services.Services,
                     services.UserPath
                 );
-                break;
             case "mail":
-                ContentFrame.Content = new MailPage(
+                return new MailPage(
                     services.Mail,
                     services.Core,
                     services.SiteSettings
                 );
-                break;
             case "dumps":
-                ContentFrame.Content = new DumpsPage(services.Dumps);
-                break;
+                return new DumpsPage(services.Dumps);
             case "logs":
-                ContentFrame.Content = new LogsPage(
+                return new LogsPage(
                     services.Core,
                     services.SiteSettings,
                     pendingLogSitePath
                 );
-                pendingLogSitePath = null;
-                break;
             case "debugger":
-                ContentFrame.Content = new DebuggerPage(
+                return new DebuggerPage(
                     services.Core,
                     services.RuntimePolicy,
                     services.PhpInstaller,
@@ -267,38 +397,11 @@ public sealed partial class MainWindow : Window
                     services.SiteSettings,
                     services.Environment
                 );
-                break;
             case "about":
-                ContentFrame.Content = new AboutPage(services.SiteSettings, services.Updates);
-                break;
+                return new AboutPage(services.SiteSettings, services.Updates);
             default:
-                ContentFrame.Content = new GeneralPage(
-                    services.Core,
-                    services.PhpInstaller,
-                    services.RuntimePolicy,
-                    services.NodeInstaller,
-                    services.ComposerTools,
-                    services.GitInstaller,
-                    services.Startup,
-                    services.Hosts,
-                    services.Certificates,
-                    services.SiteSettings,
-                    services.Updates,
-                    services.ComponentUpdates,
-                    services.UserPath
-                );
-                break;
+                return CreatePage("general");
         }
-
-        if (IsPersistentPage(tag) && ContentFrame.Content is Page page)
-        {
-            persistentPages[tag] = page;
-        }
-    }
-
-    private static bool IsPersistentPage(string tag)
-    {
-        return tag is "general" or "php" or "node" or "services" or "updates" or "debugger";
     }
 
     public void NavigateToLogs(string sitePath)
@@ -310,12 +413,7 @@ public sealed partial class MainWindow : Window
             .First(item => string.Equals(item.Tag?.ToString(), "logs", StringComparison.Ordinal));
         if (ReferenceEquals(Navigation.SelectedItem, logsItem))
         {
-            ContentFrame.Content = new LogsPage(
-                services.Core,
-                services.SiteSettings,
-                pendingLogSitePath
-            );
-            pendingLogSitePath = null;
+            ShowPage("logs");
         }
         else
         {
@@ -343,6 +441,7 @@ public sealed partial class MainWindow : Window
         RequiresOnboarding = false;
         Onboarding.Visibility = Visibility.Collapsed;
         Navigation.Visibility = Visibility.Visible;
+        UpdateTitleBarStatus();
         InitialSetupCompleted?.Invoke(this, EventArgs.Empty);
     }
 }

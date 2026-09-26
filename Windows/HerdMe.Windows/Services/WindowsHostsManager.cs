@@ -160,6 +160,7 @@ public sealed class WindowsHostsManager
             return true;
         }
 
+        string? replacement = null;
         try
         {
             var candidate = ReadStagedCandidate(arguments[2]);
@@ -202,19 +203,41 @@ public sealed class WindowsHostsManager
                     return true;
                 }
 
-                destination.Position = 0;
-                destination.SetLength(0);
-                using (var writer = new StreamWriter(
-                    destination,
-                    new UTF8Encoding(false),
-                    bufferSize: 4_096,
-                    leaveOpen: true
+                // Write the new content next to the hosts file first so a crash or power
+                // loss can never leave Windows with a truncated hosts file.
+                replacement = HostsReplacementPath(arguments[3]);
+                using (var staged = new FileStream(
+                    replacement,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None
                 ))
                 {
-                    writer.Write(candidate);
-                    writer.Flush();
+                    var bytes = new UTF8Encoding(false).GetBytes(candidate);
+                    staged.Write(bytes);
+                    staged.Flush(flushToDisk: true);
                 }
-                destination.Flush(flushToDisk: true);
+                try
+                {
+                    destination.Dispose();
+                    // ReplaceFile keeps the original DACL, attributes and owner.
+                    File.Replace(replacement, arguments[3], null, ignoreMetadataErrors: true);
+                    replacement = null;
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                {
+                    // Some security products block renames inside drivers\etc. Fall back to
+                    // the original in-place write rather than leaving sites unresolved.
+                    using var fallback = new FileStream(
+                        arguments[3],
+                        FileMode.Open,
+                        FileAccess.Write,
+                        FileShare.None
+                    );
+                    fallback.SetLength(0);
+                    fallback.Write(new UTF8Encoding(false).GetBytes(candidate));
+                    fallback.Flush(flushToDisk: true);
+                }
             }
             var flush = new ProcessStartInfo
             {
@@ -242,8 +265,22 @@ public sealed class WindowsHostsManager
         {
             exitCode = 1;
         }
+        finally
+        {
+            if (replacement is not null)
+            {
+                try { File.Delete(replacement); }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+            }
+        }
         return true;
     }
+
+    internal static string HostsReplacementPath(string hostsPath) =>
+        Path.Combine(
+            Path.GetDirectoryName(hostsPath) ?? throw new InvalidDataException("The hosts path has no folder."),
+            $"hosts.herdme-{Environment.ProcessId}.tmp"
+        );
 
     internal static bool IsAllowedHelperRequest(
         string source,

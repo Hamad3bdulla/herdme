@@ -49,13 +49,24 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     // connection is dropped only if the client stops sending body bytes for this long.
     private static readonly TimeSpan RequestBodyIdleTimeout = TimeSpan.FromSeconds(30);
     private readonly FastCgiClient fastCgiClient = new();
+    private static readonly TimeSpan TlsHandshakeTimeout = TimeSpan.FromSeconds(10);
+    // Requests paused on an Xdebug breakpoint can legitimately take minutes, so the
+    // proxy must never impose HttpClient's default 100 second limit.
     private readonly HttpClient phpHttpClient = new(new SocketsHttpHandler
     {
         AllowAutoRedirect = false,
         UseCookies = false
-    });
+    })
+    {
+        Timeout = Timeout.InfiniteTimeSpan
+    };
     private readonly ConcurrentDictionary<int, Task> sessions = new();
     private readonly SemaphoreSlim sessionGate = new(128, 128);
+    private const long PathCacheLifetimeMilliseconds = 2_000;
+    private static readonly ConcurrentDictionary<string, CachedPathCheck> FrontControllerCache =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, CachedPathCheck> RootCanonicalCache =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, SitePerformanceBucket> performance =
         new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? cancellation;
@@ -105,6 +116,8 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         if (normalized.Count == 0) throw new InvalidOperationException("No local sites were provided.");
 
         var selectedPort = AvailablePort(preferredPort, fallbackPort);
+        FrontControllerCache.Clear();
+        RootCanonicalCache.Clear();
         routes = normalized;
         fastCgiPort = phpFastCgiPort;
         certificate = serverCertificate;
@@ -139,6 +152,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         certificate?.Dispose();
         certificate = null;
         source?.Dispose();
+        await QueuedLog.FlushAllAsync();
     }
 
     public async ValueTask DisposeAsync()
@@ -151,7 +165,17 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            var client = await activeListener.AcceptTcpClientAsync(cancellationToken);
+            TcpClient client;
+            try
+            {
+                client = await activeListener.AcceptTcpClientAsync(cancellationToken);
+            }
+            catch (SocketException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // A browser that resets a queued connection must not stop every site.
+                await Task.Delay(TimeSpan.FromMilliseconds(20), cancellationToken);
+                continue;
+            }
             await sessionGate.WaitAsync(cancellationToken);
             var identifier = Interlocked.Increment(ref sessionIdentifier);
             var task = RunClientAsync(client, cancellationToken);
@@ -189,15 +213,32 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 if (certificate is not null)
                 {
                     secureStream = new SslStream(networkStream, leaveInnerStreamOpen: true);
-                    await secureStream.AuthenticateAsServerAsync(
-                        new SslServerAuthenticationOptions
-                        {
-                            ServerCertificate = certificate,
-                            EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
-                            ClientCertificateRequired = false
-                        },
+                    using var handshakeCancellation = CancellationTokenSource.CreateLinkedTokenSource(
                         cancellationToken
                     );
+                    // Idle or half-open connections must not hold one of the 128 session slots.
+                    handshakeCancellation.CancelAfter(TlsHandshakeTimeout);
+                    try
+                    {
+                        await secureStream.AuthenticateAsServerAsync(
+                            new SslServerAuthenticationOptions
+                            {
+                                ServerCertificate = certificate,
+                                EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+                                ClientCertificateRequired = false
+                            },
+                            handshakeCancellation.Token
+                        );
+                    }
+                    catch (Exception error) when (
+                        error is AuthenticationException
+                            || (error is OperationCanceledException && !cancellationToken.IsCancellationRequested)
+                    )
+                    {
+                        secureStream.Dispose();
+                        secureStream = null;
+                        return;
+                    }
                     stream = secureStream;
                 }
                 var reader = new HttpRequestReader(stream);
@@ -284,7 +325,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                     }
                 }
             }
-            catch (HttpRequestException error)
+            catch (HttpStatusException error)
             {
                 await WriteErrorAsync(stream, error.Status, cancellationToken);
             }
@@ -294,12 +335,19 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             catch (HttpResponseStartedException)
             {
             }
-            catch (Exception error) when (error is IOException or SocketException or InvalidDataException)
+            catch (Exception error) when (error is IOException or SocketException or InvalidDataException
+                or System.Net.Http.HttpRequestException)
             {
+                // Includes a PHP HTTP fallback or Vite dev server that refused or dropped
+                // the proxied request: the browser gets a real 502 page instead of a reset.
                 if (request is not null)
                 {
                     await WriteErrorAsync(stream, "502 Bad Gateway", cancellationToken);
                 }
+            }
+            catch (TimeoutException) when (request is not null)
+            {
+                await WriteErrorAsync(stream, "504 Gateway Timeout", cancellationToken);
             }
             finally
             {
@@ -583,7 +631,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         );
         if (!IsInside(FinalPath(file.SafeFileHandle, file.Name), documentRoot))
         {
-            throw new HttpRequestException("403 Forbidden");
+            throw new HttpStatusException("403 Forbidden");
         }
         var fileSize = file.Length;
         var lastWriteUtc = File.GetLastWriteTimeUtc(file.SafeFileHandle);
@@ -829,10 +877,14 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     {
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(documentRoot));
         var relative = requestPath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
-        var candidate = Path.GetFullPath(Path.Combine(root, relative));
-        if (!IsInside(candidate, root)) throw new HttpRequestException("403 Forbidden");
+        // NTFS alternate data streams (index.php::$DATA) would otherwise be served as
+        // static files and disclose PHP source. Paths with a colon never name a file
+        // HerdMe serves directly; the front controller still receives them as routes.
+        var namesFile = relative.IndexOf(':') < 0;
+        var candidate = namesFile ? Path.GetFullPath(Path.Combine(root, relative)) : root;
+        if (!IsInside(candidate, root)) throw new HttpStatusException("403 Forbidden");
 
-        if (Directory.Exists(candidate))
+        if (namesFile && Directory.Exists(candidate))
         {
             var resolvedDirectory = ResolveInside(candidate, root);
             // PHP front controllers must win over stale static placeholders in moved Laravel projects.
@@ -851,7 +903,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 }
             }
         }
-        else if (File.Exists(candidate))
+        else if (namesFile && File.Exists(candidate))
         {
             var resolvedFile = ResolveInside(candidate, root);
             return Path.GetExtension(resolvedFile).Equals(".php", StringComparison.OrdinalIgnoreCase)
@@ -859,27 +911,89 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 : new ResolvedResource(resolvedFile, null, null, null);
         }
 
-        var frontController = Path.Combine(root, "index.php");
-        if (!File.Exists(frontController)) throw new HttpRequestException("404 Not Found");
         return new ResolvedResource(
             null,
-            ResolveInside(frontController, root),
+            ResolveFrontController(root),
             "/index.php",
             requestPath == "/" ? null : requestPath
         );
+    }
+
+    // Most Laravel requests are routes that end at public/index.php. Remember its resolved
+    // location (or absence) for a short time instead of walking every path component again.
+    private static string ResolveFrontController(string root)
+    {
+        var now = Environment.TickCount64;
+        if (FrontControllerCache.TryGetValue(root, out var cached)
+            && now - cached.CheckedAt < PathCacheLifetimeMilliseconds)
+        {
+            return cached.ResolvedPath ?? throw new HttpStatusException("404 Not Found");
+        }
+        var frontController = Path.Combine(root, "index.php");
+        // ResolveInside throws 403 for escapes; such results are never cached.
+        var resolved = File.Exists(frontController) ? ResolveInside(frontController, root) : null;
+        FrontControllerCache[root] = new CachedPathCheck(now, resolved);
+        return resolved ?? throw new HttpStatusException("404 Not Found");
     }
 
     private static string ResolveInside(string path, string root)
     {
         try
         {
-            var resolved = CanonicalExistingPath(path);
+            var resolved = CanonicalExistingPathBelow(path, root);
             if (IsInside(resolved, root)) return resolved;
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
         }
-        throw new HttpRequestException("403 Forbidden");
+        throw new HttpStatusException("403 Forbidden");
+    }
+
+    // Equivalent to CanonicalExistingPath(path) while the document root itself is still canonical
+    // (it is re-verified at most every PathCacheLifetimeMilliseconds). Every component below the
+    // root is still checked for reparse points on each request.
+    private static string CanonicalExistingPathBelow(string path, string root)
+    {
+        var fullPath = Path.GetFullPath(path);
+        if (!IsInside(fullPath, root) || !RootIsCanonical(root)) return CanonicalExistingPath(fullPath);
+        var current = root;
+        var relative = fullPath.Length > root.Length ? fullPath[root.Length..] : string.Empty;
+        foreach (var component in relative.Split(
+            new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+            StringSplitOptions.RemoveEmptyEntries
+        ))
+        {
+            var next = Path.Combine(current, component);
+            FileSystemInfo entry = Directory.Exists(next)
+                ? new DirectoryInfo(next)
+                : new FileInfo(next);
+            var target = entry.ResolveLinkTarget(returnFinalTarget: true);
+            current = target is null ? next : Path.GetFullPath(target.FullName);
+        }
+        return Path.GetFullPath(current);
+    }
+
+    private static bool RootIsCanonical(string root)
+    {
+        var now = Environment.TickCount64;
+        if (RootCanonicalCache.TryGetValue(root, out var cached)
+            && now - cached.CheckedAt < PathCacheLifetimeMilliseconds)
+        {
+            return cached.ResolvedPath is not null;
+        }
+        string? canonical;
+        try
+        {
+            canonical = CanonicalExistingPath(root).Equals(root, StringComparison.OrdinalIgnoreCase)
+                ? root
+                : null;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            canonical = null;
+        }
+        RootCanonicalCache[root] = new CachedPathCheck(now, canonical);
+        return canonical is not null;
     }
 
     private static string CanonicalExistingPath(string path)
@@ -959,7 +1073,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 || !int.TryParse(sizeText, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var size)
                 || size < 0)
             {
-                throw new HttpRequestException("400 Bad Request");
+                throw new HttpStatusException("400 Bad Request");
             }
             if (size == 0)
             {
@@ -971,19 +1085,19 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                     trailerSize += trailer.Length + 2;
                     if (trailerSize > MaximumHeaderSize || trailer.IndexOf(':') <= 0)
                     {
-                        throw new HttpRequestException("400 Bad Request");
+                        throw new HttpStatusException("400 Bad Request");
                     }
                 }
             }
             if (body.Length + size > MaximumBodySize)
             {
-                throw new HttpRequestException("413 Payload Too Large");
+                throw new HttpStatusException("413 Payload Too Large");
             }
             await reader.CopyExactlyAsync(body, size, cancellationToken);
             if (await reader.ReadByteAsync(cancellationToken) != '\r'
                 || await reader.ReadByteAsync(cancellationToken) != '\n')
             {
-                throw new HttpRequestException("400 Bad Request");
+                throw new HttpStatusException("400 Bad Request");
             }
         }
     }
@@ -1191,12 +1305,13 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 "Log",
                 "sites"
             );
-            BoundedLog.AppendText(
+            // Queued so a request never waits for the log file or its rotation.
+            QueuedLog.Append(
                 Path.Combine(directory, "php-errors.log"),
                 Encoding.UTF8.GetString(errors)
             );
         }
-        catch (IOException)
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
         }
     }
@@ -1431,18 +1546,18 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             {
                 if (count > MaximumHeaderSize)
                 {
-                    throw new HttpRequestException("431 Request Header Fields Too Large");
+                    throw new HttpStatusException("431 Request Header Fields Too Large");
                 }
                 if (!await ReadMoreAsync(cancellationToken))
                 {
                     if (allowCleanEndOfStream && count == 0) return null;
-                    throw new HttpRequestException("400 Bad Request");
+                    throw new HttpStatusException("400 Bad Request");
                 }
                 headerEnd = FindHeaderEnd();
             }
             if (headerEnd > MaximumHeaderSize)
             {
-                throw new HttpRequestException("431 Request Header Fields Too Large");
+                throw new HttpStatusException("431 Request Header Fields Too Large");
             }
 
             string headerText;
@@ -1452,33 +1567,33 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             }
             catch (DecoderFallbackException error)
             {
-                throw new HttpRequestException("400 Bad Request", error);
+                throw new HttpStatusException("400 Bad Request", error);
             }
             var lines = headerText.Split("\r\n", StringSplitOptions.None);
             var requestLine = lines[0].Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
             if (requestLine.Length != 3 || !requestLine[2].StartsWith("HTTP/", StringComparison.Ordinal))
             {
-                throw new HttpRequestException("400 Bad Request");
+                throw new HttpStatusException("400 Bad Request");
             }
             if (requestLine[2] is not ("HTTP/1.0" or "HTTP/1.1"))
             {
-                throw new HttpRequestException("505 HTTP Version Not Supported");
+                throw new HttpStatusException("505 HTTP Version Not Supported");
             }
             if (!IsValidHeaderName(requestLine[0])
                 || requestLine[1].Any(character => character is <= ' ' or '\u007f'))
             {
-                throw new HttpRequestException("400 Bad Request");
+                throw new HttpStatusException("400 Bad Request");
             }
             var headers = new List<KeyValuePair<string, string>>();
             foreach (var line in lines.Skip(1))
             {
                 var separator = line.IndexOf(':');
-                if (separator <= 0) throw new HttpRequestException("400 Bad Request");
+                if (separator <= 0) throw new HttpStatusException("400 Bad Request");
                 var name = line[..separator];
                 var value = line[(separator + 1)..].Trim();
                 if (!IsValidHeaderName(name) || !IsValidHeaderValue(value))
                 {
-                    throw new HttpRequestException("400 Bad Request");
+                    throw new HttpStatusException("400 Bad Request");
                 }
                 headers.Add(new KeyValuePair<string, string>(
                     name,
@@ -1493,7 +1608,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 || requestLine[2] == "HTTP/1.1" && hostHeaders.Length != 1
                 || hostHeaders.Any(header => string.IsNullOrWhiteSpace(header.Value)))
             {
-                throw new HttpRequestException("400 Bad Request");
+                throw new HttpStatusException("400 Bad Request");
             }
 
             var transferEncodingHeaders = headers
@@ -1505,16 +1620,16 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 .ToArray();
             if (transferCodings.Any(string.IsNullOrEmpty))
             {
-                throw new HttpRequestException("400 Bad Request");
+                throw new HttpStatusException("400 Bad Request");
             }
             if (transferCodings.Any(value =>
                 !value.Equals("chunked", StringComparison.OrdinalIgnoreCase)))
             {
-                throw new HttpRequestException("501 Not Implemented");
+                throw new HttpStatusException("501 Not Implemented");
             }
             if (transferCodings.Length > 1 || requestLine[2] == "HTTP/1.0" && transferCodings.Length > 0)
             {
-                throw new HttpRequestException("400 Bad Request");
+                throw new HttpStatusException("400 Bad Request");
             }
 
             var contentLengthHeaders = headers
@@ -1522,7 +1637,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 .ToArray();
             if (contentLengthHeaders.Length > 1 || transferCodings.Length > 0 && contentLengthHeaders.Length > 0)
             {
-                throw new HttpRequestException("400 Bad Request");
+                throw new HttpStatusException("400 Bad Request");
             }
             var contentLengthText = contentLengthHeaders.FirstOrDefault().Value;
             if (!string.IsNullOrEmpty(contentLengthText)
@@ -1533,14 +1648,14 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                     out _
                 ))
             {
-                throw new HttpRequestException("400 Bad Request");
+                throw new HttpStatusException("400 Bad Request");
             }
             var contentLength = string.IsNullOrEmpty(contentLengthText)
                 ? 0
                 : int.Parse(contentLengthText, NumberStyles.None, CultureInfo.InvariantCulture);
             if (contentLength < 0 || contentLength > MaximumBodySize)
             {
-                throw new HttpRequestException("413 Payload Too Large");
+                throw new HttpStatusException("413 Payload Too Large");
             }
 
             Consume(headerEnd + 4);
@@ -1570,7 +1685,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         {
             if (count == 0 && !await ReadMoreAsync(cancellationToken))
             {
-                throw new HttpRequestException("400 Bad Request");
+                throw new HttpStatusException("400 Bad Request");
             }
             var value = buffered[start];
             Consume(1);
@@ -1587,12 +1702,12 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 {
                     if (await ReadByteAsync(cancellationToken) != '\n')
                     {
-                        throw new HttpRequestException("400 Bad Request");
+                        throw new HttpStatusException("400 Bad Request");
                     }
                     return Encoding.ASCII.GetString(line.ToArray());
                 }
                 line.WriteByte((byte)value);
-                if (line.Length > maximumLength) throw new HttpRequestException("400 Bad Request");
+                if (line.Length > maximumLength) throw new HttpStatusException("400 Bad Request");
             }
         }
 
@@ -1606,7 +1721,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             {
                 if (this.count == 0 && !await ReadMoreAsync(cancellationToken))
                 {
-                    throw new HttpRequestException("400 Bad Request");
+                    throw new HttpStatusException("400 Bad Request");
                 }
                 var available = Math.Min(count, this.count);
                 await destination.WriteAsync(
@@ -1641,7 +1756,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                     continue;
                 }
                 var read = await stream.ReadAsync(output.AsMemory(offset), cancellationToken);
-                if (read == 0) throw new HttpRequestException("400 Bad Request");
+                if (read == 0) throw new HttpStatusException("400 Bad Request");
                 bodyProgressTimeout?.CancelAfter(RequestBodyIdleTimeout);
                 offset += read;
             }
@@ -1671,7 +1786,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             var maximumCapacity = MaximumHeaderSize + 4;
             if (buffered.Length >= maximumCapacity)
             {
-                throw new HttpRequestException("431 Request Header Fields Too Large");
+                throw new HttpStatusException("431 Request Header Fields Too Large");
             }
             Array.Resize(
                 ref buffered,
@@ -1702,9 +1817,9 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             }
             catch (UriFormatException)
             {
-                throw new HttpRequestException("400 Bad Request");
+                throw new HttpStatusException("400 Bad Request");
             }
-            if (!path.StartsWith('/')) throw new HttpRequestException("400 Bad Request");
+            if (!path.StartsWith('/')) throw new HttpStatusException("400 Bad Request");
             return new RequestTarget(string.IsNullOrEmpty(path) ? "/" : path, query);
         }
 
@@ -1715,7 +1830,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 || absolute.Scheme is not ("http" or "https")
                 || target.Contains('#'))
             {
-                throw new HttpRequestException("400 Bad Request");
+                throw new HttpStatusException("400 Bad Request");
             }
 
             var authorityStart = target.IndexOf("://", StringComparison.Ordinal) + 3;
@@ -1731,6 +1846,8 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         string? ScriptName,
         string? PathInfo
     );
+
+    private sealed record CachedPathCheck(long CheckedAt, string? ResolvedPath);
 
     private sealed record SiteRoute(
         string DocumentRoot,
@@ -1822,14 +1939,14 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         uint flags
     );
 
-    private sealed class HttpRequestException : Exception
+    private sealed class HttpStatusException : Exception
     {
-        public HttpRequestException(string status) : base(status)
+        public HttpStatusException(string status) : base(status)
         {
             Status = status;
         }
 
-        public HttpRequestException(string status, Exception innerException)
+        public HttpStatusException(string status, Exception innerException)
             : base(status, innerException)
         {
             Status = status;

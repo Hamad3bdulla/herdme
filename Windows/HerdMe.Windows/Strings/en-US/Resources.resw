@@ -965,4 +965,144 @@ Recovery backup: {1}</value></data>
   <data name="DumpsExportButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Export full dump</value></data>
   <data name="DumpsExportTooltip.Text" xml:space="preserve"><value>Export full dump</value></data>
   <data name="DumpsPreviewSizeNotice.Message" xml:space="preserve"><value>This view is shortened. Export the dump to save its full contents.</value></data>
+  <data name="TitleBarEnvironmentStatus" xml:space="preserve"><value>Local sites: {0}</value></data>
+  <data name="MainWindowSettingsLoadWarningTitle" xml:space="preserve"><value>HerdMe settings could not be loaded</value></data>
+  <data name="DashboardHealthTitle.Text" xml:space="preserve"><value>Checking the environment...</value></data>
+  <data name="DashboardMoreActionsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>More actions</value></data>
+  <data name="DashboardMoreActionsTooltip.Text" xml:space="preserve"><value>More actions</value></data>
+  <data name="GeneralPageSubtitle.Text" xml:space="preserve"><value>Startup, local domains, updates, and runtime health.</value></data>
+  <data name="GeneralStartupSectionTitle.Text" xml:space="preserve"><value>Startup and appearance</value></data>
+  <data name="GeneralDomainsSectionTitle.Text" xml:space="preserve"><value>Local domains and HTTPS</value></data>
+  <data name="GeneralDomainSuffixDescription.Text" xml:space="preserve"><value>Sites open at https://name.suffix/. Changes apply when the field loses focus.</value></data>
+  <data name="GeneralDomainSuffixInput.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Domain suffix</value></data>
+  <data name="GeneralUpdateChannelBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Update channel</value></data>
+  <data name="GeneralOpenDataButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open application data folder</value></data>
+  <data name="GeneralOpenDataTooltip.Text" xml:space="preserve"><value>Open application data folder</value></data>
+  <data name="PhpPageSubtitle.Text" xml:space="preserve"><value>Choose the PHP version, install tools, and tune php.ini settings.</value></data>
+  <data name="PhpRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Refresh PHP status</value></data>
+  <data name="PhpCycleBoxInput.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>PHP version</value></data>
+  <data name="DebuggerPageSubtitle.Text" xml:space="preserve"><value>Install Xdebug and start step-debugging sessions for your sites.</value></data>
+  <data name="DebuggerRequireTriggerDescription.Text" xml:space="preserve"><value>Start Xdebug only for requests that include XDEBUG_TRIGGER.</value></data>
+  <data name="NodeRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Refresh Node.js versions</value></data>
+  <data name="NodeInstallButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Install or update</value></data>
+  <data name="NodeUseButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Use this version</value></data>
+  <data name="NodeDeleteButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Delete this version</value></data>
+  <data name="DownloadsClearButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Clear completed history</value></data>
+  <data name="AboutResourcesTitle.Text" xml:space="preserve"><value>Resources</value></data>
+  <data name="AboutExitDescription.Text" xml:space="preserve"><value>Close HerdMe and stop its local services.</value></data>
+  <data name="LogsPageSubtitle.Text" xml:space="preserve"><value>Read HerdMe, PHP, web server, and service logs in one place.</value></data>
+  <data name="LogsOpenFolderButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open log folder</value></data>
+  <data name="LogsRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Refresh logs</value></data>
+  <data name="LogsSourceBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Log source</value></data>
+  <data name="DumpsPageSubtitle.Text" xml:space="preserve"><value>Review dump() output captured from your local sites.</value></data>
+  <data name="DumpsServerButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Start or stop dump capture</value></data>
+  <data name="DumpsClearButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Delete all dumps</value></data>
+  <data name="ServicesPageSubtitle.Text" xml:space="preserve"><value>Databases, caches, and search engines that run locally for your sites.</value></data>
+  <data name="ServicesRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Refresh service status</value></data>
+  <data name="ServicesAddSectionTitle.Text" xml:space="preserve"><value>Add a service</value></data>
+  <data name="ServicesVersionBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Service version</value></data>
+  <data name="ServicesMoreButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>More service actions</value></data>
+  <data name="MailPageSubtitle.Text" xml:space="preserve"><value>Catch outgoing email from your local sites and preview it here.</value></data>
+  <data name="MailServerButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Start or stop SMTP capture</value></data>
+  <data name="MailClearButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Delete all messages</value></data>
+  <data name="MailDeleteButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Delete message</value></data>
+  <data name="SitesRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Refresh sites</value></data>
+  <data name="SitesChooseFolderButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Choose folder</value></data>
+  <data name="SitesAddFolderButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Add folder</value></data>
+  <data name="SitesRemoveFolderButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Remove selected folder</value></data>
+  <data name="SitesDevelopmentTitle.Text" xml:space="preserve"><value>Development processes</value></data>
+  <data name="AppUnhandledErrorTitle" xml:space="preserve"><value>HerdMe could not complete the operation</value></data>
+  <data name="LogsTailNoticeLimited" xml:space="preserve"><value>Showing the most recent lines. Search covers up to the latest 4 MB of this log.</value></data>
+  <data name="MailClearConfirmTitle" xml:space="preserve"><value>Delete all captured messages?</value></data>
+  <data name="MailClearConfirmMessage" xml:space="preserve"><value>Every captured message will be removed. This cannot be undone.</value></data>
+  <data name="DumpsClearConfirmTitle" xml:space="preserve"><value>Delete all captured dumps?</value></data>
+  <data name="DumpsClearConfirmMessage" xml:space="preserve"><value>Every captured dump will be removed. This cannot be undone.</value></data>
+  <data name="ServicesCatalogUnavailable" xml:space="preserve"><value>The bundled service catalog could not be loaded.</value></data>
+  <data name="SitesDoctorCheckPassed" xml:space="preserve"><value>[OK] {0}: {1}</value></data>
+  <data name="SitesDoctorCheckAttention" xml:space="preserve"><value>[!] {0}: {1}</value></data>
+  <data name="SitesDoctorFailed" xml:space="preserve"><value>Site Doctor could not finish the inspection. {0}</value></data>
+  <data name="SitesDoctorUnavailable" xml:space="preserve"><value>Health check failed</value></data>
+  <data name="SitesWorkflowStepDone" xml:space="preserve"><value>[OK] {0}</value></data>
+  <data name="SitesWorkflowMigrationsStep" xml:space="preserve"><value>migrations and cache cleanup</value></data>
+  <data name="SitesHandoffReportTitle" xml:space="preserve"><value># HerdMe handoff report: {0}</value></data>
+  <data name="SitesHandoffGenerated" xml:space="preserve"><value>Generated: {0}</value></data>
+  <data name="SitesHandoffPath" xml:space="preserve"><value>Path: `{0}`</value></data>
+  <data name="SitesHandoffGitCheck" xml:space="preserve"><value>Git working tree</value></data>
+  <data name="SitesHandoffGitChanges" xml:space="preserve"><value>{0} uncommitted changes</value></data>
+  <data name="SitesHandoffNotGit" xml:space="preserve"><value>Not a Git repository</value></data>
+  <data name="SitesHandoffEnvCheck" xml:space="preserve"><value>.env protection</value></data>
+  <data name="SitesHandoffEnvIgnored" xml:space="preserve"><value>Ignored by Git</value></data>
+  <data name="SitesHandoffEnvNotIgnored" xml:space="preserve"><value>Add .env to .gitignore</value></data>
+  <data name="SitesHandoffComposerValidate" xml:space="preserve"><value>Composer validation</value></data>
+  <data name="SitesHandoffComposerAudit" xml:space="preserve"><value>Composer security audit</value></data>
+  <data name="SitesHandoffNpmAudit" xml:space="preserve"><value>npm security audit</value></data>
+  <data name="SitesHandoffTests" xml:space="preserve"><value>Laravel tests</value></data>
+  <data name="SitesHandoffPassed" xml:space="preserve"><value>Passed</value></data>
+  <data name="SitesHandoffResultPass" xml:space="preserve"><value>- [PASS] **{0}**: {1}</value></data>
+  <data name="SitesHandoffResultFail" xml:space="preserve"><value>- [FAIL] **{0}**: {1}</value></data>
+  <data name="SitesBackupSymbolicDatabaseRejected" xml:space="preserve"><value>HerdMe will not back up a symbolic database file.</value></data>
+  <data name="SitesRestoreSymbolicDatabaseRejected" xml:space="preserve"><value>HerdMe will not replace a symbolic database file.</value></data>
+  <data name="Health_Ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="Health_EnvironmentMissing" xml:space="preserve"><value>.env is missing</value></data>
+  <data name="Health_LaravelCoreFilesMissing" xml:space="preserve"><value>artisan, bootstrap/app.php, or public/index.php is missing</value></data>
+  <data name="Health_NoPlatformRequirements" xml:space="preserve"><value>No explicit requirements</value></data>
+  <data name="Health_NodeModulesMissing" xml:space="preserve"><value>node_modules is missing</value></data>
+  <data name="Health_OtherPackageManager" xml:space="preserve"><value>Uses {0}; HerdMe will not run npm automatically</value></data>
+  <data name="Health_AppKeyMissing" xml:space="preserve"><value>APP_KEY is missing</value></data>
+  <data name="Health_AppKeyConfigured" xml:space="preserve"><value>APP_KEY is configured</value></data>
+  <data name="Health_MissingEnvironment" xml:space="preserve"><value>Missing: {0}</value></data>
+  <data name="Health_StorageNotWritable" xml:space="preserve"><value>Laravel writable directories are missing or read-only</value></data>
+  <data name="Health_Configured" xml:space="preserve"><value>Configured</value></data>
+  <data name="Health_ConfigureDatabase" xml:space="preserve"><value>Configure a site database in .env</value></data>
+  <data name="Health_LogSize" xml:space="preserve"><value>{0} MB</value></data>
+  <data name="Health_NotPresent" xml:space="preserve"><value>Not present</value></data>
+  <data name="Health_Valid" xml:space="preserve"><value>Valid</value></data>
+  <data name="Health_InvalidJson" xml:space="preserve"><value>Invalid JSON</value></data>
+  <data name="Health_NoNodeConstraint" xml:space="preserve"><value>No version constraint</value></data>
+  <data name="Health_RequiresNode" xml:space="preserve"><value>Requires Node {0}</value></data>
+  <data name="Health_RequiresNodeConfigured" xml:space="preserve"><value>Requires Node {0}; configured {1}</value></data>
+  <data name="Health_PackageJsonInvalid" xml:space="preserve"><value>package.json is invalid</value></data>
+  <data name="Health_PortAccepts" xml:space="preserve"><value>Port {0} accepts connections</value></data>
+  <data name="Health_PortError" xml:space="preserve"><value>Port {0}: {1}</value></data>
+  <data name="Health_ComposerJsonInvalid" xml:space="preserve"><value>composer.json is invalid</value></data>
+  <data name="DashboardRepairProgressInfoBar.Title" xml:space="preserve"><value>Repairing the environment</value></data>
+  <data name="DashboardRepairCancelButton.Content" xml:space="preserve"><value>Cancel</value></data>
+  <data name="DashboardRepairCancelButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Cancel repair</value></data>
+  <data name="Dashboard_Health_CertificateExpires" xml:space="preserve"><value>HTTPS certificate expires {0}</value></data>
+  <data name="Dashboard_Health_ServiceUnhealthy" xml:space="preserve"><value>{0}: Service health - {1}</value></data>
+  <data name="Dashboard_Health_DuplicatePort" xml:space="preserve"><value>Services: Duplicate port {0} - {1}</value></data>
+  <data name="Dashboard_Repair_Cancelling" xml:space="preserve"><value>Cancelling and stopping running tools...</value></data>
+  <data name="Dashboard_Repair_Cancelled" xml:space="preserve"><value>The repair was cancelled before it finished.</value></data>
+  <data name="Dashboard_Repair_ProgressCount" xml:space="preserve"><value>Step {0} of {1}</value></data>
+  <data name="Dashboard_Repair_StepPreparing" xml:space="preserve"><value>Checking linked sites...</value></data>
+  <data name="Dashboard_Repair_StepDomains" xml:space="preserve"><value>Updating local domains...</value></data>
+  <data name="Dashboard_Repair_StepCertificate" xml:space="preserve"><value>Trusting the HTTPS certificate...</value></data>
+  <data name="Dashboard_Repair_StepEnvironment" xml:space="preserve"><value>Starting the local environment...</value></data>
+  <data name="Dashboard_Repair_StepServices" xml:space="preserve"><value>Starting stopped services...</value></data>
+  <data name="Dashboard_Repair_StepSite" xml:space="preserve"><value>Repairing {0} (site {1} of {2})</value></data>
+  <data name="Dashboard_Repair_StepSiteCommand" xml:space="preserve"><value>{0}: running {1}</value></data>
+  <data name="Dashboard_Repair_StepDevServers" xml:space="preserve"><value>Restarting development servers...</value></data>
+  <data name="Dashboard_Repair_LocalDomainsFailed" xml:space="preserve"><value>Local domains: {0}</value></data>
+  <data name="Dashboard_Repair_CertificateFailed" xml:space="preserve"><value>HTTPS certificate: {0}</value></data>
+  <data name="Dashboard_Repair_EnvironmentFailed" xml:space="preserve"><value>Local environment: {0}</value></data>
+  <data name="Dashboard_Repair_DevServersFailed" xml:space="preserve"><value>Development servers: {0}</value></data>
+  <data name="Dashboard_Repair_ServiceNotInstalled" xml:space="preserve"><value>{0}: service runtime is not installed</value></data>
+  <data name="Dashboard_Repair_UnknownProcess" xml:space="preserve"><value>process {0}</value></data>
+  <data name="Dashboard_Repair_UnknownProcessId" xml:space="preserve"><value>unknown</value></data>
+  <data name="Dashboard_Repair_ServicePortInUse" xml:space="preserve"><value>{0}: port {1} is already in use by {2}</value></data>
+  <data name="Dashboard_Repair_ServiceStartFailed" xml:space="preserve"><value>{0}: could not start ({1})</value></data>
+  <data name="Dashboard_Repair_FolderMissing" xml:space="preserve"><value>{0}: project folder is missing</value></data>
+  <data name="Dashboard_Repair_LowDiskSpace" xml:space="preserve"><value>{0}: less than 1 GB free on {1}</value></data>
+  <data name="Dashboard_Repair_EnvTrackedByGit" xml:space="preserve"><value>{0}: .env is tracked by Git; remove it from the index manually</value></data>
+  <data name="Dashboard_Repair_PhpRequiredForCache" xml:space="preserve"><value>{0}: PHP {1} is required for Laravel cache repairs</value></data>
+  <data name="Dashboard_Repair_PhpRequiredForStorageLink" xml:space="preserve"><value>{0}: PHP {1} is required to create public/storage</value></data>
+  <data name="Dashboard_Repair_CommandFailed" xml:space="preserve"><value>{0}: {1} failed</value></data>
+  <data name="Dashboard_Repair_CommandCouldNotRun" xml:space="preserve"><value>{0}: {1} could not run ({2})</value></data>
+  <data name="Dashboard_Repair_CommandReportedProblems" xml:space="preserve"><value>{0}: {1} reported problems</value></data>
+  <data name="Dashboard_Repair_ComposerInstallFailed" xml:space="preserve"><value>{0}: Composer install failed</value></data>
+  <data name="Dashboard_Repair_ComposerPlatformRequirements" xml:space="preserve"><value>{0}: Composer platform requirements are not satisfied</value></data>
+  <data name="Dashboard_Repair_OtherPackageManager" xml:space="preserve"><value>{0}: uses {1}; install dependencies with that package manager</value></data>
+  <data name="Dashboard_Repair_LockFileNotInstallable" xml:space="preserve"><value>{0}: package-lock.json is not installable with npm ci</value></data>
+  <data name="Dashboard_Repair_NpmAuditVulnerabilities" xml:space="preserve"><value>{0}: npm audit found high-severity vulnerabilities</value></data>
+  <data name="Dashboard_Repair_MigrationStatusFailed" xml:space="preserve"><value>{0}: database or migration status could not be read</value></data>
 </root>

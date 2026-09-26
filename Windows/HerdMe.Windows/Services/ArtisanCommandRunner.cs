@@ -298,6 +298,7 @@ public static class ArtisanCommandRunner
 
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("The selected PHP runtime could not start Artisan.");
+        using var job = WindowsJobObject.TryAttach(process);
         var capture = new BoundedOutputCapture(MaximumCapturedCharacters);
         var capturedStandardOutput = new BoundedOutputCapture(MaximumCapturedCharacters);
         var capturedStandardError = new BoundedOutputCapture(MaximumCapturedCharacters);
@@ -333,13 +334,13 @@ public static class ArtisanCommandRunner
                 // The process exited while cancellation was being delivered.
             }
             await process.WaitForExitAsync(CancellationToken.None);
-            await Task.WhenAll(standardOutput, standardError);
+            await WindowsJobObject.DrainOutputAsync(job, standardOutput, standardError);
             cancellationToken.ThrowIfCancellationRequested();
             throw new TimeoutException(
                 $"The Artisan command did not finish within {timeout.TotalMinutes:0} minutes."
             );
         }
-        await Task.WhenAll(standardOutput, standardError);
+        await WindowsJobObject.DrainOutputAsync(job, standardOutput, standardError);
         return new ArtisanCommandResult(
             process.ExitCode,
             capture.Value,

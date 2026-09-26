@@ -31,7 +31,7 @@ public sealed class NodeRuntimeInstaller
         try
         {
             return File.Exists(SettingsPath)
-                ? JsonSerializer.Deserialize<NodeRuntimeSettings>(File.ReadAllText(SettingsPath)) ?? new()
+                ? JsonSerializer.Deserialize<NodeRuntimeSettings>(SettingsFileCache.ReadAllText(SettingsPath)) ?? new()
                 : new();
         }
         catch (JsonException)
@@ -55,6 +55,7 @@ public sealed class NodeRuntimeInstaller
             JsonSerializer.Serialize(new NodeRuntimeSettings { ActiveVersion = version }, JsonOptions)
         );
         File.Move(temporary, SettingsPath, true);
+        SettingsFileCache.Invalidate(SettingsPath);
         EnsureCommandShims(version);
     }
 
@@ -255,6 +256,7 @@ public sealed class NodeRuntimeInstaller
             SettingsPath,
             JsonSerializer.Serialize(new NodeRuntimeSettings { ActiveVersion = fallback ?? string.Empty }, JsonOptions)
         );
+        SettingsFileCache.Invalidate(SettingsPath);
         if (fallback is not null) EnsureCommandShims(fallback);
         else RemoveCommandShims();
     }

@@ -55,7 +55,7 @@ public sealed partial class SitesPage
                             progress,
                             cancellationToken
                         );
-                        report.AppendLine("[OK] composer update");
+                        report.AppendLine(AppLocalization.Format("SitesWorkflowStepDone", "composer update"));
                     }
                     if (File.Exists(Path.Combine(site.Path, "package.json")))
                     {
@@ -66,7 +66,7 @@ public sealed partial class SitesPage
                             progress,
                             cancellationToken
                         );
-                        report.AppendLine("[OK] npm update");
+                        report.AppendLine(AppLocalization.Format("SitesWorkflowStepDone", "npm update"));
                         if (HasNpmScript(site.Path, "build"))
                         {
                             await RunNpmScriptWorkflowAsync(
@@ -75,7 +75,7 @@ public sealed partial class SitesPage
                                 progress,
                                 cancellationToken
                             );
-                            report.AppendLine("[OK] npm run build");
+                            report.AppendLine(AppLocalization.Format("SitesWorkflowStepDone", "npm run build"));
                         }
                     }
                     if (File.Exists(Path.Combine(site.Path, "artisan")))
@@ -96,7 +96,10 @@ public sealed partial class SitesPage
                             progress,
                             cancellationToken
                         );
-                        report.AppendLine("[OK] migrations and cache cleanup");
+                        report.AppendLine(AppLocalization.Format(
+                            "SitesWorkflowStepDone",
+                            AppLocalization.Get("SitesWorkflowMigrationsStep")
+                        ));
                     }
                 }
                 catch (Exception error)
@@ -403,10 +406,10 @@ public sealed partial class SitesPage
             async (progress, cancellationToken) =>
             {
                 var report = new StringBuilder()
-                    .AppendLine($"# HerdMe handoff report: {site.Name}")
+                    .AppendLine(AppLocalization.Format("SitesHandoffReportTitle", site.Name))
                     .AppendLine()
-                    .AppendLine($"Generated: {DateTimeOffset.Now:g}")
-                    .AppendLine($"Path: `{site.Path}`")
+                    .AppendLine(AppLocalization.Format("SitesHandoffGenerated", DateTimeOffset.Now.ToString("g")))
+                    .AppendLine(AppLocalization.Format("SitesHandoffPath", site.Path))
                     .AppendLine();
                 WorkflowTools? tools = null;
                 if (File.Exists(Path.Combine(site.Path, "composer.json"))
@@ -417,16 +420,20 @@ public sealed partial class SitesPage
                 var git = await SitePresentation.InspectGitAsync(site.Path, cancellationToken);
                 AddAuditResult(
                     report,
-                    "Git working tree",
+                    AppLocalization.Get("SitesHandoffGitCheck"),
                     git.IsRepository && git.ChangeCount == 0,
-                    git.IsRepository ? $"{git.ChangeCount} uncommitted changes" : "Not a Git repository"
+                    git.IsRepository
+                        ? AppLocalization.Format("SitesHandoffGitChanges", git.ChangeCount)
+                        : AppLocalization.Get("SitesHandoffNotGit")
                 );
                 var environmentPath = Path.Combine(site.Path, ".env");
                 var ignorePath = Path.Combine(site.Path, ".gitignore");
                 var ignoresEnvironment = File.Exists(ignorePath)
                     && File.ReadLines(ignorePath).Any(line => line.Trim() is ".env" or "/.env");
-                AddAuditResult(report, ".env protection", File.Exists(environmentPath)
-                    && ignoresEnvironment, ignoresEnvironment ? "Ignored by Git" : "Add .env to .gitignore");
+                AddAuditResult(report, AppLocalization.Get("SitesHandoffEnvCheck"), File.Exists(environmentPath)
+                    && ignoresEnvironment, AppLocalization.Get(
+                        ignoresEnvironment ? "SitesHandoffEnvIgnored" : "SitesHandoffEnvNotIgnored"
+                    ));
 
                 if (File.Exists(Path.Combine(site.Path, "composer.json")))
                 {
@@ -459,6 +466,7 @@ public sealed partial class SitesPage
     {
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
             Title = AppLocalization.Get(titleKey),
             Content = new TextBlock
@@ -811,12 +819,12 @@ public sealed partial class SitesPage
     {
         if ((File.GetAttributes(source) & FileAttributes.ReparsePoint) != 0)
         {
-            throw new InvalidOperationException("HerdMe will not back up a symbolic database file.");
+            throw new InvalidOperationException(AppLocalization.Get("SitesBackupSymbolicDatabaseRejected"));
         }
         if ((File.Exists(destination) || Directory.Exists(destination))
             && (File.GetAttributes(destination) & FileAttributes.ReparsePoint) != 0)
         {
-            throw new InvalidOperationException("HerdMe will not replace a symbolic database file.");
+            throw new InvalidOperationException(AppLocalization.Get("SitesRestoreSymbolicDatabaseRejected"));
         }
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
         await using var input = new FileStream(
@@ -960,8 +968,8 @@ public sealed partial class SitesPage
     {
         foreach (var check in new[]
         {
-            ("Composer validation", (IReadOnlyList<string>)["validate", "--no-interaction"]),
-            ("Composer security audit", (IReadOnlyList<string>)["audit", "--no-interaction"])
+            (AppLocalization.Get("SitesHandoffComposerValidate"), (IReadOnlyList<string>)["validate", "--no-interaction"]),
+            (AppLocalization.Get("SitesHandoffComposerAudit"), (IReadOnlyList<string>)["audit", "--no-interaction"])
         })
         {
             try
@@ -973,7 +981,7 @@ public sealed partial class SitesPage
                     progress,
                     cancellationToken
                 );
-                AddAuditResult(report, check.Item1, true, "Passed");
+                AddAuditResult(report, check.Item1, true, AppLocalization.Get("SitesHandoffPassed"));
             }
             catch (Exception error)
             {
@@ -998,11 +1006,11 @@ public sealed partial class SitesPage
                 progress,
                 cancellationToken
             );
-            AddAuditResult(report, "npm security audit", true, "Passed");
+            AddAuditResult(report, AppLocalization.Get("SitesHandoffNpmAudit"), true, AppLocalization.Get("SitesHandoffPassed"));
         }
         catch (Exception error)
         {
-            AddAuditResult(report, "npm security audit", false, TrimReport(error.Message));
+            AddAuditResult(report, AppLocalization.Get("SitesHandoffNpmAudit"), false, TrimReport(error.Message));
         }
     }
 
@@ -1024,17 +1032,21 @@ public sealed partial class SitesPage
                 progress,
                 cancellationToken
             );
-            AddAuditResult(report, "Laravel tests", true, "Passed");
+            AddAuditResult(report, AppLocalization.Get("SitesHandoffTests"), true, AppLocalization.Get("SitesHandoffPassed"));
         }
         catch (Exception error)
         {
-            AddAuditResult(report, "Laravel tests", false, TrimReport(error.Message));
+            AddAuditResult(report, AppLocalization.Get("SitesHandoffTests"), false, TrimReport(error.Message));
         }
     }
 
     private static void AddAuditResult(StringBuilder report, string name, bool success, string detail)
     {
-        report.AppendLine($"- {(success ? "[PASS]" : "[FAIL]")} **{name}**: {detail.ReplaceLineEndings(" ")}");
+        report.AppendLine(AppLocalization.Format(
+            success ? "SitesHandoffResultPass" : "SitesHandoffResultFail",
+            name,
+            detail.ReplaceLineEndings(" ")
+        ));
     }
 
     private static string TrimReport(string value) => value.Length <= 2_000

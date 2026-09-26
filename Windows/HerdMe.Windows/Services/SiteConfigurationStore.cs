@@ -48,7 +48,8 @@ public sealed class SiteConfigurationStore
         LastBackupPath = null;
         try
         {
-            var json = File.ReadAllText(SettingsPath);
+            // Pages load settings repeatedly on the UI thread; reuse the unchanged file text.
+            var json = SettingsFileCache.ReadAllText(SettingsPath);
             using var document = JsonDocument.Parse(json);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
@@ -100,6 +101,7 @@ public sealed class SiteConfigurationStore
 
     private void PreserveUnreadableSettings()
     {
+        SettingsFileCache.Invalidate(SettingsPath);
         var backupPath = Path.Combine(
             Path.GetDirectoryName(SettingsPath)!,
             $"sites.corrupt-{Guid.NewGuid():N}.json"
@@ -119,6 +121,7 @@ public sealed class SiteConfigurationStore
 
     private void PreserveUnsupportedSettings(int schemaVersion)
     {
+        SettingsFileCache.Invalidate(SettingsPath);
         var backupPath = Path.Combine(
             Path.GetDirectoryName(SettingsPath)!,
             $"sites.unsupported-v{schemaVersion}-{Guid.NewGuid():N}.json"
@@ -154,6 +157,7 @@ public sealed class SiteConfigurationStore
         var temporary = SettingsPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         WriteDurably(temporary, JsonSerializer.Serialize(normalized, JsonOptions));
         File.Move(temporary, SettingsPath, true);
+        SettingsFileCache.Invalidate(SettingsPath);
     }
 
     private static void WriteDurably(string path, string contents)

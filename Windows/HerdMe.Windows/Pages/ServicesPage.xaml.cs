@@ -20,6 +20,9 @@ public sealed partial class ServicesPage : Page
     private CancellationTokenSource? refreshCancellation;
     private CancellationTokenSource? operationCancellation;
     private string? operationDefinitionId;
+    // Last resolved release versions, so a refresh renders once with the known update flags.
+    private IReadOnlyDictionary<string, string> knownLatestVersions =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyList<ManagedServiceDefinition> Definitions { get; } = ManagedServiceCatalog.All;
 
@@ -48,7 +51,7 @@ public sealed partial class ServicesPage : Page
             ServicePortBox.IsEnabled = false;
             AddServiceButton.IsEnabled = false;
             ServiceAvailabilityText.Text = RuntimeCatalog.LoadIssue
-                ?? "The bundled service catalog could not be loaded.";
+                ?? AppLocalization.Get("ServicesCatalogUnavailable");
             ServiceAvailabilityText.Visibility = Visibility.Visible;
         }
     }
@@ -313,6 +316,7 @@ public sealed partial class ServicesPage : Page
         content.Children.Add(picker);
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
             Title = AppLocalization.Get("ServicesBackupsTitle"),
             Content = content,
@@ -353,6 +357,7 @@ public sealed partial class ServicesPage : Page
         }
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
             Title = AppLocalization.Get("ServicesPortRepairTitle"),
             Content = AppLocalization.Format(
@@ -456,6 +461,7 @@ public sealed partial class ServicesPage : Page
             content.Children.Add(pathText);
             var dialog = new ContentDialog
             {
+                FlowDirection = AppLocalization.LayoutDirection,
                 XamlRoot = XamlRoot,
                 Title = AppLocalization.Format("ServicesEnvironmentDialogTitle", instance.Name),
                 Content = content,
@@ -557,6 +563,7 @@ public sealed partial class ServicesPage : Page
         if (!TryGetInstance(sender, out var instance)) return;
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
             Title = AppLocalization.Format("ServicesDeleteTitle", instance.Name),
             Content = AppLocalization.Get("ServicesDeleteMessage"),
@@ -587,10 +594,8 @@ public sealed partial class ServicesPage : Page
         try
         {
             var instances = manager.LoadInstances();
-            RenderRows(
-                instances,
-                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            );
+            var knownVersions = knownLatestVersions;
+            RenderRows(instances, knownVersions);
             var installedDefinitionIds = instances
                 .Select(instance => instance.DefinitionId)
                 .Where(manager.IsInstalled)
@@ -613,16 +618,19 @@ public sealed partial class ServicesPage : Page
                     return (DefinitionId: definitionId, Version: (string?)null);
                 }
             });
-            var latestVersions = (await Task.WhenAll(releaseTasks))
-                .Where(result => result.Version is not null)
-                .ToDictionary(
-                    result => result.DefinitionId,
-                    result => result.Version!,
-                    StringComparer.OrdinalIgnoreCase
-                );
+            var latestVersions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var result in await Task.WhenAll(releaseTasks))
+            {
+                // A failed lookup keeps the last known release instead of hiding the update.
+                var version = result.Version
+                    ?? (knownVersions.TryGetValue(result.DefinitionId, out var known) ? known : null);
+                if (version is not null) latestVersions[result.DefinitionId] = version;
+            }
             cancellation.Token.ThrowIfCancellationRequested();
             if (!loaded) return;
-            RenderRows(instances, latestVersions);
+            knownLatestVersions = latestVersions;
+            // The second pass only runs when a release lookup changed an update flag.
+            if (!SameVersions(knownVersions, latestVersions)) RenderRows(instances, latestVersions);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
@@ -642,13 +650,13 @@ public sealed partial class ServicesPage : Page
         refreshing = true;
         try
         {
-            Rows.Clear();
+            var rows = new List<ManagedServiceRow>(instances.Count);
             foreach (var instance in instances)
             {
                 var installedVersion = manager.InstalledVersion(instance.DefinitionId);
                 latestVersions.TryGetValue(instance.DefinitionId, out var latestVersion);
                 var state = manager.State(instance.Id, instance.DefinitionId);
-                Rows.Add(new ManagedServiceRow
+                rows.Add(new ManagedServiceRow
                 {
                     Id = instance.Id,
                     DefinitionId = instance.DefinitionId,
@@ -672,6 +680,20 @@ public sealed partial class ServicesPage : Page
                         : null
                 });
             }
+            if (rows.Count == Rows.Count && rows.Select((row, index) => row.Id == Rows[index].Id).All(same => same))
+            {
+                // Same services in the same order: replace only changed rows so open flyouts
+                // and focus on unchanged rows survive the refresh.
+                for (var index = 0; index < rows.Count; index++)
+                {
+                    if (!SameRow(Rows[index], rows[index])) Rows[index] = rows[index];
+                }
+            }
+            else
+            {
+                Rows.Clear();
+                foreach (var row in rows) Rows.Add(row);
+            }
             ServiceList.Visibility = Rows.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
             EmptyState.Visibility = Rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             if (!working)
@@ -689,6 +711,33 @@ public sealed partial class ServicesPage : Page
         {
             refreshing = false;
         }
+    }
+
+    private static bool SameVersions(
+        IReadOnlyDictionary<string, string> left,
+        IReadOnlyDictionary<string, string> right
+    )
+    {
+        return left.Count == right.Count
+            && left.All(pair => right.TryGetValue(pair.Key, out var value)
+                && string.Equals(pair.Value, value, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool SameRow(ManagedServiceRow left, ManagedServiceRow right)
+    {
+        return left.Id == right.Id
+            && left.DefinitionId == right.DefinitionId
+            && left.Name == right.Name
+            && left.Port == right.Port
+            && left.Version == right.Version
+            && left.State == right.State
+            && left.Status == right.Status
+            && left.InstallLabel == right.InstallLabel
+            && left.ToggleLabel == right.ToggleLabel
+            && left.StartAutomatically == right.StartAutomatically
+            && left.IsUpdateAvailable == right.IsUpdateAvailable
+            && left.ConsolePort == right.ConsolePort
+            && left.ConnectionDisplay == right.ConnectionDisplay;
     }
 
     private bool TryGetInstance(object sender, out ManagedServiceInstance instance)
@@ -795,6 +844,7 @@ public sealed partial class ServicesPage : Page
         }
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = xamlRoot,
             Title = title,
             Content = message,

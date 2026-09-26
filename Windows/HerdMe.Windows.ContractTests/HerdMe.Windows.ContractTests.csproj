@@ -35,6 +35,7 @@
     <Compile Include="../HerdMe.Windows/Services/CapturePreview.cs" Link="Services/CapturePreview.cs" />
     <Compile Include="../HerdMe.Windows/Services/CaptureExport.cs" Link="Services/CaptureExport.cs" />
     <Compile Include="CapturePersistenceContractChecks.cs" />
+    <Compile Include="PerformanceContractChecks.cs" />
     <Compile Include="../HerdMe.Windows/Services/CaptureRefreshSession.cs" Link="Services/CaptureRefreshSession.cs" />
     <Compile Include="../HerdMe.Windows/Services/ApplicationTaskLifetime.cs" Link="Services/ApplicationTaskLifetime.cs" />
     <Compile Include="../HerdMe.Windows/Models/CoreModels.cs" Link="Models/CoreModels.cs" />
@@ -72,6 +73,7 @@
     <Compile Include="../HerdMe.Windows/Services/SafeZipExtractor.cs" Link="Services/SafeZipExtractor.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsJobObject.cs" Link="Services/WindowsJobObject.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsServiceManager.cs" Link="Services/WindowsServiceManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ManagedServiceShutdown.cs" Link="Services/ManagedServiceShutdown.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsCredentialStore.cs" Link="Services/WindowsCredentialStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsServiceCredentialStore.cs" Link="Services/WindowsServiceCredentialStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/DumpCaptureService.cs" Link="Services/DumpCaptureService.cs" />
@@ -116,6 +118,9 @@
     <Compile Include="../HerdMe.Windows/Services/WindowsStartupManager.cs" Link="Services/WindowsStartupManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsUserPathManager.cs" Link="Services/WindowsUserPathManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/XdebugManager.cs" Link="Services/XdebugManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/PhpModuleProbeCache.cs" Link="Services/PhpModuleProbeCache.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SettingsFileCache.cs" Link="Services/SettingsFileCache.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ServiceText.cs" Link="Services/ServiceText.cs" />
   </ItemGroup>
 
   <ItemGroup>

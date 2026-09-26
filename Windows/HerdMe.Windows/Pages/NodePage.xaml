@@ -5,25 +5,34 @@
     xmlns:models="using:HerdMe.Windows.Models"
     AutomationProperties.AutomationId="NodePageRoot"
     Loaded="Page_Loaded">
-    <Grid Padding="{StaticResource PagePadding}" RowSpacing="16">
+    <Grid Padding="{StaticResource PagePadding}" RowSpacing="16" MaxWidth="1000" HorizontalAlignment="Stretch">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <Grid ColumnSpacing="16">
+        <Grid Style="{StaticResource PageHeaderStyle}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel Spacing="4">
+            <StackPanel Spacing="2">
                 <TextBlock x:Uid="NodePageTitle" AutomationProperties.AutomationId="NodePageRoot" Text="Node.js" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock x:Uid="NodePageDescription" Text="Official Windows runtimes managed by HerdMe" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock x:Uid="NodePageDescription" Text="Official Windows runtimes managed by HerdMe" Style="{StaticResource PageSubtitleStyle}" />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
                     <ProgressRing x:Name="OperationProgress" Width="16" Height="16" IsActive="False" Visibility="Collapsed" />
-                    <TextBlock x:Name="OperationStatusText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                    <TextBlock x:Name="OperationStatusText" VerticalAlignment="Center" Style="{StaticResource SettingsRowDescriptionStyle}" />
                 </StackPanel>
             </StackPanel>
-            <Button Grid.Column="1" VerticalAlignment="Top" Click="Refresh_Click" Style="{StaticResource ToolbarIconButtonStyle}">
+            <Button
+                x:Uid="NodeRefreshButton"
+                Grid.Column="1"
+                VerticalAlignment="Top"
+                AutomationProperties.Name="Refresh Node.js versions"
+                Click="Refresh_Click"
+                Style="{StaticResource ToolbarIconButtonStyle}">
+                <Button.KeyboardAccelerators>
+                    <KeyboardAccelerator Key="F5" />
+                </Button.KeyboardAccelerators>
                 <ToolTipService.ToolTip>
                     <ToolTip><TextBlock x:Uid="NodeRefreshTooltip" Text="Refresh Node.js versions" /></ToolTip>
                 </ToolTipService.ToolTip>
@@ -31,51 +40,68 @@
             </Button>
         </Grid>
 
-        <Border Grid.Row="1" Style="{StaticResource SectionDividerStyle}">
-            <ListView ItemsSource="{x:Bind Rows}">
+        <Border Grid.Row="1" Style="{StaticResource SettingsGroupStyle}">
+            <ListView ItemsSource="{x:Bind Rows}" SelectionMode="None" Padding="0,0,0,6">
                 <ListView.Header>
-                    <Grid Padding="18,6" ColumnSpacing="16" Background="{ThemeResource SubtleSurfaceBrush}">
+                    <Grid Padding="24,10,24,10" ColumnSpacing="16" Background="{ThemeResource SubtleFillColorTertiaryBrush}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="100" />
-                            <ColumnDefinition Width="150" />
-                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="170" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Uid="NodeMajorColumn" Text="Major" FontWeight="SemiBold" />
-                        <TextBlock x:Uid="NodeVersionColumn" Grid.Column="1" Text="Version" FontWeight="SemiBold" />
-                        <TextBlock x:Uid="NodeStatusColumn" Grid.Column="2" Text="Status" FontWeight="SemiBold" />
+                        <TextBlock x:Uid="NodeMajorColumn" Text="Major" Style="{StaticResource CaptionTextStyle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Uid="NodeVersionColumn" Grid.Column="1" Text="Version" Style="{StaticResource CaptionTextStyle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Uid="NodeStatusColumn" Grid.Column="2" Text="Status" Style="{StaticResource CaptionTextStyle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                     </Grid>
                 </ListView.Header>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="models:NodeRuntimeRow">
-                        <Grid Padding="10,8" ColumnSpacing="16">
+                        <Grid Padding="12,6" ColumnSpacing="16">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="100" />
-                                <ColumnDefinition Width="150" />
-                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="170" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="{x:Bind Major}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="{x:Bind DisplayVersion}" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="{x:Bind Status}" VerticalAlignment="Center" />
-                            <StackPanel Grid.Column="3" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Ellipse Style="{StaticResource StatusDotSuccessStyle}" Visibility="{x:Bind IsActive}" />
+                                <TextBlock Text="{x:Bind Major}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="1" Text="{x:Bind DisplayVersion}" VerticalAlignment="Center" IsTextSelectionEnabled="True" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="2" Text="{x:Bind Status}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Style="{StaticResource SettingsRowDescriptionStyle}" TextWrapping="NoWrap" />
+                            <StackPanel Grid.Column="3" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="4">
                                 <Button
+                                    x:Uid="NodeInstallButton"
                                     Tag="{x:Bind Major}"
+                                    AutomationProperties.Name="Install or update"
                                     Click="Install_Click"
                                     Visibility="{x:Bind CanInstallOrUpdate}"
-                                    >
+                                    Style="{StaticResource ToolbarIconButtonStyle}">
                                     <ToolTipService.ToolTip>
                                         <ToolTip><TextBlock x:Uid="NodeInstallTooltip" Text="Install or update" /></ToolTip>
                                     </ToolTipService.ToolTip>
                                     <SymbolIcon Symbol="Download" />
                                 </Button>
-                                <Button Tag="{x:Bind Major}" Click="Use_Click" IsEnabled="{x:Bind IsInstalled}">
+                                <Button
+                                    x:Uid="NodeUseButton"
+                                    Tag="{x:Bind Major}"
+                                    AutomationProperties.Name="Use this version"
+                                    Click="Use_Click"
+                                    IsEnabled="{x:Bind IsInstalled}"
+                                    Style="{StaticResource ToolbarIconButtonStyle}">
                                     <ToolTipService.ToolTip>
                                         <ToolTip><TextBlock x:Uid="NodeUseTooltip" Text="Use this version" /></ToolTip>
                                     </ToolTipService.ToolTip>
                                     <SymbolIcon Symbol="Play" />
                                 </Button>
-                                <Button Tag="{x:Bind Major}" Click="Delete_Click" IsEnabled="{x:Bind IsInstalled}">
+                                <Button
+                                    x:Uid="NodeDeleteButton"
+                                    Tag="{x:Bind Major}"
+                                    AutomationProperties.Name="Delete this version"
+                                    Click="Delete_Click"
+                                    IsEnabled="{x:Bind IsInstalled}"
+                                    Style="{StaticResource ToolbarIconButtonStyle}">
                                     <ToolTipService.ToolTip>
                                         <ToolTip><TextBlock x:Uid="NodeDeleteTooltip" Text="Delete this version" /></ToolTip>
                                     </ToolTipService.ToolTip>

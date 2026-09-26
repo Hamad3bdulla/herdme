@@ -1,6 +1,7 @@
 using H.NotifyIcon;
 using H.NotifyIcon.Core;
 using HerdMe.Windows.Services;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -13,6 +14,14 @@ namespace HerdMe.Windows;
 public partial class App : Application
 {
     public static MainWindow MainWindow { get; private set; } = null!;
+
+    // True while the main window is shown and not minimized. Pages pause polling while hidden.
+    public static bool IsMainWindowVisible { get; private set; }
+
+    // Raised on the UI thread with the new visibility when the window is hidden to the tray,
+    // shown again, minimized, or restored.
+    public static event EventHandler<bool>? MainWindowVisibilityChanged;
+
     private readonly AppServices services = null!;
     private readonly SingleInstanceCoordinator singleInstance = null!;
     private readonly ApplicationTaskLifetime backgroundTasks = new();
@@ -47,6 +56,12 @@ public partial class App : Application
             Environment.Exit(0);
             return;
         }
+        ServiceText.Localize = key =>
+        {
+            if (string.IsNullOrWhiteSpace(key)) return null;
+            var value = AppLocalization.Get(key);
+            return value == key ? null : value;
+        };
         services = new AppServices();
         InitializeComponent();
         UnhandledException += App_UnhandledException;
@@ -75,15 +90,19 @@ public partial class App : Application
         MainWindow.InitialSetupCompleted += MainWindow_InitialSetupCompleted;
         MainWindow.Activated += MainWindow_Activated;
         MainWindow.Closed += MainWindow_Closed;
+        MainWindow.VisibilityChanged += MainWindow_VisibilityChanged;
+        MainWindow.AppWindow.Changed += MainWindow_AppWindowChanged;
         SystemEvents.PowerModeChanged += System_PowerModeChanged;
         if (!MainWindow.RequiresOnboarding
             && Environment.GetCommandLineArgs().Contains("--background", StringComparer.OrdinalIgnoreCase))
         {
             MainWindow.AppWindow.Hide();
+            SetMainWindowVisible(false);
         }
         else
         {
             MainWindow.Activate();
+            SetMainWindowVisible(true);
         }
         activationListener = ListenForActivationAsync();
         if (!MainWindow.RequiresOnboarding)
@@ -109,6 +128,7 @@ public partial class App : Application
     private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
     {
         if (args.WindowActivationState == WindowActivationState.Deactivated) return;
+        RefreshMainWindowVisibility();
         StartAutomaticUpdateCheckOnce();
         StartAutomaticUpdatePromptOnce();
     }
@@ -228,8 +248,7 @@ public partial class App : Application
                 MainWindow.DispatcherQueue.TryEnqueue(() =>
                 {
                     if (exitRequested) return;
-                    MainWindow.AppWindow.Show();
-                    MainWindow.Activate();
+                    ShowMainWindow();
                 });
             }
         });
@@ -245,8 +264,7 @@ public partial class App : Application
         openCommand.ExecuteRequested += (_, _) =>
         {
             if (exitRequested) return;
-            MainWindow.AppWindow.Show();
-            MainWindow.Activate();
+            ShowMainWindow();
         };
         var quitCommand = new XamlUICommand
         {
@@ -315,6 +333,44 @@ public partial class App : Application
         }
         args.Handled = true;
         MainWindow.AppWindow.Hide();
+        SetMainWindowVisible(false);
+    }
+
+    private static void ShowMainWindow()
+    {
+        MainWindow.AppWindow.Show();
+        MainWindow.Activate();
+        SetMainWindowVisible(true);
+    }
+
+    private void MainWindow_VisibilityChanged(object sender, WindowVisibilityChangedEventArgs args)
+    {
+        if (exitRequested) return;
+        RefreshMainWindowVisibility();
+    }
+
+    private void MainWindow_AppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        if (exitRequested) return;
+        RefreshMainWindowVisibility();
+    }
+
+    private void RefreshMainWindowVisibility()
+    {
+        if (exitRequested || MainWindow is null) return;
+        var appWindow = MainWindow.AppWindow;
+        var minimized = appWindow.Presenter is OverlappedPresenter
+        {
+            State: OverlappedPresenterState.Minimized
+        };
+        SetMainWindowVisible(appWindow.IsVisible && !minimized);
+    }
+
+    private static void SetMainWindowVisible(bool visible)
+    {
+        if (IsMainWindowVisible == visible) return;
+        IsMainWindowVisible = visible;
+        MainWindowVisibilityChanged?.Invoke(null, visible);
     }
 
     private async void QuitCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)
@@ -332,7 +388,10 @@ public partial class App : Application
         exitRequested = true;
         singleInstance.WakeListener();
         SystemEvents.PowerModeChanged -= System_PowerModeChanged;
+        MainWindow.VisibilityChanged -= MainWindow_VisibilityChanged;
+        MainWindow.AppWindow.Changed -= MainWindow_AppWindowChanged;
         MainWindow.PrepareForShutdown();
+        SetMainWindowVisible(false);
         trayIcon?.Dispose();
         trayIcon = null;
         await StopAndLogAsync("background operations", backgroundTasks.StopAsync);
@@ -398,7 +457,9 @@ public partial class App : Application
 
     private async Task StartBackgroundServicesAsync(CancellationToken cancellationToken)
     {
-        await StartAndLogAsync("command-line path", () =>
+        // Independent listeners and processes start together off the UI thread. The
+        // environment orders its own certificate, hosts, and HTTP server work internally.
+        var commandLinePath = StartAndLogAsync("command-line path", () => Task.Run(() =>
         {
             services.NodeInstaller.RepairActiveCommandShims();
             services.UserPath.Synchronize(
@@ -406,27 +467,44 @@ public partial class App : Application
                     services.RuntimePolicy.Load().PhpCycle
                 )
             );
-            return Task.CompletedTask;
-        }, cancellationToken);
-        await StartAndLogAsync(
+        }, cancellationToken), cancellationToken);
+        var mailCapture = StartAndLogAsync(
             "mail capture",
-            () => services.Mail.StartAsync(cancellationToken: cancellationToken),
+            () => Task.Run(
+                () => services.Mail.StartAsync(cancellationToken: cancellationToken),
+                cancellationToken
+            ),
             cancellationToken
         );
-        await StartAndLogAsync(
+        var dumpCapture = StartAndLogAsync(
             "dump capture",
-            () => services.Dumps.StartAsync(cancellationToken: cancellationToken),
+            () => Task.Run(
+                () => services.Dumps.StartAsync(cancellationToken: cancellationToken),
+                cancellationToken
+            ),
             cancellationToken
         );
-        await StartAndLogAsync(
+        var managedServices = StartAndLogAsync(
             "managed services",
-            () => services.Services.StartEnabledAsync(cancellationToken),
+            () => Task.Run(
+                () => services.Services.StartEnabledAsync(cancellationToken),
+                cancellationToken
+            ),
             cancellationToken
         );
-        await StartConfiguredEnvironmentAsync(cancellationToken);
+        var environment = Task.Run(
+            () => StartConfiguredEnvironmentAsync(cancellationToken),
+            cancellationToken
+        );
+        await Task.WhenAll(commandLinePath, mailCapture, dumpCapture, managedServices, environment);
+        // Tool installation rewrites PHP configuration and the user PATH, so it waits for the
+        // path repair and the running environment above.
         await StartAndLogAsync(
             "command-line tools",
-            () => services.InitialSetup.EnsureCommandLineToolsAsync(cancellationToken: cancellationToken),
+            () => Task.Run(
+                () => services.InitialSetup.EnsureCommandLineToolsAsync(cancellationToken: cancellationToken),
+                cancellationToken
+            ),
             cancellationToken
         );
     }
@@ -482,9 +560,15 @@ public partial class App : Application
             var dialog = new Microsoft.UI.Xaml.Controls.ContentDialog
             {
                 XamlRoot = root.XamlRoot,
-                Title = "HerdMe could not complete the operation",
-                Content = UnhandledExceptionPolicy.UserMessage(error),
-                CloseButtonText = "OK"
+                FlowDirection = AppLocalization.LayoutDirection,
+                Title = AppLocalization.Get("AppUnhandledErrorTitle"),
+                Content = new TextBlock
+                {
+                    Text = UnhandledExceptionPolicy.UserMessage(error),
+                    TextWrapping = TextWrapping.Wrap,
+                    IsTextSelectionEnabled = true
+                },
+                CloseButtonText = AppLocalization.Get("CommonOk")
             };
             await dialog.ShowAsync();
         }

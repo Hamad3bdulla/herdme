@@ -384,6 +384,10 @@ internal static partial class ContractChecks
                 && Directory.Exists(Path.Combine(debuggerSupportRoot, "Log", "xdebug")),
             "PHP launch options prepare the Xdebug log directory"
         );
+        Check(
+            debuggerPhpOptions["xdebug.mode"] == "debug",
+            "Xdebug runs in step-debug mode only, without develop-mode overhead"
+        );
 
         var xdebugFixture = """
             {

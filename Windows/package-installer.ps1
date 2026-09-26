@@ -66,6 +66,8 @@ function Find-InnoCompiler([string]$RequestedPath) {
 }
 
 & (Join-Path $repoRoot "scripts\check-version.ps1")
+# Resolve ISCC.exe first so a missing compiler never deletes the previous setup.exe.
+$compiler = Find-InnoCompiler $InnoCompiler
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 foreach ($oldOutput in @($installerPath, $checksumFile)) {
     if (Test-Path -LiteralPath $oldOutput) {
@@ -118,7 +120,6 @@ if ($releaseMode -eq "public") {
         -ExpectedThumbprint $thumbprint
 }
 
-$compiler = Find-InnoCompiler $InnoCompiler
 & $compiler `
     "/DMyAppVersion=$version" `
     "/DMyAppBuild=$buildNumber" `

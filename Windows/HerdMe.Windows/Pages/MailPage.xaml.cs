@@ -57,6 +57,23 @@ public sealed partial class MailPage : Page
         refreshSession = session;
         messageCapturedHandler = (_, _) => session.RequestRefresh();
         mail.MessageCaptured += messageCapturedHandler;
+        App.MainWindowVisibilityChanged -= App_MainWindowVisibilityChanged;
+        App.MainWindowVisibilityChanged += App_MainWindowVisibilityChanged;
+        // Polling pauses while the window is hidden to the tray or minimized.
+        if (App.IsMainWindowVisible) refreshTimer.Start();
+        UpdateServerState();
+        await ReloadAsync();
+    }
+
+    private async void App_MainWindowVisibilityChanged(object? sender, bool visible)
+    {
+        if (!loaded) return;
+        if (!visible)
+        {
+            refreshTimer.Stop();
+            return;
+        }
+        refreshSession?.RequestRefresh();
         refreshTimer.Start();
         UpdateServerState();
         await ReloadAsync();
@@ -65,6 +82,7 @@ public sealed partial class MailPage : Page
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
         loaded = false;
+        App.MainWindowVisibilityChanged -= App_MainWindowVisibilityChanged;
         refreshTimer.Stop();
         refreshSession?.Dispose();
         refreshSession = null;
@@ -148,6 +166,7 @@ public sealed partial class MailPage : Page
             if (XamlRoot is not { } xamlRoot) return;
             var dialog = new ContentDialog
             {
+                FlowDirection = AppLocalization.LayoutDirection,
                 XamlRoot = xamlRoot,
                 Title = AppLocalization.Get("MailEnvironmentDialogTitle"),
                 Content = content,
@@ -197,6 +216,16 @@ public sealed partial class MailPage : Page
         ApplyFilter();
     }
 
+    private void SearchAccelerator_Invoked(
+        Microsoft.UI.Xaml.Input.KeyboardAccelerator sender,
+        Microsoft.UI.Xaml.Input.KeyboardAcceleratorInvokedEventArgs args
+    )
+    {
+        args.Handled = true;
+        SearchBox.Focus(FocusState.Keyboard);
+        SearchBox.SelectAll();
+    }
+
     private async void Delete_Click(object sender, RoutedEventArgs e)
     {
         if (MessageList.SelectedItem is not CapturedMail message) return;
@@ -205,6 +234,24 @@ public sealed partial class MailPage : Page
 
     private async void Clear_Click(object sender, RoutedEventArgs e)
     {
+        if (mutating || !loaded || XamlRoot is not { } xamlRoot) return;
+        var generation = pageGeneration;
+        var dialog = new ContentDialog
+        {
+            FlowDirection = AppLocalization.LayoutDirection,
+            XamlRoot = xamlRoot,
+            Title = AppLocalization.Get("MailClearConfirmTitle"),
+            Content = new TextBlock
+            {
+                Text = AppLocalization.Get("MailClearConfirmMessage"),
+                TextWrapping = TextWrapping.Wrap
+            },
+            PrimaryButtonText = AppLocalization.Get("CommonDelete"),
+            CloseButtonText = AppLocalization.Get("CommonCancel"),
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (!loaded || generation != pageGeneration) return;
         await MutateAsync(mail.Clear);
     }
 
@@ -518,6 +565,9 @@ public sealed partial class MailPage : Page
             ? AppLocalization.Format("MailRunningOn", mail.Port)
             : AppLocalization.Get("MailStopped");
         ServerButtonIcon.Symbol = mail.IsRunning ? Symbol.Stop : Symbol.Play;
+        ServerStatusDot.Style = Views.StatusStyles.Dot(
+            mail.IsRunning ? Views.StatusTone.Success : Views.StatusTone.Neutral
+        );
     }
 
     private async Task ShowErrorAsync(string message)
@@ -530,6 +580,7 @@ public sealed partial class MailPage : Page
         if (!loaded || XamlRoot is not { } xamlRoot) return;
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = xamlRoot,
             Title = title,
             Content = message,

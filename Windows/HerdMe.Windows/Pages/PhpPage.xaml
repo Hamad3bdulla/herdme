@@ -4,15 +4,31 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     AutomationProperties.AutomationId="PhpPageRoot"
     Loaded="Page_Loaded">
+    <Page.Resources>
+        <Style x:Key="PhpSettingRowStyle" TargetType="Grid" BasedOn="{StaticResource SettingsRowStyle}">
+            <Setter Property="MinHeight" Value="56" />
+        </Style>
+        <Style x:Key="PhpSettingNumberStyle" TargetType="NumberBox">
+            <Setter Property="Width" Value="160" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="SpinButtonPlacementMode" Value="Compact" />
+        </Style>
+    </Page.Resources>
     <ScrollViewer>
-        <StackPanel Padding="{StaticResource PagePadding}" Spacing="16" MaxWidth="900" HorizontalAlignment="Stretch">
-            <Grid ColumnSpacing="16">
+        <StackPanel Style="{StaticResource PageContentStyle}">
+            <Grid Style="{StaticResource PageHeaderStyle}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Uid="PhpPageTitle" AutomationProperties.AutomationId="PhpPageRoot" Text="PHP" Style="{StaticResource PageTitleStyle}" />
-                <Button Grid.Column="1" Click="Refresh_Click" Style="{StaticResource ToolbarIconButtonStyle}">
+                <StackPanel Spacing="2">
+                    <TextBlock x:Uid="PhpPageTitle" AutomationProperties.AutomationId="PhpPageRoot" Text="PHP" Style="{StaticResource PageTitleStyle}" />
+                    <TextBlock x:Uid="PhpPageSubtitle" Text="Choose the PHP version, install tools, and tune php.ini settings." Style="{StaticResource PageSubtitleStyle}" />
+                </StackPanel>
+                <Button x:Uid="PhpRefreshButton" Grid.Column="1" VerticalAlignment="Center" AutomationProperties.Name="Refresh PHP status" Click="Refresh_Click" Style="{StaticResource ToolbarIconButtonStyle}">
+                    <Button.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="F5" />
+                    </Button.KeyboardAccelerators>
                     <ToolTipService.ToolTip>
                         <ToolTip><TextBlock x:Uid="PhpRefreshTooltip" Text="Refresh PHP status" /></ToolTip>
                     </ToolTipService.ToolTip>
@@ -20,44 +36,67 @@
                 </Button>
             </Grid>
 
-            <Border Style="{StaticResource SectionDividerStyle}">
-                <StackPanel Spacing="12">
-                    <TextBlock x:Uid="PhpLaravelRuntimeTitle" Text="Laravel runtime" Style="{StaticResource SectionTitleStyle}" />
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <ComboBox
-                            x:Name="PhpCycleBox"
-                            Width="120"
-                            SelectionChanged="PhpCycle_SelectionChanged" />
-                        <Button x:Name="InstallPhpButton" Click="InstallPhp_Click" Style="{StaticResource AccentButtonStyle}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <SymbolIcon Symbol="Download" />
-                                <TextBlock x:Name="InstallPhpButtonText" x:Uid="PhpInstallButton" Text="Install" />
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                    <TextBlock x:Name="PhpInstalledVersionText" FontWeight="SemiBold" />
-                    <TextBlock x:Name="PhpPathText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ProgressRing x:Name="RuntimeProgress" Width="16" Height="16" />
-                        <TextBlock x:Name="RuntimeStatusText" x:Uid="PhpChecking" Text="Checking" FontWeight="SemiBold" />
-                    </StackPanel>
-                    <TextBlock x:Name="ExtensionDetailText" TextWrapping="Wrap" />
-                    <TextBlock x:Name="BackgroundUpdateStatusText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <TextBlock x:Uid="PhpLaravelRuntimeTitle" Text="Laravel runtime" Style="{StaticResource SectionHeaderStyle}" />
+            <Border Style="{StaticResource SettingsGroupStyle}">
+                <StackPanel>
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE943;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Name="PhpInstalledVersionText" FontWeight="SemiBold" Style="{StaticResource SettingsRowTitleStyle}" />
+                            <TextBlock x:Name="PhpPathText" Style="{StaticResource SettingsRowDescriptionStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Style="{StaticResource SettingsRowControlStyle}">
+                            <ComboBox
+                                x:Name="PhpCycleBox"
+                                x:Uid="PhpCycleBoxInput"
+                                Width="120"
+                                AutomationProperties.Name="PHP version"
+                                SelectionChanged="PhpCycle_SelectionChanged" />
+                            <Button x:Name="InstallPhpButton" Click="InstallPhp_Click" Style="{StaticResource AccentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <SymbolIcon Symbol="Download" />
+                                    <TextBlock x:Name="InstallPhpButtonText" x:Uid="PhpInstallButton" Text="Install" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE9D9;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Name="RuntimeStatusText" x:Uid="PhpChecking" Text="Checking" Style="{StaticResource SettingsRowTitleStyle}" />
+                            <TextBlock x:Name="ExtensionDetailText" Style="{StaticResource SettingsRowDescriptionStyle}" />
+                            <TextBlock x:Name="BackgroundUpdateStatusText" Style="{StaticResource SettingsRowDescriptionStyle}" />
+                        </StackPanel>
+                        <ProgressRing x:Name="RuntimeProgress" Grid.Column="2" Width="16" Height="16" />
+                    </Grid>
                 </StackPanel>
             </Border>
 
-            <Border Style="{StaticResource SectionDividerStyle}">
-                <Grid ColumnSpacing="16">
+            <TextBlock x:Uid="PhpToolsTitle" Text="Composer and Laravel Installer" Style="{StaticResource SectionHeaderStyle}" />
+            <Border Style="{StaticResource SettingsGroupStyle}">
+                <Grid Style="{StaticResource SettingsRowStyle}">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel Spacing="5">
-                        <TextBlock x:Uid="PhpToolsTitle" Text="Composer and Laravel Installer" Style="{StaticResource SectionTitleStyle}" />
-                        <TextBlock x:Name="ComposerVersionText" x:Uid="PhpComposerNotInstalled" Text="Composer: Not installed" />
-                        <TextBlock x:Name="LaravelInstallerVersionText" x:Uid="PhpLaravelInstallerNotInstalled" Text="Laravel Installer: Not installed" />
+                    <FontIcon Glyph="&#xE756;" Style="{StaticResource SettingsRowIconStyle}" />
+                    <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}" Spacing="3">
+                        <TextBlock x:Name="ComposerVersionText" x:Uid="PhpComposerNotInstalled" Text="Composer: Not installed" Style="{StaticResource SettingsRowTitleStyle}" />
+                        <TextBlock x:Name="LaravelInstallerVersionText" x:Uid="PhpLaravelInstallerNotInstalled" Text="Laravel Installer: Not installed" Style="{StaticResource SettingsRowTitleStyle}" />
                     </StackPanel>
-                    <Button x:Name="InstallToolsButton" Grid.Column="1" VerticalAlignment="Center" Click="InstallTools_Click">
+                    <Button x:Name="InstallToolsButton" Grid.Column="2" VerticalAlignment="Center" Click="InstallTools_Click">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <SymbolIcon Symbol="Download" />
                             <TextBlock x:Name="InstallToolsButtonText" x:Uid="PhpInstallToolsButton" Text="Install" />
@@ -66,57 +105,98 @@
                 </Grid>
             </Border>
 
-            <Border Style="{StaticResource SectionDividerStyle}">
-                <StackPanel Spacing="14">
-                    <TextBlock x:Uid="PhpSettingsTitle" Text="PHP settings" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock x:Uid="PhpSettingsDescription" Text="These values are saved separately for the selected PHP version." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                    <Grid ColumnSpacing="16" RowSpacing="14">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                        <TextBlock x:Uid="PhpMemoryLimitLabel" Text="Memory limit (MB)" VerticalAlignment="Center" TextWrapping="Wrap" />
-                        <NumberBox x:Name="MemoryLimitBox" Grid.Column="1" Minimum="16" Maximum="100000" SpinButtonPlacementMode="Compact" />
-                        <TextBlock x:Uid="PhpUploadLimitLabel" Grid.Column="2" Text="Maximum upload (MB)" VerticalAlignment="Center" TextWrapping="Wrap" />
-                        <NumberBox x:Name="UploadLimitBox" Grid.Column="3" Minimum="1" Maximum="100000" SpinButtonPlacementMode="Compact" />
-                        <TextBlock x:Uid="PhpExecutionTimeLabel" Grid.Row="1" Text="Maximum execution time (seconds)" VerticalAlignment="Center" TextWrapping="Wrap" />
-                        <NumberBox x:Name="ExecutionTimeBox" Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="86400" SpinButtonPlacementMode="Compact" />
-                        <TextBlock x:Uid="PhpInputTimeLabel" Grid.Row="1" Grid.Column="2" Text="Maximum input time (seconds)" VerticalAlignment="Center" TextWrapping="Wrap" />
-                        <NumberBox x:Name="InputTimeBox" Grid.Row="1" Grid.Column="3" Minimum="-1" Maximum="86400" SpinButtonPlacementMode="Compact" />
-                        <TextBlock x:Uid="PhpInputVariablesLabel" Grid.Row="2" Text="Maximum input variables" VerticalAlignment="Center" TextWrapping="Wrap" />
-                        <NumberBox x:Name="InputVariablesBox" Grid.Row="2" Grid.Column="1" Minimum="100" Maximum="1000000" SpinButtonPlacementMode="Compact" />
-                        <TextBlock x:Uid="PhpFileUploadsLabel" Grid.Row="2" Grid.Column="2" Text="Maximum uploaded files" VerticalAlignment="Center" TextWrapping="Wrap" />
-                        <NumberBox x:Name="FileUploadsBox" Grid.Row="2" Grid.Column="3" Minimum="1" Maximum="10000" SpinButtonPlacementMode="Compact" />
-                        <TextBlock x:Uid="PhpTimezoneLabel" Grid.Row="3" Text="Timezone" VerticalAlignment="Center" TextWrapping="Wrap" />
-                        <TextBox x:Uid="PhpTimezoneInput" x:Name="TimezoneBox" Grid.Row="3" Grid.Column="1" PlaceholderText="UTC" />
-                        <TextBlock x:Uid="PhpDisplayErrorsLabel" Grid.Row="3" Grid.Column="2" Text="Display errors" VerticalAlignment="Center" TextWrapping="Wrap" />
-                        <ToggleSwitch x:Name="DisplayErrorsToggle" Grid.Row="3" Grid.Column="3" />
-                        <TextBlock x:Uid="PhpOpcacheLabel" Grid.Row="4" Text="OPcache" VerticalAlignment="Center" TextWrapping="Wrap" />
-                        <ToggleSwitch x:Name="OpcacheToggle" Grid.Row="4" Grid.Column="1" />
+            <TextBlock x:Uid="PhpSettingsTitle" Text="PHP settings" Style="{StaticResource SectionHeaderStyle}" />
+            <Border Style="{StaticResource SettingsGroupStyle}">
+                <StackPanel>
+                    <Grid Style="{StaticResource PhpSettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="MemoryLimitLabel" x:Uid="PhpMemoryLimitLabel" Text="Memory limit (MB)" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                        <NumberBox x:Name="MemoryLimitBox" Grid.Column="1" Minimum="16" Maximum="100000" AutomationProperties.LabeledBy="{Binding ElementName=MemoryLimitLabel}" Style="{StaticResource PhpSettingNumberStyle}" />
                     </Grid>
-                    <Button x:Name="SaveButton" HorizontalAlignment="Left" Click="Save_Click" Style="{StaticResource AccentButtonStyle}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <SymbolIcon Symbol="Save" />
-                            <TextBlock x:Uid="PhpSaveButton" Text="Save" />
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource PhpSettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="UploadLimitLabel" x:Uid="PhpUploadLimitLabel" Text="Maximum upload (MB)" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                        <NumberBox x:Name="UploadLimitBox" Grid.Column="1" Minimum="1" Maximum="100000" AutomationProperties.LabeledBy="{Binding ElementName=UploadLimitLabel}" Style="{StaticResource PhpSettingNumberStyle}" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource PhpSettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="ExecutionTimeLabel" x:Uid="PhpExecutionTimeLabel" Text="Maximum execution time (seconds)" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                        <NumberBox x:Name="ExecutionTimeBox" Grid.Column="1" Minimum="0" Maximum="86400" AutomationProperties.LabeledBy="{Binding ElementName=ExecutionTimeLabel}" Style="{StaticResource PhpSettingNumberStyle}" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource PhpSettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="InputTimeLabel" x:Uid="PhpInputTimeLabel" Text="Maximum input time (seconds)" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                        <NumberBox x:Name="InputTimeBox" Grid.Column="1" Minimum="-1" Maximum="86400" AutomationProperties.LabeledBy="{Binding ElementName=InputTimeLabel}" Style="{StaticResource PhpSettingNumberStyle}" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource PhpSettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="InputVariablesLabel" x:Uid="PhpInputVariablesLabel" Text="Maximum input variables" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                        <NumberBox x:Name="InputVariablesBox" Grid.Column="1" Minimum="100" Maximum="1000000" AutomationProperties.LabeledBy="{Binding ElementName=InputVariablesLabel}" Style="{StaticResource PhpSettingNumberStyle}" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource PhpSettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="FileUploadsLabel" x:Uid="PhpFileUploadsLabel" Text="Maximum uploaded files" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                        <NumberBox x:Name="FileUploadsBox" Grid.Column="1" Minimum="1" Maximum="10000" AutomationProperties.LabeledBy="{Binding ElementName=FileUploadsLabel}" Style="{StaticResource PhpSettingNumberStyle}" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource PhpSettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="TimezoneLabel" x:Uid="PhpTimezoneLabel" Text="Timezone" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                        <TextBox x:Uid="PhpTimezoneInput" x:Name="TimezoneBox" Grid.Column="1" Width="160" VerticalAlignment="Center" AutomationProperties.LabeledBy="{Binding ElementName=TimezoneLabel}" PlaceholderText="UTC" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource PhpSettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="DisplayErrorsLabel" x:Uid="PhpDisplayErrorsLabel" Text="Display errors" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                        <ToggleSwitch x:Name="DisplayErrorsToggle" Grid.Column="1" MinWidth="0" AutomationProperties.LabeledBy="{Binding ElementName=DisplayErrorsLabel}" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource PhpSettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="OpcacheLabel" x:Uid="PhpOpcacheLabel" Text="OPcache" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                        <ToggleSwitch x:Name="OpcacheToggle" Grid.Column="1" MinWidth="0" AutomationProperties.LabeledBy="{Binding ElementName=OpcacheLabel}" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource SettingsRowStyle}" Background="{ThemeResource SubtleFillColorTertiaryBrush}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Uid="PhpSettingsDescription" Text="These values are saved separately for the selected PHP version." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                            <TextBlock x:Name="SaveStatusText" Style="{StaticResource SettingsRowDescriptionStyle}" />
                         </StackPanel>
-                    </Button>
-                    <TextBlock x:Name="SaveStatusText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <Button x:Name="SaveButton" Grid.Column="1" VerticalAlignment="Center" Click="Save_Click" Style="{StaticResource AccentButtonStyle}">
+                            <Button.KeyboardAccelerators>
+                                <KeyboardAccelerator Modifiers="Control" Key="S" />
+                            </Button.KeyboardAccelerators>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <SymbolIcon Symbol="Save" />
+                                <TextBlock x:Uid="PhpSaveButton" Text="Save" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
                 </StackPanel>
             </Border>
 
-            <Border Style="{StaticResource SectionDividerStyle}">
-                <StackPanel Spacing="12">
-                    <Grid ColumnSpacing="16">
+            <TextBlock x:Uid="PhpExtensionsTitle" Text="PHP extensions" Style="{StaticResource SectionHeaderStyle}" />
+            <Border Style="{StaticResource SettingsGroupStyle}">
+                <StackPanel>
+                    <Grid Style="{StaticResource SettingsRowStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="4">
-                            <TextBlock x:Uid="PhpExtensionsTitle" Text="PHP extensions" Style="{StaticResource SectionTitleStyle}" />
-                            <TextBlock x:Uid="PhpExtensionsDescription" Text="Built-in extensions are shown for reference. Loadable extensions can be enabled for this PHP version." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        <StackPanel Style="{StaticResource SettingsRowTextStyle}" Spacing="10">
+                            <TextBlock x:Uid="PhpExtensionsDescription" Text="Built-in extensions are shown for reference. Loadable extensions can be enabled for this PHP version." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                            <TextBox x:Name="ExtensionSearchBox" x:Uid="PhpExtensionSearch" MaxWidth="420" HorizontalAlignment="Left" PlaceholderText="Search extensions" TextChanged="ExtensionSearch_TextChanged" />
                         </StackPanel>
                         <ProgressRing x:Name="ExtensionsProgress" Grid.Column="1" Width="18" Height="18" VerticalAlignment="Center" />
                     </Grid>
-                    <TextBox x:Name="ExtensionSearchBox" x:Uid="PhpExtensionSearch" PlaceholderText="Search extensions" TextChanged="ExtensionSearch_TextChanged" />
-                    <StackPanel x:Name="ExtensionsPanel" Spacing="2" />
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <StackPanel x:Name="ExtensionsPanel" Padding="8,4,8,8" />
                 </StackPanel>
             </Border>
         </StackPanel>

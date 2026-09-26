@@ -152,6 +152,7 @@ public sealed class PhpRuntimeInstaller
             || !HasRequiredConfiguration(configurationPath, explicitlyDisabled))
         {
             File.WriteAllText(configurationPath, PhpIni);
+            PhpModuleProbeCache.Invalidate(runtimeDirectory);
         }
         PhpExtensionManager.ApplyPreferences(
             configurationPath,
@@ -446,6 +447,7 @@ public sealed class PhpRuntimeInstaller
             );
 
             await PromoteRuntimeAsync(stagingPath, destination, backupPath, cancellationToken);
+            PhpModuleProbeCache.Invalidate(destination);
             TryCleanup(() => Directory.Delete(backupPath, true));
         }
         finally
@@ -632,6 +634,7 @@ public sealed class PhpRuntimeInstaller
                 );
                 await ExtractRedisDllAsync(archivePath, candidate, cancellationToken);
                 File.Move(candidate, destination, overwrite);
+                PhpModuleProbeCache.Invalidate(runtimeDirectory);
             }
             finally
             {

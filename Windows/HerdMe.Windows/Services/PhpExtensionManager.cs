@@ -95,12 +95,15 @@ public sealed class PhpExtensionManager(
         if (!File.Exists(path)) throw new FileNotFoundException("The PHP configuration was not found.", path);
         var lines = File.ReadAllLines(path).ToList();
         var found = false;
+        var changed = false;
         for (var index = 0; index < lines.Count; index++)
         {
             if (!TryExtensionLine(lines[index], out var name, out _)
                 || !name.Equals(extension, StringComparison.OrdinalIgnoreCase)) continue;
             var declaration = lines[index].TrimStart().TrimStart(';').TrimStart();
-            lines[index] = enabled ? declaration : "; " + declaration;
+            var replacement = enabled ? declaration : "; " + declaration;
+            changed |= !string.Equals(lines[index], replacement, StringComparison.Ordinal);
+            lines[index] = replacement;
             found = true;
         }
         if (!found && enabled)
@@ -109,10 +112,18 @@ public sealed class PhpExtensionManager(
                 ? "zend_extension"
                 : "extension";
             lines.Add($"{directive} = {extension}");
+            changed = true;
         }
+        // Rewriting an unchanged php.ini would only bump its timestamp and invalidate
+        // every cached PHP probe on each start.
+        if (!changed) return;
         var temporary = path + ".tmp";
         File.WriteAllLines(temporary, lines);
         File.Move(temporary, path, true);
+        if (Path.GetDirectoryName(Path.GetFullPath(path)) is { Length: > 0 } runtimeDirectory)
+        {
+            PhpModuleProbeCache.Invalidate(runtimeDirectory);
+        }
     }
 
     private static bool TryExtensionLine(

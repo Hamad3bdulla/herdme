@@ -45,6 +45,53 @@ internal sealed class WindowsJobObject : IDisposable
         }
     }
 
+    /// <summary>
+    /// Places a started process in a kill-on-close job so its descendants cannot
+    /// outlive HerdMe. Returns null when the process cannot be assigned.
+    /// </summary>
+    public static WindowsJobObject? TryAttach(Process process)
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        WindowsJobObject? job = null;
+        try
+        {
+            job = new WindowsJobObject();
+            job.Add(process);
+            return job;
+        }
+        catch (Exception error) when (error is Win32Exception or InvalidOperationException)
+        {
+            job?.Dispose();
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Waits briefly for redirected output after the process exited. A descendant
+    /// such as vite can inherit the pipes and keep them open forever, so the job is
+    /// closed (terminating those descendants) before waiting once more.
+    /// </summary>
+    public static async Task DrainOutputAsync(WindowsJobObject? job, params Task[] pumps)
+    {
+        var output = Task.WhenAll(pumps);
+        try
+        {
+            await output.WaitAsync(TimeSpan.FromSeconds(2));
+            return;
+        }
+        catch (TimeoutException)
+        {
+        }
+        job?.Dispose();
+        try
+        {
+            await output.WaitAsync(TimeSpan.FromSeconds(2));
+        }
+        catch (TimeoutException)
+        {
+        }
+    }
+
     public void Dispose()
     {
         var current = Interlocked.Exchange(ref handle, IntPtr.Zero);

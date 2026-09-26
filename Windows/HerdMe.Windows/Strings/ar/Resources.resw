@@ -965,4 +965,144 @@
   <data name="DumpsExportButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تصدير بيانات VarDumper كاملة</value></data>
   <data name="DumpsExportTooltip.Text" xml:space="preserve"><value>تصدير بيانات VarDumper كاملة</value></data>
   <data name="DumpsPreviewSizeNotice.Message" xml:space="preserve"><value>يُعرض جزء من المحتوى فقط. صدّر بيانات VarDumper لحفظ محتواها كاملًا.</value></data>
+  <data name="TitleBarEnvironmentStatus" xml:space="preserve"><value>المواقع المحلية: {0}</value></data>
+  <data name="MainWindowSettingsLoadWarningTitle" xml:space="preserve"><value>تعذر تحميل إعدادات HerdMe</value></data>
+  <data name="DashboardHealthTitle.Text" xml:space="preserve"><value>جارٍ فحص البيئة...</value></data>
+  <data name="DashboardMoreActionsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إجراءات أخرى</value></data>
+  <data name="DashboardMoreActionsTooltip.Text" xml:space="preserve"><value>إجراءات أخرى</value></data>
+  <data name="GeneralPageSubtitle.Text" xml:space="preserve"><value>بدء التشغيل والنطاقات المحلية والتحديثات وحالة بيئات التشغيل.</value></data>
+  <data name="GeneralStartupSectionTitle.Text" xml:space="preserve"><value>بدء التشغيل والمظهر</value></data>
+  <data name="GeneralDomainsSectionTitle.Text" xml:space="preserve"><value>النطاقات المحلية وHTTPS</value></data>
+  <data name="GeneralDomainSuffixDescription.Text" xml:space="preserve"><value>تُفتح المواقع على https://name.suffix/. تُطبَّق التغييرات عند مغادرة الحقل.</value></data>
+  <data name="GeneralDomainSuffixInput.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>لاحقة النطاق</value></data>
+  <data name="GeneralUpdateChannelBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>قناة التحديث</value></data>
+  <data name="GeneralOpenDataButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح مجلد بيانات التطبيق</value></data>
+  <data name="GeneralOpenDataTooltip.Text" xml:space="preserve"><value>فتح مجلد بيانات التطبيق</value></data>
+  <data name="PhpPageSubtitle.Text" xml:space="preserve"><value>اختر إصدار PHP وثبّت الأدوات واضبط إعدادات php.ini.</value></data>
+  <data name="PhpRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تحديث حالة PHP</value></data>
+  <data name="PhpCycleBoxInput.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إصدار PHP</value></data>
+  <data name="DebuggerPageSubtitle.Text" xml:space="preserve"><value>ثبّت Xdebug وابدأ جلسات تصحيح الأخطاء خطوة بخطوة لمواقعك.</value></data>
+  <data name="DebuggerRequireTriggerDescription.Text" xml:space="preserve"><value>تشغيل Xdebug فقط للطلبات التي تتضمن XDEBUG_TRIGGER.</value></data>
+  <data name="NodeRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تحديث إصدارات Node.js</value></data>
+  <data name="NodeInstallButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تثبيت أو تحديث</value></data>
+  <data name="NodeUseButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>استخدام هذا الإصدار</value></data>
+  <data name="NodeDeleteButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>حذف هذا الإصدار</value></data>
+  <data name="DownloadsClearButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>مسح السجل المكتمل</value></data>
+  <data name="AboutResourcesTitle.Text" xml:space="preserve"><value>المصادر</value></data>
+  <data name="AboutExitDescription.Text" xml:space="preserve"><value>إغلاق HerdMe وإيقاف خدماته المحلية.</value></data>
+  <data name="LogsPageSubtitle.Text" xml:space="preserve"><value>اقرأ سجلات HerdMe وPHP وخادم الويب والخدمات في مكان واحد.</value></data>
+  <data name="LogsOpenFolderButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح مجلد السجلات</value></data>
+  <data name="LogsRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تحديث السجلات</value></data>
+  <data name="LogsSourceBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>مصدر السجل</value></data>
+  <data name="DumpsPageSubtitle.Text" xml:space="preserve"><value>راجع مخرجات dump() الملتقطة من مواقعك المحلية.</value></data>
+  <data name="DumpsServerButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>بدء التقاط التفريغات أو إيقافه</value></data>
+  <data name="DumpsClearButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>حذف كل التفريغات</value></data>
+  <data name="ServicesPageSubtitle.Text" xml:space="preserve"><value>قواعد البيانات والتخزين المؤقت ومحركات البحث التي تعمل محليًا لمواقعك.</value></data>
+  <data name="ServicesRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تحديث حالة الخدمات</value></data>
+  <data name="ServicesAddSectionTitle.Text" xml:space="preserve"><value>إضافة خدمة</value></data>
+  <data name="ServicesVersionBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إصدار الخدمة</value></data>
+  <data name="ServicesMoreButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إجراءات أخرى للخدمة</value></data>
+  <data name="MailPageSubtitle.Text" xml:space="preserve"><value>التقط البريد الصادر من مواقعك المحلية واعرضه هنا.</value></data>
+  <data name="MailServerButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>بدء التقاط SMTP أو إيقافه</value></data>
+  <data name="MailClearButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>حذف كل الرسائل</value></data>
+  <data name="MailDeleteButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>حذف الرسالة</value></data>
+  <data name="SitesRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تحديث المواقع</value></data>
+  <data name="SitesChooseFolderButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>اختيار مجلد</value></data>
+  <data name="SitesAddFolderButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إضافة مجلد</value></data>
+  <data name="SitesRemoveFolderButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إزالة المجلد المحدد</value></data>
+  <data name="SitesDevelopmentTitle.Text" xml:space="preserve"><value>عمليات التطوير</value></data>
+  <data name="AppUnhandledErrorTitle" xml:space="preserve"><value>تعذّر على HerdMe إكمال العملية</value></data>
+  <data name="LogsTailNoticeLimited" xml:space="preserve"><value>تُعرض أحدث الأسطر فقط. يشمل البحث آخر 4 ميغابايت من هذا السجل كحد أقصى.</value></data>
+  <data name="MailClearConfirmTitle" xml:space="preserve"><value>حذف جميع الرسائل الملتقطة؟</value></data>
+  <data name="MailClearConfirmMessage" xml:space="preserve"><value>ستُحذف جميع الرسائل الملتقطة. لا يمكن التراجع عن ذلك.</value></data>
+  <data name="DumpsClearConfirmTitle" xml:space="preserve"><value>حذف جميع التفريغات الملتقطة؟</value></data>
+  <data name="DumpsClearConfirmMessage" xml:space="preserve"><value>ستُحذف جميع التفريغات الملتقطة. لا يمكن التراجع عن ذلك.</value></data>
+  <data name="ServicesCatalogUnavailable" xml:space="preserve"><value>تعذّر تحميل كتالوج الخدمات المضمّن.</value></data>
+  <data name="SitesDoctorCheckPassed" xml:space="preserve"><value>[سليم] {0}: {1}</value></data>
+  <data name="SitesDoctorCheckAttention" xml:space="preserve"><value>[تنبيه] {0}: {1}</value></data>
+  <data name="SitesDoctorFailed" xml:space="preserve"><value>تعذّر على طبيب الموقع إكمال الفحص. {0}</value></data>
+  <data name="SitesDoctorUnavailable" xml:space="preserve"><value>فشل فحص السلامة</value></data>
+  <data name="SitesWorkflowStepDone" xml:space="preserve"><value>[تم] {0}</value></data>
+  <data name="SitesWorkflowMigrationsStep" xml:space="preserve"><value>عمليات الترحيل وتنظيف ذاكرة التخزين المؤقت</value></data>
+  <data name="SitesHandoffReportTitle" xml:space="preserve"><value># تقرير تسليم HerdMe: {0}</value></data>
+  <data name="SitesHandoffGenerated" xml:space="preserve"><value>تاريخ الإنشاء: {0}</value></data>
+  <data name="SitesHandoffPath" xml:space="preserve"><value>المسار: `{0}`</value></data>
+  <data name="SitesHandoffGitCheck" xml:space="preserve"><value>شجرة عمل Git</value></data>
+  <data name="SitesHandoffGitChanges" xml:space="preserve"><value>{0} تغييرات غير مودعة</value></data>
+  <data name="SitesHandoffNotGit" xml:space="preserve"><value>ليس مستودع Git</value></data>
+  <data name="SitesHandoffEnvCheck" xml:space="preserve"><value>حماية ملف .env</value></data>
+  <data name="SitesHandoffEnvIgnored" xml:space="preserve"><value>يتجاهله Git</value></data>
+  <data name="SitesHandoffEnvNotIgnored" xml:space="preserve"><value>أضف .env إلى .gitignore</value></data>
+  <data name="SitesHandoffComposerValidate" xml:space="preserve"><value>التحقق من Composer</value></data>
+  <data name="SitesHandoffComposerAudit" xml:space="preserve"><value>التدقيق الأمني لـ Composer</value></data>
+  <data name="SitesHandoffNpmAudit" xml:space="preserve"><value>التدقيق الأمني لـ npm</value></data>
+  <data name="SitesHandoffTests" xml:space="preserve"><value>اختبارات Laravel</value></data>
+  <data name="SitesHandoffPassed" xml:space="preserve"><value>نجح</value></data>
+  <data name="SitesHandoffResultPass" xml:space="preserve"><value>- [نجح] **{0}**: {1}</value></data>
+  <data name="SitesHandoffResultFail" xml:space="preserve"><value>- [فشل] **{0}**: {1}</value></data>
+  <data name="SitesBackupSymbolicDatabaseRejected" xml:space="preserve"><value>لن ينسخ HerdMe احتياطيًا ملف قاعدة بيانات رمزيًا.</value></data>
+  <data name="SitesRestoreSymbolicDatabaseRejected" xml:space="preserve"><value>لن يستبدل HerdMe ملف قاعدة بيانات رمزيًا.</value></data>
+  <data name="Health_Ready" xml:space="preserve"><value>جاهز</value></data>
+  <data name="Health_EnvironmentMissing" xml:space="preserve"><value>ملف .env مفقود</value></data>
+  <data name="Health_LaravelCoreFilesMissing" xml:space="preserve"><value>أحد الملفات artisan أو bootstrap/app.php أو public/index.php مفقود</value></data>
+  <data name="Health_NoPlatformRequirements" xml:space="preserve"><value>لا توجد متطلبات صريحة</value></data>
+  <data name="Health_NodeModulesMissing" xml:space="preserve"><value>المجلد node_modules مفقود</value></data>
+  <data name="Health_OtherPackageManager" xml:space="preserve"><value>يستخدم {0}؛ لن يشغّل HerdMe الأداة npm تلقائيًا</value></data>
+  <data name="Health_AppKeyMissing" xml:space="preserve"><value>المفتاح APP_KEY مفقود</value></data>
+  <data name="Health_AppKeyConfigured" xml:space="preserve"><value>المفتاح APP_KEY مضبوط</value></data>
+  <data name="Health_MissingEnvironment" xml:space="preserve"><value>مفقود: {0}</value></data>
+  <data name="Health_StorageNotWritable" xml:space="preserve"><value>مجلدات Laravel القابلة للكتابة مفقودة أو للقراءة فقط</value></data>
+  <data name="Health_Configured" xml:space="preserve"><value>مضبوط</value></data>
+  <data name="Health_ConfigureDatabase" xml:space="preserve"><value>اضبط قاعدة بيانات للموقع في ملف .env</value></data>
+  <data name="Health_LogSize" xml:space="preserve"><value>{0} ميغابايت</value></data>
+  <data name="Health_NotPresent" xml:space="preserve"><value>غير موجود</value></data>
+  <data name="Health_Valid" xml:space="preserve"><value>صالح</value></data>
+  <data name="Health_InvalidJson" xml:space="preserve"><value>JSON غير صالح</value></data>
+  <data name="Health_NoNodeConstraint" xml:space="preserve"><value>لا يوجد قيد على الإصدار</value></data>
+  <data name="Health_RequiresNode" xml:space="preserve"><value>يتطلب Node {0}</value></data>
+  <data name="Health_RequiresNodeConfigured" xml:space="preserve"><value>يتطلب Node {0}؛ الإصدار المضبوط {1}</value></data>
+  <data name="Health_PackageJsonInvalid" xml:space="preserve"><value>ملف package.json غير صالح</value></data>
+  <data name="Health_PortAccepts" xml:space="preserve"><value>المنفذ {0} يقبل الاتصالات</value></data>
+  <data name="Health_PortError" xml:space="preserve"><value>المنفذ {0}: {1}</value></data>
+  <data name="Health_ComposerJsonInvalid" xml:space="preserve"><value>ملف composer.json غير صالح</value></data>
+  <data name="DashboardRepairProgressInfoBar.Title" xml:space="preserve"><value>جارٍ إصلاح البيئة</value></data>
+  <data name="DashboardRepairCancelButton.Content" xml:space="preserve"><value>إلغاء</value></data>
+  <data name="DashboardRepairCancelButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إلغاء الإصلاح</value></data>
+  <data name="Dashboard_Health_CertificateExpires" xml:space="preserve"><value>تنتهي صلاحية شهادة HTTPS في {0}</value></data>
+  <data name="Dashboard_Health_ServiceUnhealthy" xml:space="preserve"><value>{0}: حالة الخدمة - {1}</value></data>
+  <data name="Dashboard_Health_DuplicatePort" xml:space="preserve"><value>الخدمات: المنفذ {0} مكرر - {1}</value></data>
+  <data name="Dashboard_Repair_Cancelling" xml:space="preserve"><value>جارٍ الإلغاء وإيقاف الأدوات قيد التشغيل...</value></data>
+  <data name="Dashboard_Repair_Cancelled" xml:space="preserve"><value>أُلغي الإصلاح قبل اكتماله.</value></data>
+  <data name="Dashboard_Repair_ProgressCount" xml:space="preserve"><value>الخطوة {0} من {1}</value></data>
+  <data name="Dashboard_Repair_StepPreparing" xml:space="preserve"><value>جارٍ فحص المواقع المرتبطة...</value></data>
+  <data name="Dashboard_Repair_StepDomains" xml:space="preserve"><value>جارٍ تحديث النطاقات المحلية...</value></data>
+  <data name="Dashboard_Repair_StepCertificate" xml:space="preserve"><value>جارٍ اعتماد شهادة HTTPS...</value></data>
+  <data name="Dashboard_Repair_StepEnvironment" xml:space="preserve"><value>جارٍ تشغيل البيئة المحلية...</value></data>
+  <data name="Dashboard_Repair_StepServices" xml:space="preserve"><value>جارٍ تشغيل الخدمات المتوقفة...</value></data>
+  <data name="Dashboard_Repair_StepSite" xml:space="preserve"><value>جارٍ إصلاح {0} (الموقع {1} من {2})</value></data>
+  <data name="Dashboard_Repair_StepSiteCommand" xml:space="preserve"><value>{0}: جارٍ تنفيذ {1}</value></data>
+  <data name="Dashboard_Repair_StepDevServers" xml:space="preserve"><value>جارٍ إعادة تشغيل خوادم التطوير...</value></data>
+  <data name="Dashboard_Repair_LocalDomainsFailed" xml:space="preserve"><value>النطاقات المحلية: {0}</value></data>
+  <data name="Dashboard_Repair_CertificateFailed" xml:space="preserve"><value>شهادة HTTPS: {0}</value></data>
+  <data name="Dashboard_Repair_EnvironmentFailed" xml:space="preserve"><value>البيئة المحلية: {0}</value></data>
+  <data name="Dashboard_Repair_DevServersFailed" xml:space="preserve"><value>خوادم التطوير: {0}</value></data>
+  <data name="Dashboard_Repair_ServiceNotInstalled" xml:space="preserve"><value>{0}: بيئة تشغيل الخدمة غير مثبتة</value></data>
+  <data name="Dashboard_Repair_UnknownProcess" xml:space="preserve"><value>العملية {0}</value></data>
+  <data name="Dashboard_Repair_UnknownProcessId" xml:space="preserve"><value>غير معروفة</value></data>
+  <data name="Dashboard_Repair_ServicePortInUse" xml:space="preserve"><value>{0}: المنفذ {1} مستخدم بالفعل من قبل {2}</value></data>
+  <data name="Dashboard_Repair_ServiceStartFailed" xml:space="preserve"><value>{0}: تعذّر التشغيل ({1})</value></data>
+  <data name="Dashboard_Repair_FolderMissing" xml:space="preserve"><value>{0}: مجلد المشروع غير موجود</value></data>
+  <data name="Dashboard_Repair_LowDiskSpace" xml:space="preserve"><value>{0}: المساحة الحرة على {1} أقل من 1 غيغابايت</value></data>
+  <data name="Dashboard_Repair_EnvTrackedByGit" xml:space="preserve"><value>{0}: ملف .env متتبَّع في Git؛ أزله من الفهرس يدويًا</value></data>
+  <data name="Dashboard_Repair_PhpRequiredForCache" xml:space="preserve"><value>{0}: يلزم PHP {1} لإصلاح ذاكرة Laravel المؤقتة</value></data>
+  <data name="Dashboard_Repair_PhpRequiredForStorageLink" xml:space="preserve"><value>{0}: يلزم PHP {1} لإنشاء public/storage</value></data>
+  <data name="Dashboard_Repair_CommandFailed" xml:space="preserve"><value>{0}: فشل تنفيذ {1}</value></data>
+  <data name="Dashboard_Repair_CommandCouldNotRun" xml:space="preserve"><value>{0}: تعذّر تشغيل {1} ({2})</value></data>
+  <data name="Dashboard_Repair_CommandReportedProblems" xml:space="preserve"><value>{0}: أبلغ {1} عن مشكلات</value></data>
+  <data name="Dashboard_Repair_ComposerInstallFailed" xml:space="preserve"><value>{0}: فشل تثبيت حزم Composer</value></data>
+  <data name="Dashboard_Repair_ComposerPlatformRequirements" xml:space="preserve"><value>{0}: متطلبات منصة Composer غير مستوفاة</value></data>
+  <data name="Dashboard_Repair_OtherPackageManager" xml:space="preserve"><value>{0}: يستخدم {1}؛ ثبّت الاعتماديات باستخدام مدير الحزم هذا</value></data>
+  <data name="Dashboard_Repair_LockFileNotInstallable" xml:space="preserve"><value>{0}: لا يمكن التثبيت من package-lock.json باستخدام npm ci</value></data>
+  <data name="Dashboard_Repair_NpmAuditVulnerabilities" xml:space="preserve"><value>{0}: عثر npm audit على ثغرات عالية الخطورة</value></data>
+  <data name="Dashboard_Repair_MigrationStatusFailed" xml:space="preserve"><value>{0}: تعذّرت قراءة حالة قاعدة البيانات أو الترحيلات</value></data>
 </root>

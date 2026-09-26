@@ -15,6 +15,7 @@ internal static class AppUpdatePrompt
         ) && downloadUri.Scheme == Uri.UriSchemeHttps;
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = xamlRoot,
             Title = AppLocalization.Format("UpdateDialogTitle", release.Version),
             Content = release.Notes,
@@ -47,6 +48,7 @@ internal static class AppUpdatePrompt
     {
         var dialog = new ContentDialog
         {
+            FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = xamlRoot,
             Title = title,
             Content = message,

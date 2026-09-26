@@ -320,6 +320,83 @@ internal static partial class ContractChecks
                 && mergedSql.Contains("SELECT 'DROP TABLE existing text'", StringComparison.Ordinal),
             "existing MySQL imports preserve tables and merge only rows with missing keys"
         );
+        var binaryPayload = Enumerable.Range(0x80, 0x80).Select(value => (byte)value)
+            .Concat(new byte[] { 0xC3, 0x28, 0xFF, 0xFE, 0x00, 0x27 }).ToArray();
+        var binarySql = Encoding.Latin1.GetString(
+            Encoding.ASCII.GetBytes("INSERT INTO `blobs` VALUES ('")
+                .Concat(binaryPayload.Where(value => value != 0x27))
+                .Concat(Encoding.ASCII.GetBytes("');\n"))
+                .ToArray()
+        );
+        var binaryFixes = 0;
+        var binaryBytes = Encoding.Latin1.GetBytes(
+            SiteDatabaseProvisioner.NormalizeMySql(binarySql, ref binaryFixes, mergeExisting: true)
+        );
+        var expectedBinary = binaryPayload.Where(value => value != 0x27).ToArray();
+        Check(
+            ((ReadOnlySpan<byte>)binaryBytes).IndexOf((ReadOnlySpan<byte>)expectedBinary) >= 0 && binaryFixes == 1,
+            "SQL import rewriting preserves binary and invalid UTF-8 bytes exactly"
+        );
+        var preambleDirectory = Path.Combine(supportRoot, "sql-preamble");
+        Directory.CreateDirectory(preambleDirectory);
+        var utf8Preamble = Path.Combine(preambleDirectory, "bom.sql");
+        await File.WriteAllBytesAsync(utf8Preamble, [0xEF, 0xBB, 0xBF, (byte)'S']);
+        var utf16Preamble = Path.Combine(preambleDirectory, "utf16.sql");
+        await File.WriteAllBytesAsync(utf16Preamble, [0xFF, 0xFE, (byte)'S', 0x00]);
+        var plainSql = Path.Combine(preambleDirectory, "plain.sql");
+        await File.WriteAllBytesAsync(plainSql, [0xFF]);
+        Check(
+            SiteDatabaseProvisioner.DetectSqlTextPreamble(utf8Preamble)
+                == SiteDatabaseProvisioner.SqlTextPreamble.Utf8
+                && SiteDatabaseProvisioner.DetectSqlTextPreamble(utf16Preamble)
+                == SiteDatabaseProvisioner.SqlTextPreamble.Utf16LittleEndian
+                && SiteDatabaseProvisioner.DetectSqlTextPreamble(plainSql)
+                == SiteDatabaseProvisioner.SqlTextPreamble.None,
+            "SQL imports only transcode files with a UTF-16 byte order mark"
+        );
+        var stagedData = Path.Combine(supportRoot, "staged-service", "data");
+        Directory.CreateDirectory(stagedData);
+        await ThrowsAsync<InvalidOperationException>(
+            () => WindowsServiceManager.InitializeStagedAsync(stagedData, target =>
+            {
+                Directory.CreateDirectory(Path.Combine(target, "mysql"));
+                throw new InvalidOperationException("initializer failed");
+            }),
+            "a failed database initializer reports its failure"
+        );
+        Check(
+            Directory.Exists(stagedData)
+                && !Directory.EnumerateFileSystemEntries(stagedData).Any()
+                && !Directory.Exists(stagedData + ".staging"),
+            "a failed database initializer never leaves a data directory that looks ready"
+        );
+        await WindowsServiceManager.InitializeStagedAsync(stagedData, target =>
+        {
+            Directory.CreateDirectory(Path.Combine(target, "mysql"));
+            File.WriteAllText(Path.Combine(target, "my.ini"), "[mysqld]\ndatadir=" + target.Replace('\\', '/') + "\n");
+            return Task.CompletedTask;
+        });
+        Check(
+            Directory.Exists(Path.Combine(stagedData, "mysql"))
+                && !Directory.Exists(stagedData + ".staging")
+                && !File.ReadAllText(Path.Combine(stagedData, "my.ini")).Contains(".staging", StringComparison.Ordinal),
+            "a successful database initializer is moved into place atomically"
+        );
+        var mongoShutdown = ManagedServiceShutdown.MongoShutdownMessage(7);
+        Check(
+            mongoShutdown.Length == 55
+                && BinaryPrimitives.ReadInt32LittleEndian(mongoShutdown) == 55
+                && BinaryPrimitives.ReadInt32LittleEndian(mongoShutdown.AsSpan(12)) == 2013
+                && BinaryPrimitives.ReadInt32LittleEndian(mongoShutdown.AsSpan(21)) == 34,
+            "MongoDB clean shutdown uses a well-formed OP_MSG command"
+        );
+        Check(
+            ManagedServiceShutdown.SupportsGracefulStop("mysql")
+                && ManagedServiceShutdown.SupportsGracefulStop("postgresql")
+                && ManagedServiceShutdown.SupportsGracefulStop("redis")
+                && !ManagedServiceShutdown.SupportsGracefulStop("minio"),
+            "databases are asked to stop cleanly before HerdMe terminates them"
+        );
         var databaseProgress = new DatabaseTransferProgress(
             512,
             1_024,
@@ -1500,6 +1577,17 @@ internal static partial class ContractChecks
         Check(hostsWithoutSites.Contains("10.0.0.5 intranet.test"), "hosts cleanup preserves unrelated mappings");
         Check(WindowsHostsManager.ContainsManagedBlock(hosts), "managed hosts blocks are detected");
         Check(!WindowsHostsManager.ContainsManagedBlock(hostsWithoutSites), "removed hosts blocks are not reported");
+        var hostsReplacement = WindowsHostsManager.HostsReplacementPath(
+            Path.Combine(Path.GetTempPath(), "etc", "hosts")
+        );
+        Check(
+            string.Equals(
+                Path.GetDirectoryName(hostsReplacement),
+                Path.Combine(Path.GetTempPath(), "etc"),
+                StringComparison.OrdinalIgnoreCase
+            ) && !hostsReplacement.EndsWith(Path.DirectorySeparatorChar + "hosts", StringComparison.Ordinal),
+            "hosts updates are staged beside the hosts file so the replace is atomic"
+        );
         Check(
             WindowsHostsManager.IsAllowedHostsUpdate(originalHosts, hosts),
             "the elevated hosts helper accepts a render that changes only HerdMe's block"

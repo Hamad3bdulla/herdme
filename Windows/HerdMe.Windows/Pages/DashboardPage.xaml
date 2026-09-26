@@ -9,7 +9,7 @@
     <Page.Resources>
         <Style x:Key="DashboardSummaryCardStyle" TargetType="Button">
             <Setter Property="MinHeight" Value="136" />
-            <Setter Property="Padding" Value="16" />
+            <Setter Property="Padding" Value="16,14,16,14" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="VerticalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -17,20 +17,41 @@
             <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
             <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}" />
         </Style>
         <Style x:Key="DashboardSummaryCountStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="30" />
+            <Setter Property="FontSize" Value="28" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="LineHeight" Value="34" />
         </Style>
         <Style x:Key="DashboardSummaryLabelStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontSize" Value="14" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
         <Style x:Key="DashboardSummaryStatusStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="DashboardCardChevronStyle" TargetType="FontIcon">
+            <Setter Property="Glyph" Value="&#xE76C;" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="MirroredWhenRightToLeft" Value="True" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorTertiaryBrush}" />
+        </Style>
+        <Style x:Key="DashboardRowIconTileStyle" TargetType="Border">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+        </Style>
+        <Style x:Key="DashboardRowLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
     </Page.Resources>
@@ -50,8 +71,7 @@
                 <TextBlock
                     x:Uid="DashboardPageSubtitle"
                     Text="Your local development environment at a glance."
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    TextWrapping="Wrap" />
+                    Style="{StaticResource PageSubtitleStyle}" />
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <ProgressRing x:Name="RefreshProgress" Width="18" Height="18" />
@@ -59,6 +79,7 @@
                     x:Uid="DashboardRefreshButton"
                     x:Name="RefreshButton"
                     Click="Refresh_Click"
+                    Style="{StaticResource ToolbarIconButtonStyle}"
                     AutomationProperties.Name="Refresh dashboard">
                     <ToolTipService.ToolTip>
                         <ToolTip><TextBlock x:Uid="DashboardRefreshTooltip" Text="Refresh dashboard" /></ToolTip>
@@ -69,40 +90,127 @@
         </Grid>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="18">
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <InfoBar x:Name="HealthBanner" IsOpen="True" IsClosable="False" />
-                    <Button
-                        x:Uid="DashboardRepairAllButton"
-                        x:Name="RepairAllButton"
-                        Grid.Column="1"
-                        Click="RepairAll_Click"
-                        VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <SymbolIcon Symbol="Repair" />
-                            <TextBlock x:Uid="DashboardRepairAllButtonText" Text="Repair all" />
+            <StackPanel Spacing="16" Padding="0,0,0,8">
+                <!-- Repair all runs in the background; this shows the current step and lets the user cancel. -->
+                <InfoBar
+                    x:Uid="DashboardRepairProgressInfoBar"
+                    x:Name="RepairProgressInfoBar"
+                    Title="Repairing the environment"
+                    IsOpen="False"
+                    IsClosable="False"
+                    Severity="Informational">
+                    <InfoBar.ActionButton>
+                        <Button
+                            x:Uid="DashboardRepairCancelButton"
+                            x:Name="RepairCancelButton"
+                            Content="Cancel"
+                            Click="RepairCancel_Click"
+                            AutomationProperties.Name="Cancel repair" />
+                    </InfoBar.ActionButton>
+                    <InfoBar.Content>
+                        <StackPanel Spacing="6" Margin="0,0,0,12">
+                            <TextBlock
+                                x:Name="RepairProgressText"
+                                TextWrapping="Wrap"
+                                AutomationProperties.LiveSetting="Polite" />
+                            <TextBlock
+                                x:Name="RepairProgressCountText"
+                                Style="{StaticResource CaptionTextStyle}"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                            <ProgressBar x:Name="RepairProgressIndicator" IsIndeterminate="True" Minimum="0" Maximum="1" />
                         </StackPanel>
-                    </Button>
-                </Grid>
-                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                    <Button x:Name="RetryFailedButton" Click="RetryFailed_Click">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <SymbolIcon Symbol="Sync" />
-                            <TextBlock x:Uid="DashboardRetryFailedButtonText" Text="Retry failed only" />
+                    </InfoBar.Content>
+                </InfoBar>
+                <InfoBar x:Name="RepairResultInfoBar" IsOpen="False" IsClosable="True" Severity="Success" />
+                <!-- Health summary: one card that says whether the environment can be trusted. -->
+                <Border x:Name="HealthCard" Style="{StaticResource CardStyle}" Padding="20,18,20,18">
+                    <Grid x:Name="HealthGrid" ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Border
+                            x:Name="HealthIconTile"
+                            Style="{StaticResource StatusPillNeutralStyle}"
+                            Width="44"
+                            Height="44"
+                            Padding="0"
+                            CornerRadius="22"
+                            VerticalAlignment="Top">
+                            <FontIcon
+                                x:Name="HealthGlyph"
+                                Glyph="&#xE946;"
+                                Style="{StaticResource StatusGlyphNeutralStyle}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock
+                                x:Uid="DashboardHealthTitle"
+                                x:Name="HealthTitle"
+                                Text="Checking the environment..."
+                                FontSize="18"
+                                FontWeight="SemiBold"
+                                TextWrapping="Wrap"
+                                AutomationProperties.LiveSetting="Polite" />
+                            <TextBlock x:Name="HealthMessage" Style="{StaticResource SecondaryTextStyle}" TextWrapping="Wrap" />
                         </StackPanel>
-                    </Button>
-                    <Button x:Name="ExportDiagnosticsButton" Click="ExportDiagnostics_Click">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <SymbolIcon Symbol="Download" />
-                            <TextBlock x:Uid="DashboardExportDiagnosticsButtonText" Text="Export diagnostics" />
+                        <StackPanel
+                            x:Name="HealthActions"
+                            Grid.Column="2"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            VerticalAlignment="Center">
+                            <Button
+                                x:Uid="DashboardRepairAllButton"
+                                x:Name="RepairAllButton"
+                                Click="RepairAll_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <SymbolIcon Symbol="Repair" />
+                                    <TextBlock x:Uid="DashboardRepairAllButtonText" Text="Repair all" />
+                                </StackPanel>
+                            </Button>
+                            <Button
+                                x:Uid="DashboardMoreActionsButton"
+                                x:Name="MoreActionsButton"
+                                Style="{StaticResource ToolbarIconButtonStyle}"
+                                Height="32"
+                                AutomationProperties.Name="More actions">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip><TextBlock x:Uid="DashboardMoreActionsTooltip" Text="More actions" /></ToolTip>
+                                </ToolTipService.ToolTip>
+                                <FontIcon Glyph="&#xE712;" FontSize="16" />
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                        <MenuFlyoutItem x:Uid="DashboardRetryFailedButtonText" Text="Retry failed only" Click="RetryFailed_Click">
+                                            <MenuFlyoutItem.Icon><SymbolIcon Symbol="Sync" /></MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutItem x:Uid="DashboardExportDiagnosticsButtonText" Text="Export diagnostics" Click="ExportDiagnostics_Click">
+                                            <MenuFlyoutItem.Icon><SymbolIcon Symbol="Download" /></MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
                         </StackPanel>
-                    </Button>
-                </StackPanel>
-                <StackPanel x:Name="WarningList" Spacing="8" Visibility="Collapsed" />
+                        <StackPanel
+                            x:Name="WarningPanel"
+                            Grid.Row="2"
+                            Grid.ColumnSpan="3"
+                            Margin="0,16,0,0"
+                            Spacing="12"
+                            Visibility="Collapsed">
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <StackPanel x:Name="WarningList" Spacing="10" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
 
                 <Grid x:Name="SummaryCardsGrid" ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
@@ -121,31 +229,23 @@
                         Click="OpenSites_Click"
                         Style="{StaticResource DashboardSummaryCardStyle}"
                         AutomationProperties.Name="Open sites">
-                        <Grid MinHeight="114">
+                        <Grid RowSpacing="2">
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource SitesTintBrush}">
-                                    <SymbolIcon Symbol="Folder" Foreground="{ThemeResource BrandBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <TextBlock x:Name="SitesCountText" Grid.Column="1" Text="0" HorizontalAlignment="Right" Style="{StaticResource DashboardSummaryCountStyle}" />
-                            </Grid>
-                            <TextBlock x:Uid="DashboardSitesLabel" Grid.Row="1" Margin="0,14,0,0" Text="Sites" Style="{StaticResource DashboardSummaryLabelStyle}" />
-                            <Grid Grid.Row="2" Margin="0,8,0,0" ColumnSpacing="8" VerticalAlignment="Bottom">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Ellipse x:Name="SitesStatusDot" Width="7" Height="7" VerticalAlignment="Center" Fill="{ThemeResource SystemFillColorNeutralBrush}" />
-                                <TextBlock x:Name="SitesStatusText" Grid.Column="1" Style="{StaticResource DashboardSummaryStatusStyle}" />
-                            </Grid>
+                            <Border Style="{StaticResource IconTileStyle}" Width="36" Height="36" HorizontalAlignment="Left" Background="{ThemeResource SitesTintBrush}">
+                                <SymbolIcon Symbol="Folder" Foreground="{ThemeResource BrandBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <FontIcon Style="{StaticResource DashboardCardChevronStyle}" />
+                            <TextBlock x:Name="SitesCountText" Grid.Row="1" Margin="0,12,0,0" Text="0" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            <TextBlock x:Uid="DashboardSitesLabel" Grid.Row="2" Text="Sites" Style="{StaticResource DashboardSummaryLabelStyle}" />
+                            <StackPanel Grid.Row="3" Margin="0,8,0,0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                                <Ellipse x:Name="SitesStatusDot" Style="{StaticResource StatusDotNeutralStyle}" />
+                                <TextBlock x:Name="SitesStatusText" Style="{StaticResource DashboardSummaryStatusStyle}" />
+                            </StackPanel>
                         </Grid>
                     </Button>
                     <Button
@@ -155,31 +255,23 @@
                         Click="OpenServices_Click"
                         Style="{StaticResource DashboardSummaryCardStyle}"
                         AutomationProperties.Name="Open services">
-                        <Grid MinHeight="114">
+                        <Grid RowSpacing="2">
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource ServicesTintBrush}">
-                                    <SymbolIcon Symbol="AllApps" Foreground="{ThemeResource ServicesInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <TextBlock x:Name="ServicesCountText" Grid.Column="1" Text="0" HorizontalAlignment="Right" Style="{StaticResource DashboardSummaryCountStyle}" />
-                            </Grid>
-                            <TextBlock x:Uid="DashboardServicesLabel" Grid.Row="1" Margin="0,14,0,0" Text="Services" Style="{StaticResource DashboardSummaryLabelStyle}" />
-                            <Grid Grid.Row="2" Margin="0,8,0,0" ColumnSpacing="8" VerticalAlignment="Bottom">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Ellipse x:Name="ServicesStatusDot" Width="7" Height="7" VerticalAlignment="Center" Fill="{ThemeResource SystemFillColorNeutralBrush}" />
-                                <TextBlock x:Name="ServicesStatusText" Grid.Column="1" Style="{StaticResource DashboardSummaryStatusStyle}" />
-                            </Grid>
+                            <Border Style="{StaticResource IconTileStyle}" Width="36" Height="36" HorizontalAlignment="Left" Background="{ThemeResource ServicesTintBrush}">
+                                <SymbolIcon Symbol="AllApps" Foreground="{ThemeResource ServicesInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <FontIcon Style="{StaticResource DashboardCardChevronStyle}" />
+                            <TextBlock x:Name="ServicesCountText" Grid.Row="1" Margin="0,12,0,0" Text="0" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            <TextBlock x:Uid="DashboardServicesLabel" Grid.Row="2" Text="Services" Style="{StaticResource DashboardSummaryLabelStyle}" />
+                            <StackPanel Grid.Row="3" Margin="0,8,0,0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                                <Ellipse x:Name="ServicesStatusDot" Style="{StaticResource StatusDotNeutralStyle}" />
+                                <TextBlock x:Name="ServicesStatusText" Style="{StaticResource DashboardSummaryStatusStyle}" />
+                            </StackPanel>
                         </Grid>
                     </Button>
                     <Button
@@ -189,31 +281,23 @@
                         Click="OpenMail_Click"
                         Style="{StaticResource DashboardSummaryCardStyle}"
                         AutomationProperties.Name="Open mail">
-                        <Grid MinHeight="114">
+                        <Grid RowSpacing="2">
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource MailTintBrush}">
-                                    <SymbolIcon Symbol="Mail" Foreground="{ThemeResource MailInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <TextBlock x:Name="MailCountText" Grid.Column="1" Text="0" HorizontalAlignment="Right" Style="{StaticResource DashboardSummaryCountStyle}" />
-                            </Grid>
-                            <TextBlock x:Uid="DashboardMailLabel" Grid.Row="1" Margin="0,14,0,0" Text="Mail" Style="{StaticResource DashboardSummaryLabelStyle}" />
-                            <Grid Grid.Row="2" Margin="0,8,0,0" ColumnSpacing="8" VerticalAlignment="Bottom">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Ellipse x:Name="MailStatusDot" Width="7" Height="7" VerticalAlignment="Center" Fill="{ThemeResource SystemFillColorNeutralBrush}" />
-                                <TextBlock x:Name="MailStatusText" Grid.Column="1" Style="{StaticResource DashboardSummaryStatusStyle}" />
-                            </Grid>
+                            <Border Style="{StaticResource IconTileStyle}" Width="36" Height="36" HorizontalAlignment="Left" Background="{ThemeResource MailTintBrush}">
+                                <SymbolIcon Symbol="Mail" Foreground="{ThemeResource MailInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <FontIcon Style="{StaticResource DashboardCardChevronStyle}" />
+                            <TextBlock x:Name="MailCountText" Grid.Row="1" Margin="0,12,0,0" Text="0" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            <TextBlock x:Uid="DashboardMailLabel" Grid.Row="2" Text="Mail" Style="{StaticResource DashboardSummaryLabelStyle}" />
+                            <StackPanel Grid.Row="3" Margin="0,8,0,0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                                <Ellipse x:Name="MailStatusDot" Style="{StaticResource StatusDotNeutralStyle}" />
+                                <TextBlock x:Name="MailStatusText" Style="{StaticResource DashboardSummaryStatusStyle}" />
+                            </StackPanel>
                         </Grid>
                     </Button>
                     <Button
@@ -223,102 +307,148 @@
                         Click="OpenDumps_Click"
                         Style="{StaticResource DashboardSummaryCardStyle}"
                         AutomationProperties.Name="Open dumps">
-                        <Grid MinHeight="114">
+                        <Grid RowSpacing="2">
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Width="36" Height="36" CornerRadius="6" Background="{ThemeResource DumpsTintBrush}">
-                                    <SymbolIcon Symbol="View" Foreground="{ThemeResource DumpsInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <TextBlock x:Name="DumpsCountText" Grid.Column="1" Text="0" HorizontalAlignment="Right" Style="{StaticResource DashboardSummaryCountStyle}" />
-                            </Grid>
-                            <TextBlock x:Uid="DashboardDumpsLabel" Grid.Row="1" Margin="0,14,0,0" Text="Dumps" Style="{StaticResource DashboardSummaryLabelStyle}" />
-                            <Grid Grid.Row="2" Margin="0,8,0,0" ColumnSpacing="8" VerticalAlignment="Bottom">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Ellipse x:Name="DumpsStatusDot" Width="7" Height="7" VerticalAlignment="Center" Fill="{ThemeResource SystemFillColorNeutralBrush}" />
-                                <TextBlock x:Name="DumpsStatusText" Grid.Column="1" Style="{StaticResource DashboardSummaryStatusStyle}" />
-                            </Grid>
+                            <Border Style="{StaticResource IconTileStyle}" Width="36" Height="36" HorizontalAlignment="Left" Background="{ThemeResource DumpsTintBrush}">
+                                <SymbolIcon Symbol="View" Foreground="{ThemeResource DumpsInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <FontIcon Style="{StaticResource DashboardCardChevronStyle}" />
+                            <TextBlock x:Name="DumpsCountText" Grid.Row="1" Margin="0,12,0,0" Text="0" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            <TextBlock x:Uid="DashboardDumpsLabel" Grid.Row="2" Text="Dumps" Style="{StaticResource DashboardSummaryLabelStyle}" />
+                            <StackPanel Grid.Row="3" Margin="0,8,0,0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                                <Ellipse x:Name="DumpsStatusDot" Style="{StaticResource StatusDotNeutralStyle}" />
+                                <TextBlock x:Name="DumpsStatusText" Style="{StaticResource DashboardSummaryStatusStyle}" />
+                            </StackPanel>
                         </Grid>
                     </Button>
                 </Grid>
 
-                <Border Style="{StaticResource SectionDividerStyle}">
-                    <StackPanel Spacing="10">
-                        <TextBlock x:Uid="DashboardEnvironmentSectionTitle" Text="Environment" Style="{StaticResource SectionTitleStyle}" />
-                        <Grid x:Name="EnvironmentGrid" ColumnSpacing="14">
+                <TextBlock x:Uid="DashboardEnvironmentSectionTitle" Text="Environment" Style="{StaticResource SectionHeaderStyle}" />
+                <Border Style="{StaticResource CardStyle}" Padding="0">
+                    <StackPanel>
+                        <Grid x:Name="EnvironmentRow" Padding="16,14,16,14" ColumnSpacing="14">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition x:Name="EnvironmentLabelColumn" Width="170" />
-                                <ColumnDefinition x:Name="EnvironmentStatusColumn" Width="140" />
-                                <ColumnDefinition x:Name="EnvironmentDetailColumn" Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Border Grid.RowSpan="2" Style="{StaticResource DashboardRowIconTileStyle}">
+                                <FontIcon Glyph="&#xE774;" FontSize="16" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock x:Uid="DashboardEnvironmentLabel" x:Name="EnvironmentLabelText" Text="Sites environment" Style="{StaticResource DashboardRowLabelStyle}" />
+                                <TextBlock x:Name="EnvironmentDetailText" Style="{StaticResource SecondaryTextStyle}" FontSize="12" />
+                            </StackPanel>
+                            <Border x:Name="EnvironmentStatusPill" Grid.Column="2" Style="{StaticResource StatusPillNeutralStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <Ellipse x:Name="EnvironmentStatusDot" Style="{StaticResource StatusDotNeutralStyle}" />
+                                    <TextBlock x:Name="EnvironmentStatusText" FontSize="12" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                        <Rectangle Style="{StaticResource CardDividerStyle}" />
+                        <Grid x:Name="DomainsRow" Padding="16,14,16,14" ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <TextBlock x:Uid="DashboardEnvironmentLabel" x:Name="EnvironmentLabelText" Text="Sites environment" Padding="0,8" FontWeight="SemiBold" />
-                            <TextBlock x:Name="EnvironmentStatusText" Grid.Column="1" Padding="0,8" />
-                            <TextBlock x:Name="EnvironmentDetailText" Grid.Column="2" Padding="0,8" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Uid="DashboardDomainsLabel" x:Name="DomainsLabelText" Grid.Row="1" Text="Local domains" Padding="0,8" FontWeight="SemiBold" />
-                            <TextBlock x:Name="DomainsStatusText" Grid.Row="1" Grid.Column="1" Padding="0,8" />
-                            <TextBlock x:Name="DomainsDetailText" Grid.Row="1" Grid.Column="2" Padding="0,8" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Uid="DashboardCertificateLabel" x:Name="CertificateLabelText" Grid.Row="2" Text="HTTPS certificate" Padding="0,8" FontWeight="SemiBold" />
-                            <TextBlock x:Name="CertificateStatusText" Grid.Row="2" Grid.Column="1" Padding="0,8" />
-                            <TextBlock x:Name="CertificateDetailText" Grid.Row="2" Grid.Column="2" Padding="0,8" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                            <Border Grid.RowSpan="2" Style="{StaticResource DashboardRowIconTileStyle}">
+                                <FontIcon Glyph="&#xE71B;" FontSize="16" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock x:Uid="DashboardDomainsLabel" x:Name="DomainsLabelText" Text="Local domains" Style="{StaticResource DashboardRowLabelStyle}" />
+                                <TextBlock x:Name="DomainsDetailText" Style="{StaticResource SecondaryTextStyle}" FontSize="12" />
+                            </StackPanel>
+                            <Border x:Name="DomainsStatusPill" Grid.Column="2" Style="{StaticResource StatusPillNeutralStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <Ellipse x:Name="DomainsStatusDot" Style="{StaticResource StatusDotNeutralStyle}" />
+                                    <TextBlock x:Name="DomainsStatusText" FontSize="12" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                        <Rectangle Style="{StaticResource CardDividerStyle}" />
+                        <Grid x:Name="CertificateRow" Padding="16,14,16,14" ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Border Grid.RowSpan="2" Style="{StaticResource DashboardRowIconTileStyle}">
+                                <FontIcon Glyph="&#xE72E;" FontSize="16" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock x:Uid="DashboardCertificateLabel" x:Name="CertificateLabelText" Text="HTTPS certificate" Style="{StaticResource DashboardRowLabelStyle}" />
+                                <TextBlock x:Name="CertificateDetailText" Style="{StaticResource SecondaryTextStyle}" FontSize="12" />
+                            </StackPanel>
+                            <Border x:Name="CertificateStatusPill" Grid.Column="2" Style="{StaticResource StatusPillNeutralStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <Ellipse x:Name="CertificateStatusDot" Style="{StaticResource StatusDotNeutralStyle}" />
+                                    <TextBlock x:Name="CertificateStatusText" FontSize="12" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
                         </Grid>
                     </StackPanel>
                 </Border>
 
-                <Border Style="{StaticResource SectionDividerStyle}">
-                    <StackPanel Spacing="12">
-                        <TextBlock x:Uid="DashboardRecentActivityTitle" Text="Recent activity" Style="{StaticResource SectionTitleStyle}" />
-                        <Grid x:Name="RecentActivityGrid" ColumnSpacing="24">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <StackPanel Spacing="10">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock x:Uid="DashboardRecentMailTitle" Text="Mail" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <Button x:Uid="DashboardOpenMailButton" Grid.Column="1" Content="View all" Click="OpenMail_Click" />
-                                </Grid>
-                                <StackPanel x:Name="RecentMailItems" Spacing="9" />
-                            </StackPanel>
-                            <StackPanel x:Name="RecentDumpsPanel" Grid.Column="1" Spacing="10">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock x:Uid="DashboardRecentDumpsTitle" Text="Dumps" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <Button x:Uid="DashboardOpenDumpsButton" Grid.Column="1" Content="View all" Click="OpenDumps_Click" />
-                                </Grid>
-                                <StackPanel x:Name="RecentDumpItems" Spacing="9" />
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
-                </Border>
+                <TextBlock x:Uid="DashboardRecentActivityTitle" Text="Recent activity" Style="{StaticResource SectionHeaderStyle}" />
+                <Grid x:Name="RecentActivityGrid" ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Border Style="{StaticResource CardStyle}">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <SymbolIcon Symbol="Mail" Foreground="{ThemeResource MailInkBrush}" VerticalAlignment="Center" />
+                                <TextBlock x:Uid="DashboardRecentMailTitle" Grid.Column="1" Text="Mail" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <Button x:Uid="DashboardOpenMailButton" Grid.Column="2" Content="View all" Style="{StaticResource SubtleButtonStyle}" Click="OpenMail_Click" />
+                            </Grid>
+                            <StackPanel x:Name="RecentMailItems" Spacing="12" />
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="RecentDumpsPanel" Grid.Column="1" Style="{StaticResource CardStyle}">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <SymbolIcon Symbol="View" Foreground="{ThemeResource DumpsInkBrush}" VerticalAlignment="Center" />
+                                <TextBlock x:Uid="DashboardRecentDumpsTitle" Grid.Column="1" Text="Dumps" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <Button x:Uid="DashboardOpenDumpsButton" Grid.Column="2" Content="View all" Style="{StaticResource SubtleButtonStyle}" Click="OpenDumps_Click" />
+                            </Grid>
+                            <StackPanel x:Name="RecentDumpItems" Spacing="12" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
             </StackPanel>
         </ScrollViewer>
     </Grid>

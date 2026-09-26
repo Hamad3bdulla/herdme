@@ -5,8 +5,14 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+## [0.1.23] - 2026-09-26
+
 ### Changed
 
+- Refresh the Windows navigation, dashboard, settings, and tool pages with a
+  consistent layout and controls that remain visible across window sizes.
+- Reduce repeated work in site, service, and runtime views so the interface
+  remains responsive during background checks and operations.
 - Keep Windows HTTP/1.1 connections alive for PHP responses without a
   Content-Length (typical for Laravel) by framing them with chunked encoding,
   avoiding a new TCP/TLS handshake for every page, XHR, and Livewire request.

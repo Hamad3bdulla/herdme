@@ -341,15 +341,23 @@ public sealed partial class PhpPage : Page
         foreach (var extension in extensions.Where(item =>
             query.Length == 0 || item.Name.Contains(query, StringComparison.OrdinalIgnoreCase)))
         {
-            var row = new Grid { Padding = new Thickness(8, 7, 8, 7), ColumnSpacing = 12 };
+            if (ExtensionsPanel.Children.Count > 0)
+            {
+                ExtensionsPanel.Children.Add(new Microsoft.UI.Xaml.Shapes.Rectangle
+                {
+                    Style = (Style)Application.Current.Resources["CardDividerStyle"],
+                    Margin = new Thickness(8, 0, 8, 0)
+                });
+            }
+            var row = new Grid { Padding = new Thickness(8, 8, 8, 8), ColumnSpacing = 12 };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var details = new StackPanel { Spacing = 2 };
+            var details = new StackPanel { Spacing = 1, VerticalAlignment = VerticalAlignment.Center };
             details.Children.Add(new TextBlock { Text = extension.Name, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             details.Children.Add(new TextBlock
             {
                 Text = ExtensionStatus(extension),
-                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+                Style = (Style)Application.Current.Resources["SettingsRowDescriptionStyle"]
             });
             row.Children.Add(details);
             var toggle = new ToggleSwitch
@@ -357,8 +365,10 @@ public sealed partial class PhpPage : Page
                 Tag = extension.Name,
                 IsOn = extension.Enabled,
                 IsEnabled = extension.CanToggle,
+                MinWidth = 0,
                 VerticalAlignment = VerticalAlignment.Center
             };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(toggle, extension.Name);
             ToolTipService.SetToolTip(toggle, extension.CanToggle
                 ? AppLocalization.Get("PhpExtensionToggleTooltip")
                 : AppLocalization.Get("PhpExtensionBuiltInTooltip"));

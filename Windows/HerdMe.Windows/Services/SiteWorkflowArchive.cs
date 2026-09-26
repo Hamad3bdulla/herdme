@@ -101,7 +101,7 @@ public static class SiteWorkflowArchive
                         await source.CopyToAsync(target, cancellationToken);
                         if (entryCount % 100 == 0)
                         {
-                            progress?.Report($"{entryCount} files · {totalBytes / 1_048_576d:F1} MB\n");
+                            progress?.Report($"{entryCount} files \u00B7 {totalBytes / 1_048_576d:F1} MB\n");
                         }
                     }
 

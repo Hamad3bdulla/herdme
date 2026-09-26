@@ -3,7 +3,17 @@ namespace HerdMe.Windows.Services;
 public sealed class AppServices : IAsyncDisposable
 {
     private readonly object disposalSync = new();
+    private readonly Lazy<MailCaptureService> mail = new(
+        () => new MailCaptureService(),
+        LazyThreadSafetyMode.ExecutionAndPublication
+    );
+    private readonly Lazy<DumpCaptureService> dumps = new(
+        () => new DumpCaptureService(),
+        LazyThreadSafetyMode.ExecutionAndPublication
+    );
+    private readonly object warmUpSync = new();
     private Task? disposalTask;
+    private Task? warmUpTask;
 
     public AppServices()
     {
@@ -41,8 +51,6 @@ public sealed class AppServices : IAsyncDisposable
             Xdebug,
             NodeInstaller
         );
-        Mail = new MailCaptureService();
-        Dumps = new DumpCaptureService();
         Services = new WindowsServiceManager();
         Startup = new WindowsStartupManager();
         Updates = AppUpdateManager.Configured();
@@ -98,9 +106,11 @@ public sealed class AppServices : IAsyncDisposable
 
     public WindowsLocalEnvironment Environment { get; }
 
-    public MailCaptureService Mail { get; }
+    // The capture services open and migrate captures.sqlite3 in their constructors, so they are
+    // created on first use (or by WarmUpAsync on a background thread) instead of at startup.
+    public MailCaptureService Mail => mail.Value;
 
-    public DumpCaptureService Dumps { get; }
+    public DumpCaptureService Dumps => dumps.Value;
 
     public WindowsServiceManager Services { get; }
 
@@ -120,6 +130,21 @@ public sealed class AppServices : IAsyncDisposable
 
     public InitialSetupManager InitialSetup { get; }
 
+    /// <summary>
+    /// Creates the lazily constructed services off the calling thread. Safe to call repeatedly;
+    /// every call returns the same task.
+    /// </summary>
+    public Task WarmUpAsync()
+    {
+        lock (warmUpSync)
+        {
+            return warmUpTask ??= Task.WhenAll(
+                Task.Run(() => _ = mail.Value),
+                Task.Run(() => _ = dumps.Value)
+            );
+        }
+    }
+
     public ValueTask DisposeAsync()
     {
         Task task;
@@ -134,11 +159,28 @@ public sealed class AppServices : IAsyncDisposable
     private async Task DisposeServicesAsync()
     {
         var failures = new List<Exception>();
+        Task? pendingWarmUp;
+        lock (warmUpSync)
+        {
+            pendingWarmUp = warmUpTask;
+        }
+        if (pendingWarmUp is not null)
+        {
+            // Let an in-flight warm-up finish so a service created during shutdown is disposed.
+            try
+            {
+                await pendingWarmUp;
+            }
+            catch (Exception error)
+            {
+                failures.Add(error);
+            }
+        }
         await DisposeOneAsync(SiteProcesses, failures);
         await DisposeOneAsync(Environment, failures);
         await DisposeOneAsync(Services, failures);
-        await DisposeOneAsync(Mail, failures);
-        await DisposeOneAsync(Dumps, failures);
+        if (mail.IsValueCreated) await DisposeOneAsync(mail.Value, failures);
+        if (dumps.IsValueCreated) await DisposeOneAsync(dumps.Value, failures);
         if (failures.Count > 0)
         {
             throw new AggregateException("One or more Windows services failed to shut down.", failures);

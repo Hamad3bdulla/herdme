@@ -6,26 +6,36 @@
     AutomationProperties.AutomationId="DumpsPageRoot"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
-    <Grid Padding="{StaticResource PagePadding}" RowSpacing="16">
+    <Grid Padding="{StaticResource PagePadding}" RowSpacing="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <TextBlock x:Uid="DumpsPageTitle" AutomationProperties.AutomationId="DumpsPageRoot" Text="Dumps" Style="{StaticResource PageTitleStyle}" />
+        <StackPanel Spacing="2" Margin="0,0,0,4">
+            <TextBlock x:Uid="DumpsPageTitle" AutomationProperties.AutomationId="DumpsPageRoot" Text="Dumps" Style="{StaticResource PageTitleStyle}" />
+            <TextBlock x:Uid="DumpsPageSubtitle" Text="Review dump() output captured from your local sites." Style="{StaticResource PageSubtitleStyle}" />
+        </StackPanel>
 
-        <Border Grid.Row="1" Style="{StaticResource SectionDividerStyle}">
-            <Grid ColumnSpacing="16">
+        <Border Grid.Row="1" Style="{StaticResource SettingsGroupStyle}">
+            <Grid Style="{StaticResource SettingsRowStyle}">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock x:Uid="DumpsCaptureTitle" Text="VarDumper capture" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock x:Name="ServerStatusText" x:Uid="DumpsStoppedInitial" Text="Stopped" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Border Style="{StaticResource IconTileStyle}" Background="{ThemeResource DumpsTintBrush}" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE9D9;" FontSize="18" Foreground="{ThemeResource DumpsInkBrush}" />
+                </Border>
+                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                    <TextBlock x:Uid="DumpsCaptureTitle" Text="VarDumper capture" FontWeight="SemiBold" Style="{StaticResource SettingsRowTitleStyle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Ellipse x:Name="ServerStatusDot" Style="{StaticResource StatusDotNeutralStyle}" />
+                        <TextBlock x:Name="ServerStatusText" x:Uid="DumpsStoppedInitial" Text="Stopped" Style="{StaticResource SettingsRowDescriptionStyle}" />
+                    </StackPanel>
                 </StackPanel>
-                <Button x:Name="ServerButton" Grid.Column="1" Click="Server_Click">
+                <Button x:Name="ServerButton" x:Uid="DumpsServerButton" Grid.Column="2" VerticalAlignment="Center" AutomationProperties.Name="Start or stop dump capture" Click="Server_Click" Style="{StaticResource ToolbarIconButtonStyle}">
                     <ToolTipService.ToolTip>
                         <ToolTip><TextBlock x:Uid="DumpsServerTooltip" Text="Start or stop dump capture" /></ToolTip>
                     </ToolTipService.ToolTip>
@@ -40,32 +50,35 @@
             </InfoBar.ActionButton>
         </InfoBar>
 
-        <Grid Grid.Row="3" ColumnSpacing="16">
+        <Grid Grid.Row="3" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*" MinWidth="220" MaxWidth="340" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Border Style="{StaticResource ToolPaneStyle}" Padding="12">
-                <Grid RowSpacing="8">
+            <Border Style="{StaticResource ToolPaneStyle}">
+                <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <Grid>
+                    <Grid Padding="14,8,8,8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Uid="DumpsCapturedTitle" Text="Captured" Style="{StaticResource SectionTitleStyle}" />
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
-                            <ProgressRing x:Name="CaptureProgress" x:Uid="DumpsCaptureProgress" Width="18" Height="18" IsActive="False" Visibility="Collapsed" AutomationProperties.Name="Loading captured data" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
+                            <ProgressRing x:Name="CaptureProgress" x:Uid="DumpsCaptureProgress" Width="18" Height="18" Margin="0,0,6,0" IsActive="False" Visibility="Collapsed" AutomationProperties.Name="Loading captured data" />
                             <Button x:Uid="DumpsCaptureRefreshButton" Click="RetryLoad_Click" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Refresh captured data">
+                                <Button.KeyboardAccelerators>
+                                    <KeyboardAccelerator Key="F5" />
+                                </Button.KeyboardAccelerators>
                                 <ToolTipService.ToolTip>
                                     <ToolTip><TextBlock x:Uid="DumpsCaptureRefreshTooltip" Text="Refresh" /></ToolTip>
                                 </ToolTipService.ToolTip>
                                 <SymbolIcon Symbol="Refresh" />
                             </Button>
-                            <Button x:Name="ClearButton" Click="Clear_Click" Style="{StaticResource ToolbarIconButtonStyle}">
+                            <Button x:Name="ClearButton" x:Uid="DumpsClearButton" Click="Clear_Click" AutomationProperties.Name="Delete all dumps" Style="{StaticResource ToolbarIconButtonStyle}">
                                 <ToolTipService.ToolTip>
                                     <ToolTip><TextBlock x:Uid="DumpsClearTooltip" Text="Delete all dumps" /></ToolTip>
                                 </ToolTipService.ToolTip>
@@ -76,45 +89,54 @@
                     <ListView
                         x:Name="DumpList"
                         Grid.Row="1"
+                        Padding="0,4,0,4"
                         ItemsSource="{x:Bind Dumps}"
                         SelectionChanged="DumpList_SelectionChanged">
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:CapturedDump">
-                                <StackPanel Padding="6" Spacing="3">
+                                <StackPanel Padding="0,4" Spacing="2">
                                     <TextBlock Text="{x:Bind SourcePreview}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{x:Bind SummaryPreview}" MaxLines="2" TextTrimming="CharacterEllipsis" FontFamily="Consolas" FontSize="12" />
-                                    <TextBlock Text="{x:Bind ReceivedText}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                    <TextBlock Text="{x:Bind SummaryPreview}" MaxLines="2" TextTrimming="CharacterEllipsis" FontFamily="Cascadia Mono, Consolas" FontSize="12" FlowDirection="LeftToRight" />
+                                    <TextBlock Text="{x:Bind ReceivedText}" Style="{StaticResource CaptionTextStyle}" />
                                 </StackPanel>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
-                    <TextBlock x:Name="EmptyState" x:Uid="DumpsInboxEmpty" Grid.Row="1" Text="No captured dumps yet" Visibility="Collapsed" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" IsHitTestVisible="False" />
+                    <StackPanel x:Name="EmptyState" Grid.Row="1" Spacing="8" Margin="16" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False">
+                        <FontIcon Glyph="&#xE9D9;" Style="{StaticResource EmptyStateGlyphStyle}" />
+                        <TextBlock x:Uid="DumpsInboxEmpty" Text="No captured dumps yet" TextAlignment="Center" Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
                 </Grid>
             </Border>
-            <Border Grid.Column="1" Padding="4,12">
-                <Grid RowSpacing="8">
+            <Border Grid.Column="1" Style="{StaticResource ToolPaneStyle}">
+                <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <Grid ColumnSpacing="8">
+                    <Grid Padding="16,8,8,8" ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="SourceText" x:Uid="DumpsSelectDumpInitial" Text="Select a dump" Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="SourceText" x:Uid="DumpsSelectDumpInitial" Text="Select a dump" VerticalAlignment="Center" Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
                         <Button x:Name="ExportButton" x:Uid="DumpsExportButton" Grid.Column="1" Click="Export_Click" IsEnabled="False" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Export full dump">
+                            <Button.KeyboardAccelerators>
+                                <KeyboardAccelerator Modifiers="Control" Key="S" />
+                            </Button.KeyboardAccelerators>
                             <ToolTipService.ToolTip>
                                 <ToolTip><TextBlock x:Uid="DumpsExportTooltip" Text="Export full dump" /></ToolTip>
                             </ToolTipService.ToolTip>
                             <SymbolIcon Symbol="Save" />
                         </Button>
                     </Grid>
-                    <InfoBar x:Name="PreviewSizeNotice" x:Uid="DumpsPreviewSizeNotice" Grid.Row="1" IsOpen="False" IsClosable="False" Severity="Informational" Message="This view is shortened. Export the dump to save its full contents." />
-                    <ScrollViewer Grid.Row="2" Margin="0,8,0,0">
-                        <TextBlock x:Name="SummaryText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontFamily="Consolas" FontSize="14" />
-                    </ScrollViewer>
+                    <InfoBar x:Name="PreviewSizeNotice" x:Uid="DumpsPreviewSizeNotice" Grid.Row="1" Margin="12,0,12,8" IsOpen="False" IsClosable="False" Severity="Informational" Message="This view is shortened. Export the dump to save its full contents." />
+                    <Border Grid.Row="2" Background="{ThemeResource SubtleSurfaceBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" CornerRadius="0,0,8,8">
+                        <ScrollViewer Padding="16,12,16,12">
+                            <TextBlock x:Name="SummaryText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontFamily="Cascadia Mono, Consolas" FontSize="13" FlowDirection="LeftToRight" />
+                        </ScrollViewer>
+                    </Border>
                 </Grid>
             </Border>
         </Grid>

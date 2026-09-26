@@ -9,7 +9,22 @@ namespace HerdMe.Windows.Services;
 
 public sealed class WindowsServiceManager : IAsyncDisposable
 {
-    private sealed record ActiveService(Process Process, WindowsJobObject Job, int? ConsolePort);
+    private sealed record ActiveService(
+        Process Process,
+        WindowsJobObject Job,
+        int? ConsolePort,
+        ServiceStopContext? StopContext = null
+    );
+
+    private sealed record ServiceStopContext(
+        string DefinitionId,
+        string Name,
+        int Port,
+        string Executable,
+        string DataDirectory,
+        ServiceCredentials? Credentials,
+        string LogPath
+    );
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly object sync = new();
@@ -450,7 +465,16 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             ActiveService activeService = new(
                     process,
                     job,
-                    consolePort > 0 ? consolePort : null
+                    consolePort > 0 ? consolePort : null,
+                    new ServiceStopContext(
+                        instance.DefinitionId,
+                        instance.Name,
+                        instance.Port,
+                        spec.Executable,
+                        dataDirectory,
+                        credentials,
+                        logPath
+                    )
                 );
             lock (sync)
             {
@@ -512,6 +536,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         if (service is null) return;
         try
         {
+            await TryStopGracefullyAsync(service);
             if (!service.Process.HasExited) service.Process.Kill(entireProcessTree: true);
             await service.Process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
         }
@@ -523,6 +548,45 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             service.Process.Dispose();
             service.Job.Dispose();
             RaiseChanged();
+        }
+    }
+
+    private static async Task TryStopGracefullyAsync(ActiveService service)
+    {
+        var context = service.StopContext;
+        if (context is null || service.Process.HasExited
+            || !ManagedServiceShutdown.SupportsGracefulStop(context.DefinitionId))
+        {
+            return;
+        }
+        try
+        {
+            var accepted = await ManagedServiceShutdown.RequestAsync(
+                context.DefinitionId,
+                service.Process.Id,
+                context.Port,
+                context.Executable,
+                context.DataDirectory,
+                context.Credentials
+            );
+            if (!accepted)
+            {
+                AppendLog(context.LogPath, $"[HerdMe] {context.Name} did not accept a clean shutdown request; stopping it.");
+                return;
+            }
+            await service.Process.WaitForExitAsync().WaitAsync(ManagedServiceShutdown.GracePeriod);
+            AppendLog(context.LogPath, $"[HerdMe] {context.Name} stopped cleanly.");
+        }
+        catch (TimeoutException)
+        {
+            AppendLog(
+                context.LogPath,
+                $"[HerdMe] {context.Name} did not stop within {ManagedServiceShutdown.GracePeriod.TotalSeconds:0} seconds; stopping it."
+            );
+        }
+        catch (Exception error) when (error is not OutOfMemoryException)
+        {
+            AppendLog(context.LogPath, $"[HerdMe] Clean shutdown of {context.Name} failed: {error.Message}");
         }
     }
 
@@ -580,8 +644,9 @@ public sealed class WindowsServiceManager : IAsyncDisposable
     {
         Guid[] identifiers;
         lock (sync) identifiers = active.Keys.ToArray();
-        List<Exception>? failures = null;
-        foreach (var identifier in identifiers)
+        // Clean database shutdowns can take seconds each, so stop services in parallel.
+        var failures = new List<Exception>();
+        await Task.WhenAll(identifiers.Select(async identifier =>
         {
             try
             {
@@ -589,10 +654,10 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             }
             catch (Exception error)
             {
-                (failures ??= []).Add(error);
+                lock (failures) failures.Add(error);
             }
-        }
-        if (failures is not null)
+        }));
+        if (failures.Count > 0)
             throw new AggregateException("One or more managed services could not be stopped.", failures);
     }
 
@@ -1036,24 +1101,19 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        foreach (var argument in BuildMariaDbInitializationArguments(
-            dataDirectory,
-            port,
-            credentials
-        ))
+        await InitializeStagedAsync(dataDirectory, async target =>
         {
-            startInfo.ArgumentList.Add(argument);
-        }
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("MariaDB's data directory could not be initialized.");
-        var standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var standardError = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        var output = (await standardOutput) + Environment.NewLine + (await standardError);
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException("MariaDB initialization failed: " + output.Trim());
-        }
+            startInfo.ArgumentList.Clear();
+            foreach (var argument in BuildMariaDbInitializationArguments(
+                target,
+                port,
+                credentials
+            ))
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+            await RunInitializerAsync(startInfo, "MariaDB", cancellationToken);
+        });
     }
 
     internal static IReadOnlyList<string> BuildMariaDbInitializationArguments(
@@ -1094,20 +1154,15 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        startInfo.ArgumentList.Add("--no-defaults");
-        startInfo.ArgumentList.Add("--initialize-insecure");
-        startInfo.ArgumentList.Add($"--basedir={runtimeDirectory}");
-        startInfo.ArgumentList.Add($"--datadir={dataDirectory}");
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("MySQL's data directory could not be initialized.");
-        var standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var standardError = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        var output = (await standardOutput) + Environment.NewLine + (await standardError);
-        if (process.ExitCode != 0)
+        await InitializeStagedAsync(dataDirectory, async target =>
         {
-            throw new InvalidOperationException("MySQL initialization failed: " + output.Trim());
-        }
+            startInfo.ArgumentList.Clear();
+            startInfo.ArgumentList.Add("--no-defaults");
+            startInfo.ArgumentList.Add("--initialize-insecure");
+            startInfo.ArgumentList.Add($"--basedir={runtimeDirectory}");
+            startInfo.ArgumentList.Add($"--datadir={target}");
+            await RunInitializerAsync(startInfo, "MySQL", cancellationToken);
+        });
     }
 
     private async Task InitializePostgreSqlAsync(
@@ -1133,8 +1188,6 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        startInfo.ArgumentList.Add("-D");
-        startInfo.ArgumentList.Add(dataDirectory);
         var passwordPath = Path.Combine(
             Directory.GetParent(dataDirectory)!.FullName,
             $".herdme-initdb-{Guid.NewGuid():N}.password"
@@ -1147,25 +1200,150 @@ public sealed class WindowsServiceManager : IAsyncDisposable
                 new System.Text.UTF8Encoding(false),
                 cancellationToken
             );
-            startInfo.ArgumentList.Add($"--username={credentials.Username}");
-            startInfo.ArgumentList.Add($"--pwfile={passwordPath}");
-            startInfo.ArgumentList.Add("--encoding=UTF8");
-            startInfo.ArgumentList.Add("--auth-local=scram-sha-256");
-            startInfo.ArgumentList.Add("--auth-host=scram-sha-256");
-            using var process = Process.Start(startInfo)
-                ?? throw new InvalidOperationException("PostgreSQL's data directory could not be initialized.");
-            var standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            var standardError = process.StandardError.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken);
-            var output = (await standardOutput) + Environment.NewLine + (await standardError);
-            if (process.ExitCode != 0)
+            await InitializeStagedAsync(dataDirectory, async target =>
             {
-                throw new InvalidOperationException("PostgreSQL initialization failed: " + output.Trim());
-            }
+                startInfo.ArgumentList.Clear();
+                startInfo.ArgumentList.Add("-D");
+                startInfo.ArgumentList.Add(target);
+                startInfo.ArgumentList.Add($"--username={credentials.Username}");
+                startInfo.ArgumentList.Add($"--pwfile={passwordPath}");
+                startInfo.ArgumentList.Add("--encoding=UTF8");
+                startInfo.ArgumentList.Add("--auth-local=scram-sha-256");
+                startInfo.ArgumentList.Add("--auth-host=scram-sha-256");
+                await RunInitializerAsync(startInfo, "PostgreSQL", cancellationToken);
+            });
         }
         finally
         {
             if (File.Exists(passwordPath)) File.Delete(passwordPath);
+        }
+    }
+
+    /// <summary>
+    /// Initializes a database into a sibling staging directory and only moves it into
+    /// place after the initializer succeeds, so a cancelled or failed first start can
+    /// never leave a half-initialized directory that later looks ready.
+    /// </summary>
+    internal static async Task InitializeStagedAsync(
+        string dataDirectory,
+        Func<string, Task> initialize
+    )
+    {
+        var finalDirectory = Path.GetFullPath(dataDirectory).TrimEnd(Path.DirectorySeparatorChar);
+        var canStage = !Directory.Exists(finalDirectory)
+            || !Directory.EnumerateFileSystemEntries(finalDirectory).Any();
+        if (!canStage)
+        {
+            await initialize(finalDirectory);
+            return;
+        }
+        var staging = finalDirectory + ".staging";
+        if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
+        try
+        {
+            await initialize(staging);
+            RewriteStagedConfiguration(staging, finalDirectory);
+            if (Directory.Exists(finalDirectory)) Directory.Delete(finalDirectory);
+            Directory.Move(staging, finalDirectory);
+        }
+        catch
+        {
+            try
+            {
+                if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
+            }
+            catch (Exception cleanupError) when (cleanupError is IOException or UnauthorizedAccessException)
+            {
+                Debug.WriteLine($"HerdMe could not remove a staged data directory: {cleanupError.Message}");
+            }
+            Directory.CreateDirectory(finalDirectory);
+            throw;
+        }
+    }
+
+    private static void RewriteStagedConfiguration(string staging, string finalDirectory)
+    {
+        // mariadb-install-db records its data directory in my.ini. HerdMe starts the
+        // server with --no-defaults, but keep the file truthful after the move.
+        var configuration = Path.Combine(staging, "my.ini");
+        if (!File.Exists(configuration)) return;
+        var contents = File.ReadAllText(configuration);
+        var updated = contents
+            .Replace(staging, finalDirectory, StringComparison.OrdinalIgnoreCase)
+            .Replace(
+                staging.Replace('\\', '/'),
+                finalDirectory.Replace('\\', '/'),
+                StringComparison.OrdinalIgnoreCase
+            );
+        if (!string.Equals(contents, updated, StringComparison.Ordinal))
+        {
+            File.WriteAllText(configuration, updated);
+        }
+    }
+
+    private static async Task RunInitializerAsync(
+        ProcessStartInfo startInfo,
+        string engine,
+        CancellationToken cancellationToken
+    )
+    {
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException($"{engine}'s data directory could not be initialized.");
+        WindowsJobObject? job = null;
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                job = new WindowsJobObject();
+                job.Add(process);
+            }
+        }
+        catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            job?.Dispose();
+            job = null;
+        }
+        try
+        {
+            var standardOutput = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
+            var standardError = process.StandardError.ReadToEndAsync(CancellationToken.None);
+            try
+            {
+                await process.WaitForExitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Do not leave an orphaned initializer writing into the staging directory.
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                try
+                {
+                    await process.WaitForExitAsync(CancellationToken.None)
+                        .WaitAsync(TimeSpan.FromSeconds(10), CancellationToken.None);
+                }
+                catch (TimeoutException)
+                {
+                    // The job object below still terminates anything left behind.
+                }
+                throw;
+            }
+            var output = string.Empty;
+            try
+            {
+                var pipes = await Task.WhenAll(standardOutput, standardError)
+                    .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+                output = pipes[0] + Environment.NewLine + pipes[1];
+            }
+            catch (TimeoutException)
+            {
+            }
+            if (process.ExitCode != 0)
+            {
+                throw new InvalidOperationException($"{engine} initialization failed: " + output.Trim());
+            }
+        }
+        finally
+        {
+            job?.Dispose();
         }
     }
 
@@ -1305,7 +1483,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         {
             BoundedLog.AppendLine(path, $"[{DateTimeOffset.Now:O}] {line}");
         }
-        catch (IOException)
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
         }
     }

@@ -42,6 +42,23 @@ public sealed partial class DumpsPage : Page
         refreshSession = session;
         dumpCapturedHandler = (_, _) => session.RequestRefresh();
         capture.DumpCaptured += dumpCapturedHandler;
+        App.MainWindowVisibilityChanged -= App_MainWindowVisibilityChanged;
+        App.MainWindowVisibilityChanged += App_MainWindowVisibilityChanged;
+        // Polling pauses while the window is hidden to the tray or minimized.
+        if (App.IsMainWindowVisible) refreshTimer.Start();
+        UpdateServerState();
+        await ReloadAsync();
+    }
+
+    private async void App_MainWindowVisibilityChanged(object? sender, bool visible)
+    {
+        if (!loaded) return;
+        if (!visible)
+        {
+            refreshTimer.Stop();
+            return;
+        }
+        refreshSession?.RequestRefresh();
         refreshTimer.Start();
         UpdateServerState();
         await ReloadAsync();
@@ -50,6 +67,7 @@ public sealed partial class DumpsPage : Page
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
         loaded = false;
+        App.MainWindowVisibilityChanged -= App_MainWindowVisibilityChanged;
         refreshTimer.Stop();
         refreshSession?.Dispose();
         refreshSession = null;
@@ -74,6 +92,7 @@ public sealed partial class DumpsPage : Page
             if (!loaded || generation != pageGeneration || XamlRoot is not { } xamlRoot) return;
             var dialog = new ContentDialog
             {
+                FlowDirection = AppLocalization.LayoutDirection,
                 XamlRoot = xamlRoot,
                 Title = "HerdMe",
                 Content = error.Message,
@@ -96,7 +115,25 @@ public sealed partial class DumpsPage : Page
 
     private async void Clear_Click(object sender, RoutedEventArgs e)
     {
-        if (mutating || refreshSession is not { } session) return;
+        if (mutating || !loaded || XamlRoot is not { } xamlRoot) return;
+        var generation = pageGeneration;
+        var dialog = new ContentDialog
+        {
+            FlowDirection = AppLocalization.LayoutDirection,
+            XamlRoot = xamlRoot,
+            Title = AppLocalization.Get("DumpsClearConfirmTitle"),
+            Content = new TextBlock
+            {
+                Text = AppLocalization.Get("DumpsClearConfirmMessage"),
+                TextWrapping = TextWrapping.Wrap
+            },
+            PrimaryButtonText = AppLocalization.Get("CommonDelete"),
+            CloseButtonText = AppLocalization.Get("CommonCancel"),
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (mutating || !loaded || generation != pageGeneration
+            || refreshSession is not { } session) return;
         mutating = true;
         session.Invalidate();
         UpdateCaptureState();
@@ -230,5 +267,8 @@ public sealed partial class DumpsPage : Page
             ? AppLocalization.Format("DumpsRunningOn", capture.Port)
             : AppLocalization.Get("DumpsStopped");
         ServerButtonIcon.Symbol = capture.IsRunning ? Symbol.Stop : Symbol.Play;
+        ServerStatusDot.Style = Views.StatusStyles.Dot(
+            capture.IsRunning ? Views.StatusTone.Success : Views.StatusTone.Neutral
+        );
     }
 }

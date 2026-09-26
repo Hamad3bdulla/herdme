@@ -197,7 +197,7 @@ public sealed class SiteDevelopmentServer : IAsyncDisposable
     {
         if (eventArgs.Data is null || logPath is null) return;
         try { BoundedLog.AppendLine(logPath, $"[{DateTimeOffset.Now:O}] {eventArgs.Data}"); }
-        catch (IOException) { }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
     }
 
     private static bool HasDevScript(string path)

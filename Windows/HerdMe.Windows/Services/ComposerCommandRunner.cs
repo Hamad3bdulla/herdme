@@ -66,6 +66,7 @@ public static class ComposerCommandRunner
         foreach (var variable in environment) startInfo.Environment[variable.Key] = variable.Value;
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Composer could not be started.");
+        using var job = WindowsJobObject.TryAttach(process);
         var standardOutput = ReadAsync(process.StandardOutput, outputProgress, cancellationToken);
         var standardError = ReadAsync(process.StandardError, outputProgress, cancellationToken);
         try
@@ -78,8 +79,9 @@ public static class ComposerCommandRunner
             await process.WaitForExitAsync(CancellationToken.None);
             throw;
         }
-        var output = await standardOutput;
-        var error = await standardError;
+        await WindowsJobObject.DrainOutputAsync(job, standardOutput, standardError);
+        var output = standardOutput.IsCompletedSuccessfully ? standardOutput.Result : string.Empty;
+        var error = standardError.IsCompletedSuccessfully ? standardError.Result : string.Empty;
         return new ArtisanCommandResult(
             process.ExitCode,
             (output + Environment.NewLine + error).Trim(),

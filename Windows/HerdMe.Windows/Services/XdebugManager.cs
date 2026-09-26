@@ -41,15 +41,31 @@ public sealed class XdebugManager
         var extensionPath = ExtensionPath(phpCycle);
         if (!File.Exists(extensionPath)) return null;
 
+        // Only successful probes are cached; the entry follows php.exe, php.ini, ext and the DLL.
+        var version = await PhpModuleProbeCache.GetOrProbeAsync<string>(
+            phpExecutable,
+            "xdebug-version:" + extensionPath,
+            [extensionPath],
+            token => ProbeInstalledVersionAsync(phpExecutable, extensionPath, token),
+            cancellationToken,
+            shouldCache: IsVersion
+        );
+        return IsVersion(version) ? new XdebugInstallation(version, extensionPath) : null;
+    }
+
+    private static async Task<string> ProbeInstalledVersionAsync(
+        string phpExecutable,
+        string extensionPath,
+        CancellationToken cancellationToken
+    )
+    {
         var result = await RunAsync(
             phpExecutable,
             ["-n", "-d", $"zend_extension={extensionPath}", "-r", "echo phpversion('xdebug') ?: '';"],
             cancellationToken
         );
         var version = result.Output.Trim();
-        return result.ExitCode == 0 && IsVersion(version)
-            ? new XdebugInstallation(version, extensionPath)
-            : null;
+        return result.ExitCode == 0 && IsVersion(version) ? version : string.Empty;
     }
 
     public async Task<XdebugInstallation> InstallAsync(
@@ -95,6 +111,7 @@ public sealed class XdebugManager
             }
 
             File.Move(candidate, destination, true);
+            PhpModuleProbeCache.Invalidate(phpExecutable);
             await File.WriteAllTextAsync(
                 Path.Combine(directory, "VERSION"),
                 release.Version + Environment.NewLine,
