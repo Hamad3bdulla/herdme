@@ -36,6 +36,12 @@
     <Compile Include="../HerdMe.Windows/Services/CaptureExport.cs" Link="Services/CaptureExport.cs" />
     <Compile Include="CapturePersistenceContractChecks.cs" />
     <Compile Include="PerformanceContractChecks.cs" />
+    <Compile Include="ProxySiteContractChecks.cs" />
+    <Compile Include="ShareContractChecks.cs" />
+    <Compile Include="ManifestContractChecks.cs" />
+    <Compile Include="ProfilerContractChecks.cs" />
+    <Compile Include="TinkerContractChecks.cs" />
+    <Compile Include="CaptureSummaryContractChecks.cs" />
     <Compile Include="../HerdMe.Windows/Services/CaptureRefreshSession.cs" Link="Services/CaptureRefreshSession.cs" />
     <Compile Include="../HerdMe.Windows/Services/ApplicationTaskLifetime.cs" Link="Services/ApplicationTaskLifetime.cs" />
     <Compile Include="../HerdMe.Windows/Models/CoreModels.cs" Link="Models/CoreModels.cs" />
@@ -52,6 +58,7 @@
     <Compile Include="../HerdMe.Windows/Models/SiteSettingsModels.cs" Link="Models/SiteSettingsModels.cs" />
     <Compile Include="../HerdMe.Windows/Services/AppServices.cs" Link="Services/AppServices.cs" />
     <Compile Include="../HerdMe.Windows/Services/ArtisanCommandRunner.cs" Link="Services/ArtisanCommandRunner.cs" />
+    <Compile Include="../HerdMe.Windows/Services/TinkerRunner.cs" Link="Services/TinkerRunner.cs" />
     <Compile Include="../HerdMe.Windows/Services/NpmScriptRunner.cs" Link="Services/NpmScriptRunner.cs" />
     <Compile Include="../HerdMe.Windows/Services/ComposerToolManager.cs" Link="Services/ComposerToolManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/ComposerCommandRunner.cs" Link="Services/ComposerCommandRunner.cs" />
@@ -78,7 +85,6 @@
     <Compile Include="../HerdMe.Windows/Services/WindowsServiceCredentialStore.cs" Link="Services/WindowsServiceCredentialStore.cs" />
     <Compile Include="../HerdMe.Windows/Services/DumpCaptureService.cs" Link="Services/DumpCaptureService.cs" />
     <Compile Include="../HerdMe.Windows/Services/OperationJournal.cs" Link="Services/OperationJournal.cs" />
-    <Compile Include="../HerdMe.Windows/Services/BackendSupervisor.cs" Link="Services/BackendSupervisor.cs" />
     <Compile Include="../HerdMe.Windows/Services/CaptureDatabase.cs" Link="Services/CaptureDatabase.cs" />
     <Compile Include="../HerdMe.Windows/Services/ApplicationDiagnostics.cs" Link="Services/ApplicationDiagnostics.cs" />
     <Compile Include="../HerdMe.Windows/Services/DiagnosticLog.cs" Link="Services/DiagnosticLog.cs" />
@@ -112,6 +118,7 @@
     <Compile Include="../HerdMe.Windows/Services/PhpRuntimeInstaller.cs" Link="Services/PhpRuntimeInstaller.cs" />
     <Compile Include="../HerdMe.Windows/Services/PhpExtensionManager.cs" Link="Services/PhpExtensionManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/PhpRuntimePolicy.cs" Link="Services/PhpRuntimePolicy.cs" />
+    <Compile Include="../HerdMe.Windows/Services/XdebugProfiler.cs" Link="Services/XdebugProfiler.cs" />
     <Compile Include="../HerdMe.Windows/Services/RuntimeVersionComparison.cs" Link="Services/RuntimeVersionComparison.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsCertificateManager.cs" Link="Services/WindowsCertificateManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsLocalEnvironment.cs" Link="Services/WindowsLocalEnvironment.cs" />
@@ -120,6 +127,9 @@
     <Compile Include="../HerdMe.Windows/Services/XdebugManager.cs" Link="Services/XdebugManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/PhpModuleProbeCache.cs" Link="Services/PhpModuleProbeCache.cs" />
     <Compile Include="../HerdMe.Windows/Services/SettingsFileCache.cs" Link="Services/SettingsFileCache.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ProxySiteStore.cs" Link="Services/ProxySiteStore.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SiteShareManager.cs" Link="Services/SiteShareManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ProjectManifest.cs" Link="Services/ProjectManifest.cs" />
     <Compile Include="../HerdMe.Windows/Services/ServiceText.cs" Link="Services/ServiceText.cs" />
   </ItemGroup>
 

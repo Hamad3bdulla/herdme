@@ -1,0 +1,121 @@
+<Page
+    x:Class="HerdMe.Windows.Pages.TinkerPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    AutomationProperties.AutomationId="TinkerPageRoot"
+    Loaded="Page_Loaded"
+    Unloaded="Page_Unloaded">
+    <ScrollViewer>
+        <StackPanel Style="{StaticResource PageContentStyle}">
+            <StackPanel Spacing="2" Margin="0,0,0,4">
+                <TextBlock x:Uid="TinkerPageTitle" AutomationProperties.AutomationId="TinkerPageRoot" Text="Tinker" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock x:Uid="TinkerPageSubtitle" Text="Run PHP code inside a site, with Composer and Laravel already loaded." Style="{StaticResource PageSubtitleStyle}" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Border Style="{StaticResource SettingsGroupStyle}">
+                <StackPanel>
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE774;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Name="SiteLabel" x:Uid="TinkerSiteLabel" Text="Site" Style="{StaticResource SettingsRowTitleStyle}" />
+                            <TextBlock x:Name="SiteRuntimeText" Style="{StaticResource SettingsRowDescriptionStyle}" />
+                        </StackPanel>
+                        <ComboBox
+                            x:Name="SiteBox"
+                            Grid.Column="2"
+                            Width="300"
+                            VerticalAlignment="Center"
+                            AutomationProperties.AutomationId="TinkerSiteBox"
+                            AutomationProperties.LabeledBy="{Binding ElementName=SiteLabel}"
+                            ItemsSource="{x:Bind Sites}"
+                            DisplayMemberPath="Domain"
+                            SelectionChanged="SiteBox_SelectionChanged" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE81C;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <TextBlock x:Name="HistoryLabel" x:Uid="TinkerHistoryLabel" Grid.Column="1" Text="Recent code" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                        <StackPanel Grid.Column="2" Style="{StaticResource SettingsRowControlStyle}">
+                            <ComboBox
+                                x:Name="HistoryBox"
+                                Width="300"
+                                AutomationProperties.AutomationId="TinkerHistoryBox"
+                                AutomationProperties.LabeledBy="{Binding ElementName=HistoryLabel}"
+                                ItemsSource="{x:Bind History}"
+                                DisplayMemberPath="Preview"
+                                SelectionChanged="HistoryBox_SelectionChanged" />
+                            <Button x:Name="ClearHistoryButton" x:Uid="TinkerClearHistoryButton" Click="ClearHistory_Click" AutomationProperties.Name="Clear recent code" Style="{StaticResource ToolbarIconButtonStyle}">
+                                <SymbolIcon Symbol="Delete" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <TextBlock x:Uid="TinkerCodeTitle" Text="Code" Style="{StaticResource SectionHeaderStyle}" />
+            <TextBox
+                x:Name="CodeBox"
+                x:Uid="TinkerCodeBox"
+                AutomationProperties.AutomationId="TinkerCodeBox"
+                AutomationProperties.Name="PHP code"
+                PlaceholderText="return App\Models\User::count();"
+                AcceptsReturn="True"
+                TextWrapping="NoWrap"
+                IsSpellCheckEnabled="False"
+                IsTextPredictionEnabled="False"
+                FlowDirection="LeftToRight"
+                FontFamily="Consolas"
+                Height="220"
+                ScrollViewer.VerticalScrollBarVisibility="Auto"
+                ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                <TextBox.KeyboardAccelerators>
+                    <KeyboardAccelerator Key="Enter" Modifiers="Control" Invoked="RunAccelerator_Invoked" />
+                </TextBox.KeyboardAccelerators>
+            </TextBox>
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <ProgressRing x:Name="RunProgress" Width="18" Height="18" />
+                    <TextBlock x:Name="StatusText" x:Uid="TinkerReady" Text="Use return to show a value. Ctrl+Enter runs the code." FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.AutomationId="TinkerStatusText" AutomationProperties.LiveSetting="Polite" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="CancelButton" x:Uid="TinkerCancelButton" Content="Cancel" Click="Cancel_Click" IsEnabled="False" AutomationProperties.AutomationId="TinkerCancelButton" />
+                    <Button x:Name="RunButton" Click="Run_Click" IsEnabled="False" Style="{StaticResource AccentButtonStyle}" AutomationProperties.AutomationId="TinkerRunButton">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <SymbolIcon Symbol="Play" />
+                            <TextBlock x:Uid="TinkerRunButton" Text="Run" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <TextBlock x:Uid="TinkerOutputTitle" Text="Output" Style="{StaticResource SectionHeaderStyle}" />
+            <TextBox
+                x:Name="OutputBox"
+                x:Uid="TinkerOutputBox"
+                AutomationProperties.AutomationId="TinkerOutputBox"
+                AutomationProperties.Name="Output"
+                IsReadOnly="True"
+                AcceptsReturn="True"
+                TextWrapping="NoWrap"
+                FlowDirection="LeftToRight"
+                FontFamily="Consolas"
+                Height="300"
+                ScrollViewer.VerticalScrollBarVisibility="Auto"
+                ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

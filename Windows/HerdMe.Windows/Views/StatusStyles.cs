@@ -20,6 +20,11 @@ internal static class StatusStyles
 
     public static Style Glyph(StatusTone tone) => Find("StatusGlyph", tone);
 
+    // Neutral text is secondary text; PrimaryText is for status lines that reset to normal text.
+    public static Style Text(StatusTone tone) => Find("StatusText", tone);
+
+    public static Style PrimaryText => (Style)Application.Current.Resources["StatusTextPrimaryStyle"];
+
     private static Style Find(string prefix, StatusTone tone) =>
         (Style)Application.Current.Resources[$"{prefix}{tone}Style"];
 }

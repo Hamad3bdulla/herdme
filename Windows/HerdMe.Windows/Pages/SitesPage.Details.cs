@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
+using HerdMe.Windows.Views;
 using HerdMe.Windows.ViewModels;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.UI.Xaml;
@@ -536,9 +537,7 @@ public sealed partial class SitesPage
             Text = Path.Combine(site.Path, ".env"),
             FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"),
             FontSize = 12,
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                "TextFillColorSecondaryBrush"
-            ],
+            Style = StatusStyles.Text(StatusTone.Neutral),
             TextTrimming = TextTrimming.CharacterEllipsis,
             IsTextSelectionEnabled = true
         };
@@ -546,9 +545,7 @@ public sealed partial class SitesPage
         {
             Text = EnvironmentDocumentStatus(document),
             TextWrapping = TextWrapping.Wrap,
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                "TextFillColorSecondaryBrush"
-            ]
+            Style = StatusStyles.Text(StatusTone.Neutral)
         };
         var editor = new TextBox
         {
@@ -589,9 +586,7 @@ public sealed partial class SitesPage
             statusText.Text = isDirty
                 ? AppLocalization.Get("SitesEnvironmentStatusUnsaved")
                 : EnvironmentDocumentStatus(document);
-            statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                "TextFillColorSecondaryBrush"
-            ];
+            statusText.Style = StatusStyles.Text(StatusTone.Neutral);
         };
         dialog.PrimaryButtonClick += async (_, args) =>
         {
@@ -612,16 +607,12 @@ public sealed partial class SitesPage
                 isDirty = false;
                 discardArmed = false;
                 statusText.Text = AppLocalization.Get("SitesEnvironmentStatusSaved");
-                statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                    "SystemFillColorSuccessBrush"
-                ];
+                statusText.Style = StatusStyles.Text(StatusTone.Success);
             }
             catch (ProjectEnvironmentChangedException)
             {
                 statusText.Text = AppLocalization.Get("SitesEnvironmentExternalChange");
-                statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                    "SystemFillColorCriticalBrush"
-                ];
+                statusText.Style = StatusStyles.Text(StatusTone.Critical);
             }
             catch (Exception error) when (error is IOException
                 or UnauthorizedAccessException
@@ -629,9 +620,7 @@ public sealed partial class SitesPage
                 or InvalidOperationException)
             {
                 statusText.Text = error.Message;
-                statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                    "SystemFillColorCriticalBrush"
-                ];
+                statusText.Style = StatusStyles.Text(StatusTone.Critical);
             }
             finally
             {
@@ -646,9 +635,7 @@ public sealed partial class SitesPage
             args.Cancel = true;
             discardArmed = true;
             statusText.Text = AppLocalization.Get("SitesEnvironmentConfirmDiscard");
-            statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                "SystemFillColorCautionBrush"
-            ];
+            statusText.Style = StatusStyles.Text(StatusTone.Caution);
         };
         await dialog.ShowAsync();
     }

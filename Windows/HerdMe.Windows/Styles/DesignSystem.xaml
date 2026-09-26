@@ -182,6 +182,22 @@
     <Style x:Key="StatusGlyphCriticalStyle" TargetType="FontIcon" BasedOn="{StaticResource StatusGlyphStyle}">
         <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCriticalBrush}" />
     </Style>
+    <!-- Text colors for status lines built in code; neutral is secondary text. -->
+    <Style x:Key="StatusTextPrimaryStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+    </Style>
+    <Style x:Key="StatusTextNeutralStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+    </Style>
+    <Style x:Key="StatusTextSuccessStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource SystemFillColorSuccessBrush}" />
+    </Style>
+    <Style x:Key="StatusTextCautionStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+    </Style>
+    <Style x:Key="StatusTextCriticalStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCriticalBrush}" />
+    </Style>
 
     <!--
         Settings rows (Windows Settings pattern): a group card holds rows separated by

@@ -99,6 +99,18 @@ public sealed class DumpCaptureService : IAsyncDisposable
         return database.LoadDumps(retentionLimit, retentionAge);
     }
 
+    /// <summary>List rows without large bodies; pass a row to <see cref="Complete"/> to show it.</summary>
+    public IReadOnlyList<CapturedDump> LoadSummaries()
+    {
+        return database.LoadDumpSummaries(retentionLimit, retentionAge);
+    }
+
+    /// <summary>Returns the full capture for a list row, or null when it was deleted meanwhile.</summary>
+    public CapturedDump? Complete(CapturedDump item)
+    {
+        return item.IsSummary ? database.LoadDump(item.Id) : item;
+    }
+
     public void Clear()
     {
         lock (storageSync)

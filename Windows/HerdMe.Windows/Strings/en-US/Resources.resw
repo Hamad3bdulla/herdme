@@ -1105,4 +1105,152 @@ Recovery backup: {1}</value></data>
   <data name="Dashboard_Repair_LockFileNotInstallable" xml:space="preserve"><value>{0}: package-lock.json is not installable with npm ci</value></data>
   <data name="Dashboard_Repair_NpmAuditVulnerabilities" xml:space="preserve"><value>{0}: npm audit found high-severity vulnerabilities</value></data>
   <data name="Dashboard_Repair_MigrationStatusFailed" xml:space="preserve"><value>{0}: database or migration status could not be read</value></data>
+  <data name="SitesProxySitesButton.Text" xml:space="preserve"><value>Proxy sites</value></data>
+  <data name="SitesProxyDialogTitle" xml:space="preserve"><value>Proxy sites</value></data>
+  <data name="SitesProxyDialogDescription" xml:space="preserve"><value>Serve a development server that already runs on this computer (Nuxt, Next, Node, Python, ...) at a clean https address. HerdMe forwards requests, WebSockets, and streamed responses to the local port. Start the development server yourself; HerdMe only routes traffic to it.</value></data>
+  <data name="SitesProxyNameHeader" xml:space="preserve"><value>Name</value></data>
+  <data name="SitesProxyTargetHeader" xml:space="preserve"><value>Local target</value></data>
+  <data name="SitesProxyAddButton" xml:space="preserve"><value>Add</value></data>
+  <data name="SitesProxySaveButton" xml:space="preserve"><value>Save</value></data>
+  <data name="SitesProxyCloseButton" xml:space="preserve"><value>Close</value></data>
+  <data name="SitesProxyEmpty" xml:space="preserve"><value>No proxy sites yet.</value></data>
+  <data name="SitesProxyPreview" xml:space="preserve"><value>{0} will forward to http://127.0.0.1:{1}</value></data>
+  <data name="SitesProxyTargetLabel" xml:space="preserve"><value>Proxy to 127.0.0.1:{0}</value></data>
+  <data name="SitesProxyOpenButton" xml:space="preserve"><value>Open in browser</value></data>
+  <data name="SitesProxyCopyButton" xml:space="preserve"><value>Copy link</value></data>
+  <data name="SitesProxyEditButton" xml:space="preserve"><value>Edit</value></data>
+  <data name="SitesProxyRemoveButton" xml:space="preserve"><value>Remove</value></data>
+  <data name="SitesProxyInvalidName" xml:space="preserve"><value>Use lowercase letters, digits, and hyphens for the name (for example my-app).</value></data>
+  <data name="SitesProxyInvalidTarget" xml:space="preserve"><value>Enter a local port between 1024 and 65535, for example 3000 or localhost:3000. Only this computer can be a target.</value></data>
+  <data name="SitesProxyNameTaken" xml:space="preserve"><value>A folder site already uses {0}. Choose another name.</value></data>
+  <data name="SitesProxyLimit" xml:space="preserve"><value>HerdMe supports up to {0} proxy sites.</value></data>
+  <data name="SitesShareCommand.Label" xml:space="preserve"><value>Share publicly</value></data>
+  <data name="SitesShareBar.Title" xml:space="preserve"><value>Shared publicly</value></data>
+  <data name="SitesShareStopButton.Content" xml:space="preserve"><value>Stop sharing</value></data>
+  <data name="SitesShareCopyButton.Content" xml:space="preserve"><value>Copy link</value></data>
+  <data name="SitesShareBarMessage" xml:space="preserve"><value>Anyone with this link can open the site from the internet. Stop sharing when you are done; sharing also stops when local sites stop or HerdMe exits.</value></data>
+  <data name="SitesShareStarting" xml:space="preserve"><value>Creating a temporary public link...</value></data>
+  <data name="SitesShareConfirmTitle" xml:space="preserve"><value>Share {0} on the internet?</value></data>
+  <data name="SitesShareConfirmMessage" xml:space="preserve"><value>HerdMe will download the official cloudflared tool from Cloudflare (verified with SHA-256) and open a temporary Cloudflare quick tunnel to this site. Anyone who has the link can open the site, including its pages, API routes, and data. Do not share sites that contain real customer data or secrets. The link changes every time you share.</value></data>
+  <data name="SitesShareConfirmButton" xml:space="preserve"><value>Share publicly</value></data>
+  <data name="SitesShareFailed" xml:space="preserve"><value>The site could not be shared: {0}</value></data>
+  <data name="ShareEnvironmentStopped" xml:space="preserve"><value>Start local sites before sharing.</value></data>
+  <data name="SitesManifestCommand.Text" xml:space="preserve"><value>Project settings (herdme.yml)</value></data>
+  <data name="SitesManifestApplyCommand.Text" xml:space="preserve"><value>Apply herdme.yml</value></data>
+  <data name="SitesManifestExportCommand.Text" xml:space="preserve"><value>Export herdme.yml</value></data>
+  <data name="SitesManifestMissing" xml:space="preserve"><value>This project has no herdme.yml file. Use Export herdme.yml to create one from the current setup.</value></data>
+  <data name="SitesManifestEmpty" xml:space="preserve"><value>herdme.yml does not contain any settings.</value></data>
+  <data name="SitesManifestApplyIntro" xml:space="preserve"><value>HerdMe will prepare this project with the settings from herdme.yml. Missing runtimes and services are downloaded from their official sources.</value></data>
+  <data name="SitesManifestApplyTitle" xml:space="preserve"><value>Apply project settings to {0}</value></data>
+  <data name="SitesManifestApplyButton" xml:space="preserve"><value>Apply</value></data>
+  <data name="SitesManifestRetryButton" xml:space="preserve"><value>Try again</value></data>
+  <data name="SitesManifestApplied" xml:space="preserve"><value>Project settings applied.</value></data>
+  <data name="SitesManifestSummaryPhp" xml:space="preserve"><value>PHP {0}</value></data>
+  <data name="SitesManifestSummaryNode" xml:space="preserve"><value>Node.js {0}</value></data>
+  <data name="SitesManifestSummaryServices" xml:space="preserve"><value>Services: {0}</value></data>
+  <data name="SitesManifestSummaryDatabase" xml:space="preserve"><value>Database: {0}</value></data>
+  <data name="SitesManifestPhpUnsupported" xml:space="preserve"><value>PHP {0} is not available for Windows in HerdMe.</value></data>
+  <data name="SitesManifestInstallingRuntime" xml:space="preserve"><value>Installing {0}...</value></data>
+  <data name="SitesManifestNodeSubstituted" xml:space="preserve"><value>Node.js {0} is not installed; using {1} from the same major version.</value></data>
+  <data name="SitesManifestServiceUnavailable" xml:space="preserve"><value>{0} is not available on Windows.</value></data>
+  <data name="SitesManifestDatabaseExists" xml:space="preserve"><value>The database {0} already exists and was left unchanged.</value></data>
+  <data name="SitesManifestExportTitle" xml:space="preserve"><value>Export herdme.yml for {0}</value></data>
+  <data name="SitesManifestExportIntro" xml:space="preserve"><value>Review the suggested settings, then save herdme.yml in the project folder so teammates can apply the same setup.</value></data>
+  <data name="SitesManifestExportExisting" xml:space="preserve"><value>This project already has herdme.yml. Edit it here and save to replace it.</value></data>
+  <data name="SitesManifestSavedTitle" xml:space="preserve"><value>herdme.yml saved</value></data>
+  <data name="ManifestErrorAtLine" xml:space="preserve"><value>herdme.yml line {0}: {1}</value></data>
+  <data name="ManifestError" xml:space="preserve"><value>herdme.yml: {0}</value></data>
+  <data name="ManifestTooLarge" xml:space="preserve"><value>the file is larger than 16 KB.</value></data>
+  <data name="ManifestTabs" xml:space="preserve"><value>use spaces instead of tabs.</value></data>
+  <data name="ManifestUnexpectedIndent" xml:space="preserve"><value>only list items under services can be indented.</value></data>
+  <data name="ManifestUnexpectedList" xml:space="preserve"><value>list items are only allowed under services.</value></data>
+  <data name="ManifestExpectedKey" xml:space="preserve"><value>expected "key: value".</value></data>
+  <data name="ManifestUnknownKey" xml:space="preserve"><value>unknown setting "{0}". Supported settings: php, node, services, database.</value></data>
+  <data name="ManifestDuplicateKey" xml:space="preserve"><value>"{0}" is listed more than once.</value></data>
+  <data name="ManifestServicesList" xml:space="preserve"><value>services must be a list, for example [mariadb, redis].</value></data>
+  <data name="ManifestMissingValue" xml:space="preserve"><value>"{0}" needs a value.</value></data>
+  <data name="ManifestInvalidPhp" xml:space="preserve"><value>php must be a version such as "8.3".</value></data>
+  <data name="ManifestInvalidNode" xml:space="preserve"><value>node must be a version such as "22" or "22.11.0".</value></data>
+  <data name="ManifestTooManyServices" xml:space="preserve"><value>too many services are listed.</value></data>
+  <data name="ManifestUnknownService" xml:space="preserve"><value>"{0}" is not a HerdMe service. Supported services: {1}.</value></data>
+  <data name="ManifestDuplicateService" xml:space="preserve"><value>"{0}" is listed more than once.</value></data>
+  <data name="ManifestInvalidDatabase" xml:space="preserve"><value>database must start with a letter and use only letters, digits, and underscores (up to 63).</value></data>
+  <data name="ManifestDatabaseNeedsService" xml:space="preserve"><value>database needs mariadb, mysql, or postgresql in services.</value></data>
+  <data name="ManifestUnclosedQuote" xml:space="preserve"><value>a quoted value is not closed.</value></data>
+  <data name="ManifestInvalidValue" xml:space="preserve"><value>"{0}" is not a valid value.</value></data>
+  <data name="DoctorHttps" xml:space="preserve"><value>HTTPS</value></data>
+  <data name="DoctorLaravel" xml:space="preserve"><value>Laravel</value></data>
+  <data name="DoctorLaravelCoreFiles" xml:space="preserve"><value>Laravel core files</value></data>
+  <data name="DoctorPhp" xml:space="preserve"><value>PHP</value></data>
+  <data name="DoctorComposer" xml:space="preserve"><value>Composer</value></data>
+  <data name="DoctorComposerLock" xml:space="preserve"><value>Composer lock file</value></data>
+  <data name="DoctorPhpPlatform" xml:space="preserve"><value>PHP platform requirements</value></data>
+  <data name="DoctorNodeLock" xml:space="preserve"><value>Node lock file</value></data>
+  <data name="DoctorNodeDependencies" xml:space="preserve"><value>Node dependencies</value></data>
+  <data name="DoctorNodePackageManager" xml:space="preserve"><value>Node package manager</value></data>
+  <data name="DoctorNodeVersion" xml:space="preserve"><value>Node.js version</value></data>
+  <data name="DoctorEnvironmentConfiguration" xml:space="preserve"><value>Environment configuration</value></data>
+  <data name="DoctorStorageLink" xml:space="preserve"><value>Storage link</value></data>
+  <data name="DoctorLaravelLogs" xml:space="preserve"><value>Laravel logs</value></data>
+  <data name="DebuggerProfilerLabel.Text" xml:space="preserve"><value>Enable profiler</value></data>
+  <data name="DebuggerProfilerDescription.Text" xml:space="preserve"><value>Profile requests that include XDEBUG_PROFILE. While on, debugging also starts only with a trigger.</value></data>
+  <data name="DebuggerProfileRequestButton.Text" xml:space="preserve"><value>Profile Request</value></data>
+  <data name="DebuggerProfilesTitle.Text" xml:space="preserve"><value>Profiles</value></data>
+  <data name="DebuggerProfilesNone.Text" xml:space="preserve"><value>No profiles yet.</value></data>
+  <data name="DebuggerProfilesDescription.Text" xml:space="preserve"><value>Select a profile to see the slowest functions. HerdMe keeps the newest 50 profiles.</value></data>
+  <data name="DebuggerRefreshProfilesButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Refresh profiles</value></data>
+  <data name="DebuggerOpenProfilesButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open profiles folder</value></data>
+  <data name="DebuggerDeleteProfilesButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Delete all profiles</value></data>
+  <data name="DebuggerProfilesEmpty" xml:space="preserve"><value>No profiles yet.</value></data>
+  <data name="DebuggerProfilesCount" xml:space="preserve"><value>{0} profiles</value></data>
+  <data name="DebuggerEnableProfilerAndSave" xml:space="preserve"><value>Enable the debugger and the profiler, then save and restart the environment.</value></data>
+  <data name="DebuggerProfilingSite" xml:space="preserve"><value>Opened {0} with the profiler trigger. The profile appears below when the request finishes.</value></data>
+  <data name="DebuggerDeleteProfilesTitle" xml:space="preserve"><value>Delete all profiles?</value></data>
+  <data name="DebuggerDeleteProfilesMessage" xml:space="preserve"><value>This removes every profile in the HerdMe profiles folder.</value></data>
+  <data name="DebuggerDeleteProfilesConfirm" xml:space="preserve"><value>Delete All</value></data>
+  <data name="DebuggerProfileLoading" xml:space="preserve"><value>Reading {0}...</value></data>
+  <data name="DebuggerProfileFailed" xml:space="preserve"><value>The profile could not be read: {0}</value></data>
+  <data name="DebuggerProfileTitle" xml:space="preserve"><value>Profile: {0}, peak memory {1}</value></data>
+  <data name="DebuggerProfileDelete" xml:space="preserve"><value>Delete Profile</value></data>
+  <data name="DebuggerProfileFunction" xml:space="preserve"><value>Function</value></data>
+  <data name="DebuggerProfileCalls" xml:space="preserve"><value>Calls</value></data>
+  <data name="DebuggerProfileSelf" xml:space="preserve"><value>Self</value></data>
+  <data name="DebuggerProfileInclusive" xml:space="preserve"><value>Total</value></data>
+  <data name="DebuggerProfileMemory" xml:space="preserve"><value>Memory</value></data>
+  <data name="DebuggerProfileMore" xml:space="preserve"><value>{0} more functions are not shown.</value></data>
+  <data name="DebuggerProfileRow" xml:space="preserve"><value>{0}  ({1} KB)</value></data>
+  <data name="DebuggerSeconds" xml:space="preserve"><value>{0} s</value></data>
+  <data name="DebuggerMilliseconds" xml:space="preserve"><value>{0} ms</value></data>
+  <data name="DebuggerMegabytes" xml:space="preserve"><value>{0} MB</value></data>
+  <data name="DebuggerKilobytes" xml:space="preserve"><value>{0} KB</value></data>
+  <data name="NavTinker.Content" xml:space="preserve"><value>Tinker</value></data>
+  <data name="TinkerPageTitle.Text" xml:space="preserve"><value>Tinker</value></data>
+  <data name="TinkerPageSubtitle.Text" xml:space="preserve"><value>Run PHP code inside a site, with Composer and Laravel already loaded.</value></data>
+  <data name="TinkerSiteLabel.Text" xml:space="preserve"><value>Site</value></data>
+  <data name="TinkerHistoryLabel.Text" xml:space="preserve"><value>Recent code</value></data>
+  <data name="TinkerClearHistoryButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Clear recent code</value></data>
+  <data name="TinkerCodeTitle.Text" xml:space="preserve"><value>Code</value></data>
+  <data name="TinkerCodeBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>PHP code</value></data>
+  <data name="TinkerReady.Text" xml:space="preserve"><value>Use return to show a value. Ctrl+Enter runs the code.</value></data>
+  <data name="TinkerCancelButton.Content" xml:space="preserve"><value>Cancel</value></data>
+  <data name="TinkerRunButton.Text" xml:space="preserve"><value>Run</value></data>
+  <data name="TinkerOutputTitle.Text" xml:space="preserve"><value>Output</value></data>
+  <data name="TinkerOutputBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Output</value></data>
+  <data name="TinkerNoSites" xml:space="preserve"><value>Add a site first, then run code inside it.</value></data>
+  <data name="TinkerCancelling" xml:space="preserve"><value>Stopping...</value></data>
+  <data name="TinkerPreparing" xml:space="preserve"><value>Checking PHP...</value></data>
+  <data name="TinkerRunning" xml:space="preserve"><value>Running in {0}...</value></data>
+  <data name="TinkerCompleted" xml:space="preserve"><value>Finished in {0} s.</value></data>
+  <data name="TinkerFailedExit" xml:space="preserve"><value>Failed with exit code {0} after {1} s.</value></data>
+  <data name="TinkerCancelled" xml:space="preserve"><value>Stopped.</value></data>
+  <data name="TinkerTimedOut" xml:space="preserve"><value>The code took too long and was stopped.</value></data>
+  <data name="TinkerFailed" xml:space="preserve"><value>The code could not run.</value></data>
+  <data name="TinkerCodeTooLong" xml:space="preserve"><value>Tinker code is limited to 16 KB.</value></data>
+  <data name="TinkerCodeInvalid" xml:space="preserve"><value>The code contains an unsupported character.</value></data>
+  <data name="TinkerCodeEmpty" xml:space="preserve"><value>Enter some PHP code to run.</value></data>
+  <data name="TinkerPhpMissing" xml:space="preserve"><value>Install the selected HerdMe PHP runtime first.</value></data>
+  <data name="TinkerProjectMissing" xml:space="preserve"><value>The site folder no longer exists.</value></data>
+  <data name="TinkerStartFailed" xml:space="preserve"><value>The selected PHP runtime could not start.</value></data>
+  <data name="TinkerTimeoutSubject" xml:space="preserve"><value>The Tinker code</value></data>
+  <data name="TinkerCodeBox.PlaceholderText" xml:space="preserve"><value>return App\Models\User::count();</value></data>
 </root>

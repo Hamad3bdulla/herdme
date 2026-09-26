@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
+using HerdMe.Windows.Views;
 using HerdMe.Windows.ViewModels;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.UI.Xaml;
@@ -84,7 +85,7 @@ public sealed partial class SitesPage
         {
             Text = AppLocalization.Format("SitesProjectLocation", parent),
             TextWrapping = TextWrapping.Wrap,
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+            Style = StatusStyles.Text(StatusTone.Neutral)
         });
         content.Children.Add(nameBox);
         content.Children.Add(starterBox);

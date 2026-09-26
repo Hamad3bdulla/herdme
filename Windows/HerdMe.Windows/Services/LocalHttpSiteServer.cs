@@ -73,11 +73,42 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     private TcpListener? listener;
     private Task? acceptTask;
     private IReadOnlyDictionary<string, SiteRoute> routes = new Dictionary<string, SiteRoute>();
+    private readonly ConcurrentDictionary<string, string> shareAliases = new(StringComparer.OrdinalIgnoreCase);
     private int fastCgiPort;
     private int sessionIdentifier;
     private X509Certificate2? certificate;
 
     public int? Port { get; private set; }
+
+    /// <summary>
+    /// Routes a public tunnel host name (for example abc.trycloudflare.com) to an existing
+    /// local site. The tunnel terminates HTTPS, so PHP sees an https request for that host
+    /// and generates links that work for the visitor. The listener itself stays loopback-only.
+    /// </summary>
+    public void SetShareAlias(string publicHost, string domain)
+    {
+        var alias = NormalizeHost(publicHost);
+        var target = NormalizeHost(domain);
+        if (alias.Length == 0 || target.Length == 0 || routes.ContainsKey(alias))
+        {
+            throw new ArgumentException("The share host name is not valid.", nameof(publicHost));
+        }
+        shareAliases[alias] = target;
+    }
+
+    public void RemoveShareAlias(string publicHost)
+    {
+        shareAliases.TryRemove(NormalizeHost(publicHost), out _);
+    }
+
+    public void RemoveShareAliasesFor(string domain)
+    {
+        var target = NormalizeHost(domain);
+        foreach (var alias in shareAliases.Where(entry => entry.Value == target).Select(entry => entry.Key).ToArray())
+        {
+            shareAliases.TryRemove(alias, out _);
+        }
+    }
 
     public bool IsRunning => listener is not null && acceptTask is { IsCompleted: false };
 
@@ -106,7 +137,10 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         var normalized = sites.ToDictionary(
             site => NormalizeHost(site.Domain),
             site => new SiteRoute(
-                DocumentRoot(site.Path),
+                // Proxy sites have no folder: every request goes to the loopback target.
+                string.IsNullOrEmpty(site.Path) && site.DevelopmentServerPort is not null
+                    ? string.Empty
+                    : DocumentRoot(site.Path),
                 site.PhpFastCgiPort ?? phpFastCgiPort,
                 site.PhpUsesHttpFallback,
                 site.DevelopmentServerPort
@@ -266,7 +300,15 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
 
                     var host = request.Header("Host")?.Split(':', 2)[0];
                     var normalizedHost = host is null ? null : NormalizeHost(host);
-                    if (normalizedHost is null || !routes.TryGetValue(normalizedHost, out var route))
+                    SiteRoute? route = null;
+                    if (normalizedHost is not null && !routes.TryGetValue(normalizedHost, out route)
+                        && shareAliases.TryGetValue(normalizedHost, out var sharedDomain)
+                        && routes.TryGetValue(sharedDomain, out var sharedRoute))
+                    {
+                        route = sharedRoute with { Shared = true };
+                        normalizedHost = sharedDomain;
+                    }
+                    if (normalizedHost is null || route is null)
                     {
                         await WriteErrorAsync(stream, "404 Not Found", cancellationToken);
                         return;
@@ -380,6 +422,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
     )
     {
         var target = RequestTarget.Parse(request.Target);
+        var secure = certificate is not null || route.Shared;
         if (route.DevelopmentServerPort is { } developmentPort)
         {
             return await WriteHttpProxyAsync(
@@ -387,6 +430,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
                 request,
                 developmentPort,
                 keepAlive,
+                secure,
                 cancellationToken
             );
         }
@@ -424,7 +468,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             target,
             route.DocumentRoot,
             resource,
-            certificate is not null
+            secure
         );
         var writer = new FastCgiHttpResponseWriter(
             destination,
@@ -465,14 +509,9 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         );
         var host = request.Header("Host")?.Split(':', 2)[0] ?? "localhost";
         upstream.Headers.Host = host;
-        upstream.Headers.TryAddWithoutValidation(
-            "X-Forwarded-Proto",
-            certificate is null ? "http" : "https"
-        );
-        upstream.Headers.TryAddWithoutValidation(
-            "X-HerdMe-Original-Scheme",
-            certificate is null ? "http" : "https"
-        );
+        var scheme = certificate is not null || route.Shared ? "https" : "http";
+        upstream.Headers.TryAddWithoutValidation("X-Forwarded-Proto", scheme);
+        upstream.Headers.TryAddWithoutValidation("X-HerdMe-Original-Scheme", scheme);
         upstream.Headers.TryAddWithoutValidation("X-Forwarded-For", "127.0.0.1");
         if (request.Body.Length > 0)
         {
@@ -524,6 +563,7 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         HttpRequestData request,
         int upstreamPort,
         bool keepAlive,
+        bool secure,
         CancellationToken cancellationToken
     )
     {
@@ -531,22 +571,23 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             new HttpMethod(request.Method),
             $"http://127.0.0.1:{upstreamPort}{request.Target}"
         );
+        // Development servers (Vite, Nuxt, Next) reject unknown Host headers, so the
+        // upstream sees its own loopback address and the original name in X-Forwarded-Host.
         upstream.Headers.Host = $"127.0.0.1:{upstreamPort}";
         upstream.Headers.TryAddWithoutValidation(
             "X-Forwarded-Host",
             request.Header("Host")?.Split(':', 2)[0] ?? "localhost"
         );
-        upstream.Headers.TryAddWithoutValidation(
-            "X-Forwarded-Proto",
-            certificate is null ? "http" : "https"
-        );
+        upstream.Headers.TryAddWithoutValidation("X-Forwarded-Proto", secure ? "https" : "http");
+        upstream.Headers.TryAddWithoutValidation("X-Forwarded-For", "127.0.0.1");
         if (request.Body.Length > 0) upstream.Content = new ByteArrayContent(request.Body);
         foreach (var header in request.Headers)
         {
             if (header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase)
                 || header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase)
                 || header.Key.Equals("Connection", StringComparison.OrdinalIgnoreCase)
-                || header.Key.Equals("Upgrade", StringComparison.OrdinalIgnoreCase)) continue;
+                || header.Key.Equals("Upgrade", StringComparison.OrdinalIgnoreCase)
+                || header.Key.StartsWith("X-Forwarded-", StringComparison.OrdinalIgnoreCase)) continue;
             if (!(upstream.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value) ?? false))
                 upstream.Headers.TryAddWithoutValidation(header.Key, header.Value);
         }
@@ -555,18 +596,28 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             HttpCompletionOption.ResponseHeadersRead,
             cancellationToken
         );
-        var body = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-        if (body.Length > MaximumBodySize)
-            throw new InvalidDataException("Development server response exceeded the limit.");
+        var contentLength = response.Content.Headers.ContentLength;
+        var headOnly = request.Method == "HEAD";
+        // Streamed responses (server-sent events, React streaming, large downloads) are
+        // forwarded as they arrive instead of being buffered until the upstream finishes.
+        var chunked = contentLength is null && !headOnly && request.Protocol == "HTTP/1.1";
+        var persistent = keepAlive && (contentLength is not null || chunked || headOnly);
         var headers = response.Headers.Concat(response.Content.Headers)
             .Where(header => !header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase)
                 && !header.Key.Equals("Connection", StringComparison.OrdinalIgnoreCase)
-                && !header.Key.Equals("Keep-Alive", StringComparison.OrdinalIgnoreCase))
+                && !header.Key.Equals("Keep-Alive", StringComparison.OrdinalIgnoreCase)
+                && !header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
             .SelectMany(header => header.Value.Select(value => (header.Key, value)))
             .ToList();
-        headers.RemoveAll(header => header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase));
-        headers.Add(("Content-Length", body.Length.ToString(CultureInfo.InvariantCulture)));
-        headers.Add(("Connection", keepAlive ? "keep-alive" : "close"));
+        if (contentLength is { } length)
+        {
+            headers.Add(("Content-Length", length.ToString(CultureInfo.InvariantCulture)));
+        }
+        else if (chunked)
+        {
+            headers.Add(("Transfer-Encoding", "chunked"));
+        }
+        headers.Add(("Connection", persistent ? "keep-alive" : "close"));
         await destination.WriteAsync(
             MakeResponseHead(
                 $"{(int)response.StatusCode} {response.ReasonPhrase ?? string.Empty}".TrimEnd(),
@@ -574,9 +625,54 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
             ),
             cancellationToken
         );
-        if (request.Method != "HEAD" && body.Length > 0)
-            await destination.WriteAsync(body, cancellationToken);
-        return new LocalResponseResult(keepAlive, (int)response.StatusCode);
+        if (headOnly) return new LocalResponseResult(persistent, (int)response.StatusCode);
+        try
+        {
+            await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);
+            var buffer = ArrayPool<byte>.Shared.Rent(32 * 1024);
+            try
+            {
+                long remaining = contentLength ?? long.MaxValue;
+                while (remaining > 0)
+                {
+                    var read = await body.ReadAsync(
+                        buffer.AsMemory(0, (int)Math.Min(buffer.Length, remaining)),
+                        cancellationToken
+                    );
+                    if (read == 0) break;
+                    remaining -= read;
+                    if (chunked)
+                    {
+                        await destination.WriteAsync(
+                            Encoding.ASCII.GetBytes(read.ToString("X", CultureInfo.InvariantCulture) + "\r\n"),
+                            cancellationToken
+                        );
+                        await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                        await destination.WriteAsync("\r\n"u8.ToArray(), cancellationToken);
+                    }
+                    else
+                    {
+                        await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                    }
+                    // Flush every read so event streams reach the browser immediately.
+                    await destination.FlushAsync(cancellationToken);
+                }
+                if (contentLength is not null && remaining > 0)
+                {
+                    throw new IOException("The development server closed the response early.");
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
+            if (chunked) await destination.WriteAsync("0\r\n\r\n"u8.ToArray(), cancellationToken);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            throw new HttpResponseStartedException(error);
+        }
+        return new LocalResponseResult(persistent, (int)response.StatusCode);
     }
 
     private static async Task ProxyWebSocketAsync(
@@ -1853,7 +1949,8 @@ public sealed class LocalHttpSiteServer : IAsyncDisposable
         string DocumentRoot,
         int PhpFastCgiPort,
         bool PhpUsesHttpFallback,
-        int? DevelopmentServerPort
+        int? DevelopmentServerPort,
+        bool Shared = false
     );
 
     private readonly record struct LocalResponseResult(bool KeepAlive, int StatusCode);

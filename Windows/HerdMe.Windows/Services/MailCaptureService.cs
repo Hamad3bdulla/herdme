@@ -102,6 +102,18 @@ public sealed class MailCaptureService : IAsyncDisposable
         return database.LoadMail(retentionLimit, retentionAge);
     }
 
+    /// <summary>List rows without large bodies; pass a row to <see cref="Complete"/> to show it.</summary>
+    public IReadOnlyList<CapturedMail> LoadSummaries()
+    {
+        return database.LoadMailSummaries(retentionLimit, retentionAge);
+    }
+
+    /// <summary>Returns the full capture for a list row, or null when it was deleted meanwhile.</summary>
+    public CapturedMail? Complete(CapturedMail item)
+    {
+        return item.IsSummary ? database.LoadMail(item.Id) : item;
+    }
+
     public void Delete(CapturedMail message)
     {
         lock (storageSync)

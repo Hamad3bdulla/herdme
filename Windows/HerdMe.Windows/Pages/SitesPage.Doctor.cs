@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
+using HerdMe.Windows.Views;
 using HerdMe.Windows.ViewModels;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.UI.Xaml;
@@ -232,17 +233,7 @@ public sealed partial class SitesPage
         check.Detail
     );
 
-    private static string DoctorCheckName(string name) => name switch
-    {
-        "Project" => AppLocalization.Get("DoctorProject"),
-        "Environment" => AppLocalization.Get("DoctorEnvironment"),
-        "Dependencies" => AppLocalization.Get("DoctorDependencies"),
-        "PHP extensions" => AppLocalization.Get("DoctorExtensions"),
-        "Storage directories" => AppLocalization.Get("DoctorStorage"),
-        "Application key" => AppLocalization.Get("DoctorKey"),
-        "Database configuration" => AppLocalization.Get("DoctorDatabase"),
-        _ => name
-    };
+    private static string DoctorCheckName(string name) => HealthCheckNames.Display(name);
 
     private static IReadOnlyList<string> LaravelWritableDirectories(string sitePath) =>
     [

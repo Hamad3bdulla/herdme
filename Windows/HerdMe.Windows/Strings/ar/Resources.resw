@@ -1105,4 +1105,152 @@
   <data name="Dashboard_Repair_LockFileNotInstallable" xml:space="preserve"><value>{0}: لا يمكن التثبيت من package-lock.json باستخدام npm ci</value></data>
   <data name="Dashboard_Repair_NpmAuditVulnerabilities" xml:space="preserve"><value>{0}: عثر npm audit على ثغرات عالية الخطورة</value></data>
   <data name="Dashboard_Repair_MigrationStatusFailed" xml:space="preserve"><value>{0}: تعذّرت قراءة حالة قاعدة البيانات أو الترحيلات</value></data>
+  <data name="SitesProxySitesButton.Text" xml:space="preserve"><value>مواقع البروكسي</value></data>
+  <data name="SitesProxyDialogTitle" xml:space="preserve"><value>مواقع البروكسي</value></data>
+  <data name="SitesProxyDialogDescription" xml:space="preserve"><value>اعرض خادم تطوير يعمل مسبقاً على هذا الجهاز (Nuxt أو Next أو Node أو Python ...) على عنوان https نظيف. يمرر HerdMe الطلبات واتصالات WebSocket والردود المتدفقة إلى المنفذ المحلي. شغّل خادم التطوير بنفسك؛ HerdMe يوجه الحركة إليه فقط.</value></data>
+  <data name="SitesProxyNameHeader" xml:space="preserve"><value>الاسم</value></data>
+  <data name="SitesProxyTargetHeader" xml:space="preserve"><value>الهدف المحلي</value></data>
+  <data name="SitesProxyAddButton" xml:space="preserve"><value>إضافة</value></data>
+  <data name="SitesProxySaveButton" xml:space="preserve"><value>حفظ</value></data>
+  <data name="SitesProxyCloseButton" xml:space="preserve"><value>إغلاق</value></data>
+  <data name="SitesProxyEmpty" xml:space="preserve"><value>لا توجد مواقع بروكسي بعد.</value></data>
+  <data name="SitesProxyPreview" xml:space="preserve"><value>سيتم تمرير {0} إلى http://127.0.0.1:{1}</value></data>
+  <data name="SitesProxyTargetLabel" xml:space="preserve"><value>بروكسي إلى 127.0.0.1:{0}</value></data>
+  <data name="SitesProxyOpenButton" xml:space="preserve"><value>فتح في المتصفح</value></data>
+  <data name="SitesProxyCopyButton" xml:space="preserve"><value>نسخ الرابط</value></data>
+  <data name="SitesProxyEditButton" xml:space="preserve"><value>تعديل</value></data>
+  <data name="SitesProxyRemoveButton" xml:space="preserve"><value>إزالة</value></data>
+  <data name="SitesProxyInvalidName" xml:space="preserve"><value>استخدم أحرفاً إنجليزية صغيرة وأرقاماً وشرطات للاسم (مثل my-app).</value></data>
+  <data name="SitesProxyInvalidTarget" xml:space="preserve"><value>أدخل منفذاً محلياً بين 1024 و65535، مثل 3000 أو localhost:3000. الهدف يجب أن يكون هذا الجهاز فقط.</value></data>
+  <data name="SitesProxyNameTaken" xml:space="preserve"><value>يوجد موقع مجلد يستخدم {0} مسبقاً. اختر اسماً آخر.</value></data>
+  <data name="SitesProxyLimit" xml:space="preserve"><value>يدعم HerdMe حتى {0} من مواقع البروكسي.</value></data>
+  <data name="SitesShareCommand.Label" xml:space="preserve"><value>مشاركة علنية</value></data>
+  <data name="SitesShareBar.Title" xml:space="preserve"><value>تمت المشاركة علناً</value></data>
+  <data name="SitesShareStopButton.Content" xml:space="preserve"><value>إيقاف المشاركة</value></data>
+  <data name="SitesShareCopyButton.Content" xml:space="preserve"><value>نسخ الرابط</value></data>
+  <data name="SitesShareBarMessage" xml:space="preserve"><value>أي شخص لديه هذا الرابط يستطيع فتح الموقع من الإنترنت. أوقف المشاركة عند الانتهاء؛ تتوقف المشاركة أيضاً عند إيقاف المواقع المحلية أو إغلاق HerdMe.</value></data>
+  <data name="SitesShareStarting" xml:space="preserve"><value>جاري إنشاء رابط علني مؤقت...</value></data>
+  <data name="SitesShareConfirmTitle" xml:space="preserve"><value>مشاركة {0} على الإنترنت؟</value></data>
+  <data name="SitesShareConfirmMessage" xml:space="preserve"><value>سيقوم HerdMe بتنزيل أداة cloudflared الرسمية من Cloudflare (مع التحقق بـ SHA-256) وفتح نفق Cloudflare مؤقت لهذا الموقع. أي شخص لديه الرابط يستطيع فتح الموقع بما فيه الصفحات ومسارات API والبيانات. لا تشارك مواقع تحتوي على بيانات عملاء حقيقية أو أسرار. يتغير الرابط في كل مرة تشارك فيها.</value></data>
+  <data name="SitesShareConfirmButton" xml:space="preserve"><value>مشاركة علنية</value></data>
+  <data name="SitesShareFailed" xml:space="preserve"><value>تعذرت مشاركة الموقع: {0}</value></data>
+  <data name="ShareEnvironmentStopped" xml:space="preserve"><value>شغّل المواقع المحلية قبل المشاركة.</value></data>
+  <data name="SitesManifestCommand.Text" xml:space="preserve"><value>إعدادات المشروع (herdme.yml)</value></data>
+  <data name="SitesManifestApplyCommand.Text" xml:space="preserve"><value>تطبيق herdme.yml</value></data>
+  <data name="SitesManifestExportCommand.Text" xml:space="preserve"><value>تصدير herdme.yml</value></data>
+  <data name="SitesManifestMissing" xml:space="preserve"><value>هذا المشروع ما فيه ملف herdme.yml. استخدم تصدير herdme.yml لإنشائه من الإعداد الحالي.</value></data>
+  <data name="SitesManifestEmpty" xml:space="preserve"><value>ملف herdme.yml ما فيه أي إعدادات.</value></data>
+  <data name="SitesManifestApplyIntro" xml:space="preserve"><value>راح يجهز HerdMe هذا المشروع بالإعدادات الموجودة في herdme.yml. الإصدارات والخدمات الناقصة تنزل من مصادرها الرسمية.</value></data>
+  <data name="SitesManifestApplyTitle" xml:space="preserve"><value>تطبيق إعدادات المشروع على {0}</value></data>
+  <data name="SitesManifestApplyButton" xml:space="preserve"><value>تطبيق</value></data>
+  <data name="SitesManifestRetryButton" xml:space="preserve"><value>حاول مرة ثانية</value></data>
+  <data name="SitesManifestApplied" xml:space="preserve"><value>تم تطبيق إعدادات المشروع.</value></data>
+  <data name="SitesManifestSummaryPhp" xml:space="preserve"><value>إصدار PHP {0}</value></data>
+  <data name="SitesManifestSummaryNode" xml:space="preserve"><value>إصدار Node.js {0}</value></data>
+  <data name="SitesManifestSummaryServices" xml:space="preserve"><value>الخدمات: {0}</value></data>
+  <data name="SitesManifestSummaryDatabase" xml:space="preserve"><value>قاعدة البيانات: {0}</value></data>
+  <data name="SitesManifestPhpUnsupported" xml:space="preserve"><value>PHP {0} غير متوفر لويندوز في HerdMe.</value></data>
+  <data name="SitesManifestInstallingRuntime" xml:space="preserve"><value>جاري تثبيت {0}...</value></data>
+  <data name="SitesManifestNodeSubstituted" xml:space="preserve"><value>Node.js {0} غير مثبت؛ تم استخدام {1} من نفس الإصدار الرئيسي.</value></data>
+  <data name="SitesManifestServiceUnavailable" xml:space="preserve"><value>{0} غير متوفر على ويندوز.</value></data>
+  <data name="SitesManifestDatabaseExists" xml:space="preserve"><value>قاعدة البيانات {0} موجودة من قبل وما تم تغييرها.</value></data>
+  <data name="SitesManifestExportTitle" xml:space="preserve"><value>تصدير herdme.yml لـ {0}</value></data>
+  <data name="SitesManifestExportIntro" xml:space="preserve"><value>راجع الإعدادات المقترحة، وبعدين احفظ herdme.yml في مجلد المشروع عشان يقدر فريقك يطبق نفس الإعداد.</value></data>
+  <data name="SitesManifestExportExisting" xml:space="preserve"><value>هذا المشروع فيه herdme.yml من قبل. عدله هنا واحفظ عشان تستبدله.</value></data>
+  <data name="SitesManifestSavedTitle" xml:space="preserve"><value>تم حفظ herdme.yml</value></data>
+  <data name="ManifestErrorAtLine" xml:space="preserve"><value>herdme.yml السطر {0}: {1}</value></data>
+  <data name="ManifestError" xml:space="preserve"><value>خطأ herdme.yml: {0}</value></data>
+  <data name="ManifestTooLarge" xml:space="preserve"><value>حجم الملف أكبر من 16 كيلوبايت.</value></data>
+  <data name="ManifestTabs" xml:space="preserve"><value>استخدم مسافات بدل علامات الجدولة (Tab).</value></data>
+  <data name="ManifestUnexpectedIndent" xml:space="preserve"><value>فقط عناصر القائمة تحت services يمكن إزاحتها.</value></data>
+  <data name="ManifestUnexpectedList" xml:space="preserve"><value>عناصر القائمة مسموحة فقط تحت services.</value></data>
+  <data name="ManifestExpectedKey" xml:space="preserve"><value>المتوقع "key: value".</value></data>
+  <data name="ManifestUnknownKey" xml:space="preserve"><value>إعداد غير معروف "{0}". الإعدادات المدعومة: php و node و services و database.</value></data>
+  <data name="ManifestDuplicateKey" xml:space="preserve"><value>"{0}" مكرر أكثر من مرة.</value></data>
+  <data name="ManifestServicesList" xml:space="preserve"><value>لازم تكون services قائمة، مثل [mariadb, redis].</value></data>
+  <data name="ManifestMissingValue" xml:space="preserve"><value>"{0}" يحتاج قيمة.</value></data>
+  <data name="ManifestInvalidPhp" xml:space="preserve"><value>لازم يكون php إصدار مثل "8.3".</value></data>
+  <data name="ManifestInvalidNode" xml:space="preserve"><value>لازم يكون node إصدار مثل "22" أو "22.11.0".</value></data>
+  <data name="ManifestTooManyServices" xml:space="preserve"><value>عدد الخدمات المذكورة كثير.</value></data>
+  <data name="ManifestUnknownService" xml:space="preserve"><value>"{0}" ليست خدمة في HerdMe. الخدمات المدعومة: {1}.</value></data>
+  <data name="ManifestDuplicateService" xml:space="preserve"><value>"{0}" مكررة أكثر من مرة.</value></data>
+  <data name="ManifestInvalidDatabase" xml:space="preserve"><value>لازم يبدأ اسم database بحرف ويحتوي فقط على حروف وأرقام وشرطة سفلية (حتى 63).</value></data>
+  <data name="ManifestDatabaseNeedsService" xml:space="preserve"><value>قاعدة البيانات تحتاج mariadb أو mysql أو postgresql في services.</value></data>
+  <data name="ManifestUnclosedQuote" xml:space="preserve"><value>في قيمة بين علامات تنصيص ما تم إغلاقها.</value></data>
+  <data name="ManifestInvalidValue" xml:space="preserve"><value>"{0}" قيمة غير صالحة.</value></data>
+  <data name="DoctorHttps" xml:space="preserve"><value>اتصال HTTPS</value></data>
+  <data name="DoctorLaravel" xml:space="preserve"><value>إطار Laravel</value></data>
+  <data name="DoctorLaravelCoreFiles" xml:space="preserve"><value>ملفات Laravel الأساسية</value></data>
+  <data name="DoctorPhp" xml:space="preserve"><value>إصدار PHP</value></data>
+  <data name="DoctorComposer" xml:space="preserve"><value>مدير Composer</value></data>
+  <data name="DoctorComposerLock" xml:space="preserve"><value>ملف قفل Composer</value></data>
+  <data name="DoctorPhpPlatform" xml:space="preserve"><value>متطلبات منصة PHP</value></data>
+  <data name="DoctorNodeLock" xml:space="preserve"><value>ملف قفل Node</value></data>
+  <data name="DoctorNodeDependencies" xml:space="preserve"><value>اعتماديات Node</value></data>
+  <data name="DoctorNodePackageManager" xml:space="preserve"><value>مدير حزم Node</value></data>
+  <data name="DoctorNodeVersion" xml:space="preserve"><value>إصدار Node.js</value></data>
+  <data name="DoctorEnvironmentConfiguration" xml:space="preserve"><value>إعدادات البيئة</value></data>
+  <data name="DoctorStorageLink" xml:space="preserve"><value>رابط التخزين</value></data>
+  <data name="DoctorLaravelLogs" xml:space="preserve"><value>سجلات Laravel</value></data>
+  <data name="DebuggerProfilerLabel.Text" xml:space="preserve"><value>تفعيل المحلّل (Profiler)</value></data>
+  <data name="DebuggerProfilerDescription.Text" xml:space="preserve"><value>يحلّل الطلبات التي تحتوي على XDEBUG_PROFILE. أثناء تفعيله، يبدأ التصحيح أيضاً فقط مع المُشغِّل (Trigger).</value></data>
+  <data name="DebuggerProfileRequestButton.Text" xml:space="preserve"><value>تحليل طلب</value></data>
+  <data name="DebuggerProfilesTitle.Text" xml:space="preserve"><value>ملفات التحليل</value></data>
+  <data name="DebuggerProfilesNone.Text" xml:space="preserve"><value>لا توجد ملفات تحليل بعد.</value></data>
+  <data name="DebuggerProfilesDescription.Text" xml:space="preserve"><value>اختر ملف تحليل لعرض أبطأ الدوال. يحتفظ HerdMe بأحدث 50 ملفاً.</value></data>
+  <data name="DebuggerRefreshProfilesButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تحديث ملفات التحليل</value></data>
+  <data name="DebuggerOpenProfilesButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح مجلد ملفات التحليل</value></data>
+  <data name="DebuggerDeleteProfilesButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>حذف كل ملفات التحليل</value></data>
+  <data name="DebuggerProfilesEmpty" xml:space="preserve"><value>لا توجد ملفات تحليل بعد.</value></data>
+  <data name="DebuggerProfilesCount" xml:space="preserve"><value>ملفات التحليل: {0}</value></data>
+  <data name="DebuggerEnableProfilerAndSave" xml:space="preserve"><value>فعّل المصحّح والمحلّل، ثم احفظ وأعد تشغيل البيئة.</value></data>
+  <data name="DebuggerProfilingSite" xml:space="preserve"><value>تم فتح {0} مع مُشغِّل التحليل. يظهر ملف التحليل بالأسفل عند انتهاء الطلب.</value></data>
+  <data name="DebuggerDeleteProfilesTitle" xml:space="preserve"><value>حذف كل ملفات التحليل؟</value></data>
+  <data name="DebuggerDeleteProfilesMessage" xml:space="preserve"><value>سيؤدي هذا إلى حذف كل ملفات التحليل في مجلد HerdMe.</value></data>
+  <data name="DebuggerDeleteProfilesConfirm" xml:space="preserve"><value>حذف الكل</value></data>
+  <data name="DebuggerProfileLoading" xml:space="preserve"><value>جارٍ قراءة {0}...</value></data>
+  <data name="DebuggerProfileFailed" xml:space="preserve"><value>تعذّرت قراءة ملف التحليل: {0}</value></data>
+  <data name="DebuggerProfileTitle" xml:space="preserve"><value>التحليل: {0}، أعلى استهلاك للذاكرة {1}</value></data>
+  <data name="DebuggerProfileDelete" xml:space="preserve"><value>حذف ملف التحليل</value></data>
+  <data name="DebuggerProfileFunction" xml:space="preserve"><value>الدالة</value></data>
+  <data name="DebuggerProfileCalls" xml:space="preserve"><value>الاستدعاءات</value></data>
+  <data name="DebuggerProfileSelf" xml:space="preserve"><value>الذاتي</value></data>
+  <data name="DebuggerProfileInclusive" xml:space="preserve"><value>الإجمالي</value></data>
+  <data name="DebuggerProfileMemory" xml:space="preserve"><value>الذاكرة</value></data>
+  <data name="DebuggerProfileMore" xml:space="preserve"><value>هناك {0} دوال أخرى غير معروضة.</value></data>
+  <data name="DebuggerProfileRow" xml:space="preserve"><value>{0}  ({1} كيلوبايت)</value></data>
+  <data name="DebuggerSeconds" xml:space="preserve"><value>{0} ث</value></data>
+  <data name="DebuggerMilliseconds" xml:space="preserve"><value>{0} مللي ث</value></data>
+  <data name="DebuggerMegabytes" xml:space="preserve"><value>{0} ميجابايت</value></data>
+  <data name="DebuggerKilobytes" xml:space="preserve"><value>{0} كيلوبايت</value></data>
+  <data name="NavTinker.Content" xml:space="preserve"><value>مجرّب Tinker</value></data>
+  <data name="TinkerPageTitle.Text" xml:space="preserve"><value>مجرّب Tinker</value></data>
+  <data name="TinkerPageSubtitle.Text" xml:space="preserve"><value>شغّل كود PHP داخل موقع مع تحميل Composer وLaravel مسبقاً.</value></data>
+  <data name="TinkerSiteLabel.Text" xml:space="preserve"><value>الموقع</value></data>
+  <data name="TinkerHistoryLabel.Text" xml:space="preserve"><value>الكود الأخير</value></data>
+  <data name="TinkerClearHistoryButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>مسح الكود الأخير</value></data>
+  <data name="TinkerCodeTitle.Text" xml:space="preserve"><value>الكود</value></data>
+  <data name="TinkerCodeBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>كود PHP</value></data>
+  <data name="TinkerReady.Text" xml:space="preserve"><value>استخدم return لعرض قيمة. Ctrl+Enter يشغّل الكود.</value></data>
+  <data name="TinkerCancelButton.Content" xml:space="preserve"><value>إلغاء</value></data>
+  <data name="TinkerRunButton.Text" xml:space="preserve"><value>تشغيل</value></data>
+  <data name="TinkerOutputTitle.Text" xml:space="preserve"><value>المخرجات</value></data>
+  <data name="TinkerOutputBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>المخرجات</value></data>
+  <data name="TinkerNoSites" xml:space="preserve"><value>أضف موقعاً أولاً، ثم شغّل الكود داخله.</value></data>
+  <data name="TinkerCancelling" xml:space="preserve"><value>جارٍ الإيقاف...</value></data>
+  <data name="TinkerPreparing" xml:space="preserve"><value>جارٍ التحقق من PHP...</value></data>
+  <data name="TinkerRunning" xml:space="preserve"><value>جارٍ التشغيل في {0}...</value></data>
+  <data name="TinkerCompleted" xml:space="preserve"><value>انتهى خلال {0} ث.</value></data>
+  <data name="TinkerFailedExit" xml:space="preserve"><value>فشل برمز الخروج {0} بعد {1} ث.</value></data>
+  <data name="TinkerCancelled" xml:space="preserve"><value>تم الإيقاف.</value></data>
+  <data name="TinkerTimedOut" xml:space="preserve"><value>استغرق الكود وقتاً طويلاً وتم إيقافه.</value></data>
+  <data name="TinkerFailed" xml:space="preserve"><value>تعذّر تشغيل الكود.</value></data>
+  <data name="TinkerCodeTooLong" xml:space="preserve"><value>الحد الأقصى لكود Tinker هو 16 كيلوبايت.</value></data>
+  <data name="TinkerCodeInvalid" xml:space="preserve"><value>يحتوي الكود على حرف غير مدعوم.</value></data>
+  <data name="TinkerCodeEmpty" xml:space="preserve"><value>أدخل كود PHP لتشغيله.</value></data>
+  <data name="TinkerPhpMissing" xml:space="preserve"><value>ثبّت إصدار PHP المحدد في HerdMe أولاً.</value></data>
+  <data name="TinkerProjectMissing" xml:space="preserve"><value>مجلد الموقع لم يعد موجوداً.</value></data>
+  <data name="TinkerStartFailed" xml:space="preserve"><value>تعذّر تشغيل إصدار PHP المحدد.</value></data>
+  <data name="TinkerTimeoutSubject" xml:space="preserve"><value>كود Tinker</value></data>
+  <data name="TinkerCodeBox.PlaceholderText" xml:space="preserve"><value>أدخل تعبير PHP مثل: return App\Models\User::count();</value></data>
 </root>

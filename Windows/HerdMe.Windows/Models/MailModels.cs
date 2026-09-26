@@ -21,6 +21,21 @@ public sealed class CapturedMail
 
     public string? HtmlBody { get; set; }
 
+    /// <summary>True for list rows loaded without bodies; load the full message to preview it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsSummary { get; set; }
+
+    /// <summary>The columns the message list needs, without the body, HTML, or raw MIME.</summary>
+    public CapturedMail ToSummary() => new()
+    {
+        Id = Id,
+        Sender = Sender,
+        Recipients = [.. Recipients],
+        Subject = Subject,
+        ReceivedAt = ReceivedAt,
+        IsSummary = true
+    };
+
     [JsonIgnore]
     public string RecipientsText => string.Join(", ", Recipients);
 

@@ -53,7 +53,7 @@ public sealed partial class MailPage : Page
         loadFailed = false;
         CaptureErrorBar.IsOpen = false;
         pageGeneration++;
-        var session = new CaptureRefreshSession<IReadOnlyList<CapturedMail>>(mail.Load);
+        var session = new CaptureRefreshSession<IReadOnlyList<CapturedMail>>(mail.LoadSummaries);
         refreshSession = session;
         messageCapturedHandler = (_, _) => session.RequestRefresh();
         mail.MessageCaptured += messageCapturedHandler;
@@ -272,7 +272,7 @@ public sealed partial class MailPage : Page
             InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
             var file = await picker.PickSaveFileAsync();
             if (file is null || !loaded || generation != pageGeneration) return;
-            await Task.Run(() => CaptureExport.SaveMailAsync(message, file.Path));
+            await Task.Run(() => CaptureExport.SaveMailAsync(mail.Complete(message) ?? message, file.Path));
         }
         catch (Exception error)
         {
@@ -422,7 +422,7 @@ public sealed partial class MailPage : Page
         }
         try
         {
-            var preview = await Task.Run(() => CapturePreview.ForMail(message));
+            var preview = await Task.Run(() => CapturePreview.ForMail(mail.Complete(message) ?? message));
             if (!loaded || generation != previewGeneration || !IsSelected(message)) return;
             BodyText.Text = preview.Body;
             RawText.Text = preview.Raw;
@@ -433,7 +433,8 @@ public sealed partial class MailPage : Page
             ConfigurePreviewOnce();
             HtmlPreview.NavigateToString(preview.HtmlDocument);
         }
-        catch (Exception error) when (error is InvalidOperationException or COMException)
+        catch (Exception error) when (error is InvalidOperationException or COMException
+            or Microsoft.Data.Sqlite.SqliteException or System.Text.Json.JsonException)
         {
             if (!loaded || generation != previewGeneration) return;
             await ReportPreviewFailureAsync("initialization", message, error.ToString());

@@ -4,7 +4,8 @@ param(
     [switch]$LeaveRunning,
     [switch]$CaptureScreenshots,
     [switch]$SkipLiveReleaseChecks,
-    [string]$PreviousInstallerPath
+    [string]$PreviousInstallerPath,
+    [switch]$PerformanceBudgetsWarnOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -424,6 +425,111 @@ function Assert-OnboardingLayout(
     Save-WindowEvidence $window "Onboarding"
 }
 
+$script:performance = [ordered]@{
+    startupMilliseconds = $null
+    pages = [ordered]@{}
+    workingSetMegabytes = $null
+    privateMegabytes = $null
+    idleCpuPercent = $null
+}
+$performanceBudgetPath = Join-Path $PSScriptRoot "performance-budgets.json"
+$performanceBudgets = Get-Content -LiteralPath $performanceBudgetPath -Raw | ConvertFrom-Json
+
+function Assert-PerformanceBudget(
+    [string]$Name,
+    [double]$Value,
+    [double]$Budget,
+    [string]$Unit
+) {
+    $message = "Performance: $Name = $([Math]::Round($Value, 1)) $Unit (budget $Budget $Unit)"
+    Write-Host $message
+    if ($Value -le $Budget) { return }
+    if ($PerformanceBudgetsWarnOnly) {
+        Write-Warning "Over budget. $message"
+        return
+    }
+    Save-PerformanceReport
+    throw "HerdMe exceeded its performance budget. $message"
+}
+
+function Save-PerformanceReport {
+    $directory = Join-Path $repoRoot "build\windows-ui-evidence"
+    New-Item -ItemType Directory -Force -Path $directory | Out-Null
+    $script:performance | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $directory "performance.json") -Encoding utf8
+    if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
+        $lines = [System.Collections.Generic.List[string]]::new()
+        $lines.Add("### HerdMe Windows performance ($([System.Globalization.CultureInfo]::CurrentCulture.Name))")
+        $lines.Add("")
+        $lines.Add("| Measure | Value | Budget |")
+        $lines.Add("| --- | --- | --- |")
+        if ($null -ne $script:performance.startupMilliseconds) {
+            $lines.Add("| Startup to navigation | $($script:performance.startupMilliseconds) ms | $($performanceBudgets.startupMilliseconds) ms |")
+        }
+        foreach ($entry in $script:performance.pages.GetEnumerator()) {
+            $lines.Add("| $($entry.Key) | $($entry.Value) ms | $($performanceBudgets.pageNavigationMilliseconds) ms |")
+        }
+        $lines.Add("| Working set | $($script:performance.workingSetMegabytes) MB | $($performanceBudgets.workingSetMegabytes) MB |")
+        $lines.Add("| Private memory | $($script:performance.privateMegabytes) MB | $($performanceBudgets.privateMegabytes) MB |")
+        $lines.Add("| Idle CPU | $($script:performance.idleCpuPercent) % | $($performanceBudgets.idleCpuPercent) % |")
+        Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value ($lines -join "`n") -Encoding utf8
+    }
+}
+
+function Assert-IdleResourceBudgets(
+    [System.Diagnostics.Process]$Process
+) {
+    # Let page loads settle, then sample CPU over a quiet window.
+    Start-Sleep -Seconds 3
+    $Process.Refresh()
+    $cpuBefore = $Process.TotalProcessorTime
+    $clock = [System.Diagnostics.Stopwatch]::StartNew()
+    Start-Sleep -Seconds $performanceBudgets.idleSampleSeconds
+    $Process.Refresh()
+    $cpu = ($Process.TotalProcessorTime - $cpuBefore).TotalMilliseconds
+    $idleCpu = 100 * $cpu / ($clock.Elapsed.TotalMilliseconds * [Environment]::ProcessorCount)
+    $workingSet = $Process.WorkingSet64 / 1MB
+    $private = $Process.PrivateMemorySize64 / 1MB
+    $script:performance.idleCpuPercent = [Math]::Round($idleCpu, 2)
+    $script:performance.workingSetMegabytes = [Math]::Round($workingSet, 1)
+    $script:performance.privateMegabytes = [Math]::Round($private, 1)
+    Save-PerformanceReport
+    Assert-PerformanceBudget "idle CPU" $idleCpu $performanceBudgets.idleCpuPercent "%"
+    Assert-PerformanceBudget "working set" $workingSet $performanceBudgets.workingSetMegabytes "MB"
+    Assert-PerformanceBudget "private memory" $private $performanceBudgets.privateMegabytes "MB"
+}
+
+function Assert-NavigationFlowDirection(
+    [System.Windows.Automation.AutomationElement]$Window,
+    [System.Windows.Automation.AutomationElement]$Navigation
+) {
+    # HerdMe follows the first Windows display language (ApplicationLanguages.Languages).
+    $languageTag = [System.Globalization.CultureInfo]::CurrentUICulture.Name
+    try {
+        $preferred = @(Get-WinUserLanguageList -ErrorAction Stop)
+        if ($preferred.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($preferred[0].LanguageTag)) {
+            $languageTag = $preferred[0].LanguageTag
+        }
+    } catch {
+        Write-Host "Using the UI culture for the flow direction check: $($_.Exception.Message)"
+    }
+    $rightToLeft = ([System.Globalization.CultureInfo]::GetCultureInfo($languageTag)).TextInfo.IsRightToLeft
+    $item = Wait-AutomationElementById $Navigation "NavDashboard"
+    $windowBounds = $Window.Current.BoundingRectangle
+    $itemBounds = $item.Current.BoundingRectangle
+    if ($itemBounds.IsEmpty -or $itemBounds.Width -le 0 -or $windowBounds.Width -le 0) {
+        throw "The Dashboard navigation item has no on-screen bounds, so flow direction cannot be verified."
+    }
+    $itemCenter = $itemBounds.Left + ($itemBounds.Width / 2)
+    $windowCenter = $windowBounds.Left + ($windowBounds.Width / 2)
+    if ($rightToLeft -and $itemCenter -le $windowCenter) {
+        throw "The navigation pane is not mirrored for the right-to-left language $languageTag."
+    }
+    if (-not $rightToLeft -and $itemCenter -ge $windowCenter) {
+        throw "The navigation pane is mirrored for the left-to-right language $languageTag."
+    }
+    Write-Host "Verified navigation flow direction (right-to-left: $rightToLeft)."
+}
+
 function Assert-WinUiNavigation(
     [System.Diagnostics.Process]$Process
 ) {
@@ -435,6 +541,11 @@ function Assert-WinUiNavigation(
     }
 
     $navigation = Wait-AutomationElementById $window "NavigationRoot"
+    Assert-NavigationFlowDirection $window $navigation
+    $pageControls = @{
+        "DebuggerPageRoot" = @("DebuggerProfilerToggle", "DebuggerProfilesList")
+        "TinkerPageRoot" = @("TinkerSiteBox", "TinkerCodeBox", "TinkerRunButton", "TinkerOutputBox")
+    }
     $pages = @(
         @{ Navigation = "NavDashboard"; Page = "DashboardPageRoot" },
         @{ Navigation = "NavGeneral"; Page = "GeneralPageRoot" },
@@ -446,14 +557,24 @@ function Assert-WinUiNavigation(
         @{ Navigation = "NavMail"; Page = "MailPageRoot" },
         @{ Navigation = "NavDumps"; Page = "DumpsPageRoot" },
         @{ Navigation = "NavDebugger"; Page = "DebuggerPageRoot" },
+        @{ Navigation = "NavTinker"; Page = "TinkerPageRoot" },
         @{ Navigation = "NavLogs"; Page = "LogsPageRoot" },
         @{ Navigation = "NavAbout"; Page = "AboutPageRoot" }
     )
 
     foreach ($page in $pages) {
         $navigationItem = Wait-AutomationElementById $navigation $page.Navigation
+        $navigationClock = [System.Diagnostics.Stopwatch]::StartNew()
         Select-AutomationElement $navigationItem $page.Navigation
         $null = Wait-AutomationElementById $window $page.Page
+        $navigationMilliseconds = [Math]::Round($navigationClock.Elapsed.TotalMilliseconds)
+        $script:performance.pages[$page.Page] = $navigationMilliseconds
+        Assert-PerformanceBudget "navigation to $($page.Page)" $navigationMilliseconds $performanceBudgets.pageNavigationMilliseconds "ms"
+        if ($pageControls.ContainsKey($page.Page)) {
+            foreach ($controlId in $pageControls[$page.Page]) {
+                $null = Wait-AutomationElementById $window $controlId
+            }
+        }
         Start-Sleep -Milliseconds 300
         $Process.Refresh()
         if ($Process.HasExited) {
@@ -797,6 +918,7 @@ finally {
 $startedBySuite = $false
 $processes = @(Get-HerdMeProcesses)
 if ($processes.Count -eq 0) {
+    $startupClock = [System.Diagnostics.Stopwatch]::StartNew()
     Start-Process -FilePath $executable -ArgumentList "--acceptance" | Out-Null
     $startedBySuite = $true
 }
@@ -820,6 +942,14 @@ try {
     if ($primary.MainWindowHandle -eq 0) {
         throw "The native HerdMe window did not become available."
     }
+    if ($startedBySuite) {
+        $startupWindow = [System.Windows.Automation.AutomationElement]::FromHandle(
+            [IntPtr]$primary.MainWindowHandle
+        )
+        $null = Wait-AutomationElementById $startupWindow "NavigationRoot" 30
+        $script:performance.startupMilliseconds = [Math]::Round($startupClock.Elapsed.TotalMilliseconds)
+        Assert-PerformanceBudget "startup to navigation" $script:performance.startupMilliseconds $performanceBudgets.startupMilliseconds "ms"
+    }
     Assert-ResizableMainWindow $primary
 
     Start-Process -FilePath $executable | Out-Null
@@ -830,6 +960,7 @@ try {
     }
 
     Assert-WinUiNavigation $primary
+    Assert-IdleResourceBudgets $primary
 
     $deadline = [DateTime]::UtcNow.AddSeconds(15)
     do {

@@ -307,7 +307,7 @@ public sealed partial class DashboardPage : Page
             var siteHealth = (await Task.WhenAll(healthTasks))
                 .SelectMany((checks, index) => checks
                     .Where(check => !check.Healthy)
-                    .Select(check => $"{sites[index].Name}: {check.Name} - {check.Detail}"))
+                    .Select(check => $"{sites[index].Name}: {HealthCheckNames.Display(check.Name)} - {check.Detail}"))
                 .ToArray();
             if (environment.IsRunning)
             {

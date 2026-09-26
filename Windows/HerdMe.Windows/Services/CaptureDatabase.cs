@@ -52,11 +52,48 @@ public sealed class CaptureDatabase
         return Load<CapturedDump>("dumps", limit, maximumAge);
     }
 
+    /// <summary>
+    /// Loads only the list columns (sender, subject, recipients) so opening Mail does not
+    /// read every body and raw MIME message. Use <see cref="LoadMail(Guid)"/> for a preview.
+    /// </summary>
+    public IReadOnlyList<CapturedMail> LoadMailSummaries(int limit, TimeSpan maximumAge)
+    {
+        PruneIfDue("mail", limit, maximumAge, inserted: false);
+        return Load<CapturedMail>("mail", limit, maximumAge, summaries: true);
+    }
+
+    /// <summary>Loads only the list columns of dumps; use <see cref="LoadDump(Guid)"/> for details.</summary>
+    public IReadOnlyList<CapturedDump> LoadDumpSummaries(int limit, TimeSpan maximumAge)
+    {
+        PruneIfDue("dumps", limit, maximumAge, inserted: false);
+        return Load<CapturedDump>("dumps", limit, maximumAge, summaries: true);
+    }
+
+    public CapturedMail? LoadMail(Guid id) => LoadOne<CapturedMail>("mail", id.ToString());
+
+    public CapturedDump? LoadDump(Guid id) => LoadOne<CapturedDump>("dumps", id.ToString());
+
     public void Save(CapturedMail message, int limit, TimeSpan maximumAge) =>
-        Save("mail", message.Id.ToString(), message.ReceivedAt, JsonSerializer.Serialize(message), limit, maximumAge);
+        Save(
+            "mail",
+            message.Id.ToString(),
+            message.ReceivedAt,
+            JsonSerializer.Serialize(message),
+            JsonSerializer.Serialize(message.ToSummary()),
+            limit,
+            maximumAge
+        );
 
     public void Save(CapturedDump dump, int limit, TimeSpan maximumAge) =>
-        Save("dumps", dump.Id.ToString(), dump.ReceivedAt, JsonSerializer.Serialize(dump), limit, maximumAge);
+        Save(
+            "dumps",
+            dump.Id.ToString(),
+            dump.ReceivedAt,
+            JsonSerializer.Serialize(dump),
+            JsonSerializer.Serialize(dump.ToSummary()),
+            limit,
+            maximumAge
+        );
 
     /// <summary>Closes idle pooled connections so the database file is not kept open.</summary>
     public void ReleasePooledConnections()
@@ -100,6 +137,34 @@ public sealed class CaptureDatabase
             CREATE INDEX IF NOT EXISTS dumps_received_at ON dumps(received_at DESC);
             """;
         command.ExecuteNonQuery();
+        EnsureSummaryColumn(connection, "mail");
+        EnsureSummaryColumn(connection, "dumps");
+    }
+
+    /// <summary>
+    /// Adds the list-column copy used by the capture lists. Rows written before it existed
+    /// keep a NULL summary and are read from the full payload instead.
+    /// </summary>
+    private static void EnsureSummaryColumn(SqliteConnection connection, string table)
+    {
+        if (HasSummaryColumn(connection, table)) return;
+        try
+        {
+            using var alter = connection.CreateCommand();
+            alter.CommandText = $"ALTER TABLE {table} ADD COLUMN summary TEXT";
+            alter.ExecuteNonQuery();
+        }
+        catch (SqliteException) when (HasSummaryColumn(connection, table))
+        {
+            // Another HerdMe component added the column at the same time.
+        }
+    }
+
+    private static bool HasSummaryColumn(SqliteConnection connection, string table)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = 'summary'";
+        return Convert.ToInt64(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture) > 0;
     }
 
     private SqliteConnection Open()
@@ -122,11 +187,12 @@ public sealed class CaptureDatabase
         return connection;
     }
 
-    private IReadOnlyList<T> Load<T>(string table, int limit, TimeSpan maximumAge)
+    private IReadOnlyList<T> Load<T>(string table, int limit, TimeSpan maximumAge, bool summaries = false)
     {
         using var connection = Open();
         using var command = connection.CreateCommand();
-        command.CommandText = $"SELECT payload FROM {table} WHERE received_at >= $cutoff ORDER BY received_at DESC LIMIT $limit";
+        var column = summaries ? "COALESCE(summary, payload)" : "payload";
+        command.CommandText = $"SELECT {column} FROM {table} WHERE received_at >= $cutoff ORDER BY received_at DESC LIMIT $limit";
         command.Parameters.AddWithValue("$cutoff", Cutoff(maximumAge));
         command.Parameters.AddWithValue("$limit", Math.Max(1, limit));
         using var reader = command.ExecuteReader();
@@ -139,17 +205,35 @@ public sealed class CaptureDatabase
         return result;
     }
 
-    private void Save(string table, string id, DateTimeOffset receivedAt, string payload, int limit, TimeSpan maximumAge)
+    private T? LoadOne<T>(string table, string id) where T : class
+    {
+        using var connection = Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT payload FROM {table} WHERE id = $id";
+        command.Parameters.AddWithValue("$id", id);
+        return command.ExecuteScalar() is string payload ? JsonSerializer.Deserialize<T>(payload) : null;
+    }
+
+    private void Save(
+        string table,
+        string id,
+        DateTimeOffset receivedAt,
+        string payload,
+        string summary,
+        int limit,
+        TimeSpan maximumAge
+    )
     {
         using var connection = Open();
         using var transaction = connection.BeginTransaction();
         using (var command = connection.CreateCommand())
         {
             command.Transaction = transaction;
-            command.CommandText = $"INSERT OR REPLACE INTO {table}(id, received_at, payload) VALUES($id, $at, $payload)";
+            command.CommandText = $"INSERT OR REPLACE INTO {table}(id, received_at, payload, summary) VALUES($id, $at, $payload, $summary)";
             command.Parameters.AddWithValue("$id", id);
             command.Parameters.AddWithValue("$at", receivedAt.UtcDateTime.ToString("O"));
             command.Parameters.AddWithValue("$payload", payload);
+            command.Parameters.AddWithValue("$summary", summary);
             command.ExecuteNonQuery();
         }
         transaction.Commit();

@@ -273,52 +273,16 @@ public sealed partial class SitesPage
                 customBox.Text = command;
             }
         );
-        var statusText = new TextBlock
-        {
-            Text = AppLocalization.Get("SitesArtisanReady"),
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
-        };
-        var progressRing = new ProgressRing { Width = 18, Height = 18 };
-        var statusRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        statusRow.Children.Add(progressRing);
-        statusRow.Children.Add(statusText);
-        var outputBox = new TextBox
-        {
-            Text = AppLocalization.Get("SitesArtisanOutputPlaceholder"),
-            IsReadOnly = true,
-            AcceptsReturn = true,
-            TextWrapping = TextWrapping.NoWrap,
-            Height = 240,
-            VerticalAlignment = VerticalAlignment.Top,
-            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
-        };
-        ScrollViewer.SetVerticalScrollBarVisibility(outputBox, ScrollBarVisibility.Auto);
-        ScrollViewer.SetHorizontalScrollBarVisibility(outputBox, ScrollBarVisibility.Auto);
-        var runButton = new Button
-        {
-            Content = AppLocalization.Get("SitesRun"),
-            Style = (Style)Application.Current.Resources["AccentButtonStyle"]
-        };
-        var cancelButton = new Button
-        {
-            Content = AppLocalization.Get("SitesCancel"),
-            IsEnabled = false
-        };
-        var buttons = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 8,
-            HorizontalAlignment = HorizontalAlignment.Right
-        };
-        buttons.Children.Add(cancelButton);
-        buttons.Children.Add(runButton);
+        var console = new CommandConsole(
+            "SitesArtisanReady",
+            "SitesArtisanOutputPlaceholder",
+            "SitesArtisanCancelling"
+        );
         var content = new StackPanel { Spacing = 12, Width = 500 };
         content.Children.Add(favorites);
         content.Children.Add(presetBox);
         content.Children.Add(customBox);
-        content.Children.Add(buttons);
-        content.Children.Add(statusRow);
-        content.Children.Add(outputBox);
+        console.AddTo(content);
         var dialog = new ContentDialog
         {
             FlowDirection = AppLocalization.LayoutDirection,
@@ -327,7 +291,9 @@ public sealed partial class SitesPage
             Content = content,
             CloseButtonText = AppLocalization.Get("SitesClose")
         };
+        console.AttachTo(dialog);
         using var suggestionCancellation = new CancellationTokenSource();
+        dialog.Closing += (_, _) => suggestionCancellation.Cancel();
         dialog.Opened += async (_, _) =>
         {
             try
@@ -362,24 +328,9 @@ public sealed partial class SitesPage
             }
         };
 
-        var running = false;
-        cancelButton.Click += (_, _) =>
+        console.RunButton.Click += async (_, _) =>
         {
-            if (!running) return;
-            statusText.Text = AppLocalization.Get("SitesArtisanCancelling");
-            artisanCancellation?.Cancel();
-        };
-        dialog.Closing += (_, args) =>
-        {
-            suggestionCancellation.Cancel();
-            if (!running) return;
-            args.Cancel = true;
-            statusText.Text = AppLocalization.Get("SitesArtisanCancelling");
-            artisanCancellation?.Cancel();
-        };
-        runButton.Click += async (_, _) =>
-        {
-            if (running) return;
+            if (console.IsRunning) return;
             if (presetBox.SelectedItem is not DisplayOption selectedPreset) return;
             ArtisanCommandSpec command;
             try
@@ -391,72 +342,69 @@ public sealed partial class SitesPage
             }
             catch (ArgumentException error)
             {
-                statusText.Text = AppLocalization.Get("SitesArtisanFailed");
-                outputBox.Text = error.Message;
+                console.StatusText.Text = AppLocalization.Get("SitesArtisanFailed");
+                console.OutputBox.Text = error.Message;
                 return;
             }
 
-            using var cancellation = new CancellationTokenSource();
-            artisanCancellation = cancellation;
-            running = true;
-            runButton.IsEnabled = false;
-            cancelButton.IsEnabled = true;
-            presetBox.IsEnabled = false;
-            customBox.IsEnabled = false;
-            progressRing.IsActive = true;
-            statusText.Text = AppLocalization.Get("SitesArtisanValidatingPhp");
-            outputBox.Text = string.Empty;
-            try
-            {
-                var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
-                var php = phpInstaller.PhpExecutable(cycle);
-                await runtimePolicy.PrepareLaunchAsync(php, cycle, cancellation.Token);
-                var environmentVariables = composerTools.ManagedEnvironment(cycle);
-                statusText.Text = AppLocalization.Get("SitesArtisanRunning");
-                var result = await ArtisanCommandRunner.RunAsync(
-                    php,
-                    site.Path,
-                    command.Arguments,
-                    environmentVariables,
-                    command.Timeout,
-                    new Progress<string>(chunk => AppendCommandOutput(outputBox, chunk)),
-                    cancellation.Token
-                );
-                statusText.Text = result.ExitCode == 0
-                    ? AppLocalization.Get("SitesArtisanCompleted")
-                    : AppLocalization.Format("SitesArtisanFailedExit", result.ExitCode);
-                if (outputBox.Text.Length == 0) outputBox.Text = result.Output;
-            }
-            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
-            {
-                statusText.Text = AppLocalization.Get("SitesArtisanCancelled");
-            }
-            catch (Exception error)
-            {
-                statusText.Text = AppLocalization.Get(
-                    error is TimeoutException ? "SitesArtisanTimedOut" : "SitesArtisanFailed"
-                );
-                AppendCommandOutput(outputBox, error.Message);
-                await DiagnosticLog.WriteFailureAsync(
-                    "artisan",
-                    "run",
-                    $"The Artisan command for {site.Name} failed.",
-                    error.ToString()
-                );
-            }
-            finally
-            {
-                running = false;
-                progressRing.IsActive = false;
-                runButton.IsEnabled = true;
-                cancelButton.IsEnabled = false;
-                presetBox.IsEnabled = true;
-                customBox.IsEnabled = true;
-                if (ReferenceEquals(artisanCancellation, cancellation)) artisanCancellation = null;
-            }
+            await console.RunAsync(
+                AppLocalization.Get("SitesArtisanValidatingPhp"),
+                "SitesArtisanCancelled",
+                enabled =>
+                {
+                    presetBox.IsEnabled = enabled;
+                    customBox.IsEnabled = enabled;
+                },
+                async cancellationToken =>
+                {
+                    try
+                    {
+                        var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
+                        var php = phpInstaller.PhpExecutable(cycle);
+                        await runtimePolicy.PrepareLaunchAsync(php, cycle, cancellationToken);
+                        var environmentVariables = composerTools.ManagedEnvironment(cycle);
+                        console.StatusText.Text = AppLocalization.Get("SitesArtisanRunning");
+                        var result = await ArtisanCommandRunner.RunAsync(
+                            php,
+                            site.Path,
+                            command.Arguments,
+                            environmentVariables,
+                            command.Timeout,
+                            console.OutputProgress(),
+                            cancellationToken
+                        );
+                        console.StatusText.Text = result.ExitCode == 0
+                            ? AppLocalization.Get("SitesArtisanCompleted")
+                            : AppLocalization.Format("SitesArtisanFailedExit", result.ExitCode);
+                        if (console.OutputBox.Text.Length == 0) console.OutputBox.Text = result.Output;
+                    }
+                    catch (Exception error) when (error is not OperationCanceledException
+                        || !cancellationToken.IsCancellationRequested)
+                    {
+                        console.StatusText.Text = AppLocalization.Get(
+                            error is TimeoutException ? "SitesArtisanTimedOut" : "SitesArtisanFailed"
+                        );
+                        console.Append(error.Message);
+                        await DiagnosticLog.WriteFailureAsync(
+                            "artisan",
+                            "run",
+                            $"The Artisan command for {site.Name} failed.",
+                            error.ToString()
+                        );
+                    }
+                }
+            );
         };
 
-        await dialog.ShowAsync();
+        activeCommandConsole = console;
+        try
+        {
+            await dialog.ShowAsync();
+        }
+        finally
+        {
+            if (ReferenceEquals(activeCommandConsole, console)) activeCommandConsole = null;
+        }
     }
 
     private async void Npm_Click(object sender, RoutedEventArgs e)
@@ -522,51 +470,15 @@ public sealed partial class SitesPage
         scriptRow.Children.Add(scriptBox);
         scriptRow.Children.Add(reloadButton);
 
-        var statusText = new TextBlock
-        {
-            Text = AppLocalization.Get("SitesNpmReady"),
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
-        };
-        var progressRing = new ProgressRing { Width = 18, Height = 18 };
-        var statusRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        statusRow.Children.Add(progressRing);
-        statusRow.Children.Add(statusText);
-        var outputBox = new TextBox
-        {
-            Text = AppLocalization.Get("SitesNpmOutputPlaceholder"),
-            IsReadOnly = true,
-            AcceptsReturn = true,
-            TextWrapping = TextWrapping.NoWrap,
-            Height = 240,
-            VerticalAlignment = VerticalAlignment.Top,
-            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
-        };
-        ScrollViewer.SetVerticalScrollBarVisibility(outputBox, ScrollBarVisibility.Auto);
-        ScrollViewer.SetHorizontalScrollBarVisibility(outputBox, ScrollBarVisibility.Auto);
-        var runButton = new Button
-        {
-            Content = AppLocalization.Get("SitesRun"),
-            Style = (Style)Application.Current.Resources["AccentButtonStyle"]
-        };
-        var cancelButton = new Button
-        {
-            Content = AppLocalization.Get("SitesCancel"),
-            IsEnabled = false
-        };
-        var buttons = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 8,
-            HorizontalAlignment = HorizontalAlignment.Right
-        };
-        buttons.Children.Add(cancelButton);
-        buttons.Children.Add(runButton);
+        var console = new CommandConsole(
+            "SitesNpmReady",
+            "SitesNpmOutputPlaceholder",
+            "SitesNpmCancelling"
+        );
         var content = new StackPanel { Spacing = 12, Width = 500 };
         content.Children.Add(favorites);
         content.Children.Add(scriptRow);
-        content.Children.Add(buttons);
-        content.Children.Add(statusRow);
-        content.Children.Add(outputBox);
+        console.AddTo(content);
         var dialog = new ContentDialog
         {
             FlowDirection = AppLocalization.LayoutDirection,
@@ -575,23 +487,23 @@ public sealed partial class SitesPage
             Content = content,
             CloseButtonText = AppLocalization.Get("SitesClose")
         };
+        console.AttachTo(dialog);
 
-        var running = false;
         reloadButton.Click += async (_, _) =>
         {
-            if (running) return;
+            if (console.IsRunning) return;
             reloadButton.IsEnabled = false;
             scriptBox.IsEnabled = false;
-            progressRing.IsActive = true;
-            statusText.Text = AppLocalization.Get("SitesNpmLoading");
+            console.SetBusy(true);
+            console.StatusText.Text = AppLocalization.Get("SitesNpmLoading");
             try
             {
                 var reloaded = await Task.Run(() => NpmScriptCatalog.Discover(site.Path));
                 scriptSuggestions = reloaded.Select(script => script.Name).ToArray();
                 scriptBox.ItemsSource = scriptSuggestions;
                 scriptBox.Text = scriptSuggestions[0];
-                statusText.Text = AppLocalization.Get("SitesNpmReady");
-                outputBox.Text = string.Empty;
+                console.StatusText.Text = AppLocalization.Get("SitesNpmReady");
+                console.OutputBox.Text = string.Empty;
             }
             catch (Exception error) when (error is IOException
                 or UnauthorizedAccessException
@@ -600,96 +512,80 @@ public sealed partial class SitesPage
                 or NpmScriptException)
             {
                 scriptBox.ItemsSource = Array.Empty<DisplayOption>();
-                statusText.Text = AppLocalization.Get("SitesNpmUnavailable");
-                outputBox.Text = NpmErrorMessage(error);
+                console.StatusText.Text = AppLocalization.Get("SitesNpmUnavailable");
+                console.OutputBox.Text = NpmErrorMessage(error);
             }
             finally
             {
-                progressRing.IsActive = false;
+                console.SetBusy(false);
                 reloadButton.IsEnabled = true;
                 scriptBox.IsEnabled = true;
             }
         };
-        cancelButton.Click += (_, _) =>
+        console.RunButton.Click += async (_, _) =>
         {
-            if (!running) return;
-            statusText.Text = AppLocalization.Get("SitesNpmCancelling");
-            npmCancellation?.Cancel();
-        };
-        dialog.Closing += (_, args) =>
-        {
-            if (!running) return;
-            args.Cancel = true;
-            statusText.Text = AppLocalization.Get("SitesNpmCancelling");
-            npmCancellation?.Cancel();
-        };
-        runButton.Click += async (_, _) =>
-        {
-            if (running) return;
+            if (console.IsRunning) return;
             var selectedScript = scriptBox.Text.Trim();
             if (selectedScript.Length == 0) return;
 
-            using var cancellation = new CancellationTokenSource();
-            npmCancellation = cancellation;
-            running = true;
-            runButton.IsEnabled = false;
-            cancelButton.IsEnabled = true;
-            reloadButton.IsEnabled = false;
-            scriptBox.IsEnabled = false;
-            progressRing.IsActive = true;
-            statusText.Text = AppLocalization.Get("SitesNpmPreparingNode");
-            outputBox.Text = string.Empty;
-            try
-            {
-                var invocation = NpmScriptRunner.CreateInvocation(
-                    nodeInstaller,
-                    site.Path,
-                    site.NodeVersion,
-                    selectedScript
-                );
-                statusText.Text = AppLocalization.Get("SitesNpmRunning");
-                var result = await NpmScriptRunner.RunAsync(
-                    invocation,
-                    new Progress<string>(chunk => AppendCommandOutput(outputBox, chunk)),
-                    cancellation.Token
-                );
-                statusText.Text = result.ExitCode == 0
-                    ? AppLocalization.Get("SitesNpmCompleted")
-                    : AppLocalization.Format("SitesNpmFailedExit", result.ExitCode);
-                if (outputBox.Text.Length == 0) outputBox.Text = result.Output;
-            }
-            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
-            {
-                statusText.Text = AppLocalization.Get("SitesNpmCancelled");
-            }
-            catch (Exception error)
-            {
-                statusText.Text = AppLocalization.Get(
-                    error is NpmScriptException { ResourceKey: "SitesNpmErrorTimedOut" }
-                        ? "SitesNpmTimedOut"
-                        : "SitesNpmFailed"
-                );
-                AppendCommandOutput(outputBox, NpmErrorMessage(error));
-                await DiagnosticLog.WriteFailureAsync(
-                    "npm-script",
-                    "run",
-                    $"The npm script for {site.Name} failed.",
-                    error.ToString()
-                );
-            }
-            finally
-            {
-                running = false;
-                progressRing.IsActive = false;
-                runButton.IsEnabled = true;
-                cancelButton.IsEnabled = false;
-                reloadButton.IsEnabled = true;
-                scriptBox.IsEnabled = true;
-                if (ReferenceEquals(npmCancellation, cancellation)) npmCancellation = null;
-            }
+            await console.RunAsync(
+                AppLocalization.Get("SitesNpmPreparingNode"),
+                "SitesNpmCancelled",
+                enabled =>
+                {
+                    reloadButton.IsEnabled = enabled;
+                    scriptBox.IsEnabled = enabled;
+                },
+                async cancellationToken =>
+                {
+                    try
+                    {
+                        var invocation = NpmScriptRunner.CreateInvocation(
+                            nodeInstaller,
+                            site.Path,
+                            site.NodeVersion,
+                            selectedScript
+                        );
+                        console.StatusText.Text = AppLocalization.Get("SitesNpmRunning");
+                        var result = await NpmScriptRunner.RunAsync(
+                            invocation,
+                            console.OutputProgress(),
+                            cancellationToken
+                        );
+                        console.StatusText.Text = result.ExitCode == 0
+                            ? AppLocalization.Get("SitesNpmCompleted")
+                            : AppLocalization.Format("SitesNpmFailedExit", result.ExitCode);
+                        if (console.OutputBox.Text.Length == 0) console.OutputBox.Text = result.Output;
+                    }
+                    catch (Exception error) when (error is not OperationCanceledException
+                        || !cancellationToken.IsCancellationRequested)
+                    {
+                        console.StatusText.Text = AppLocalization.Get(
+                            error is NpmScriptException { ResourceKey: "SitesNpmErrorTimedOut" }
+                                ? "SitesNpmTimedOut"
+                                : "SitesNpmFailed"
+                        );
+                        console.Append(NpmErrorMessage(error));
+                        await DiagnosticLog.WriteFailureAsync(
+                            "npm-script",
+                            "run",
+                            $"The npm script for {site.Name} failed.",
+                            error.ToString()
+                        );
+                    }
+                }
+            );
         };
 
-        await dialog.ShowAsync();
+        activeCommandConsole = console;
+        try
+        {
+            await dialog.ShowAsync();
+        }
+        finally
+        {
+            if (ReferenceEquals(activeCommandConsole, console)) activeCommandConsole = null;
+        }
     }
 
     private static string NpmErrorMessage(Exception error)

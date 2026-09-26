@@ -260,6 +260,17 @@ public sealed class PhpRuntimePolicy
         options["xdebug.mode"] = "debug";
         options["xdebug.start_with_request"] = settings.Debugger.DetectBreakpoints ? "trigger" : "yes";
         options["xdebug.trigger_value"] = settings.Debugger.IdeKey;
+        if (settings.Debugger.ProfilerEnabled)
+        {
+            // Profiling every request would be far too slow, so the profiler (and, with it,
+            // debugging) only starts for requests that carry the trigger.
+            var profileDirectory = XdebugProfileStore.DirectoryFor(supportPath);
+            Directory.CreateDirectory(profileDirectory);
+            options["xdebug.mode"] = "debug,profile";
+            options["xdebug.start_with_request"] = "trigger";
+            options["xdebug.output_dir"] = profileDirectory;
+            options["xdebug.profiler_output_name"] = XdebugProfileStore.OutputNamePattern;
+        }
         return options;
     }
 

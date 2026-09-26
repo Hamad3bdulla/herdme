@@ -143,6 +143,14 @@ try
     await VerifyToolAndUpdateContractsAsync(supportRoot);
 
     await VerifyPerformanceContractsAsync(supportRoot);
+
+    await VerifyProxySiteContractsAsync(supportRoot);
+
+    await VerifyShareContractsAsync();
+    VerifyProjectManifestContracts(supportRoot);
+    VerifyProfilerContracts(supportRoot);
+    VerifyTinkerContracts(repositoryRoot, supportRoot);
+    VerifyCaptureSummaryContracts(supportRoot);
 }
 finally
 {

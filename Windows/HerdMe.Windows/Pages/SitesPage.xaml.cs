@@ -42,6 +42,8 @@ public sealed partial class SitesPage : Page
     private readonly SiteProcessManager siteProcesses;
     private readonly WindowsCertificateManager certificates;
     private readonly MailCaptureService mail;
+    private readonly ProxySiteStore proxySites;
+    private readonly SiteShareManager shares;
     private readonly SiteScanGeneration siteScanGeneration = new();
     private bool loaded;
     private bool subscribed;
@@ -55,8 +57,6 @@ public sealed partial class SitesPage : Page
     private DispatcherTimer? searchDebounce;
     private bool suppressPreviewToggle = true;
     private SiteRecord? selectedSite;
-    private CancellationTokenSource? artisanCancellation;
-    private CancellationTokenSource? npmCancellation;
     private CancellationTokenSource? siteDetailsCancellation;
     private CancellationTokenSource? gitInspectionCancellation;
     private CancellationTokenSource? databaseCancellation;
@@ -80,9 +80,13 @@ public sealed partial class SitesPage : Page
         WindowsServiceManager serviceManager,
         SiteProcessManager siteProcesses,
         WindowsCertificateManager certificates,
-        MailCaptureService mail
+        MailCaptureService mail,
+        ProxySiteStore proxySites,
+        SiteShareManager shares
     )
     {
+        this.proxySites = proxySites;
+        this.shares = shares;
         this.coreClient = coreClient;
         this.environment = environment;
         this.settingsStore = settingsStore;
@@ -136,8 +140,7 @@ public sealed partial class SitesPage : Page
         siteScanGeneration.Invalidate();
         CancelGitInspection();
         projectCreationCancellation?.Cancel();
-        artisanCancellation?.Cancel();
-        npmCancellation?.Cancel();
+        activeCommandConsole?.Cancel();
         siteDetailsCancellation?.Cancel();
         databaseCancellation?.Cancel();
         siteOperationCancellation?.Cancel();
@@ -149,6 +152,7 @@ public sealed partial class SitesPage : Page
         if (subscribed) return;
         subscribed = true;
         siteProcesses.Changed += SiteProcesses_Changed;
+        shares.SharesChanged += Shares_Changed;
         App.MainWindowVisibilityChanged += App_MainWindowVisibilityChanged;
     }
 
@@ -157,6 +161,7 @@ public sealed partial class SitesPage : Page
         if (!subscribed) return;
         subscribed = false;
         siteProcesses.Changed -= SiteProcesses_Changed;
+        shares.SharesChanged -= Shares_Changed;
         App.MainWindowVisibilityChanged -= App_MainWindowVisibilityChanged;
     }
 
@@ -510,6 +515,7 @@ public sealed partial class SitesPage : Page
             {
                 EnvironmentStatusText.Text = AppLocalization.Get("SitesEnvironmentStarting");
             }
+            environment.ProxyTld = normalizedSettings.Tld;
             await environment.SynchronizeSitesAsync(scanned);
             if (!siteScanGeneration.IsCurrent(generation)) return;
             UpdateEnvironmentState();
@@ -787,6 +793,7 @@ public sealed partial class SitesPage : Page
         PathText.Text = site.Path;
         UnlinkButton.Visibility = site.Linked ? Visibility.Visible : Visibility.Collapsed;
         RemoveSiteButton.Visibility = site.Linked ? Visibility.Collapsed : Visibility.Visible;
+        UpdateShareState();
         // File probing and .env parsing run in RefreshSiteDetailsAsync off the UI thread;
         // the cached detection keeps the actions usable while it revalidates.
         ApplySiteDetection(site, detectionCache.Peek(site.Path));

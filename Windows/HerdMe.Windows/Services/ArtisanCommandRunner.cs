@@ -281,10 +281,39 @@ public static class ArtisanCommandRunner
             throw new ArgumentException("The Artisan invocation is incomplete.", nameof(arguments));
         }
 
+        return await RunPhpAsync(
+            phpExecutable,
+            projectPath,
+            ["artisan", .. arguments],
+            environment,
+            timeout,
+            "The selected PHP runtime could not start Artisan.",
+            "The Artisan command",
+            outputProgress,
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Runs the PHP CLI hidden (no console window) inside a job object, with bounded output
+    /// capture, cancellation, and a timeout. Artisan and Tinker share this process handling.
+    /// </summary>
+    internal static async Task<ArtisanCommandResult> RunPhpAsync(
+        string phpExecutable,
+        string workingDirectory,
+        IReadOnlyList<string> phpArguments,
+        IReadOnlyDictionary<string, string> environment,
+        TimeSpan timeout,
+        string startFailureMessage,
+        string timeoutSubject,
+        IProgress<string>? outputProgress,
+        CancellationToken cancellationToken
+    )
+    {
         var startInfo = new ProcessStartInfo
         {
             FileName = phpExecutable,
-            WorkingDirectory = projectPath,
+            WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -292,12 +321,11 @@ public static class ArtisanCommandRunner
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8
         };
-        startInfo.ArgumentList.Add("artisan");
-        foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
+        foreach (var argument in phpArguments) startInfo.ArgumentList.Add(argument);
         foreach (var variable in environment) startInfo.Environment[variable.Key] = variable.Value;
 
         using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("The selected PHP runtime could not start Artisan.");
+            ?? throw new InvalidOperationException(startFailureMessage);
         using var job = WindowsJobObject.TryAttach(process);
         var capture = new BoundedOutputCapture(MaximumCapturedCharacters);
         var capturedStandardOutput = new BoundedOutputCapture(MaximumCapturedCharacters);
@@ -337,7 +365,9 @@ public static class ArtisanCommandRunner
             await WindowsJobObject.DrainOutputAsync(job, standardOutput, standardError);
             cancellationToken.ThrowIfCancellationRequested();
             throw new TimeoutException(
-                $"The Artisan command did not finish within {timeout.TotalMinutes:0} minutes."
+                timeout < TimeSpan.FromMinutes(1)
+                    ? $"{timeoutSubject} did not finish within {timeout.TotalSeconds:0} seconds."
+                    : $"{timeoutSubject} did not finish within {timeout.TotalMinutes:0} minutes."
             );
         }
         await WindowsJobObject.DrainOutputAsync(job, standardOutput, standardError);

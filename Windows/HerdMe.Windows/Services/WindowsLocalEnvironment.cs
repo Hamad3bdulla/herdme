@@ -21,11 +21,15 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
     private readonly WindowsHostsManager hostsManager;
     private readonly XdebugManager xdebugManager;
     private readonly NodeRuntimeInstaller nodeInstaller;
+    private readonly ProxySiteStore? proxyStore;
     private readonly SemaphoreSlim operationLock = new(1, 1);
     private readonly object healthMonitorLock = new();
     private readonly object disposalSync = new();
     private volatile IReadOnlyList<PhpFastCgiProcess> phpProcessSnapshot = [];
     private volatile IReadOnlyList<SiteRecord> configuredSites = [];
+    private volatile IReadOnlyList<ProxySite> activeProxies = [];
+    private volatile bool proxiesConfigured;
+    private volatile string proxyTld = "test";
     private string? activeConfigurationKey;
     private CancellationTokenSource? healthMonitorCancellation;
     private Task? healthMonitorTask;
@@ -41,9 +45,11 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         WindowsCertificateManager? certificateManager = null,
         WindowsHostsManager? hostsManager = null,
         XdebugManager? xdebugManager = null,
-        NodeRuntimeInstaller? nodeInstaller = null
+        NodeRuntimeInstaller? nodeInstaller = null,
+        ProxySiteStore? proxyStore = null
     )
     {
+        this.proxyStore = proxyStore;
         this.coreClient = coreClient ?? new CoreClient();
         this.runtimeInstaller = runtimeInstaller ?? new PhpRuntimeInstaller(this.coreClient);
         this.runtimePolicy = runtimePolicy ?? new PhpRuntimePolicy(this.coreClient);
@@ -53,14 +59,17 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         this.nodeInstaller = nodeInstaller ?? new NodeRuntimeInstaller();
     }
 
-    public bool IsRunning => phpProcessSnapshot.Count > 0
+    public bool IsRunning => (phpProcessSnapshot.Count > 0 || activeProxies.Count > 0)
         && phpProcessSnapshot.All(process => process.IsRunning)
         && httpServer.IsRunning
         && httpsServer.IsRunning;
 
     public bool IsDegraded => Volatile.Read(ref recoveryEnabled) == 1
-        && configuredSites.Count > 0
+        && (configuredSites.Count > 0 || proxiesConfigured)
         && !IsRunning;
+
+    /// <summary>Proxy sites currently routed by the HTTP and HTTPS listeners.</summary>
+    public IReadOnlyList<ProxySite> ActiveProxySites => activeProxies;
 
     public int? HttpPort => httpServer.Port;
 
@@ -95,6 +104,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         ThrowIfDisposing();
         cancellationToken.ThrowIfCancellationRequested();
         var settings = store.Load();
+        ProxyTld = settings.Tld;
         if (!settings.StartAutomatically)
         {
             store.UpdateStartAutomatically(true);
@@ -106,7 +116,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
             settings.LinkedSites,
             cancellationToken
         );
-        if (sites.Count == 0) return;
+        if (sites.Count == 0 && LoadProxies(sites).Count == 0) return;
         await StartAsync(sites, cancellationToken);
     }
 
@@ -153,7 +163,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
     {
         ThrowIfDisposing();
         var siteList = sites.ToArray();
-        if (siteList.Length == 0)
+        if (siteList.Length == 0 && LoadProxies(siteList).Count == 0)
         {
             throw new InvalidOperationException("Scan at least one site before starting.");
         }
@@ -162,7 +172,8 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         {
             ThrowIfDisposing();
             var settings = runtimePolicy.Load();
-            var configurationKey = ConfigurationKey(siteList, settings.PhpCycle);
+            var configurationKey = ConfigurationKey(siteList, settings.PhpCycle)
+                + ProxyConfigurationKey(LoadProxies(siteList));
             if (IsRunning
                 && HttpPort is not null
                 && activeConfigurationKey == configurationKey
@@ -201,7 +212,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         try
         {
             ThrowIfDisposing();
-            if (siteList.Length == 0)
+            if (siteList.Length == 0 && LoadProxies(siteList).Count == 0)
             {
                 Volatile.Write(ref recoveryEnabled, 0);
                 configuredSites = [];
@@ -213,7 +224,8 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
             Volatile.Write(ref recoveryEnabled, 1);
             EnsureHealthMonitorStarted();
             var settings = runtimePolicy.Load();
-            var configurationKey = ConfigurationKey(siteList, settings.PhpCycle);
+            var configurationKey = ConfigurationKey(siteList, settings.PhpCycle)
+                + ProxyConfigurationKey(LoadProxies(siteList));
             if (IsRunning && activeConfigurationKey == configurationKey
                 && DevelopmentSitesHealthy(siteList))
             {
@@ -234,6 +246,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
     {
         Volatile.Write(ref recoveryEnabled, 0);
         configuredSites = [];
+        proxiesConfigured = false;
         await operationLock.WaitAsync();
         try
         {
@@ -241,6 +254,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
             // recovery and created a new monitor while StopAsync was waiting.
             Volatile.Write(ref recoveryEnabled, 0);
             configuredSites = [];
+            proxiesConfigured = false;
             Interlocked.Exchange(ref resumeRecoveryRequested, 0);
             await CancelHealthMonitorAsync();
             await StopCoreAsync();
@@ -249,7 +263,11 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         {
             operationLock.Release();
         }
+        Stopped?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>Raised after the user stopped local sites; public shares close with them.</summary>
+    public event EventHandler? Stopped;
 
     public ValueTask DisposeAsync()
     {
@@ -274,6 +292,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
     private async Task StopCoreAsync()
     {
         phpProcessSnapshot = [];
+        activeProxies = [];
         activeConfigurationKey = null;
         await httpsServer.StopAsync();
         await httpServer.StopAsync();
@@ -344,8 +363,10 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
                     );
                 }
             }
+            var proxies = LoadProxies(siteList);
+            var proxyDomains = proxies.Select(proxy => proxy.Domain(proxyTld)).ToArray();
             await hostsManager.EnsureMappingsAsync(
-                siteList.Select(site => site.Domain),
+                siteList.Select(site => site.Domain).Concat(proxyDomains),
                 cancellationToken
             );
             var definitions = siteList
@@ -357,25 +378,32 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
                     developmentPorts.GetValueOrDefault(site.Path) is var developmentPort
                         && developmentPort > 0 ? developmentPort : null
                 ))
+                .Concat(proxies.Select(proxy => new LocalSiteDefinition(
+                    proxy.Domain(proxyTld),
+                    string.Empty,
+                    DevelopmentServerPort: proxy.Port
+                )))
                 .ToList();
             var httpPort = await httpServer.StartAsync(
                 definitions,
-                phpFastCgiPort: ports.Values.First(),
+                phpFastCgiPort: ports.Values.FirstOrDefault(),
                 fallbackPort: null,
                 cancellationToken: cancellationToken
             );
             var certificate = certificateManager.PrepareServerCertificate(
-                siteList.Select(site => site.Domain)
+                siteList.Select(site => site.Domain).Concat(proxyDomains)
             );
             await httpsServer.StartAsync(
                 definitions,
-                phpFastCgiPort: ports.Values.First(),
+                phpFastCgiPort: ports.Values.FirstOrDefault(),
                 preferredPort: 443,
                 fallbackPort: null,
                 serverCertificate: certificate,
                 cancellationToken: cancellationToken
             );
-            activeConfigurationKey = ConfigurationKey(siteList, settings.PhpCycle);
+            activeProxies = proxies;
+            activeConfigurationKey = ConfigurationKey(siteList, settings.PhpCycle)
+                + ProxyConfigurationKey(proxies);
             return httpPort;
         }
         catch
@@ -490,7 +518,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
             while (await timer.WaitForNextTickAsync(cancellationToken))
             {
                 if (Volatile.Read(ref recoveryEnabled) == 0
-                    || configuredSites.Count == 0
+                    || (configuredSites.Count == 0 && !proxiesConfigured)
                     || (IsRunning && Volatile.Read(ref resumeRecoveryRequested) == 0))
                 {
                     continue;
@@ -500,7 +528,7 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
                 try
                 {
                     if (Volatile.Read(ref recoveryEnabled) == 0
-                        || configuredSites.Count == 0
+                        || (configuredSites.Count == 0 && !proxiesConfigured)
                         || (IsRunning && Volatile.Read(ref resumeRecoveryRequested) == 0))
                     {
                         continue;
@@ -530,6 +558,59 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
+    }
+
+    /// <summary>Lets a tunnel host name reach a local site through the loopback HTTP listener.</summary>
+    public void SetShareAlias(string publicHost, string domain) => httpServer.SetShareAlias(publicHost, domain);
+
+    public void RemoveShareAlias(string publicHost) => httpServer.RemoveShareAlias(publicHost);
+
+    /// <summary>
+    /// Applies added, edited, or removed proxy sites without waiting for the next site scan.
+    /// </summary>
+    public Task ReloadProxySitesAsync(string tld, CancellationToken cancellationToken = default)
+    {
+        ProxyTld = tld;
+        return SynchronizeSitesAsync(configuredSites, cancellationToken);
+    }
+
+    /// <summary>The top-level domain used for proxy sites (the same one used for folder sites).</summary>
+    public string ProxyTld
+    {
+        get => proxyTld;
+        set
+        {
+            if (!string.IsNullOrWhiteSpace(value)) proxyTld = value.Trim().TrimStart('.').ToLowerInvariant();
+        }
+    }
+
+    /// <summary>
+    /// Proxy names that collide with a folder site are skipped so a scanned project always wins.
+    /// </summary>
+    private IReadOnlyList<ProxySite> LoadProxies(IEnumerable<SiteRecord> sites)
+    {
+        if (proxyStore is null)
+        {
+            proxiesConfigured = false;
+            return [];
+        }
+        var taken = sites.Select(site => site.Domain.Trim().TrimEnd('.'))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var proxies = proxyStore.Load()
+            .Where(proxy => !taken.Contains(proxy.Domain(proxyTld)))
+            .ToArray();
+        proxiesConfigured = proxies.Length > 0;
+        return proxies;
+    }
+
+    internal static string ProxyConfigurationKey(IEnumerable<ProxySite> proxies)
+    {
+        var entries = proxies
+            .Select(proxy => proxy.Name.ToLowerInvariant() + ":" + proxy.Port.ToString(
+                System.Globalization.CultureInfo.InvariantCulture))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        return entries.Length == 0 ? string.Empty : "\nproxy\n" + string.Join("\n", entries);
     }
 
     internal static string ConfigurationKey(

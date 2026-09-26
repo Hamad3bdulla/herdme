@@ -1,13 +1,13 @@
 {
   "releases": [
     {
-      "version": "0.1.23",
+      "version": "0.1.24",
       "build": 1,
       "channel": "stable",
-      "notes": "Refreshes the Windows interface and page layouts, improves dashboard and site responsiveness, and reduces PHP request latency with keep-alive, buffering, and static-file caching. Windows-only unsigned preview.",
+      "notes": "Adds proxy sites, explicit site sharing, herdme.yml import/export, Xdebug profiling, Laravel Tinker, faster capture lists, and improved Arabic and RTL Windows UI. Windows-only unsigned preview.",
       "downloadURLs": {
-        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.23/HerdMe-0.1.23-macOS.zip",
-        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.23/HerdMe-0.1.23-win-x64-setup.exe"
+        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.24/HerdMe-0.1.24-macOS.zip",
+        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.24/HerdMe-0.1.24-win-x64-setup.exe"
       }
     },
     {

@@ -97,6 +97,20 @@
                         <TextBox x:Name="IdeKeyBox" Grid.Column="2" Width="220" VerticalAlignment="Center" MaxLength="80" AutomationProperties.LabeledBy="{Binding ElementName=IdeKeyLabel}" />
                     </Grid>
                     <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE9D2;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Name="ProfilerLabel" x:Uid="DebuggerProfilerLabel" Text="Enable profiler" Style="{StaticResource SettingsRowTitleStyle}" />
+                            <TextBlock x:Uid="DebuggerProfilerDescription" Text="Profile requests that include XDEBUG_PROFILE. While on, debugging also starts only with a trigger." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="ProfilerToggle" Grid.Column="2" MinWidth="0" AutomationProperties.AutomationId="DebuggerProfilerToggle" AutomationProperties.LabeledBy="{Binding ElementName=ProfilerLabel}" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
                     <Grid Style="{StaticResource SettingsRowStyle}" Background="{ThemeResource SubtleFillColorTertiaryBrush}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -146,13 +160,59 @@
                         </Grid.ColumnDefinitions>
                         <ProgressRing x:Name="SessionProgress" Width="20" Height="20" VerticalAlignment="Center" />
                         <TextBlock x:Name="SessionStatusText" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SettingsRowDescriptionStyle}" />
-                        <Button x:Name="StartSessionButton" Grid.Column="2" VerticalAlignment="Center" Click="StartSession_Click" IsEnabled="False" Style="{StaticResource AccentButtonStyle}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <SymbolIcon Symbol="Play" />
-                                <TextBlock x:Uid="DebuggerStartSessionButton" Text="Start Session" />
-                            </StackPanel>
-                        </Button>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button x:Name="ProfileRequestButton" Click="ProfileRequest_Click" IsEnabled="False" AutomationProperties.AutomationId="DebuggerProfileRequestButton">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE9D2;" FontSize="16" />
+                                    <TextBlock x:Uid="DebuggerProfileRequestButton" Text="Profile Request" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="StartSessionButton" Click="StartSession_Click" IsEnabled="False" Style="{StaticResource AccentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <SymbolIcon Symbol="Play" />
+                                    <TextBlock x:Uid="DebuggerStartSessionButton" Text="Start Session" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </Grid>
+                </StackPanel>
+            </Border>
+
+            <TextBlock x:Uid="DebuggerProfilesTitle" Text="Profiles" Style="{StaticResource SectionHeaderStyle}" />
+            <Border Style="{StaticResource SettingsGroupStyle}">
+                <StackPanel>
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE9F9;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Name="ProfilesStatusText" x:Uid="DebuggerProfilesNone" Text="No profiles yet." Style="{StaticResource SettingsRowTitleStyle}" />
+                            <TextBlock x:Uid="DebuggerProfilesDescription" Text="Select a profile to see the slowest functions. HerdMe keeps the newest 50 profiles." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Style="{StaticResource SettingsRowControlStyle}">
+                            <Button x:Name="RefreshProfilesButton" x:Uid="DebuggerRefreshProfilesButton" Click="RefreshProfiles_Click" AutomationProperties.Name="Refresh profiles" Style="{StaticResource ToolbarIconButtonStyle}">
+                                <SymbolIcon Symbol="Refresh" />
+                            </Button>
+                            <Button x:Name="OpenProfilesButton" x:Uid="DebuggerOpenProfilesButton" Click="OpenProfiles_Click" AutomationProperties.Name="Open profiles folder" Style="{StaticResource ToolbarIconButtonStyle}">
+                                <SymbolIcon Symbol="OpenLocal" />
+                            </Button>
+                            <Button x:Name="DeleteProfilesButton" x:Uid="DebuggerDeleteProfilesButton" Click="DeleteProfiles_Click" IsEnabled="False" AutomationProperties.Name="Delete all profiles" Style="{StaticResource ToolbarIconButtonStyle}">
+                                <SymbolIcon Symbol="Delete" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                    <ListView
+                        x:Name="ProfilesList"
+                        AutomationProperties.AutomationId="DebuggerProfilesList"
+                        ItemsSource="{x:Bind Profiles}"
+                        DisplayMemberPath="Label"
+                        MaxHeight="280"
+                        SelectionMode="None"
+                        IsItemClickEnabled="True"
+                        ItemClick="ProfilesList_ItemClick" />
                 </StackPanel>
             </Border>
         </StackPanel>

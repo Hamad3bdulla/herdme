@@ -38,7 +38,7 @@ public sealed partial class DumpsPage : Page
         loadFailed = false;
         CaptureErrorBar.IsOpen = false;
         pageGeneration++;
-        var session = new CaptureRefreshSession<IReadOnlyList<CapturedDump>>(capture.Load);
+        var session = new CaptureRefreshSession<IReadOnlyList<CapturedDump>>(capture.LoadSummaries);
         refreshSession = session;
         dumpCapturedHandler = (_, _) => session.RequestRefresh();
         capture.DumpCaptured += dumpCapturedHandler;
@@ -176,7 +176,7 @@ public sealed partial class DumpsPage : Page
             InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
             var file = await picker.PickSaveFileAsync();
             if (file is null || !loaded || generation != pageGeneration) return;
-            await Task.Run(() => CaptureExport.SaveDumpAsync(dump, file.Path));
+            await Task.Run(() => CaptureExport.SaveDumpAsync(capture.Complete(dump) ?? dump, file.Path));
         }
         catch (Exception error)
         {
@@ -259,6 +259,25 @@ public sealed partial class DumpsPage : Page
         SummaryText.Text = preview.Text;
         PreviewSizeNotice.IsOpen = preview.IsTruncated;
         ExportButton.IsEnabled = !exporting && dump is not null;
+        if (dump is { IsSummary: true }) _ = ShowCompleteDumpAsync(dump);
+    }
+
+    private async Task ShowCompleteDumpAsync(CapturedDump row)
+    {
+        try
+        {
+            var complete = await Task.Run(() => capture.Complete(row));
+            if (!loaded || !ReferenceEquals(displayedDump, row) || complete is null) return;
+            SourceText.Text = CapturePreview.LimitText(complete.Source, 2_048).Text;
+            var preview = CapturePreview.LimitText(complete.Summary);
+            SummaryText.Text = preview.Text;
+            PreviewSizeNotice.IsOpen = preview.IsTruncated;
+        }
+        catch (Exception error) when (error is Microsoft.Data.Sqlite.SqliteException
+            or System.Text.Json.JsonException or IOException)
+        {
+            if (loaded && ReferenceEquals(displayedDump, row)) ShowCaptureError("CaptureLoadFailed", error);
+        }
     }
 
     private void UpdateServerState()

@@ -205,8 +205,25 @@ public static class SitePresentation
         string ideKey
     )
     {
-        var builder = new UriBuilder(SiteUri(site, environmentRunning, httpPort, httpsPort));
-        var trigger = "XDEBUG_TRIGGER=" + Uri.EscapeDataString(ideKey.Trim());
+        return WithXdebugTrigger(SiteUri(site, environmentRunning, httpPort, httpsPort), "XDEBUG_TRIGGER", ideKey);
+    }
+
+    /// <summary>Opens the site with the profiler trigger; only this request is profiled.</summary>
+    public static Uri ProfileUri(
+        SiteRecord site,
+        bool environmentRunning,
+        int? httpPort,
+        int? httpsPort,
+        string ideKey
+    )
+    {
+        return WithXdebugTrigger(SiteUri(site, environmentRunning, httpPort, httpsPort), "XDEBUG_PROFILE", ideKey);
+    }
+
+    private static Uri WithXdebugTrigger(Uri uri, string name, string ideKey)
+    {
+        var builder = new UriBuilder(uri);
+        var trigger = name + "=" + Uri.EscapeDataString(ideKey.Trim());
         builder.Query = string.IsNullOrEmpty(builder.Query)
             ? trigger
             : builder.Query.TrimStart('?') + "&" + trigger;

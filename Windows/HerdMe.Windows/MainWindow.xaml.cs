@@ -278,7 +278,7 @@ public sealed partial class MainWindow : Window
     private static string NormalizePageTag(string tag)
     {
         return tag is "dashboard" or "general" or "sites" or "php" or "node" or "services"
-            or "updates" or "mail" or "dumps" or "logs" or "debugger" or "about"
+            or "updates" or "mail" or "dumps" or "logs" or "debugger" or "tinker" or "about"
             ? tag
             : "general";
     }
@@ -334,7 +334,9 @@ public sealed partial class MainWindow : Window
                     services.Services,
                     services.SiteProcesses,
                     services.Certificates,
-                    services.Mail
+                    services.Mail,
+                    services.ProxySites,
+                    services.Shares
                 );
             case "php":
                 return new PhpPage(
@@ -396,6 +398,14 @@ public sealed partial class MainWindow : Window
                     services.ComponentUpdates,
                     services.SiteSettings,
                     services.Environment
+                );
+            case "tinker":
+                return new TinkerPage(
+                    services.Core,
+                    services.SiteSettings,
+                    services.PhpInstaller,
+                    services.RuntimePolicy,
+                    services.ComposerTools
                 );
             case "about":
                 return new AboutPage(services.SiteSettings, services.Updates);

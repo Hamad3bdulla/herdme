@@ -6,6 +6,18 @@ public sealed class SiteRuntimeStore
 
     public void SetNode(string sitePath, string? version) => Set(sitePath, ".herdme-node", version, IsNodeVersion);
 
+    public string? GetPhp(string sitePath) => Get(sitePath, ".herdme-php", IsPhpCycle);
+
+    public string? GetNode(string sitePath) => Get(sitePath, ".herdme-node", IsNodeVersion);
+
+    private static string? Get(string sitePath, string fileName, Func<string, bool> validator)
+    {
+        var file = new FileInfo(Path.Combine(Path.GetFullPath(sitePath), fileName));
+        if (!file.Exists || file.Length > 256) return null;
+        var value = File.ReadAllText(file.FullName).Trim();
+        return validator(value) ? value : null;
+    }
+
     private static void Set(
         string sitePath,
         string fileName,

@@ -42,6 +42,7 @@ public sealed class AppServices : IAsyncDisposable
             UserPath
         );
         Xdebug = new XdebugManager();
+        ProxySites = new ProxySiteStore(SiteSettings.SupportRoot);
         Environment = new WindowsLocalEnvironment(
             Core,
             PhpInstaller,
@@ -49,8 +50,11 @@ public sealed class AppServices : IAsyncDisposable
             Certificates,
             Hosts,
             Xdebug,
-            NodeInstaller
+            NodeInstaller,
+            ProxySites
         );
+        Tunnels = new CloudflaredInstaller();
+        Shares = new SiteShareManager(Tunnels, Environment);
         Services = new WindowsServiceManager();
         Startup = new WindowsStartupManager();
         Updates = AppUpdateManager.Configured();
@@ -126,6 +130,12 @@ public sealed class AppServices : IAsyncDisposable
 
     public SiteCommandFavoritesStore CommandFavorites { get; }
 
+    public ProxySiteStore ProxySites { get; }
+
+    public CloudflaredInstaller Tunnels { get; }
+
+    public SiteShareManager Shares { get; }
+
     public SiteProcessManager SiteProcesses { get; }
 
     public InitialSetupManager InitialSetup { get; }
@@ -176,6 +186,7 @@ public sealed class AppServices : IAsyncDisposable
                 failures.Add(error);
             }
         }
+        await DisposeOneAsync(Shares, failures);
         await DisposeOneAsync(SiteProcesses, failures);
         await DisposeOneAsync(Environment, failures);
         await DisposeOneAsync(Services, failures);

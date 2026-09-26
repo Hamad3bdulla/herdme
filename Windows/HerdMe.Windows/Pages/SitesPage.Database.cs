@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
+using HerdMe.Windows.Views;
 using HerdMe.Windows.ViewModels;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.UI.Xaml;
@@ -57,9 +58,7 @@ public sealed partial class SitesPage
             Text = AppLocalization.Get("SitesDatabaseNameValidation"),
             TextWrapping = TextWrapping.Wrap,
             Visibility = Visibility.Collapsed,
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                "SystemFillColorCriticalBrush"
-            ]
+            Style = StatusStyles.Text(StatusTone.Critical)
         };
         var content = new StackPanel { MaxWidth = 420, Spacing = 10 };
         var openInTablePlus = new CheckBox
@@ -156,9 +155,7 @@ public sealed partial class SitesPage
             dialog.IsPrimaryButtonEnabled = false;
             dialog.CloseButtonText = string.Empty;
             progressBar.Visibility = Visibility.Visible;
-            statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                "TextFillColorPrimaryBrush"
-            ];
+            statusText.Style = StatusStyles.PrimaryText;
             try
             {
                 if (provisioning is null)
@@ -231,9 +228,7 @@ public sealed partial class SitesPage
                     : AppLocalization.Get(environmentUpdated
                         ? "SitesDatabaseEnvironmentReady"
                         : "SitesDatabaseCreatedStatus") + Environment.NewLine) + error.Message;
-                statusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                    "SystemFillColorCriticalBrush"
-                ];
+                statusText.Style = StatusStyles.Text(StatusTone.Critical);
                 if (provisioning is not null && !environmentUpdated)
                 {
                     usernameBox.Text = provisioning.Username;
@@ -653,9 +648,7 @@ public sealed partial class SitesPage
             Text = AppLocalization.Get("SitesDatabaseNameValidation"),
             TextWrapping = TextWrapping.Wrap,
             Visibility = Visibility.Collapsed,
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                "SystemFillColorCriticalBrush"
-            ]
+            Style = StatusStyles.Text(StatusTone.Critical)
         };
         var targetContent = new StackPanel { Width = 430, Spacing = 10 };
         targetContent.Children.Add(new TextBlock

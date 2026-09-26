@@ -17,6 +17,22 @@ public sealed class CapturedDump
 
     public string Payload { get; set; } = string.Empty;
 
+    /// <summary>True for list rows loaded without the payload; load the full capture to show it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsSummary { get; set; }
+
+    internal const int SummaryRowCharacters = 2_048;
+
+    /// <summary>The columns the capture list needs, without the (possibly large) payload.</summary>
+    public CapturedDump ToSummary() => new()
+    {
+        Id = Id,
+        ReceivedAt = ReceivedAt,
+        Source = Source.Length > SummaryRowCharacters ? Source[..SummaryRowCharacters] : Source,
+        Summary = Summary.Length > SummaryRowCharacters ? Summary[..SummaryRowCharacters] : Summary,
+        IsSummary = true
+    };
+
     [JsonIgnore]
     public string ReceivedText => ReceivedAt.LocalDateTime.ToString("g");
 

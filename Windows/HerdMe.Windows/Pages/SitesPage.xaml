@@ -67,6 +67,12 @@
                         <TextBlock x:Uid="SitesParkFolderButton" Text="Park folder" />
                     </StackPanel>
                 </Button>
+                <Button x:Name="ProxySitesButton" Click="ProxySites_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <SymbolIcon Symbol="Globe" />
+                        <TextBlock x:Uid="SitesProxySitesButton" Text="Proxy sites" />
+                    </StackPanel>
+                </Button>
                 <Button x:Name="CreateLaravelButton" Click="CreateLaravel_Click" Style="{StaticResource AccentButtonStyle}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <SymbolIcon Symbol="Add" />
@@ -325,6 +331,9 @@
                                         </MenuFlyout>
                                     </AppBarButton.Flyout>
                                 </AppBarButton>
+                                <AppBarButton x:Uid="SitesShareCommand" x:Name="ShareButton" Label="Share publicly" Click="ShareSite_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Share" /></AppBarButton.Icon>
+                                </AppBarButton>
                                 <AppBarButton x:Uid="SitesOpenFolderCommand" Label="Open project folder" Click="OpenFolder_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Folder" /></AppBarButton.Icon>
                                 </AppBarButton>
@@ -366,6 +375,10 @@
                                             <MenuFlyoutItem x:Uid="SitesPerformanceCommand" Text="Performance" Click="Performance_Click" />
                                             <MenuFlyoutItem x:Uid="SitesPhpExtensionsCommand" Text="PHP extensions" Click="PhpExtensions_Click" />
                                             <MenuFlyoutItem x:Uid="SitesConfigureRuntimesCommand" Text="Configure PHP and Node.js" Click="EditRuntimes_Click" />
+                                            <MenuFlyoutSubItem x:Uid="SitesManifestCommand" Text="Project settings (herdme.yml)">
+                                                <MenuFlyoutItem x:Uid="SitesManifestApplyCommand" Text="Apply herdme.yml" Click="ApplyManifest_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesManifestExportCommand" Text="Export herdme.yml" Click="ExportManifest_Click" />
+                                            </MenuFlyoutSubItem>
                                             <MenuFlyoutSeparator />
                                             <MenuFlyoutItem x:Uid="SitesUnlinkCommand" x:Name="UnlinkButton" Text="Unlink project" Click="UnlinkSelectedSite_Click" />
                                             <MenuFlyoutItem
@@ -381,6 +394,17 @@
 
                         <ScrollViewer Grid.Row="2" Padding="20,8,20,20" VerticalScrollBarVisibility="Auto" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
                             <StackPanel Spacing="14" Margin="0,8,0,0">
+                                <InfoBar x:Name="ShareBar" x:Uid="SitesShareBar" Severity="Warning" IsOpen="False" IsClosable="False" Title="Shared publicly">
+                                    <InfoBar.ActionButton>
+                                        <Button x:Uid="SitesShareStopButton" Content="Stop sharing" Click="StopShare_Click" />
+                                    </InfoBar.ActionButton>
+                                    <InfoBar.Content>
+                                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+                                            <HyperlinkButton x:Name="ShareLinkButton" Click="OpenShareLink_Click" />
+                                            <Button x:Uid="SitesShareCopyButton" Content="Copy link" Click="CopyShareLink_Click" />
+                                        </StackPanel>
+                                    </InfoBar.Content>
+                                </InfoBar>
                                 <Border Style="{StaticResource SettingsGroupStyle}">
                                     <Grid Style="{StaticResource SettingsRowStyle}">
                                         <Grid.ColumnDefinitions>

@@ -1,0 +1,9 @@
+{
+  "description": "Generous budgets for GitHub-hosted windows-latest runners. acceptance.ps1 measures these and writes build/windows-ui-evidence/performance.json. Lower them as measurements settle; never raise them to hide a regression without a reason in the commit.",
+  "startupMilliseconds": 25000,
+  "pageNavigationMilliseconds": 5000,
+  "workingSetMegabytes": 600,
+  "privateMegabytes": 700,
+  "idleCpuPercent": 5,
+  "idleSampleSeconds": 5
+}

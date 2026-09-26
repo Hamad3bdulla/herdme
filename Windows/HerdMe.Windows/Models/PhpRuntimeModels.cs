@@ -63,6 +63,10 @@ public sealed class DebuggerSettings
     public int Port { get; set; } = 9_003;
 
     public string IdeKey { get; set; } = "VSCODE";
+
+    // Adds Xdebug's profiler behind the request trigger (XDEBUG_PROFILE); off by default so
+    // normal step debugging keeps xdebug.mode=debug without profiling overhead.
+    public bool ProfilerEnabled { get; set; }
 }
 
 public sealed record PhpRuntimeLaunchContract(

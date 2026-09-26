@@ -1167,6 +1167,7 @@ internal static partial class ContractChecks
             (Tag: "mail", NavigationId: "NavMail", Page: "MailPage.xaml", PageId: "MailPageRoot"),
             (Tag: "dumps", NavigationId: "NavDumps", Page: "DumpsPage.xaml", PageId: "DumpsPageRoot"),
             (Tag: "debugger", NavigationId: "NavDebugger", Page: "DebuggerPage.xaml", PageId: "DebuggerPageRoot"),
+            (Tag: "tinker", NavigationId: "NavTinker", Page: "TinkerPage.xaml", PageId: "TinkerPageRoot"),
             (Tag: "logs", NavigationId: "NavLogs", Page: "LogsPage.xaml", PageId: "LogsPageRoot"),
             (Tag: "about", NavigationId: "NavAbout", Page: "AboutPage.xaml", PageId: "AboutPageRoot")
         };
@@ -1204,6 +1205,73 @@ internal static partial class ContractChecks
         Check(
             acceptanceSource.Contains("Assert-WinUiNavigation $primary", StringComparison.Ordinal),
             "native Windows acceptance executes the WinUI navigation smoke test"
+        );
+        using (var budgets = System.Text.Json.JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(repositoryRoot, "Windows", "performance-budgets.json"))
+        ))
+        {
+            foreach (var name in new[]
+            {
+                "startupMilliseconds",
+                "pageNavigationMilliseconds",
+                "workingSetMegabytes",
+                "privateMegabytes",
+                "idleCpuPercent",
+                "idleSampleSeconds",
+            })
+            {
+                Check(
+                    budgets.RootElement.TryGetProperty(name, out var value)
+                        && value.ValueKind == System.Text.Json.JsonValueKind.Number
+                        && value.GetDouble() > 0,
+                    $"Windows performance budget {name} is a positive number"
+                );
+            }
+        }
+        Check(
+            acceptanceSource.Contains("performance-budgets.json", StringComparison.Ordinal)
+                && acceptanceSource.Contains("Assert-IdleResourceBudgets $primary", StringComparison.Ordinal)
+                && acceptanceSource.Contains("$performanceBudgets.startupMilliseconds", StringComparison.Ordinal)
+                && acceptanceSource.Contains("$performanceBudgets.pageNavigationMilliseconds", StringComparison.Ordinal)
+                && acceptanceSource.Contains("performance.json", StringComparison.Ordinal),
+            "native Windows acceptance enforces and reports the performance budgets"
+        );
+        Check(
+            acceptanceSource.Contains("Assert-NavigationFlowDirection $window $navigation", StringComparison.Ordinal)
+                && acceptanceSource.Contains("\"DebuggerProfilerToggle\"", StringComparison.Ordinal)
+                && acceptanceSource.Contains("\"TinkerRunButton\"", StringComparison.Ordinal),
+            "native Windows acceptance checks right-to-left mirroring and the new page controls"
+        );
+        var installerDefinition = File.ReadAllText(Path.Combine(repositoryRoot, "Windows", "installer.iss"));
+        var wingetScript = File.ReadAllText(
+            Path.Combine(repositoryRoot, "Windows", "winget", "New-WingetManifest.ps1")
+        );
+        var appIdLine = installerDefinition.Split('\n')
+            .Select(line => line.Trim())
+            .FirstOrDefault(line => line.StartsWith("AppId={{", StringComparison.Ordinal));
+        Check(
+            appIdLine is not null
+                && wingetScript.Contains("{" + appIdLine["AppId={{".Length..] + "_is1", StringComparison.Ordinal),
+            "the winget manifest product code matches the Inno Setup AppId"
+        );
+        Check(
+            wingetScript.Contains("Get-FileHash", StringComparison.Ordinal)
+                && wingetScript.Contains(".sha256", StringComparison.Ordinal)
+                && wingetScript.Contains("InstallerType: inno", StringComparison.Ordinal)
+                && wingetScript.Contains("Scope: user", StringComparison.Ordinal)
+                && installerDefinition.Contains("PrivilegesRequired=lowest", StringComparison.Ordinal)
+                && wingetScript.Contains("releases/download/$Tag/$expectedName", StringComparison.Ordinal),
+            "the winget manifest pins the published per-user installer by SHA-256"
+        );
+        var workflowSource = File.ReadAllText(
+            Path.Combine(repositoryRoot, ".github", "workflows", "windows-x64.yml")
+        );
+        Check(
+            workflowSource.Contains("ar-BH", StringComparison.Ordinal)
+                && workflowSource.Contains("en-US", StringComparison.Ordinal)
+                && workflowSource.Contains("-CaptureScreenshots", StringComparison.Ordinal)
+                && workflowSource.Contains("windows-ui-evidence", StringComparison.Ordinal),
+            "Windows CI runs the UI smoke test in English and Arabic and keeps the screenshots"
         );
         Check(
             acceptanceSource.Contains("Assert-ResizableMainWindow $primary", StringComparison.Ordinal)
