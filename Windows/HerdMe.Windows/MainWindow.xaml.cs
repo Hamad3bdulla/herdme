@@ -45,6 +45,7 @@ public sealed partial class MainWindow : Window
         ConfigureTitleBar();
         ResizeWindow();
         var siteSettings = services.SiteSettings.Load();
+        InitializeAppearance(siteSettings.CompactMode);
         _ = services.Services.LoadInstances();
         configurationLoadWarning = string.Join(
             Environment.NewLine + Environment.NewLine,
@@ -58,6 +59,7 @@ public sealed partial class MainWindow : Window
         if (configurationLoadWarning is not null) Activated += ShowConfigurationLoadWarning;
         RequiresOnboarding = forceOnboarding
             || (!skipOnboarding && !siteSettings.OnboardingCompleted);
+        InitializeWhatsNew(siteSettings.LastSeenVersion);
         Navigation.Visibility = RequiresOnboarding ? Visibility.Collapsed : Visibility.Visible;
         Onboarding.Visibility = RequiresOnboarding ? Visibility.Visible : Visibility.Collapsed;
         Navigation.SelectedItem = Navigation.MenuItems[0];
@@ -66,6 +68,7 @@ public sealed partial class MainWindow : Window
         App.MainWindowVisibilityChanged += App_MainWindowVisibilityChanged;
         toastTimer.Tick += ToastTimer_Tick;
         SubscribeActivity();
+        InitializeStatusBar();
     }
 
     public bool RequiresOnboarding { get; private set; }
@@ -80,6 +83,8 @@ public sealed partial class MainWindow : Window
         toastTimer.Stop();
         toastTimer.Tick -= ToastTimer_Tick;
         UnsubscribeActivity();
+        ReleaseAppearance();
+        ReleaseStatusBar();
         AppWindow.Hide();
         RootLayout.IsHitTestVisible = false;
         ContentFrame.Content = null;
@@ -106,6 +111,7 @@ public sealed partial class MainWindow : Window
             XamlRoot = xamlRoot
         };
         await dialog.ShowAsync();
+        await ShowPendingWhatsNewAsync();
     }
 
     private void ConfigureTitleBar()
@@ -130,7 +136,11 @@ public sealed partial class MainWindow : Window
         };
         AppTitleBar.SizeChanged += (_, _) => UpdateTitleBarInsets();
         RootLayout.ActualThemeChanged += (_, _) => ApplyCaptionButtonColors();
-        titleBarStatusTimer.Tick += (_, _) => UpdateTitleBarStatus();
+        titleBarStatusTimer.Tick += (_, _) =>
+        {
+            UpdateTitleBarStatus();
+            UpdateStatusBar();
+        };
         // The status poll starts once App reports the window visible and pauses in the tray.
     }
 
@@ -140,6 +150,7 @@ public sealed partial class MainWindow : Window
         if (visible)
         {
             UpdateTitleBarStatus();
+            UpdateStatusBar();
             titleBarStatusTimer.Start();
             MarkPageSeen(currentPageTag);
         }
@@ -486,6 +497,7 @@ public sealed partial class MainWindow : Window
         Onboarding.Visibility = Visibility.Collapsed;
         Navigation.Visibility = Visibility.Visible;
         UpdateTitleBarStatus();
+        UpdateStatusBar();
         InitialSetupCompleted?.Invoke(this, EventArgs.Empty);
         if (Onboarding.RequestedNextStep != OnboardingNextStep.None)
         {
@@ -494,7 +506,7 @@ public sealed partial class MainWindow : Window
     }
 
     // Opens Sites and, once its folders are loaded, starts Create Laravel or Park a folder.
-    private void StartSitesNextStep(OnboardingNextStep step)
+    internal void StartSitesNextStep(OnboardingNextStep step)
     {
         if (!cachedPages.TryGetValue("sites", out var page))
         {

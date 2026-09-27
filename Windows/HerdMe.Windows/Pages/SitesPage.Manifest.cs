@@ -1,5 +1,6 @@
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
+using HerdMe.Windows.Views;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -319,8 +320,21 @@ public sealed partial class SitesPage
             DefaultButton = ContentDialogButton.Primary
         };
         var saved = false;
+        var originalText = text.Replace("\r", string.Empty);
+        var guard = UnsavedChangesGuard.Attach(
+            dialog,
+            () => !saved && !string.Equals(editor.Text.Replace("\r", string.Empty), originalText, StringComparison.Ordinal),
+            message =>
+            {
+                errorBar.Severity = InfoBarSeverity.Warning;
+                errorBar.Message = message;
+                errorBar.IsOpen = true;
+            }
+        );
+        editor.TextChanged += (_, _) => guard.Reset();
         dialog.PrimaryButtonClick += (_, args) =>
         {
+            errorBar.Severity = InfoBarSeverity.Error;
             try
             {
                 var manifest = ProjectManifestFile.Parse(editor.Text.Replace("\r", string.Empty));

@@ -128,6 +128,7 @@ $requiredFiles = @(
     "MRM.dll",
     "LICENSE",
     "THIRD_PARTY.md",
+    "CHANGELOG.md",
     "release-manifest.json"
 )
 if ($releaseMode -eq "public") {

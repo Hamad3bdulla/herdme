@@ -95,8 +95,12 @@ public sealed partial class DashboardPage : Page
         {
             lifecycleAttached = true;
             App.MainWindowVisibilityChanged += App_MainWindowVisibilityChanged;
+            App.MainWindow.TimelineChanged += MainWindow_TimelineChanged;
         }
         loadedPage = this;
+        RenderTimeline();
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+            () => App.MainWindow.OfferShellTips(HealthTabTip));
         if (activeRepair is { } repair) ObserveRepair(repair);
         ShowPendingRepairSummary();
         if (App.IsMainWindowVisible) environmentRefreshTimer.Start();
@@ -183,6 +187,7 @@ public sealed partial class DashboardPage : Page
         PositionEnvironmentRow(DomainsStatusPill, compact);
         PositionEnvironmentRow(CertificateStatusPill, compact);
 
+        PositionQuickActions(compact);
         RecentActivityGrid.RowSpacing = compact ? 12 : 0;
         Grid.SetRow(RecentDumpsPanel, compact ? 1 : 0);
         Grid.SetColumn(RecentDumpsPanel, compact ? 0 : 1);
@@ -210,6 +215,7 @@ public sealed partial class DashboardPage : Page
         {
             lifecycleAttached = false;
             App.MainWindowVisibilityChanged -= App_MainWindowVisibilityChanged;
+            App.MainWindow.TimelineChanged -= MainWindow_TimelineChanged;
         }
         if (ReferenceEquals(loadedPage, this)) loadedPage = null;
         StopObservingRepair();
@@ -264,6 +270,7 @@ public sealed partial class DashboardPage : Page
             cancellation.Token.ThrowIfCancellationRequested();
 
             var sites = await sitesTask;
+            RememberSitePaths(sites);
             var instances = await servicesTask;
             var messages = await mailTask;
             var dumps = await dumpsTask;
@@ -419,6 +426,8 @@ public sealed partial class DashboardPage : Page
                 environment.HttpPort, environment.HttpsPort);
             RenderRecentMail(messages);
             RenderRecentDumps(dumps);
+            UpdateQuickActions(sites, settings);
+            RenderTimeline();
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
@@ -559,6 +568,8 @@ public sealed partial class DashboardPage : Page
         {
             warnings.Add(AppLocalization.Get("DashboardCertificateWarning"));
         }
+        var portWarnings = WebPortConflictWarnings();
+        warnings.AddRange(portWarnings.Keys);
 
         var healthy = warnings.Count == 0 && siteWarnings.Count == 0;
         var tone = !string.IsNullOrWhiteSpace(failure)
@@ -580,6 +591,9 @@ public sealed partial class DashboardPage : Page
         );
         WarningList.Children.Clear();
         WarningPanel.Visibility = healthy ? Visibility.Collapsed : Visibility.Visible;
+        // Environment-wide problems first, each with its own repair; then one group per site
+        // with a way to open it; then everything else.
+        if (warnings.Count > 0) WarningList.Children.Add(HealthGroupHeader(AppLocalization.Get("DashboardHealthGroupEnvironment"), null, null));
         foreach (var warning in warnings)
         {
             RoutedEventHandler? repair = warning == AppLocalization.Get("DashboardDomainsWarning")
@@ -589,13 +603,28 @@ public sealed partial class DashboardPage : Page
                     : warning == AppLocalization.Get("DashboardEnvironmentRecoveringWarning")
                         ? RepairEnvironment_Click
                         : null;
-            WarningList.Children.Add(HealthIssueRow(warning, repair));
+            if (portWarnings.TryGetValue(warning, out var portDetail))
+            {
+                WarningList.Children.Add(HealthIssueRow(
+                    warning,
+                    RepairEnvironment_Click,
+                    portDetail,
+                    AppLocalization.Get("DashboardFixRetryAction")
+                ));
+                continue;
+            }
+            WarningList.Children.Add(repair == RepairCertificate_Click
+                ? HealthIssueRow(
+                    warning,
+                    repair,
+                    AppLocalization.Get("DashboardFixCertificateDetail"),
+                    AppLocalization.Get("DashboardFixCertificateAction")
+                )
+                : HealthIssueRow(warning, repair));
         }
-        foreach (var warning in siteWarnings)
-        {
-            WarningList.Children.Add(HealthIssueRow(warning, OpenSites_Click));
-        }
+        RenderSiteWarningGroups(siteWarnings);
         lastHealthWarnings = warnings.Concat(siteWarnings).ToArray();
+        UpdateHealthStrip(tone, lastHealthWarnings.Count, healthy);
         failedSiteNames.Clear();
         foreach (var warning in siteWarnings)
         {
@@ -604,7 +633,12 @@ public sealed partial class DashboardPage : Page
         }
     }
 
-    private UIElement HealthIssueRow(string message, RoutedEventHandler? repair)
+    private UIElement HealthIssueRow(
+        string message,
+        RoutedEventHandler? repair,
+        string? detail = null,
+        string? actionLabel = null
+    )
     {
         var row = new Grid { ColumnSpacing = 12 };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -617,14 +651,25 @@ public sealed partial class DashboardPage : Page
             FontSize = 16,
             VerticalAlignment = VerticalAlignment.Center
         });
-        var text = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+        // A fix-it card: what is wrong, then why and what the button will do.
+        var text = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
+        text.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
+        if (!string.IsNullOrWhiteSpace(detail))
+        {
+            text.Children.Add(new TextBlock
+            {
+                Text = detail,
+                TextWrapping = TextWrapping.Wrap,
+                Style = TextStyle("CaptionTextStyle")
+            });
+        }
         Grid.SetColumn(text, 1);
         row.Children.Add(text);
         if (repair is not null)
         {
             var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             content.Children.Add(new SymbolIcon(Symbol.Repair));
-            content.Children.Add(new TextBlock { Text = AppLocalization.Get("DashboardRepairAction") });
+            content.Children.Add(new TextBlock { Text = actionLabel ?? AppLocalization.Get("DashboardRepairAction") });
             var button = new Button { Content = content };
             button.Click += repair;
             ToolTipService.SetToolTip(button, AppLocalization.Get("DashboardRepairTooltip"));
@@ -762,6 +807,7 @@ public sealed partial class DashboardPage : Page
             RepairAllButton.IsEnabled = true;
             RefreshButton.IsEnabled = refreshCancellation is null;
             RefreshProgress.IsActive = refreshCancellation is not null;
+            RestoreHealthStrip();
             return;
         }
 
@@ -774,6 +820,7 @@ public sealed partial class DashboardPage : Page
         RepairProgressText.Text = repair.IsCancelling
             ? AppLocalization.Get("Dashboard_Repair_Cancelling")
             : progress.Message;
+        ShowRepairInHealthStrip(RepairProgressText.Text);
         if (progress.TotalSteps > 0 && !repair.IsCancelling)
         {
             RepairProgressIndicator.IsIndeterminate = false;
@@ -813,6 +860,7 @@ public sealed partial class DashboardPage : Page
         if (activeRepair is { } running)
         {
             // Never start a second repair; bring the running one into view instead.
+            ShowTab("health");
             ObserveRepair(running);
             RepairProgressInfoBar.StartBringIntoView();
             return;
@@ -820,6 +868,7 @@ public sealed partial class DashboardPage : Page
 
         using var session = new RepairSession();
         activeRepair = session;
+        ShowTab("health");
         ObserveRepair(session);
         RepairResultInfoBar.IsOpen = false;
         pendingRepairSummary = null;
@@ -869,6 +918,7 @@ public sealed partial class DashboardPage : Page
                         PrimaryButtonText = AppLocalization.Get("DashboardRemoveMissingSites"),
                         CloseButtonText = AppLocalization.Get("DashboardKeepMissingSites"),
                         DefaultButton = ContentDialogButton.Close,
+                        PrimaryButtonStyle = DangerStyles.Button,
                         XamlRoot = dialogRoot
                     };
                     try
@@ -970,6 +1020,13 @@ public sealed partial class DashboardPage : Page
         ));
 
         var summary = AppLocalization.Format("DashboardRepairAllSummary", repaired, skipped.Count);
+        App.MainWindow.RecordActivity(new ActivityEvent(
+            ActivityEventKind.Repair,
+            AppLocalization.Get(cancelled ? "TimelineRepairCancelled" : "TimelineRepairFinished"),
+            summary,
+            DateTimeOffset.Now,
+            "dashboard"
+        ));
         if (skipped.Count > 0)
         {
             summary += Environment.NewLine + Environment.NewLine
@@ -1575,6 +1632,7 @@ public sealed partial class DashboardPage : Page
         if (activeRepair is not null)
         {
             // Repair all is already fixing this; show its progress instead of racing it.
+            ShowTab("health");
             RepairProgressInfoBar.StartBringIntoView();
             return;
         }

@@ -371,7 +371,7 @@ public sealed partial class DebuggerPage : Page
 
     private async void DeleteProfiles_Click(object sender, RoutedEventArgs e)
     {
-        var confirm = new ContentDialog
+        var confirm = DangerStyles.Apply(new ContentDialog
         {
             XamlRoot = XamlRoot,
             Title = AppLocalization.Get("DebuggerDeleteProfilesTitle"),
@@ -379,7 +379,7 @@ public sealed partial class DebuggerPage : Page
             PrimaryButtonText = AppLocalization.Get("DebuggerDeleteProfilesConfirm"),
             CloseButtonText = AppLocalization.Get("SitesCancel"),
             DefaultButton = ContentDialogButton.Close
-        };
+        });
         if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
         await Task.Run(() => profileStore.DeleteAll());
         await RefreshProfilesAsync();
@@ -402,7 +402,7 @@ public sealed partial class DebuggerPage : Page
         }
         ProfilesStatusText.Text = AppLocalization.Format("DebuggerProfilesCount", Profiles.Count);
 
-        var dialog = new ContentDialog
+        var dialog = DangerStyles.Apply(new ContentDialog
         {
             XamlRoot = XamlRoot,
             Title = AppLocalization.Format(
@@ -414,7 +414,7 @@ public sealed partial class DebuggerPage : Page
             PrimaryButtonText = AppLocalization.Get("DebuggerProfileDelete"),
             CloseButtonText = AppLocalization.Get("CommonClose"),
             DefaultButton = ContentDialogButton.Close
-        };
+        });
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         try
         {

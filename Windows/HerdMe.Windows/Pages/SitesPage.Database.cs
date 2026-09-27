@@ -553,7 +553,7 @@ public sealed partial class SitesPage
         InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
         var file = await picker.PickSingleFileAsync();
         if (file is null) return;
-        var confirmation = new ContentDialog
+        var confirmation = DangerStyles.Apply(new ContentDialog
         {
             FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
@@ -562,7 +562,7 @@ public sealed partial class SitesPage
             PrimaryButtonText = AppLocalization.Get("SitesDatabaseRestore"),
             CloseButtonText = AppLocalization.Get("SitesCancel"),
             DefaultButton = ContentDialogButton.Close
-        };
+        });
         if (await confirmation.ShowAsync() != ContentDialogResult.Primary) return;
         await RunDatabaseImportOperationAsync(
             AppLocalization.Get("SitesDatabaseRestoring"),
@@ -829,7 +829,7 @@ public sealed partial class SitesPage
         SiteDatabaseProvisioning provisioning
     )
     {
-        var confirmation = new ContentDialog
+        var confirmation = DangerStyles.Apply(new ContentDialog
         {
             FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
@@ -838,7 +838,7 @@ public sealed partial class SitesPage
             PrimaryButtonText = AppLocalization.Get("SitesDatabaseDelete"),
             CloseButtonText = AppLocalization.Get("SitesCancel"),
             DefaultButton = ContentDialogButton.Close
-        };
+        });
         if (await confirmation.ShowAsync() != ContentDialogResult.Primary) return;
         var succeeded = await RunSiteOperationAsync(
             AppLocalization.Get("SitesDatabaseDeleting"),

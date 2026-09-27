@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
+using HerdMe.Windows.Views;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System.Runtime.InteropServices;
@@ -236,7 +237,7 @@ public sealed partial class MailPage : Page
     {
         if (mutating || !loaded || XamlRoot is not { } xamlRoot) return;
         var generation = pageGeneration;
-        var dialog = new ContentDialog
+        var dialog = DangerStyles.Apply(new ContentDialog
         {
             FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = xamlRoot,
@@ -249,7 +250,7 @@ public sealed partial class MailPage : Page
             PrimaryButtonText = AppLocalization.Get("CommonDelete"),
             CloseButtonText = AppLocalization.Get("CommonCancel"),
             DefaultButton = ContentDialogButton.Close
-        };
+        });
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         if (!loaded || generation != pageGeneration) return;
         await MutateAsync(mail.Clear);
@@ -403,6 +404,7 @@ public sealed partial class MailPage : Page
             : AppLocalization.Format("MailTo", CapturePreview.LimitText(message.RecipientsText, 4_096).Text);
         BodyText.Text = string.Empty;
         RawText.Text = string.Empty;
+        ClearInspection(message is not null);
         PreviewSizeNotice.IsOpen = false;
         DeleteButton.IsEnabled = !mutating && message is not null;
         ExportButton.IsEnabled = !exporting && message is not null;
@@ -425,10 +427,16 @@ public sealed partial class MailPage : Page
         }
         try
         {
-            var preview = await Task.Run(() => CapturePreview.ForMail(mail.Complete(message) ?? message));
+            var (preview, inspection) = await Task.Run(() =>
+            {
+                var complete = mail.Complete(message) ?? message;
+                return (CapturePreview.ForMail(complete), Inspect(complete));
+            });
             if (!loaded || generation != previewGeneration || !IsSelected(message)) return;
             BodyText.Text = preview.Body;
             RawText.Text = preview.Raw;
+            RenderInspection(inspection.Headers, inspection.Links);
+            ApplyPreviewWidth();
             PreviewSizeNotice.IsOpen = preview.IsTruncated;
             HtmlPreview.Visibility = Visibility.Visible;
             await HtmlPreview.EnsureCoreWebView2Async();

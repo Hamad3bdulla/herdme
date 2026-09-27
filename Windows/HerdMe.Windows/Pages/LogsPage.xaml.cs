@@ -380,14 +380,14 @@ public sealed partial class LogsPage : Page
     private void ShowText(string text, bool scrollToEnd)
     {
         if (string.Equals(text, displayedText, StringComparison.Ordinal)) return;
-        // Follow the end of the log only when the reader is already there.
+        // Follow the end of the log only when the reader is already there (or Follow is on).
         var atBottom = LogScroll.ScrollableHeight <= 0
             || LogScroll.VerticalOffset >= LogScroll.ScrollableHeight - BottomTolerance;
         displayedText = text;
         LogContentText.Text = text;
-        if (!atBottom && !scrollToEnd) return;
-        LogScroll.UpdateLayout();
-        LogScroll.ChangeView(null, LogScroll.ScrollableHeight, null, true);
+        ApplyHighlights(text);
+        if (!atBottom && !scrollToEnd && !FollowTail) return;
+        ScrollToEnd();
     }
 
     private void UpdateTailNotice()
@@ -408,6 +408,7 @@ public sealed partial class LogsPage : Page
         contentTruncated = false;
         displayTrimmed = false;
         LogContentText.Text = string.Empty;
+        ApplyHighlights(string.Empty);
         LogTitleText.Text = AppLocalization.Get("LogsSelectLog");
         TailNoticeText.Visibility = Visibility.Collapsed;
         ShowLaravelSummary(null);

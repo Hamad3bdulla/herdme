@@ -5,6 +5,34 @@ Semantic Versioning for public releases.
 
 ## [Unreleased]
 
+### Added
+
+- Windows: a Health tab on the dashboard, quick actions, and a "This session"
+  timeline; fix-it cards name the program holding port 443 or 80.
+- Windows: an in-app language setting (Windows, English, Arabic), compact
+  density, reduce motion, and high-contrast and text-scale fixes.
+- Windows: a status bar with environment, ports, and downloads, plus taskbar
+  progress for downloads.
+- Windows: a What's new dialog after upgrades and one-time tips for new
+  features.
+- Windows: Mail Headers and Links tabs with a static link check and a phone
+  width preview; a browsable tree for dumps; coloured logs with follow tail
+  and jump to next error; coloured Artisan output with Stop and Run again.
+- Windows: pick a site's PHP version straight from the Sites list.
+
+### Changed
+
+- Windows: destructive buttons share one red style, Cancel stays the default,
+  and forms with unsaved changes ask before closing.
+
+## [0.1.27] - 2026-09-27
+
+### Added
+
+- Windows: dashboard health and session activity, improved onboarding and settings,
+  richer mail and dump inspection, highlighted logs and Artisan output, and PHP
+  version selection from the Sites list.
+
 ## [0.1.23] - 2026-09-26
 
 ### Changed

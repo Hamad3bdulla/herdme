@@ -91,7 +91,7 @@
                                 </ToolTipService.ToolTip>
                                 <SymbolIcon Symbol="Refresh" />
                             </Button>
-                            <Button x:Name="ClearButton" x:Uid="MailClearButton" Click="Clear_Click" AutomationProperties.Name="Delete all messages" Style="{StaticResource ToolbarIconButtonStyle}">
+                            <Button x:Name="ClearButton" x:Uid="MailClearButton" Click="Clear_Click" AutomationProperties.Name="Delete all messages" Style="{StaticResource DangerToolbarIconButtonStyle}">
                                 <ToolTipService.ToolTip>
                                     <ToolTip><TextBlock x:Uid="MailClearTooltip" Text="Delete all messages" /></ToolTip>
                                 </ToolTipService.ToolTip>
@@ -160,13 +160,19 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="SubjectText" x:Uid="MailSelectMessageInitial" Text="Select a message" Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                            <ToggleButton x:Name="MobileWidthToggle" x:Uid="MailMobileWidthToggle" IsEnabled="False" Click="MobileWidth_Click" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Preview at phone width" AutomationProperties.AutomationId="MailMobileWidthToggle">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip><TextBlock x:Uid="MailMobileWidthTooltip" Text="Preview at phone width (375 px)" /></ToolTip>
+                                </ToolTipService.ToolTip>
+                                <FontIcon Glyph="&#xE8EA;" FontSize="16" />
+                            </ToggleButton>
                             <Button x:Name="ExportButton" x:Uid="MailExportButton" Click="Export_Click" IsEnabled="False" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Export full message">
                                 <ToolTipService.ToolTip>
                                     <ToolTip><TextBlock x:Uid="MailExportTooltip" Text="Export full message" /></ToolTip>
                                 </ToolTipService.ToolTip>
                                 <SymbolIcon Symbol="Save" />
                             </Button>
-                            <Button x:Name="DeleteButton" x:Uid="MailDeleteButton" Click="Delete_Click" IsEnabled="False" AutomationProperties.Name="Delete message" Style="{StaticResource ToolbarIconButtonStyle}">
+                            <Button x:Name="DeleteButton" x:Uid="MailDeleteButton" Click="Delete_Click" IsEnabled="False" AutomationProperties.Name="Delete message" Style="{StaticResource DangerToolbarIconButtonStyle}">
                                 <ToolTipService.ToolTip>
                                     <ToolTip><TextBlock x:Uid="MailDeleteTooltip" Text="Delete message" /></ToolTip>
                                 </ToolTipService.ToolTip>
@@ -177,9 +183,9 @@
                     <TextBlock x:Name="SenderText" Grid.Row="1" Style="{StaticResource SettingsRowDescriptionStyle}" MaxLines="2" TextTrimming="CharacterEllipsis" IsTextSelectionEnabled="True" />
                     <TextBlock x:Name="RecipientText" Grid.Row="2" Style="{StaticResource SettingsRowDescriptionStyle}" MaxLines="2" TextTrimming="CharacterEllipsis" IsTextSelectionEnabled="True" />
                     <InfoBar x:Name="PreviewSizeNotice" x:Uid="MailPreviewSizeNotice" Grid.Row="3" IsOpen="False" IsClosable="False" Severity="Informational" Message="This view is shortened. Export the message to save its full contents." />
-                    <TabView Grid.Row="4" Margin="-8,4,0,0" IsAddTabButtonVisible="False">
+                    <TabView x:Name="MailViewTabs" Grid.Row="4" Margin="-8,4,0,0" IsAddTabButtonVisible="False">
                         <TabViewItem x:Uid="MailPreviewTab" Header="Preview" IsClosable="False">
-                            <Grid>
+                            <Grid x:Name="PreviewHost">
                                 <WebView2
                                     x:Name="HtmlPreview"
                                     Visibility="Collapsed"
@@ -209,6 +215,19 @@
                         <TabViewItem x:Uid="MailTextTab" Header="Text" IsClosable="False">
                             <ScrollViewer>
                                 <TextBlock x:Name="BodyText" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                            </ScrollViewer>
+                        </TabViewItem>
+                        <TabViewItem x:Uid="MailHeadersTab" Header="Headers" IsClosable="False">
+                            <ScrollViewer>
+                                <StackPanel x:Name="HeaderList" Spacing="6" Padding="0,8,8,8" AutomationProperties.AutomationId="MailHeaderList" />
+                            </ScrollViewer>
+                        </TabViewItem>
+                        <TabViewItem x:Name="LinksTab" x:Uid="MailLinksTab" Header="Links" IsClosable="False">
+                            <ScrollViewer>
+                                <StackPanel Spacing="8" Padding="0,8,8,8">
+                                    <TextBlock x:Name="LinkSummaryText" TextWrapping="Wrap" Style="{StaticResource CaptionTextStyle}" />
+                                    <StackPanel x:Name="LinkList" Spacing="6" AutomationProperties.AutomationId="MailLinkList" />
+                                </StackPanel>
                             </ScrollViewer>
                         </TabViewItem>
                         <TabViewItem x:Uid="MailRawTab" Header="Raw" IsClosable="False">

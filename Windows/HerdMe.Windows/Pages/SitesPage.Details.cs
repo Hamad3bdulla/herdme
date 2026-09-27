@@ -451,6 +451,7 @@ public sealed partial class SitesPage
         try
         {
             Process.Start(new ProcessStartInfo(SiteUri(selectedSite).AbsoluteUri) { UseShellExecute = true });
+            App.MainWindow.RememberOpenedSite(selectedSite.Path);
         }
         catch (Exception error) when (error is Win32Exception or InvalidOperationException)
         {

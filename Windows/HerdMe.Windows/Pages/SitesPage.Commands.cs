@@ -367,7 +367,7 @@ public sealed partial class SitesPage
                         var result = await ArtisanCommandRunner.RunAsync(
                             php,
                             site.Path,
-                            command.Arguments,
+                            AnsiParser.WithArtisanColors(command.Arguments),
                             environmentVariables,
                             command.Timeout,
                             console.OutputProgress(),
@@ -616,15 +616,4 @@ public sealed partial class SitesPage
         "custom" => "SitesArtisanPresetCustom",
         _ => throw new ArgumentOutOfRangeException(nameof(presetId), presetId, null)
     };
-
-    private static void AppendCommandOutput(TextBox outputBox, string value)
-    {
-        const int maximumCharacters = 1 * 1_024 * 1_024;
-        if (value.Length == 0) return;
-        var combined = outputBox.Text + value;
-        outputBox.Text = combined.Length > maximumCharacters
-            ? combined[^maximumCharacters..]
-            : combined;
-        outputBox.Select(outputBox.Text.Length, 0);
-    }
 }

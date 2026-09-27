@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
+using HerdMe.Windows.Views;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -90,7 +91,7 @@ public sealed partial class NodePage : Page
         if ((sender as Button)?.Tag is not string major) return;
         var version = installer.InstalledVersion(major);
         if (version is null) return;
-        var dialog = new ContentDialog
+        var dialog = DangerStyles.Apply(new ContentDialog
         {
             FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
@@ -99,7 +100,7 @@ public sealed partial class NodePage : Page
             PrimaryButtonText = AppLocalization.Get("CommonDelete"),
             CloseButtonText = AppLocalization.Get("CommonCancel"),
             DefaultButton = ContentDialogButton.Close
-        };
+        });
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         try
         {

@@ -76,6 +76,29 @@ internal static class TaskbarOverlay
         }
     }
 
+    // Download progress on the taskbar button. Same rules as the overlay: UI thread, best effort.
+    [SupportedOSPlatform("windows")]
+    public static void ApplyProgress(IntPtr window, TaskbarProgressState state, ulong completed, ulong total)
+    {
+        if (window == IntPtr.Zero) return;
+        object? instance = null;
+        try
+        {
+            instance = new TaskbarList();
+            var list = (ITaskbarList3)instance;
+            if (list.HrInit() < 0) return;
+            list.SetProgressState(window, (int)state);
+            if (state == TaskbarProgressState.Normal && total > 0) list.SetProgressValue(window, completed, total);
+        }
+        catch (Exception error) when (error is COMException or InvalidCastException)
+        {
+        }
+        finally
+        {
+            if (instance is not null) Marshal.ReleaseComObject(instance);
+        }
+    }
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr LoadImage(
         IntPtr instance,

@@ -58,6 +58,7 @@
     <Grid x:Name="DashboardLayout" Padding="{StaticResource PagePadding}" RowSpacing="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -89,8 +90,33 @@
             </StackPanel>
         </Grid>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="16" Padding="0,0,0,8">
+        <!-- Overview keeps the at-a-glance cards; Health holds the issue list and every repair. -->
+        <SelectorBar
+            x:Name="DashboardTabs"
+            Grid.Row="1"
+            Margin="-12,-6,0,0"
+            AutomationProperties.AutomationId="DashboardTabs"
+            SelectionChanged="DashboardTabs_SelectionChanged">
+            <SelectorBarItem x:Uid="DashboardTabOverview" x:Name="OverviewTab" Tag="overview" Text="Overview" IsSelected="True" />
+            <SelectorBarItem x:Uid="DashboardTabHealth" x:Name="HealthTab" Tag="health" Text="Health" />
+        </SelectorBar>
+        <TeachingTip
+            x:Name="HealthTabTip"
+            x:Uid="HealthTabTip"
+            Grid.Row="1"
+            Target="{x:Bind HealthTab}"
+            Title="Health has its own tab"
+            Subtitle="Every warning and repair now lives here. The Overview strip tells you when something needs a look."
+            AutomationProperties.AutomationId="HealthTabTip" />
+
+        <ScrollViewer x:Name="DashboardScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <Grid>
+            <StackPanel
+                x:Name="HealthPanel"
+                AutomationProperties.AutomationId="DashboardHealthPanel"
+                Spacing="16"
+                Padding="0,0,0,8"
+                Visibility="Collapsed">
                 <!-- Repair all runs in the background; this shows the current step and lets the user cancel. -->
                 <InfoBar
                     x:Uid="DashboardRepairProgressInfoBar"
@@ -211,6 +237,130 @@
                         </StackPanel>
                     </Grid>
                 </Border>
+            </StackPanel>
+
+            <StackPanel
+                x:Name="OverviewPanel"
+                AutomationProperties.AutomationId="DashboardOverviewPanel"
+                Spacing="16"
+                Padding="0,0,0,8">
+                <!-- One line that says whether anything needs attention; the Health tab has the details. -->
+                <Button
+                    x:Uid="DashboardHealthStrip"
+                    x:Name="HealthStrip"
+                    AutomationProperties.AutomationId="DashboardHealthStrip"
+                    AutomationProperties.Name="Open health"
+                    Click="HealthStrip_Click"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Stretch"
+                    Padding="16,12,16,12"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    CornerRadius="{StaticResource CardCornerRadius}">
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border
+                            x:Name="HealthStripIconTile"
+                            Style="{StaticResource StatusPillNeutralStyle}"
+                            Width="32"
+                            Height="32"
+                            Padding="0"
+                            CornerRadius="16">
+                            <FontIcon
+                                x:Name="HealthStripGlyph"
+                                Glyph="&#xE946;"
+                                FontSize="14"
+                                Style="{StaticResource StatusGlyphNeutralStyle}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                            <TextBlock
+                                x:Name="HealthStripTitle"
+                                FontWeight="SemiBold"
+                                TextWrapping="Wrap"
+                                AutomationProperties.LiveSetting="Polite" />
+                            <TextBlock
+                                x:Name="HealthStripMessage"
+                                Style="{StaticResource SecondaryTextStyle}"
+                                FontSize="12"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                        </StackPanel>
+                        <FontIcon Grid.Column="2" Style="{StaticResource DashboardCardChevronStyle}" VerticalAlignment="Center" Margin="0" />
+                    </Grid>
+                </Button>
+
+                <!-- Quick actions: the four things people come to the dashboard to do. -->
+                <Grid x:Name="QuickActionsGrid" ColumnSpacing="8" RowSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:Name="QuickColumn0" Width="*" />
+                        <ColumnDefinition x:Name="QuickColumn1" Width="*" />
+                        <ColumnDefinition x:Name="QuickColumn2" Width="*" />
+                        <ColumnDefinition x:Name="QuickColumn3" Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Button
+                        x:Uid="DashboardQuickCreateButton"
+                        x:Name="QuickCreateButton"
+                        AutomationProperties.AutomationId="DashboardQuickCreate"
+                        AutomationProperties.Name="New Laravel site"
+                        Click="QuickCreate_Click"
+                        HorizontalAlignment="Stretch"
+                        Style="{StaticResource AccentButtonStyle}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <SymbolIcon Symbol="Add" />
+                            <TextBlock x:Uid="DashboardQuickCreateText" Text="New Laravel site" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        x:Uid="DashboardQuickParkButton"
+                        x:Name="QuickParkButton"
+                        Grid.Column="1"
+                        AutomationProperties.AutomationId="DashboardQuickPark"
+                        AutomationProperties.Name="Park a folder"
+                        Click="QuickPark_Click"
+                        HorizontalAlignment="Stretch">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <SymbolIcon Symbol="NewFolder" />
+                            <TextBlock x:Uid="DashboardQuickParkText" Text="Park a folder" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        x:Uid="DashboardQuickLastSiteButton"
+                        x:Name="QuickLastSiteButton"
+                        Grid.Column="2"
+                        AutomationProperties.AutomationId="DashboardQuickLastSite"
+                        AutomationProperties.Name="Open last site"
+                        Click="QuickLastSite_Click"
+                        HorizontalAlignment="Stretch"
+                        IsEnabled="False">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <SymbolIcon Symbol="World" />
+                            <TextBlock x:Name="QuickLastSiteText" x:Uid="DashboardQuickLastSiteText" Text="Open last site" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        x:Uid="DashboardQuickPowerButton"
+                        x:Name="QuickPowerButton"
+                        Grid.Column="3"
+                        AutomationProperties.AutomationId="DashboardQuickPower"
+                        AutomationProperties.Name="Stop all"
+                        Click="QuickPower_Click"
+                        HorizontalAlignment="Stretch">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <SymbolIcon x:Name="QuickPowerIcon" Symbol="Stop" />
+                            <TextBlock x:Name="QuickPowerText" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
 
                 <Grid x:Name="SummaryCardsGrid" ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
@@ -453,7 +603,22 @@
                         </StackPanel>
                     </Border>
                 </Grid>
+
+                <!-- Timeline of what happened this session: mail, dumps, stops, repairs. -->
+                <TextBlock x:Uid="DashboardTimelineTitle" Text="This session" Style="{StaticResource SectionHeaderStyle}" />
+                <Border x:Name="TimelineCard" Style="{StaticResource CardStyle}" AutomationProperties.AutomationId="DashboardTimeline">
+                    <StackPanel Spacing="10">
+                        <StackPanel x:Name="TimelineItems" Spacing="10" />
+                        <TextBlock
+                            x:Uid="DashboardTimelineEmpty"
+                            x:Name="TimelineEmptyText"
+                            Text="Nothing yet. Mail, dumps, stops and repairs from this session appear here."
+                            Style="{StaticResource SecondaryTextStyle}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
+            </Grid>
         </ScrollViewer>
     </Grid>
 </Page>

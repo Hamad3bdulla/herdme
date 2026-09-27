@@ -54,7 +54,7 @@
                                 ItemsSource="{x:Bind History}"
                                 DisplayMemberPath="Preview"
                                 SelectionChanged="HistoryBox_SelectionChanged" />
-                            <Button x:Name="ClearHistoryButton" x:Uid="TinkerClearHistoryButton" Click="ClearHistory_Click" AutomationProperties.Name="Clear recent code" Style="{StaticResource ToolbarIconButtonStyle}">
+                            <Button x:Name="ClearHistoryButton" x:Uid="TinkerClearHistoryButton" Click="ClearHistory_Click" AutomationProperties.Name="Clear recent code" Style="{StaticResource DangerToolbarIconButtonStyle}">
                                 <SymbolIcon Symbol="Delete" />
                             </Button>
                         </StackPanel>

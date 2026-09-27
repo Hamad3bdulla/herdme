@@ -78,7 +78,7 @@
                                 </ToolTipService.ToolTip>
                                 <SymbolIcon Symbol="Refresh" />
                             </Button>
-                            <Button x:Name="ClearButton" x:Uid="DumpsClearButton" Click="Clear_Click" AutomationProperties.Name="Delete all dumps" Style="{StaticResource ToolbarIconButtonStyle}">
+                            <Button x:Name="ClearButton" x:Uid="DumpsClearButton" Click="Clear_Click" AutomationProperties.Name="Delete all dumps" Style="{StaticResource DangerToolbarIconButtonStyle}">
                                 <ToolTipService.ToolTip>
                                     <ToolTip><TextBlock x:Uid="DumpsClearTooltip" Text="Delete all dumps" /></ToolTip>
                                 </ToolTipService.ToolTip>
@@ -133,9 +133,49 @@
                     </Grid>
                     <InfoBar x:Name="PreviewSizeNotice" x:Uid="DumpsPreviewSizeNotice" Grid.Row="1" Margin="12,0,12,8" IsOpen="False" IsClosable="False" Severity="Informational" Message="This view is shortened. Export the dump to save its full contents." />
                     <Border Grid.Row="2" Background="{ThemeResource SubtleSurfaceBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" CornerRadius="0,0,8,8">
-                        <ScrollViewer Padding="16,12,16,12">
-                            <TextBlock x:Name="SummaryText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontFamily="Cascadia Mono, Consolas" FontSize="13" FlowDirection="LeftToRight" />
-                        </ScrollViewer>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <!-- Tree for browsing nested arrays, objects and JSON strings; Text is the full rendering. -->
+                            <Grid Padding="8,2,12,0" ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <SelectorBar x:Name="DumpViewTabs" AutomationProperties.AutomationId="DumpViewTabs" SelectionChanged="DumpViewTabs_SelectionChanged">
+                                    <SelectorBarItem x:Name="DumpTreeTab" x:Uid="DumpTreeTab" Tag="tree" Text="Tree" IsSelected="True" />
+                                    <SelectorBarItem x:Name="DumpTextTab" x:Uid="DumpTextTab" Tag="text" Text="Text" />
+                                </SelectorBar>
+                                <StackPanel x:Name="DumpTreeTools" Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                    <Button x:Uid="DumpExpandAllButton" Click="DumpExpandAll_Click" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Expand all">
+                                        <ToolTipService.ToolTip>
+                                            <ToolTip><TextBlock x:Uid="DumpExpandAllTooltip" Text="Expand all" /></ToolTip>
+                                        </ToolTipService.ToolTip>
+                                        <FontIcon Glyph="&#xE8A9;" FontSize="14" />
+                                    </Button>
+                                    <Button x:Uid="DumpCollapseAllButton" Click="DumpCollapseAll_Click" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Collapse all">
+                                        <ToolTipService.ToolTip>
+                                            <ToolTip><TextBlock x:Uid="DumpCollapseAllTooltip" Text="Collapse all" /></ToolTip>
+                                        </ToolTipService.ToolTip>
+                                        <FontIcon Glyph="&#xE8A8;" FontSize="14" />
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                            <TreeView
+                                x:Name="DumpTreeView"
+                                Grid.Row="1"
+                                Padding="4,4,8,8"
+                                SelectionMode="None"
+                                FlowDirection="LeftToRight"
+                                Expanding="DumpTreeView_Expanding"
+                                AutomationProperties.AutomationId="DumpTreeView" />
+                            <TextBlock x:Name="DumpTreeEmpty" x:Uid="DumpTreeEmpty" Grid.Row="1" Margin="16" Visibility="Collapsed" Text="This dump has no structure to browse. Switch to Text." TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
+                            <ScrollViewer x:Name="SummaryScroll" Grid.Row="1" Padding="16,12,16,12" Visibility="Collapsed">
+                                <TextBlock x:Name="SummaryText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontFamily="Cascadia Mono, Consolas" FontSize="13" FlowDirection="LeftToRight" />
+                            </ScrollViewer>
+                        </Grid>
                     </Border>
                 </Grid>
             </Border>

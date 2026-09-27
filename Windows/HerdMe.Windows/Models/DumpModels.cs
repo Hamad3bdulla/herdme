@@ -137,7 +137,7 @@ internal sealed class PhpSerializedValue
             + Environment.NewLine + closingIndent + closing;
     }
 
-    private string ShortKey()
+    internal string ShortKey()
     {
         return Kind switch
         {

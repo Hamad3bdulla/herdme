@@ -1,5 +1,6 @@
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
+using HerdMe.Windows.Views;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -48,6 +49,12 @@ public sealed partial class AboutPage : Page
     private async void ReleaseNotes_Click(object sender, RoutedEventArgs e)
     {
         await OpenProductLinkAsync(ProductLinks.ReleaseNotes);
+    }
+
+    private async void WhatsNew_Click(object sender, RoutedEventArgs e)
+    {
+        if (XamlRoot is null) return;
+        await WhatsNewDialog.ShowAsync(XamlRoot, updateManager.CurrentVersion);
     }
 
     private async void CopyVersion_Click(object sender, RoutedEventArgs e)

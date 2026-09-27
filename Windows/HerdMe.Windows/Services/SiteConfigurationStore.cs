@@ -191,6 +191,31 @@ public sealed class SiteConfigurationStore
         Update(settings => settings.ShowNotifications = showNotifications);
     }
 
+    public void UpdateUiLanguage(string? language)
+    {
+        var normalized = UiLanguageSettings.Normalize(language);
+        Update(settings => settings.UiLanguage = normalized);
+    }
+
+    public void UpdateReduceMotion(bool reduceMotion)
+    {
+        Update(settings => settings.ReduceMotion = reduceMotion);
+    }
+
+    public void UpdateLastSeenVersion(string version)
+    {
+        Update(settings => settings.LastSeenVersion = version.Trim());
+    }
+
+    public void MarkTipSeen(string tipId)
+    {
+        Update(settings =>
+        {
+            settings.SeenTips ??= [];
+            if (!settings.SeenTips.Contains(tipId, StringComparer.Ordinal)) settings.SeenTips.Add(tipId);
+        });
+    }
+
     public void UpdateTld(string tld)
     {
         Update(settings => settings.Tld = tld);
@@ -352,11 +377,16 @@ public sealed class SiteConfigurationStore
             ShowPreviews = settings.ShowPreviews,
             CompactMode = settings.CompactMode,
             ShowNotifications = settings.ShowNotifications,
+            UiLanguage = UiLanguageSettings.Normalize(settings.UiLanguage),
+            ReduceMotion = settings.ReduceMotion,
             AutomaticUpdates = settings.AutomaticUpdates,
             UpdateChannel = settings.UpdateChannel.Equals("Beta", StringComparison.OrdinalIgnoreCase)
                 ? "Beta"
                 : "Stable",
-            OnboardingCompleted = settings.OnboardingCompleted
+            OnboardingCompleted = settings.OnboardingCompleted,
+            LastSeenVersion = (settings.LastSeenVersion ?? string.Empty).Trim(),
+            SeenTips = (settings.SeenTips ?? []).Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.Ordinal).Take(64).ToList()
         };
     }
 

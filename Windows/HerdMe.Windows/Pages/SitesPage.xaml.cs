@@ -6,6 +6,7 @@ using System.Text;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
 using HerdMe.Windows.ViewModels;
+using HerdMe.Windows.Views;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -325,7 +326,7 @@ public sealed partial class SitesPage : Page
 
     private async Task MoveSiteToRecycleBinAsync(SiteRecord site)
     {
-        var dialog = new ContentDialog
+        var dialog = DangerStyles.Apply(new ContentDialog
         {
             FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
@@ -334,7 +335,7 @@ public sealed partial class SitesPage : Page
             PrimaryButtonText = AppLocalization.Get("SitesMoveToRecycleBin"),
             CloseButtonText = AppLocalization.Get("CommonCancel"),
             DefaultButton = ContentDialogButton.Close
-        };
+        });
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
         try

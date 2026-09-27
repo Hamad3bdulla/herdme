@@ -29,6 +29,10 @@
             <SolidColorBrush x:Key="FrameworkNodeTintBrush" Color="#E6F4E4" />
             <SolidColorBrush x:Key="FrameworkNodeInkBrush" Color="#2F7A2A" />
             <SolidColorBrush x:Key="SkeletonBrush" Color="#E8EAED" />
+            <SolidColorBrush x:Key="DangerFillBrush" Color="#C42B1C" />
+            <SolidColorBrush x:Key="DangerOnFillBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="DangerInkBrush" Color="#C42B1C" />
+            <SolidColorBrush x:Key="DangerBorderBrush" Color="Transparent" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Default">
             <SolidColorBrush x:Key="WorkspaceBackgroundBrush" Color="#202124" />
@@ -57,6 +61,10 @@
             <SolidColorBrush x:Key="FrameworkNodeTintBrush" Color="#233A22" />
             <SolidColorBrush x:Key="FrameworkNodeInkBrush" Color="#93D98C" />
             <SolidColorBrush x:Key="SkeletonBrush" Color="#33363B" />
+            <SolidColorBrush x:Key="DangerFillBrush" Color="#FF99A4" />
+            <SolidColorBrush x:Key="DangerOnFillBrush" Color="#1A1A1A" />
+            <SolidColorBrush x:Key="DangerInkBrush" Color="#FF99A4" />
+            <SolidColorBrush x:Key="DangerBorderBrush" Color="Transparent" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
             <SolidColorBrush x:Key="WorkspaceBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
@@ -85,6 +93,10 @@
             <SolidColorBrush x:Key="FrameworkNodeTintBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="FrameworkNodeInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SkeletonBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
+            <SolidColorBrush x:Key="DangerFillBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="DangerOnFillBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <SolidColorBrush x:Key="DangerInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="DangerBorderBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
@@ -374,12 +386,80 @@
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Padding" Value="10,5" />
     </Style>
+    <!--
+        Destructive actions (delete, clear, stop all, move to Recycle Bin) use one red button,
+        both inline and as the primary button of their confirmation dialog.
+        See Views/DangerStyles.cs; the dialog default is always Cancel.
+    -->
+    <Style x:Key="DangerButtonStyle" TargetType="Button">
+        <Setter Property="Padding" Value="11,5,11,6" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualMargin" Value="-3" />
+        <Setter Property="Background" Value="{ThemeResource DangerFillBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource DangerOnFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource DangerBorderBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <ContentPresenter
+                        x:Name="ContentPresenter"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        Padding="{TemplateBinding Padding}"
+                        Foreground="{TemplateBinding Foreground}"
+                        Content="{TemplateBinding Content}"
+                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                        ContentTransitions="{TemplateBinding ContentTransitions}"
+                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                        AutomationProperties.AccessibilityView="Raw">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="ContentPresenter.Opacity" Value="0.9" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="ContentPresenter.Opacity" Value="0.75" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="ContentPresenter.Background" Value="{ThemeResource ControlFillColorDisabledBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource TextFillColorDisabledBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </ContentPresenter>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
     <Style x:Key="ToolbarIconButtonStyle" TargetType="Button">
         <Setter Property="Width" Value="36" />
         <Setter Property="Height" Value="36" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <!-- Icon-only and menu versions of a destructive action: same red, same confirmation. -->
+    <Style x:Key="DangerToolbarIconButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarIconButtonStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource DangerInkBrush}" />
+    </Style>
+    <Style x:Key="DangerMenuFlyoutItemStyle" TargetType="MenuFlyoutItem">
+        <Setter Property="Foreground" Value="{ThemeResource DangerInkBrush}" />
     </Style>
     <Style TargetType="ListViewItem">
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />

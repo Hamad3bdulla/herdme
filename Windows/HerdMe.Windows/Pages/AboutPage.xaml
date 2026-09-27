@@ -40,6 +40,12 @@
                                     <TextBlock x:Uid="AboutCopyVersionButtonText" Text="Copy Version" />
                                 </StackPanel>
                             </Button>
+                            <Button x:Name="WhatsNewButton" x:Uid="AboutWhatsNewButton" AutomationProperties.AutomationId="AboutWhatsNewButton" AutomationProperties.Name="What's new" Click="WhatsNew_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE789;" FontSize="14" />
+                                    <TextBlock x:Uid="AboutWhatsNewButtonText" Text="What's new" />
+                                </StackPanel>
+                            </Button>
                             <Grid Width="20" Height="20" VerticalAlignment="Center">
                                 <ProgressRing x:Name="UpdateProgress" Width="18" Height="18" IsActive="False" Visibility="Collapsed" />
                             </Grid>

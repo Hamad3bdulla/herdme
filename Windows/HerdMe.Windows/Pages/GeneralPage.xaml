@@ -75,9 +75,59 @@
                                 <FontIcon Glyph="&#xE8A9;" Style="{StaticResource SettingsRowIconStyle}" />
                                 <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
                                     <TextBlock x:Uid="GeneralCompactModeTitle" Text="Compact interface" Style="{StaticResource SettingsRowTitleStyle}" />
-                                    <TextBlock x:Uid="GeneralCompactModeDescription" Text="Use tighter spacing on sites and dashboard pages." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                    <TextBlock x:Uid="GeneralCompactModeDescription" Text="Use tighter spacing on every page. Lists and forms switch fully the next time HerdMe starts." Style="{StaticResource SettingsRowDescriptionStyle}" />
                                 </StackPanel>
                                 <ToggleSwitch x:Name="CompactModeToggle" Grid.Column="2" MinWidth="0" Toggled="CompactModeToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE8C1;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralLanguageTitle" Text="Language" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Uid="GeneralLanguageDescription" Text="HerdMe follows Windows unless you pick a language here." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                    <TextBlock
+                                        x:Uid="GeneralLanguageRestartNote"
+                                        x:Name="LanguageRestartNote"
+                                        Text="Quit HerdMe from the tray and open it again to switch the language."
+                                        Visibility="Collapsed"
+                                        Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                        Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <ComboBox
+                                    x:Uid="GeneralLanguageBox"
+                                    x:Name="LanguageBox"
+                                    Grid.Column="2"
+                                    MinWidth="180"
+                                    VerticalAlignment="Center"
+                                    AutomationProperties.Name="Language"
+                                    AutomationProperties.AutomationId="GeneralLanguageBox"
+                                    SelectionChanged="LanguageBox_SelectionChanged" />
+                                <TeachingTip
+                                    x:Name="LanguageTip"
+                                    x:Uid="LanguageTip"
+                                    Target="{x:Bind LanguageBox}"
+                                    Title="Pick the app language"
+                                    Subtitle="HerdMe follows Windows by default. Choose English or Arabic here; it applies the next time HerdMe starts."
+                                    AutomationProperties.AutomationId="LanguageTip" />
+                            </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE916;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralReduceMotionTitle" Text="Reduce motion" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Uid="GeneralReduceMotionDescription" Text="Turn off page transitions and fades. HerdMe also does this when Windows animation effects are off." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="ReduceMotionToggle" x:Uid="ReduceMotionToggle" Grid.Column="2" MinWidth="0" AutomationProperties.Name="Reduce motion" Toggled="ReduceMotionToggle_Toggled" />
                             </Grid>
                             <Rectangle Style="{StaticResource CardDividerStyle}" />
                             <Grid Style="{StaticResource SettingsRowStyle}">

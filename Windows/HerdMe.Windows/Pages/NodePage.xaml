@@ -101,7 +101,7 @@
                                     AutomationProperties.Name="Delete this version"
                                     Click="Delete_Click"
                                     IsEnabled="{x:Bind IsInstalled}"
-                                    Style="{StaticResource ToolbarIconButtonStyle}">
+                                    Style="{StaticResource DangerToolbarIconButtonStyle}">
                                     <ToolTipService.ToolTip>
                                         <ToolTip><TextBlock x:Uid="NodeDeleteTooltip" Text="Delete this version" /></ToolTip>
                                     </ToolTipService.ToolTip>

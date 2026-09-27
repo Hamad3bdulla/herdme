@@ -84,6 +84,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>LICENSE</TargetPath>
     </Content>
+    <Content Include="..\..\CHANGELOG.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>CHANGELOG.md</TargetPath>
+    </Content>
     <Content Include="..\..\docs\THIRD_PARTY.md">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>THIRD_PARTY.md</TargetPath>

@@ -246,7 +246,8 @@
                                                     x:Uid="ServicesDeleteTooltip"
                                                     Text="Delete service instance"
                                                     Tag="{x:Bind Id}"
-                                                    Click="Delete_Click">
+                                                    Click="Delete_Click"
+                                                    Style="{StaticResource DangerMenuFlyoutItemStyle}">
                                                     <MenuFlyoutItem.Icon><SymbolIcon Symbol="Delete" /></MenuFlyoutItem.Icon>
                                                 </MenuFlyoutItem>
                                             </MenuFlyout>

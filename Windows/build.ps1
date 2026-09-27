@@ -234,6 +234,7 @@ foreach ($relativePath in @(
     "MRM.dll",
     "LICENSE",
     "THIRD_PARTY.md",
+    "CHANGELOG.md",
     "release-manifest.json"
 )) {
     $requiredPath = Join-Path $buildOutput $relativePath

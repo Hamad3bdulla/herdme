@@ -1,13 +1,13 @@
 {
   "releases": [
     {
-      "version": "0.1.26",
+      "version": "0.1.27",
       "build": 1,
       "channel": "stable",
-      "notes": "Improves Windows taskbar and tray states, onboarding and settings navigation, site filtering, dashboard presentation, and localized database actions. Windows-only unsigned preview.",
+      "notes": "Adds dashboard health and activity, improved onboarding and settings, richer mail and dump inspection, highlighted logs and Artisan output, and PHP version selection from the Sites list. Windows-only unsigned preview.",
       "downloadURLs": {
-        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.26/HerdMe-0.1.26-macOS.zip",
-        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.26/HerdMe-0.1.26-win-x64-setup.exe"
+        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.27/HerdMe-0.1.27-macOS.zip",
+        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.27/HerdMe-0.1.27-win-x64-setup.exe"
       }
     },
     {

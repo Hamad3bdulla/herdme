@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
+using HerdMe.Windows.Views;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.ApplicationModel.DataTransfer;
@@ -314,7 +315,7 @@ public sealed partial class ServicesPage : Page
         var content = new StackPanel { Spacing = 12 };
         content.Children.Add(new TextBlock { Text = AppLocalization.Get("ServicesRestoreNotice"), TextWrapping = TextWrapping.Wrap });
         content.Children.Add(picker);
-        var dialog = new ContentDialog
+        var dialog = DangerStyles.Apply(new ContentDialog
         {
             FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
@@ -324,7 +325,7 @@ public sealed partial class ServicesPage : Page
             CloseButtonText = AppLocalization.Get("CommonCancel"),
             IsPrimaryButtonEnabled = backups.Length > 0,
             DefaultButton = ContentDialogButton.Close
-        };
+        });
         if (await dialog.ShowAsync() != ContentDialogResult.Primary || picker.SelectedIndex < 0) return;
         using var cancellation = BeginOperation(AppLocalization.Get("ServicesRestoreData"));
         try { await manager.RestoreDataAsync(instance.Id, backups[picker.SelectedIndex], cancellation.Token); }
@@ -562,7 +563,7 @@ public sealed partial class ServicesPage : Page
     private async void Delete_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetInstance(sender, out var instance)) return;
-        var dialog = new ContentDialog
+        var dialog = DangerStyles.Apply(new ContentDialog
         {
             FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
@@ -571,7 +572,7 @@ public sealed partial class ServicesPage : Page
             PrimaryButtonText = AppLocalization.Get("CommonDelete"),
             CloseButtonText = AppLocalization.Get("CommonCancel"),
             DefaultButton = ContentDialogButton.Close
-        };
+        });
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         try
         {

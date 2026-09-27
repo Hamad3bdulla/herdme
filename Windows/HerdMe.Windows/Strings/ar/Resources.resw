@@ -795,7 +795,7 @@
   <data name="PhpExtensionToggleTooltip" xml:space="preserve"><value>تفعيل أو تعطيل هذه الإضافة لنسخة PHP المحددة</value></data>
   <data name="PhpExtensionBuiltInTooltip" xml:space="preserve"><value>هذه الإضافة مدمجة في PHP ولا يمكن تبديلها</value></data>
   <data name="GeneralCompactModeTitle.Text" xml:space="preserve"><value>واجهة مضغوطة</value></data>
-  <data name="GeneralCompactModeDescription.Text" xml:space="preserve"><value>استخدام مسافات أصغر في صفحتي المواقع ولوحة التحكم.</value></data>
+  <data name="GeneralCompactModeDescription.Text" xml:space="preserve"><value>استخدام مسافات أصغر في كل الصفحات. تتحول القوائم والنماذج بالكامل عند تشغيل HerdMe في المرة القادمة.</value></data>
   <data name="DashboardRepairAction" xml:space="preserve"><value>إصلاح</value></data>
   <data name="DashboardRepairTooltip" xml:space="preserve"><value>إصلاح مشكلة الصحة هذه</value></data>
   <data name="DashboardRepairAllButtonText.Text" xml:space="preserve"><value>إصلاح الكل</value></data>
@@ -1416,4 +1416,113 @@
   <data name="TrayTooltipStopped" xml:space="preserve"><value>HerdMe - متوقف</value></data>
   <data name="TaskbarOverlayErrors" xml:space="preserve"><value>{0} توقفات غير متوقعة</value></data>
   <data name="TaskbarOverlayActivity" xml:space="preserve"><value>{0} عناصر جديدة</value></data>
+  <data name="DashboardTabOverview.Text" xml:space="preserve"><value>نظرة عامة</value></data>
+  <data name="DashboardTabHealth.Text" xml:space="preserve"><value>الصحة</value></data>
+  <data name="DashboardTabHealthPlain" xml:space="preserve"><value>الصحة</value></data>
+  <data name="DashboardTabHealthCount" xml:space="preserve"><value>الصحة ({0})</value></data>
+  <data name="DashboardHealthStrip.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح الصحة</value></data>
+  <data name="DashboardHealthStripIssues" xml:space="preserve"><value>{0} مشكلات تحتاج إلى انتباه</value></data>
+  <data name="DashboardHealthStripHint" xml:space="preserve"><value>افتح الصحة لمراجعتها وإصلاحها.</value></data>
+  <data name="DashboardHealthStripRepairing" xml:space="preserve"><value>جارٍ الإصلاح...</value></data>
+  <data name="DashboardHealthGroupEnvironment" xml:space="preserve"><value>البيئة</value></data>
+  <data name="DashboardHealthGroupSite" xml:space="preserve"><value>{0} ({1} مشكلات)</value></data>
+  <data name="DashboardHealthGroupOther" xml:space="preserve"><value>أخرى</value></data>
+  <data name="DashboardHealthOpenSite" xml:space="preserve"><value>فتح الموقع</value></data>
+  <data name="DashboardQuickCreateButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>موقع Laravel جديد</value></data>
+  <data name="DashboardQuickCreateText.Text" xml:space="preserve"><value>موقع Laravel جديد</value></data>
+  <data name="DashboardQuickParkButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>ربط مجلد</value></data>
+  <data name="DashboardQuickParkText.Text" xml:space="preserve"><value>ربط مجلد</value></data>
+  <data name="DashboardQuickLastSiteButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح آخر موقع</value></data>
+  <data name="DashboardQuickLastSiteText.Text" xml:space="preserve"><value>فتح آخر موقع</value></data>
+  <data name="DashboardQuickLastSiteDefault" xml:space="preserve"><value>فتح آخر موقع</value></data>
+  <data name="DashboardQuickOpenSite" xml:space="preserve"><value>فتح {0}</value></data>
+  <data name="DashboardQuickPowerButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إيقاف الكل</value></data>
+  <data name="DashboardQuickStopAll" xml:space="preserve"><value>إيقاف الكل</value></data>
+  <data name="DashboardQuickStartAll" xml:space="preserve"><value>تشغيل الكل</value></data>
+  <data name="DashboardQuickStopConfirmTitle" xml:space="preserve"><value>إيقاف كل شيء؟</value></data>
+  <data name="DashboardQuickStopConfirmMessage" xml:space="preserve"><value>ستتوقف كل المواقع وPHP والخدمات حتى تشغلها مرة أخرى.</value></data>
+  <data name="DashboardTimelineTitle.Text" xml:space="preserve"><value>هذه الجلسة</value></data>
+  <data name="DashboardTimelineEmpty.Text" xml:space="preserve"><value>لا شيء بعد. ستظهر هنا الرسائل والتفريغات والتوقفات والإصلاحات من هذه الجلسة.</value></data>
+  <data name="TimelineServiceStopped" xml:space="preserve"><value>توقف {0}</value></data>
+  <data name="TimelineProcessStopped" xml:space="preserve"><value>انتهى {0}</value></data>
+  <data name="TimelineExitCode" xml:space="preserve"><value>رمز الخروج {0}</value></data>
+  <data name="TimelineEnvironmentStopped" xml:space="preserve"><value>توقفت البيئة</value></data>
+  <data name="TimelineRepairFinished" xml:space="preserve"><value>اكتمل الإصلاح</value></data>
+  <data name="TimelineRepairCancelled" xml:space="preserve"><value>أُلغي الإصلاح</value></data>
+  <data name="NavDashboardBadge" xml:space="preserve"><value>{0} مشكلات صحية</value></data>
+  <data name="GeneralLanguageTitle.Text" xml:space="preserve"><value>اللغة</value></data>
+  <data name="GeneralLanguageDescription.Text" xml:space="preserve"><value>يتبع HerdMe لغة Windows ما لم تختر لغة هنا.</value></data>
+  <data name="GeneralLanguageRestartNote.Text" xml:space="preserve"><value>أغلق HerdMe من علبة النظام ثم افتحه مرة أخرى لتغيير اللغة.</value></data>
+  <data name="GeneralLanguageBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>اللغة</value></data>
+  <data name="GeneralLanguageSystem" xml:space="preserve"><value>افتراضي Windows</value></data>
+  <data name="GeneralReduceMotionTitle.Text" xml:space="preserve"><value>تقليل الحركة</value></data>
+  <data name="GeneralReduceMotionDescription.Text" xml:space="preserve"><value>إيقاف انتقالات الصفحات والتلاشي. يفعل HerdMe ذلك أيضًا عند إيقاف تأثيرات الحركة في Windows.</value></data>
+  <data name="ReduceMotionToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تقليل الحركة</value></data>
+  <data name="StatusBarDownloadsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح التنزيلات</value></data>
+  <data name="StatusBarLoopback.Text" xml:space="preserve"><value>محلي فقط</value></data>
+  <data name="StatusBarLoopbackTooltip.Text" xml:space="preserve"><value>يستمع HerdMe على 127.0.0.1 فقط. لا يمكن الوصول إلى أي شيء من أجهزة أخرى إلا إذا شاركت موقعًا.</value></data>
+  <data name="StatusBarPorts" xml:space="preserve"><value>المنافذ HTTP {0} · HTTPS {1}</value></data>
+  <data name="StatusBarDownloadOne" xml:space="preserve"><value>{0}: اكتمل {1}٪</value></data>
+  <data name="StatusBarDownloadOneWaiting" xml:space="preserve"><value>جارٍ تنزيل {0}...</value></data>
+  <data name="StatusBarDownloadMany" xml:space="preserve"><value>{0} تنزيلات: {1}٪</value></data>
+  <data name="StatusBarDownloadManyWaiting" xml:space="preserve"><value>{0} تنزيلات قيد التشغيل...</value></data>
+  <data name="UnsavedChangesDiscardHint" xml:space="preserve"><value>لديك تغييرات غير محفوظة. أغلق مرة أخرى لتجاهلها، أو اختر حفظ.</value></data>
+  <data name="DashboardFixRetryAction" xml:space="preserve"><value>إعادة المحاولة</value></data>
+  <data name="DashboardFixCertificateAction" xml:space="preserve"><value>إعادة التثبيت</value></data>
+  <data name="DashboardFixCertificateDetail" xml:space="preserve"><value>تعرض المتصفحات تحذيرًا لـ https://name.test/ حتى يثق Windows بشهادة HerdMe. تعيد إعادة التثبيت إضافتها إلى مخزن شهادات المستخدم.</value></data>
+  <data name="DashboardFixPortOwner" xml:space="preserve"><value>{0} (معرّف العملية {1})</value></data>
+  <data name="DashboardFixPortBusy" xml:space="preserve"><value>المنفذ {0} مستخدم من قبل {1}</value></data>
+  <data name="DashboardFixPortBusyDetail" xml:space="preserve"><value>يحتاج HerdMe إلى المنفذ {0} لتقديم https://name.test/ بدون رقم منفذ. أغلق ذلك البرنامج أو أوقف خادم الويب الخاص به، ثم اختر إعادة المحاولة.</value></data>
+  <data name="AboutWhatsNewButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>ما الجديد</value></data>
+  <data name="AboutWhatsNewButtonText.Text" xml:space="preserve"><value>ما الجديد</value></data>
+  <data name="WhatsNewTitle" xml:space="preserve"><value>ما الجديد في HerdMe {0}</value></data>
+  <data name="WhatsNewNoNotes" xml:space="preserve"><value>ملاحظات هذا الإصدار موجودة في صفحة الإصدارات.</value></data>
+  <data name="WhatsNewReleaseNotes" xml:space="preserve"><value>ملاحظات الإصدار كاملة</value></data>
+  <data name="WhatsNewGroupAdded" xml:space="preserve"><value>أُضيف</value></data>
+  <data name="WhatsNewGroupChanged" xml:space="preserve"><value>تغيّر</value></data>
+  <data name="WhatsNewGroupFixed" xml:space="preserve"><value>أُصلح</value></data>
+  <data name="WhatsNewGroupSecurity" xml:space="preserve"><value>الأمان</value></data>
+  <data name="HealthTabTip.Title" xml:space="preserve"><value>للصحة تبويب خاص</value></data>
+  <data name="HealthTabTip.Subtitle" xml:space="preserve"><value>كل التنبيهات والإصلاحات صارت هنا. شريط النظرة العامة ينبهك إذا فيه شي يحتاج مراجعة.</value></data>
+  <data name="LanguageTip.Title" xml:space="preserve"><value>اختر لغة التطبيق</value></data>
+  <data name="LanguageTip.Subtitle" xml:space="preserve"><value>يتبع HerdMe لغة ويندوز افتراضياً. اختر الإنجليزية أو العربية من هنا، وتُطبّق في التشغيل القادم.</value></data>
+  <data name="StatusBarTip.Title" xml:space="preserve"><value>شريط الحالة</value></data>
+  <data name="StatusBarTip.Subtitle" xml:space="preserve"><value>حالة البيئة والمنافذ المستخدمة والتنزيلات الجارية تظهر هنا في كل صفحة. اختر التنزيلات لعرض تقدّمها.</value></data>
+  <data name="MailMobileWidthToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>معاينة بعرض الجوال</value></data>
+  <data name="MailMobileWidthTooltip.Text" xml:space="preserve"><value>معاينة بعرض الجوال (375 بكسل)</value></data>
+  <data name="MailHeadersTab.Header" xml:space="preserve"><value>الترويسات</value></data>
+  <data name="MailLinksTab.Header" xml:space="preserve"><value>الروابط</value></data>
+  <data name="MailLinksTabPlain" xml:space="preserve"><value>الروابط</value></data>
+  <data name="MailLinksTabProblems" xml:space="preserve"><value>الروابط ({0})</value></data>
+  <data name="MailLinksNone" xml:space="preserve"><value>هذه الرسالة لا تحتوي روابط.</value></data>
+  <data name="MailLinksAllGood" xml:space="preserve"><value>{0} روابط، ولا يبدو أي منها معطلاً لمستلم حقيقي.</value></data>
+  <data name="MailLinksProblems" xml:space="preserve"><value>{0} روابط، منها {1} لن تعمل لمستلم حقيقي. يتم الفحص بدون فتح الروابط.</value></data>
+  <data name="MailLinkEmptyUrl" xml:space="preserve"><value>(رابط فارغ)</value></data>
+  <data name="MailLinkCopy" xml:space="preserve"><value>نسخ الرابط</value></data>
+  <data name="MailLinkIssueEmpty" xml:space="preserve"><value>الرابط بدون عنوان.</value></data>
+  <data name="MailLinkIssueInsecure" xml:space="preserve"><value>يستخدم http بدلاً من https.</value></data>
+  <data name="MailLinkIssueLocalhost" xml:space="preserve"><value>يشير إلى localhost؛ اضبط APP_URL على العنوان الحقيقي.</value></data>
+  <data name="MailLinkIssueRelative" xml:space="preserve"><value>رابط نسبي؛ برامج البريد لا تستطيع فتحه.</value></data>
+  <data name="DumpTreeTab.Text" xml:space="preserve"><value>شجرة</value></data>
+  <data name="DumpTextTab.Text" xml:space="preserve"><value>نص</value></data>
+  <data name="DumpExpandAllButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>توسيع الكل</value></data>
+  <data name="DumpExpandAllTooltip.Text" xml:space="preserve"><value>توسيع الكل</value></data>
+  <data name="DumpCollapseAllButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>طي الكل</value></data>
+  <data name="DumpCollapseAllTooltip.Text" xml:space="preserve"><value>طي الكل</value></data>
+  <data name="DumpTreeEmpty.Text" xml:space="preserve"><value>هذا التفريغ ليس له بنية للتصفح. انتقل إلى النص.</value></data>
+  <data name="DumpExpandAllLimited" xml:space="preserve"><value>تم توسيع أول 1500 عنصر. وسّع الباقي واحداً واحداً.</value></data>
+  <data name="LogsPreviousErrorButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>الخطأ السابق</value></data>
+  <data name="LogsPreviousErrorTooltip.Text" xml:space="preserve"><value>الخطأ السابق (Shift+F8)</value></data>
+  <data name="LogsNextErrorButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>الخطأ التالي</value></data>
+  <data name="LogsNextErrorTooltip.Text" xml:space="preserve"><value>الخطأ التالي (F8)</value></data>
+  <data name="LogsFollowTailToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>متابعة نهاية السجل</value></data>
+  <data name="LogsFollowTailTooltip.Text" xml:space="preserve"><value>متابعة نهاية السجل (Ctrl+End)</value></data>
+  <data name="LogsErrorCount" xml:space="preserve"><value>{0} أخطاء</value></data>
+  <data name="LogsErrorPosition" xml:space="preserve"><value>الخطأ {0} من {1}</value></data>
+  <data name="SitesConsoleStop" xml:space="preserve"><value>إيقاف</value></data>
+  <data name="SitesConsoleCopy" xml:space="preserve"><value>نسخ المخرجات</value></data>
+  <data name="SitesConsoleRunAgain" xml:space="preserve"><value>تشغيل مرة أخرى</value></data>
+  <data name="SitesRowPhpPicker.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إصدار PHP</value></data>
+  <data name="SitesRowPhpNoneInstalled" xml:space="preserve"><value>لا توجد إصدارات PHP مثبتة</value></data>
+  <data name="SitesRowPhpChanged" xml:space="preserve"><value>أصبح {0} يستخدم {1}</value></data>
 </root>

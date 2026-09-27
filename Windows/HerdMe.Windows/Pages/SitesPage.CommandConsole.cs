@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using HerdMe.Windows.Services;
+using HerdMe.Windows.Views;
 
 namespace HerdMe.Windows.Pages;
 
@@ -11,6 +12,14 @@ namespace HerdMe.Windows.Pages;
 public sealed partial class SitesPage
 {
     private CommandConsole? activeCommandConsole;
+
+    private static StackPanel CommandButtonContent(Symbol symbol, string label)
+    {
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        panel.Children.Add(new SymbolIcon(symbol));
+        panel.Children.Add(new TextBlock { Text = label });
+        return panel;
+    }
 
     private sealed class CommandConsole
     {
@@ -26,34 +35,44 @@ public sealed partial class SitesPage
                 Text = AppLocalization.Get(readyKey),
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
             };
-            OutputBox = new TextBox
-            {
-                Text = AppLocalization.Get(placeholderKey),
-                IsReadOnly = true,
-                AcceptsReturn = true,
-                TextWrapping = TextWrapping.NoWrap,
-                Height = 240,
-                VerticalAlignment = VerticalAlignment.Top,
-                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
-            };
-            ScrollViewer.SetVerticalScrollBarVisibility(OutputBox, ScrollBarVisibility.Auto);
-            ScrollViewer.SetHorizontalScrollBarVisibility(OutputBox, ScrollBarVisibility.Auto);
+            // Output keeps ANSI colours (Artisan runs with --ansi); see ConsoleOutputView.
+            OutputBox = new ConsoleOutputView(240) { Text = AppLocalization.Get(placeholderKey) };
             RunButton = new Button
             {
                 Content = AppLocalization.Get("SitesRun"),
                 Style = (Style)Application.Current.Resources["AccentButtonStyle"]
             };
+            // Stop is destructive for the running command only; it is red while it can act.
             CancelButton = new Button
             {
-                Content = AppLocalization.Get("SitesCancel"),
+                Content = CommandButtonContent(Symbol.Stop, AppLocalization.Get("SitesConsoleStop")),
                 IsEnabled = false
             };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(CancelButton, AppLocalization.Get("SitesConsoleStop"));
             CancelButton.Click += (_, _) => Cancel();
+            CopyButton = new Button
+            {
+                Content = new SymbolIcon(Symbol.Copy),
+                Style = (Style)Application.Current.Resources["ToolbarIconButtonStyle"]
+            };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(CopyButton, AppLocalization.Get("SitesConsoleCopy"));
+            ToolTipService.SetToolTip(CopyButton, AppLocalization.Get("SitesConsoleCopy"));
+            CopyButton.Click += (_, _) =>
+            {
+                var package = new global::Windows.ApplicationModel.DataTransfer.DataPackage();
+                package.SetText(OutputBox.Text);
+                global::Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+                App.MainWindow.ShowToast(AppLocalization.Get("CommonCopiedToast"));
+            };
         }
 
         internal TextBlock StatusText { get; }
 
-        internal TextBox OutputBox { get; }
+        internal ConsoleOutputView OutputBox { get; }
+
+        internal Button CopyButton { get; }
+
+        internal bool HasRun { get; private set; }
 
         internal Button RunButton { get; }
 
@@ -73,6 +92,7 @@ public sealed partial class SitesPage
                 Spacing = 8,
                 HorizontalAlignment = HorizontalAlignment.Right
             };
+            buttons.Children.Add(CopyButton);
             buttons.Children.Add(CancelButton);
             buttons.Children.Add(RunButton);
             var statusRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
@@ -80,7 +100,7 @@ public sealed partial class SitesPage
             statusRow.Children.Add(StatusText);
             content.Children.Add(buttons);
             content.Children.Add(statusRow);
-            content.Children.Add(OutputBox);
+            content.Children.Add(OutputBox.Scroll);
         }
 
         /// <summary>Closing the dialog while a command runs cancels it instead of hiding it.</summary>
@@ -101,7 +121,7 @@ public sealed partial class SitesPage
             cancellation.Cancel();
         }
 
-        internal void Append(string value) => AppendCommandOutput(OutputBox, value);
+        internal void Append(string value) => OutputBox.Append(value);
 
         internal IProgress<string> OutputProgress() => new Progress<string>(Append);
 
@@ -123,6 +143,7 @@ public sealed partial class SitesPage
             IsRunning = true;
             RunButton.IsEnabled = false;
             CancelButton.IsEnabled = true;
+            CancelButton.Style = DangerStyles.Button;
             setInputsEnabled(false);
             progressRing.IsActive = true;
             StatusText.Text = startingStatus;
@@ -141,6 +162,11 @@ public sealed partial class SitesPage
                 progressRing.IsActive = false;
                 RunButton.IsEnabled = true;
                 CancelButton.IsEnabled = false;
+                CancelButton.ClearValue(FrameworkElement.StyleProperty);
+                // After the first run the same button re-runs the command with the same inputs.
+                HasRun = true;
+                RunButton.Content = CommandButtonContent(Symbol.Refresh, AppLocalization.Get("SitesConsoleRunAgain"));
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(RunButton, AppLocalization.Get("SitesConsoleRunAgain"));
                 setInputsEnabled(true);
                 if (ReferenceEquals(cancellation, source)) cancellation = null;
             }

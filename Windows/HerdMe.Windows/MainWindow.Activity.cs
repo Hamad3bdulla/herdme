@@ -19,6 +19,13 @@ public sealed partial class MainWindow
     private string currentPageTag = "dashboard";
     private readonly DispatcherTimer toastTimer = new();
     private Func<Task>? toastAction;
+    private int healthIssues;
+
+    // What happened this session, newest first, for the dashboard timeline.
+    public ActivityTimeline Timeline { get; } = new();
+
+    // The site last opened in the browser from HerdMe; the dashboard offers it again.
+    public string? LastOpenedSitePath { get; private set; }
 
     public int UnseenMail => unseenMail;
 
@@ -33,6 +40,7 @@ public sealed partial class MainWindow
     {
         services.Services.ExitedUnexpectedly += Services_ExitedUnexpectedly;
         services.SiteProcesses.ExitedUnexpectedly += SiteProcesses_ExitedUnexpectedly;
+        services.Environment.Stopped += Environment_Stopped;
         try
         {
             // The capture services open SQLite in their constructors; build them off the UI thread.
@@ -53,20 +61,97 @@ public sealed partial class MainWindow
     {
         services.Services.ExitedUnexpectedly -= Services_ExitedUnexpectedly;
         services.SiteProcesses.ExitedUnexpectedly -= SiteProcesses_ExitedUnexpectedly;
+        services.Environment.Stopped -= Environment_Stopped;
         if (!activitySubscribed) return;
         activitySubscribed = false;
         services.Mail.MessageCaptured -= Mail_MessageCaptured;
         services.Dumps.DumpCaptured -= Dumps_DumpCaptured;
     }
 
-    private void Mail_MessageCaptured(object? sender, CapturedMail mail) => CountActivity("mail");
+    private void Mail_MessageCaptured(object? sender, CapturedMail mail)
+    {
+        RecordActivity(new ActivityEvent(
+            ActivityEventKind.Mail,
+            string.IsNullOrWhiteSpace(mail.Subject) ? AppLocalization.Get("DashboardNoSubject") : mail.Subject,
+            mail.Sender,
+            DateTimeOffset.Now,
+            "mail"
+        ));
+        CountActivity("mail");
+    }
 
-    private void Dumps_DumpCaptured(object? sender, CapturedDump dump) => CountActivity("dumps");
+    private void Dumps_DumpCaptured(object? sender, CapturedDump dump)
+    {
+        var summary = dump.Summary.ReplaceLineEndings(" ").Trim();
+        RecordActivity(new ActivityEvent(
+            ActivityEventKind.Dump,
+            summary.Length == 0 ? AppLocalization.Get("DashboardEmptyDump") : summary,
+            dump.Source,
+            DateTimeOffset.Now,
+            "dumps"
+        ));
+        CountActivity("dumps");
+    }
 
-    private void Services_ExitedUnexpectedly(object? sender, ServiceExitedEventArgs args) => CountActivity("logs");
-
-    private void SiteProcesses_ExitedUnexpectedly(object? sender, SiteBackgroundProcessState state) =>
+    private void Services_ExitedUnexpectedly(object? sender, ServiceExitedEventArgs args)
+    {
+        RecordActivity(new ActivityEvent(
+            ActivityEventKind.ServiceStopped,
+            AppLocalization.Format("TimelineServiceStopped", args.Name),
+            args.ExitCode is { } code ? AppLocalization.Format("TimelineExitCode", code) : string.Empty,
+            DateTimeOffset.Now,
+            "services"
+        ));
         CountActivity("logs");
+    }
+
+    private void SiteProcesses_ExitedUnexpectedly(object? sender, SiteBackgroundProcessState state)
+    {
+        RecordActivity(new ActivityEvent(
+            ActivityEventKind.ProcessStopped,
+            AppLocalization.Format("TimelineProcessStopped", Path.GetFileName(state.SitePath.TrimEnd('\\', '/'))),
+            state.ExitCode is { } code ? AppLocalization.Format("TimelineExitCode", code) : string.Empty,
+            DateTimeOffset.Now,
+            "logs"
+        ));
+        CountActivity("logs");
+    }
+
+    private void Environment_Stopped(object? sender, EventArgs args)
+    {
+        RecordActivity(new ActivityEvent(
+            ActivityEventKind.EnvironmentStopped,
+            AppLocalization.Get("TimelineEnvironmentStopped"),
+            string.Empty,
+            DateTimeOffset.Now,
+            null
+        ));
+    }
+
+    // Safe from any thread; listeners are told on the UI thread.
+    public void RecordActivity(ActivityEvent item)
+    {
+        Timeline.Add(item);
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!shuttingDown) TimelineChanged?.Invoke(this, EventArgs.Empty);
+        });
+    }
+
+    public event EventHandler? TimelineChanged;
+
+    public void RememberOpenedSite(string sitePath)
+    {
+        if (!string.IsNullOrWhiteSpace(sitePath)) LastOpenedSitePath = sitePath;
+    }
+
+    // The dashboard reports how many health issues it found; the nav item shows the count.
+    public void SetHealthIssueCount(int count)
+    {
+        if (shuttingDown || healthIssues == count) return;
+        healthIssues = count;
+        SetBadge(DashboardBadge, count, "NavDashboardBadge");
+    }
 
     private void CountActivity(string tag)
     {

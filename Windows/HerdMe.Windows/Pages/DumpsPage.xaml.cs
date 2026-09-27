@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
+using HerdMe.Windows.Views;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Storage.Pickers;
@@ -37,6 +38,7 @@ public sealed partial class DumpsPage : Page
         loaded = true;
         loadFailed = false;
         CaptureErrorBar.IsOpen = false;
+        ApplyDumpView();
         pageGeneration++;
         var session = new CaptureRefreshSession<IReadOnlyList<CapturedDump>>(capture.LoadSummaries);
         refreshSession = session;
@@ -117,7 +119,7 @@ public sealed partial class DumpsPage : Page
     {
         if (mutating || !loaded || XamlRoot is not { } xamlRoot) return;
         var generation = pageGeneration;
-        var dialog = new ContentDialog
+        var dialog = DangerStyles.Apply(new ContentDialog
         {
             FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = xamlRoot,
@@ -130,7 +132,7 @@ public sealed partial class DumpsPage : Page
             PrimaryButtonText = AppLocalization.Get("CommonDelete"),
             CloseButtonText = AppLocalization.Get("CommonCancel"),
             DefaultButton = ContentDialogButton.Close
-        };
+        });
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         if (mutating || !loaded || generation != pageGeneration
             || refreshSession is not { } session) return;
@@ -259,6 +261,8 @@ public sealed partial class DumpsPage : Page
         SummaryText.Text = preview.Text;
         PreviewSizeNotice.IsOpen = preview.IsTruncated;
         ExportButton.IsEnabled = !exporting && dump is not null;
+        displayedDumpForTree = dump;
+        ShowDumpTree(dump);
         if (dump is { IsSummary: true }) _ = ShowCompleteDumpAsync(dump);
     }
 
@@ -272,6 +276,8 @@ public sealed partial class DumpsPage : Page
             var preview = CapturePreview.LimitText(complete.Summary);
             SummaryText.Text = preview.Text;
             PreviewSizeNotice.IsOpen = preview.IsTruncated;
+            displayedDumpForTree = complete;
+            ShowDumpTree(complete);
         }
         catch (Exception error) when (error is Microsoft.Data.Sqlite.SqliteException
             or System.Text.Json.JsonException or IOException)

@@ -84,6 +84,7 @@ public sealed partial class GeneralPage : Page
         loadingNotifications = true;
         NotificationsToggle.IsOn = settings.ShowNotifications;
         loadingNotifications = false;
+        LoadAppearance(settings);
         TldTextBox.Text = settings.Tld;
         loadingUpdateSettings = true;
         AutomaticUpdatesToggle.IsOn = settings.AutomaticUpdates;
@@ -228,6 +229,8 @@ public sealed partial class GeneralPage : Page
             updateEventSubscribed = true;
         }
         RenderLatestUpdateResult();
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+            () => App.MainWindow.OfferTip(LanguageTip, MainWindow.LanguageTipId, automatic: false));
         await RefreshAsync();
     }
 

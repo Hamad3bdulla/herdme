@@ -798,7 +798,7 @@
   <data name="PhpExtensionToggleTooltip" xml:space="preserve"><value>Enable or disable this extension for the selected PHP version</value></data>
   <data name="PhpExtensionBuiltInTooltip" xml:space="preserve"><value>This extension is built into PHP and cannot be toggled</value></data>
   <data name="GeneralCompactModeTitle.Text" xml:space="preserve"><value>Compact interface</value></data>
-  <data name="GeneralCompactModeDescription.Text" xml:space="preserve"><value>Use tighter spacing on sites and dashboard pages.</value></data>
+  <data name="GeneralCompactModeDescription.Text" xml:space="preserve"><value>Use tighter spacing on every page. Lists and forms switch fully the next time HerdMe starts.</value></data>
   <data name="DashboardRepairAction" xml:space="preserve"><value>Repair</value></data>
   <data name="DashboardRepairTooltip" xml:space="preserve"><value>Repair this health issue</value></data>
   <data name="DashboardRepairAllButtonText.Text" xml:space="preserve"><value>Repair all</value></data>
@@ -1416,4 +1416,113 @@ Recovery backup: {1}</value></data>
   <data name="TrayTooltipStopped" xml:space="preserve"><value>HerdMe - stopped</value></data>
   <data name="TaskbarOverlayErrors" xml:space="preserve"><value>{0} unexpected stops</value></data>
   <data name="TaskbarOverlayActivity" xml:space="preserve"><value>{0} new items</value></data>
+  <data name="DashboardTabOverview.Text" xml:space="preserve"><value>Overview</value></data>
+  <data name="DashboardTabHealth.Text" xml:space="preserve"><value>Health</value></data>
+  <data name="DashboardTabHealthPlain" xml:space="preserve"><value>Health</value></data>
+  <data name="DashboardTabHealthCount" xml:space="preserve"><value>Health ({0})</value></data>
+  <data name="DashboardHealthStrip.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open health</value></data>
+  <data name="DashboardHealthStripIssues" xml:space="preserve"><value>{0} issues need attention</value></data>
+  <data name="DashboardHealthStripHint" xml:space="preserve"><value>Open Health to review and repair them.</value></data>
+  <data name="DashboardHealthStripRepairing" xml:space="preserve"><value>Repairing...</value></data>
+  <data name="DashboardHealthGroupEnvironment" xml:space="preserve"><value>Environment</value></data>
+  <data name="DashboardHealthGroupSite" xml:space="preserve"><value>{0} ({1} issues)</value></data>
+  <data name="DashboardHealthGroupOther" xml:space="preserve"><value>Other</value></data>
+  <data name="DashboardHealthOpenSite" xml:space="preserve"><value>Open site</value></data>
+  <data name="DashboardQuickCreateButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>New Laravel site</value></data>
+  <data name="DashboardQuickCreateText.Text" xml:space="preserve"><value>New Laravel site</value></data>
+  <data name="DashboardQuickParkButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Park a folder</value></data>
+  <data name="DashboardQuickParkText.Text" xml:space="preserve"><value>Park a folder</value></data>
+  <data name="DashboardQuickLastSiteButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open last site</value></data>
+  <data name="DashboardQuickLastSiteText.Text" xml:space="preserve"><value>Open last site</value></data>
+  <data name="DashboardQuickLastSiteDefault" xml:space="preserve"><value>Open last site</value></data>
+  <data name="DashboardQuickOpenSite" xml:space="preserve"><value>Open {0}</value></data>
+  <data name="DashboardQuickPowerButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Stop all</value></data>
+  <data name="DashboardQuickStopAll" xml:space="preserve"><value>Stop all</value></data>
+  <data name="DashboardQuickStartAll" xml:space="preserve"><value>Start all</value></data>
+  <data name="DashboardQuickStopConfirmTitle" xml:space="preserve"><value>Stop everything?</value></data>
+  <data name="DashboardQuickStopConfirmMessage" xml:space="preserve"><value>All sites, PHP and services stop until you start them again.</value></data>
+  <data name="DashboardTimelineTitle.Text" xml:space="preserve"><value>This session</value></data>
+  <data name="DashboardTimelineEmpty.Text" xml:space="preserve"><value>Nothing yet. Mail, dumps, stops and repairs from this session appear here.</value></data>
+  <data name="TimelineServiceStopped" xml:space="preserve"><value>{0} stopped</value></data>
+  <data name="TimelineProcessStopped" xml:space="preserve"><value>{0} exited</value></data>
+  <data name="TimelineExitCode" xml:space="preserve"><value>Exit code {0}</value></data>
+  <data name="TimelineEnvironmentStopped" xml:space="preserve"><value>Environment stopped</value></data>
+  <data name="TimelineRepairFinished" xml:space="preserve"><value>Repair finished</value></data>
+  <data name="TimelineRepairCancelled" xml:space="preserve"><value>Repair cancelled</value></data>
+  <data name="NavDashboardBadge" xml:space="preserve"><value>{0} health issues</value></data>
+  <data name="GeneralLanguageTitle.Text" xml:space="preserve"><value>Language</value></data>
+  <data name="GeneralLanguageDescription.Text" xml:space="preserve"><value>HerdMe follows Windows unless you pick a language here.</value></data>
+  <data name="GeneralLanguageRestartNote.Text" xml:space="preserve"><value>Quit HerdMe from the tray and open it again to switch the language.</value></data>
+  <data name="GeneralLanguageBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Language</value></data>
+  <data name="GeneralLanguageSystem" xml:space="preserve"><value>Windows default</value></data>
+  <data name="GeneralReduceMotionTitle.Text" xml:space="preserve"><value>Reduce motion</value></data>
+  <data name="GeneralReduceMotionDescription.Text" xml:space="preserve"><value>Turn off page transitions and fades. HerdMe also does this when Windows animation effects are off.</value></data>
+  <data name="ReduceMotionToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Reduce motion</value></data>
+  <data name="StatusBarDownloadsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open downloads</value></data>
+  <data name="StatusBarLoopback.Text" xml:space="preserve"><value>Local only</value></data>
+  <data name="StatusBarLoopbackTooltip.Text" xml:space="preserve"><value>HerdMe listens on 127.0.0.1 only. Nothing is reachable from other devices unless you share a site.</value></data>
+  <data name="StatusBarPorts" xml:space="preserve"><value>HTTP {0} · HTTPS {1}</value></data>
+  <data name="StatusBarDownloadOne" xml:space="preserve"><value>{0}: {1}%</value></data>
+  <data name="StatusBarDownloadOneWaiting" xml:space="preserve"><value>Downloading {0}...</value></data>
+  <data name="StatusBarDownloadMany" xml:space="preserve"><value>{0} downloads: {1}%</value></data>
+  <data name="StatusBarDownloadManyWaiting" xml:space="preserve"><value>{0} downloads running...</value></data>
+  <data name="UnsavedChangesDiscardHint" xml:space="preserve"><value>You have unsaved changes. Close again to discard them, or choose Save.</value></data>
+  <data name="DashboardFixRetryAction" xml:space="preserve"><value>Retry</value></data>
+  <data name="DashboardFixCertificateAction" xml:space="preserve"><value>Reinstall</value></data>
+  <data name="DashboardFixCertificateDetail" xml:space="preserve"><value>Browsers show a warning for https://name.test/ until Windows trusts the HerdMe certificate. Reinstall adds it to your user certificate store again.</value></data>
+  <data name="DashboardFixPortOwner" xml:space="preserve"><value>{0} (PID {1})</value></data>
+  <data name="DashboardFixPortBusy" xml:space="preserve"><value>Port {0} is used by {1}</value></data>
+  <data name="DashboardFixPortBusyDetail" xml:space="preserve"><value>HerdMe needs port {0} to serve https://name.test/ without a port number. Close that program or stop its web server, then choose Retry.</value></data>
+  <data name="AboutWhatsNewButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>What's new</value></data>
+  <data name="AboutWhatsNewButtonText.Text" xml:space="preserve"><value>What's new</value></data>
+  <data name="WhatsNewTitle" xml:space="preserve"><value>What's new in HerdMe {0}</value></data>
+  <data name="WhatsNewNoNotes" xml:space="preserve"><value>The notes for this version are on the release page.</value></data>
+  <data name="WhatsNewReleaseNotes" xml:space="preserve"><value>Full release notes</value></data>
+  <data name="WhatsNewGroupAdded" xml:space="preserve"><value>Added</value></data>
+  <data name="WhatsNewGroupChanged" xml:space="preserve"><value>Changed</value></data>
+  <data name="WhatsNewGroupFixed" xml:space="preserve"><value>Fixed</value></data>
+  <data name="WhatsNewGroupSecurity" xml:space="preserve"><value>Security</value></data>
+  <data name="HealthTabTip.Title" xml:space="preserve"><value>Health has its own tab</value></data>
+  <data name="HealthTabTip.Subtitle" xml:space="preserve"><value>Every warning and repair now lives here. The Overview strip tells you when something needs a look.</value></data>
+  <data name="LanguageTip.Title" xml:space="preserve"><value>Pick the app language</value></data>
+  <data name="LanguageTip.Subtitle" xml:space="preserve"><value>HerdMe follows Windows by default. Choose English or Arabic here; it applies the next time HerdMe starts.</value></data>
+  <data name="StatusBarTip.Title" xml:space="preserve"><value>The status bar</value></data>
+  <data name="StatusBarTip.Subtitle" xml:space="preserve"><value>Environment state, the ports in use and running downloads stay visible here on every page. Select the downloads to see their progress.</value></data>
+  <data name="MailMobileWidthToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Preview at phone width</value></data>
+  <data name="MailMobileWidthTooltip.Text" xml:space="preserve"><value>Preview at phone width (375 px)</value></data>
+  <data name="MailHeadersTab.Header" xml:space="preserve"><value>Headers</value></data>
+  <data name="MailLinksTab.Header" xml:space="preserve"><value>Links</value></data>
+  <data name="MailLinksTabPlain" xml:space="preserve"><value>Links</value></data>
+  <data name="MailLinksTabProblems" xml:space="preserve"><value>Links ({0})</value></data>
+  <data name="MailLinksNone" xml:space="preserve"><value>This message has no links.</value></data>
+  <data name="MailLinksAllGood" xml:space="preserve"><value>{0} links, none look broken for a real recipient.</value></data>
+  <data name="MailLinksProblems" xml:space="preserve"><value>{0} links, {1} would not work for a real recipient. Links are checked without opening them.</value></data>
+  <data name="MailLinkEmptyUrl" xml:space="preserve"><value>(empty link)</value></data>
+  <data name="MailLinkCopy" xml:space="preserve"><value>Copy link</value></data>
+  <data name="MailLinkIssueEmpty" xml:space="preserve"><value>The link has no address.</value></data>
+  <data name="MailLinkIssueInsecure" xml:space="preserve"><value>Uses http instead of https.</value></data>
+  <data name="MailLinkIssueLocalhost" xml:space="preserve"><value>Points to localhost; set APP_URL to the real address.</value></data>
+  <data name="MailLinkIssueRelative" xml:space="preserve"><value>Relative link; mail clients cannot open it.</value></data>
+  <data name="DumpTreeTab.Text" xml:space="preserve"><value>Tree</value></data>
+  <data name="DumpTextTab.Text" xml:space="preserve"><value>Text</value></data>
+  <data name="DumpExpandAllButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Expand all</value></data>
+  <data name="DumpExpandAllTooltip.Text" xml:space="preserve"><value>Expand all</value></data>
+  <data name="DumpCollapseAllButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Collapse all</value></data>
+  <data name="DumpCollapseAllTooltip.Text" xml:space="preserve"><value>Collapse all</value></data>
+  <data name="DumpTreeEmpty.Text" xml:space="preserve"><value>This dump has no structure to browse. Switch to Text.</value></data>
+  <data name="DumpExpandAllLimited" xml:space="preserve"><value>Expanded the first 1,500 entries. Expand the rest one by one.</value></data>
+  <data name="LogsPreviousErrorButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Previous error</value></data>
+  <data name="LogsPreviousErrorTooltip.Text" xml:space="preserve"><value>Previous error (Shift+F8)</value></data>
+  <data name="LogsNextErrorButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Next error</value></data>
+  <data name="LogsNextErrorTooltip.Text" xml:space="preserve"><value>Next error (F8)</value></data>
+  <data name="LogsFollowTailToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Follow the end of the log</value></data>
+  <data name="LogsFollowTailTooltip.Text" xml:space="preserve"><value>Follow the end of the log (Ctrl+End)</value></data>
+  <data name="LogsErrorCount" xml:space="preserve"><value>{0} errors</value></data>
+  <data name="LogsErrorPosition" xml:space="preserve"><value>Error {0} of {1}</value></data>
+  <data name="SitesConsoleStop" xml:space="preserve"><value>Stop</value></data>
+  <data name="SitesConsoleCopy" xml:space="preserve"><value>Copy output</value></data>
+  <data name="SitesConsoleRunAgain" xml:space="preserve"><value>Run again</value></data>
+  <data name="SitesRowPhpPicker.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>PHP version</value></data>
+  <data name="SitesRowPhpNoneInstalled" xml:space="preserve"><value>No PHP versions installed</value></data>
+  <data name="SitesRowPhpChanged" xml:space="preserve"><value>{0} now uses {1}</value></data>
 </root>

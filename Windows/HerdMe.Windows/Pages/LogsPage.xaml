@@ -151,17 +151,48 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <Grid Margin="16,12,16,8" ColumnSpacing="12">
+                    <Grid Margin="16,8,8,8" ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="LogTitleText" x:Uid="LogsSelectLogInitial" Text="Select a log" Style="{StaticResource SectionTitleStyle}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="LogTitleText" x:Uid="LogsSelectLogInitial" Text="Select a log" VerticalAlignment="Center" Style="{StaticResource SectionTitleStyle}" TextTrimming="CharacterEllipsis" />
                         <TextBlock x:Name="LevelCountsText" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SettingsRowDescriptionStyle}" Visibility="Collapsed" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock x:Name="ErrorPositionText" VerticalAlignment="Center" Margin="0,0,4,0" Style="{StaticResource CaptionTextStyle}" />
+                            <Button x:Name="PreviousErrorButton" x:Uid="LogsPreviousErrorButton" IsEnabled="False" Click="PreviousError_Click" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Previous error" AutomationProperties.AutomationId="LogsPreviousErrorButton">
+                                <Button.KeyboardAccelerators>
+                                    <KeyboardAccelerator Modifiers="Shift" Key="F8" />
+                                </Button.KeyboardAccelerators>
+                                <ToolTipService.ToolTip>
+                                    <ToolTip><TextBlock x:Uid="LogsPreviousErrorTooltip" Text="Previous error (Shift+F8)" /></ToolTip>
+                                </ToolTipService.ToolTip>
+                                <FontIcon Glyph="&#xE70E;" FontSize="14" />
+                            </Button>
+                            <Button x:Name="NextErrorButton" x:Uid="LogsNextErrorButton" IsEnabled="False" Click="NextError_Click" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Next error" AutomationProperties.AutomationId="LogsNextErrorButton">
+                                <Button.KeyboardAccelerators>
+                                    <KeyboardAccelerator Key="F8" />
+                                </Button.KeyboardAccelerators>
+                                <ToolTipService.ToolTip>
+                                    <ToolTip><TextBlock x:Uid="LogsNextErrorTooltip" Text="Next error (F8)" /></ToolTip>
+                                </ToolTipService.ToolTip>
+                                <FontIcon Glyph="&#xE70D;" FontSize="14" />
+                            </Button>
+                            <ToggleButton x:Name="FollowTailToggle" x:Uid="LogsFollowTailToggle" IsChecked="True" Click="FollowTail_Click" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Follow the end of the log" AutomationProperties.AutomationId="LogsFollowTailToggle">
+                                <ToggleButton.KeyboardAccelerators>
+                                    <KeyboardAccelerator Modifiers="Control" Key="End" />
+                                </ToggleButton.KeyboardAccelerators>
+                                <ToolTipService.ToolTip>
+                                    <ToolTip><TextBlock x:Uid="LogsFollowTailTooltip" Text="Follow the end of the log (Ctrl+End)" /></ToolTip>
+                                </ToolTipService.ToolTip>
+                                <FontIcon Glyph="&#xE74B;" FontSize="14" />
+                            </ToggleButton>
+                        </StackPanel>
                     </Grid>
                     <TextBlock x:Name="TailNoticeText" x:Uid="LogsTailNotice" Grid.Row="1" Margin="16,0,16,8" Text="Showing the latest 4 MB. Search applies to this portion of the log." Style="{StaticResource SettingsRowDescriptionStyle}" Visibility="Collapsed" />
                     <Border Grid.Row="2" Background="{ThemeResource SubtleSurfaceBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" CornerRadius="0,0,8,8">
-                        <ScrollViewer x:Name="LogScroll" Padding="16,10,16,10" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer x:Name="LogScroll" Padding="16,10,16,10" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" ViewChanged="LogScroll_ViewChanged">
                             <TextBlock x:Name="LogContentText" FontFamily="Cascadia Mono, Consolas" FontSize="13" TextWrapping="NoWrap" IsTextSelectionEnabled="True" FlowDirection="LeftToRight" />
                         </ScrollViewer>
                     </Border>

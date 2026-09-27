@@ -20,6 +20,8 @@ public sealed class SitesListItem : INotifyPropertyChanged
     private string? lastError;
     private bool isRunning;
     private bool isShared;
+    private string? phpVersion;
+    private bool usesPhp;
 
     public SitesListItem(SiteRecord site)
     {
@@ -69,6 +71,11 @@ public sealed class SitesListItem : INotifyPropertyChanged
     public Style StatusDotStyle => StatusStyles.Dot(HasError ? StatusTone.Critical : StatusTone.Success);
 
     public Visibility SharedVisibility => isShared ? Visibility.Visible : Visibility.Collapsed;
+
+    // Inline PHP picker: Node.js sites have no PHP runtime, so the chip is hidden for them.
+    public string PhpLabel => phpVersion is null ? "PHP" : $"PHP {phpVersion}";
+
+    public Visibility PhpPickerVisibility => usesPhp ? Visibility.Visible : Visibility.Collapsed;
 
     private bool HasError => !string.IsNullOrWhiteSpace(lastError);
 
@@ -123,6 +130,17 @@ public sealed class SitesListItem : INotifyPropertyChanged
         {
             Raise(nameof(StatusDotVisibility));
             Raise(nameof(StatusDotStyle));
+        }
+        if (!string.Equals(phpVersion, site.PhpVersion, StringComparison.Ordinal))
+        {
+            phpVersion = site.PhpVersion;
+            Raise(nameof(PhpLabel));
+        }
+        var php = !site.Framework.Equals("Node.js", StringComparison.OrdinalIgnoreCase);
+        if (usesPhp != php)
+        {
+            usesPhp = php;
+            Raise(nameof(PhpPickerVisibility));
         }
         if (isShared != site.IsShared)
         {

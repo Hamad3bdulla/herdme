@@ -120,6 +120,15 @@
     <Compile Include="../HerdMe.Windows/Services/TablePlusConnection.cs" Link="Services/TablePlusConnection.cs" />
     <Compile Include="../HerdMe.Windows/Services/UnhandledExceptionPolicy.cs" Link="Services/UnhandledExceptionPolicy.cs" />
     <Compile Include="../HerdMe.Windows/Services/UiLanguagePolicy.cs" Link="Services/UiLanguagePolicy.cs" />
+    <Compile Include="../HerdMe.Windows/Services/UiLanguageSettings.cs" Link="Services/UiLanguageSettings.cs" />
+    <Compile Include="../HerdMe.Windows/Models/ActivityEvent.cs" Link="Models/ActivityEvent.cs" />
+    <Compile Include="Round5UxContractChecks.cs" />
+    <Compile Include="../HerdMe.Windows/Services/StatusBarPresentation.cs" Link="Services/StatusBarPresentation.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ChangelogReader.cs" Link="Services/ChangelogReader.cs" />
+    <Compile Include="../HerdMe.Windows/Services/MailInspection.cs" Link="Services/MailInspection.cs" />
+    <Compile Include="../HerdMe.Windows/Models/DumpTree.cs" Link="Models/DumpTree.cs" />
+    <Compile Include="../HerdMe.Windows/Services/LogHighlighting.cs" Link="Services/LogHighlighting.cs" />
+    <Compile Include="../HerdMe.Windows/Services/AnsiText.cs" Link="Services/AnsiText.cs" />
     <Compile Include="../HerdMe.Windows/Services/SingleInstanceCoordinator.cs" Link="Services/SingleInstanceCoordinator.cs" />
     <Compile Include="../HerdMe.Windows/Services/WindowsHostsManager.cs" Link="Services/WindowsHostsManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/AppUpdateManager.cs" Link="Services/AppUpdateManager.cs" />

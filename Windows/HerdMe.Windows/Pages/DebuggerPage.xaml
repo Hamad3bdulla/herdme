@@ -199,7 +199,7 @@
                             <Button x:Name="OpenProfilesButton" x:Uid="DebuggerOpenProfilesButton" Click="OpenProfiles_Click" AutomationProperties.Name="Open profiles folder" Style="{StaticResource ToolbarIconButtonStyle}">
                                 <SymbolIcon Symbol="OpenLocal" />
                             </Button>
-                            <Button x:Name="DeleteProfilesButton" x:Uid="DebuggerDeleteProfilesButton" Click="DeleteProfiles_Click" IsEnabled="False" AutomationProperties.Name="Delete all profiles" Style="{StaticResource ToolbarIconButtonStyle}">
+                            <Button x:Name="DeleteProfilesButton" x:Uid="DebuggerDeleteProfilesButton" Click="DeleteProfiles_Click" IsEnabled="False" AutomationProperties.Name="Delete all profiles" Style="{StaticResource DangerToolbarIconButtonStyle}">
                                 <SymbolIcon Symbol="Delete" />
                             </Button>
                         </StackPanel>

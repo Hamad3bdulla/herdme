@@ -71,9 +71,32 @@ public partial class App : Application
             return value == key ? null : value;
         };
         services = new AppServices();
+        // Before any resource lookup or XAML load, so x:Uid, ResourceLoader and FlowDirection
+        // all agree on the language chosen in General.
+        ApplyLanguageOverride(services.SiteSettings.Load().UiLanguage);
         InstallCrashReporter();
         InitializeComponent();
         UnhandledException += App_UnhandledException;
+    }
+
+    private static void ApplyLanguageOverride(string? language)
+    {
+        var normalized = UiLanguageSettings.Normalize(language);
+        try
+        {
+            Microsoft.Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = normalized;
+            if (normalized.Length == 0) return;
+            // UI culture only: dates and numbers keep the user's Windows regional format.
+            var culture = System.Globalization.CultureInfo.GetCultureInfo(normalized);
+            System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = culture;
+            System.Globalization.CultureInfo.CurrentUICulture = culture;
+        }
+        catch (Exception error) when (error is System.Runtime.InteropServices.COMException
+            or ArgumentException
+            or System.Globalization.CultureNotFoundException)
+        {
+            System.Diagnostics.Debug.WriteLine($"HerdMe could not apply the language override: {error.Message}");
+        }
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -453,7 +476,7 @@ public partial class App : Application
         await StopAllAsync();
     }
 
-    private async Task StartAllAsync()
+    internal async Task StartAllAsync()
     {
         await backgroundTasks.RunAsync(async cancellationToken =>
         {
@@ -464,7 +487,7 @@ public partial class App : Application
         });
     }
 
-    private async Task StopAllAsync()
+    internal async Task StopAllAsync()
     {
         await backgroundTasks.RunAsync(async _ =>
         {

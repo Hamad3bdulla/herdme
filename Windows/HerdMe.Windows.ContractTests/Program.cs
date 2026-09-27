@@ -155,6 +155,7 @@ try
     await VerifyAppCommandContractsAsync(repositoryRoot, supportRoot);
     await VerifyShellIntegrationContractsAsync(repositoryRoot, supportRoot);
     await VerifyNotificationAndDiagnosticsContractsAsync(repositoryRoot, supportRoot);
+    VerifyRound5UxContracts(repositoryRoot, supportRoot);
     await VerifyLaravelToolsContractsAsync(repositoryRoot, supportRoot);
     VerifyPlatformToolingContracts(repositoryRoot);
 }

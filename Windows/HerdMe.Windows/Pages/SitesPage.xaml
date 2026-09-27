@@ -115,7 +115,7 @@
                 <TextBox
                     x:Uid="SitesRootPathField"
                     x:Name="RootPathTextBox"
-                    Height="36"
+                    MinHeight="36"
                     PlaceholderText="Site folder" />
                 <Button x:Uid="SitesChooseFolderButton" Grid.Column="1" Click="Browse_Click" AutomationProperties.Name="Choose folder" Style="{StaticResource SitesIconButtonStyle}">
                     <ToolTipService.ToolTip>
@@ -135,7 +135,7 @@
                     </ToolTipService.ToolTip>
                     <SymbolIcon Symbol="Remove" />
                 </Button>
-                <Button Grid.Column="4" Height="36" Click="LinkSite_Click">
+                <Button Grid.Column="4" MinHeight="36" Click="LinkSite_Click">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <SymbolIcon Symbol="Link" />
                         <TextBlock x:Uid="SitesLinkProjectButton" Text="Link project" />
@@ -293,6 +293,7 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <Grid Width="34" Height="34" VerticalAlignment="Top">
                                         <Border
@@ -346,6 +347,22 @@
                                         <TextBlock Text="{x:Bind WorkflowStatus, Mode=OneWay}" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" />
                                         <TextBlock Text="{x:Bind LastError, Mode=OneWay}" MaxLines="2" TextWrapping="Wrap" Visibility="{x:Bind LastErrorVisibility, Mode=OneWay}" Style="{StaticResource StatusCriticalTextStyle}" />
                                     </StackPanel>
+                                    <DropDownButton
+                                        x:Uid="SitesRowPhpPicker"
+                                        Grid.Column="2"
+                                        VerticalAlignment="Center"
+                                        Padding="8,2,6,2"
+                                        MinHeight="0"
+                                        FontSize="12"
+                                        Tag="{x:Bind Path}"
+                                        Content="{x:Bind PhpLabel, Mode=OneWay}"
+                                        Visibility="{x:Bind PhpPickerVisibility, Mode=OneWay}"
+                                        AutomationProperties.Name="PHP version"
+                                        AutomationProperties.AutomationId="SitesRowPhpPicker">
+                                        <DropDownButton.Flyout>
+                                            <MenuFlyout Placement="BottomEdgeAlignedRight" Opening="RowPhpFlyout_Opening" />
+                                        </DropDownButton.Flyout>
+                                    </DropDownButton>
                                 </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>
@@ -537,7 +554,8 @@
                                                 x:Uid="SitesMoveToRecycleBinCommand"
                                                 x:Name="RemoveSiteButton"
                                                 Text="Move project to Recycle Bin"
-                                                Click="MoveSelectedSiteToRecycleBin_Click" />
+                                                Click="MoveSelectedSiteToRecycleBin_Click"
+                                                Style="{StaticResource DangerMenuFlyoutItemStyle}" />
                                         </MenuFlyout>
                                     </AppBarButton.Flyout>
                                 </AppBarButton>

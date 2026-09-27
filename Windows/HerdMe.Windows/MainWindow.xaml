@@ -8,6 +8,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="48" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Custom title bar; the whole strip stays a drag region, so it holds no controls. -->
@@ -50,6 +51,7 @@
             <NavigationView.MenuItems>
             <NavigationViewItem x:Uid="NavDashboard" AutomationProperties.AutomationId="NavDashboard" Content="Dashboard" Tag="dashboard">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
+                <NavigationViewItem.InfoBadge><InfoBadge x:Name="DashboardBadge" Style="{StaticResource CautionValueInfoBadgeStyle}" Visibility="Collapsed" /></NavigationViewItem.InfoBadge>
             </NavigationViewItem>
             <NavigationViewItem x:Uid="NavSites" AutomationProperties.AutomationId="NavSites" Content="Sites" Tag="sites">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Folder" /></NavigationViewItem.Icon>
@@ -104,6 +106,63 @@
             x:Name="Onboarding"
             Grid.Row="1"
             SetupCompleted="Onboarding_SetupCompleted" />
+
+        <!-- Status bar: environment, ports, running downloads and the loopback-only promise. -->
+        <Border
+            x:Name="StatusBar"
+            Grid.Row="2"
+            Padding="16,3,16,4"
+            MinHeight="28"
+            BorderThickness="0,1,0,0"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            Background="{ThemeResource ShellBackgroundBrush}"
+            Visibility="Collapsed"
+            AutomationProperties.AutomationId="StatusBar">
+            <Grid ColumnSpacing="18">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                    <Ellipse x:Name="StatusBarDot" Style="{StaticResource StatusDotNeutralStyle}" />
+                    <TextBlock x:Name="StatusBarEnvironmentText" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock x:Name="StatusBarPortsText" Grid.Column="1" Style="{StaticResource CaptionTextStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                <HyperlinkButton
+                    x:Uid="StatusBarDownloadsButton"
+                    x:Name="StatusBarDownloadsButton"
+                    Grid.Column="2"
+                    Padding="6,0,6,0"
+                    MinHeight="0"
+                    Visibility="Collapsed"
+                    AutomationProperties.Name="Open downloads"
+                    AutomationProperties.AutomationId="StatusBarDownloads"
+                    Click="StatusBarDownloads_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <ProgressRing x:Name="StatusBarDownloadsRing" Width="12" Height="12" MinWidth="12" MinHeight="12" IsActive="False" />
+                        <TextBlock x:Name="StatusBarDownloadsText" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </HyperlinkButton>
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE72E;" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock x:Uid="StatusBarLoopback" Text="Local only" Style="{StaticResource CaptionTextStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <ToolTipService.ToolTip>
+                        <ToolTip><TextBlock x:Uid="StatusBarLoopbackTooltip" Text="HerdMe listens on 127.0.0.1 only. Nothing is reachable from other devices unless you share a site." TextWrapping="Wrap" /></ToolTip>
+                    </ToolTipService.ToolTip>
+                </StackPanel>
+            </Grid>
+        </Border>
+        <TeachingTip
+            x:Name="StatusBarTip"
+            x:Uid="StatusBarTip"
+            Grid.Row="2"
+            Target="{x:Bind StatusBar}"
+            PreferredPlacement="Top"
+            Title="The status bar"
+            Subtitle="Environment state, the ports in use and running downloads stay visible here on every page. Select the downloads to see their progress."
+            AutomationProperties.AutomationId="StatusBarTip" />
 
         <!-- One light confirmation surface ("Copied", "Saved", Undo) for the whole window. -->
         <Border
