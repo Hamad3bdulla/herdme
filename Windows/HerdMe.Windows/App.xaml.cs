@@ -38,6 +38,7 @@ public partial class App : Application
     private bool suppressAutomaticUpdateCheck;
     private Task<AutomaticUpdateCheck>? automaticUpdateCheck;
     private Task activationListener = Task.CompletedTask;
+    private Task backgroundServicesStartup = Task.CompletedTask;
 
     public App()
     {
@@ -49,9 +50,16 @@ public partial class App : Application
             Environment.Exit(helperExitCode);
             return;
         }
-        singleInstance = new SingleInstanceCoordinator();
+        launchRequest = ParseLaunchRequest();
+        singleInstance = new SingleInstanceCoordinator(signalActivation: launchRequest is null);
         if (!singleInstance.IsPrimary)
         {
+            // Jump List tasks, Explorer "Link with HerdMe" and herdme:// links forward their
+            // request to the running instance; plain launches just bring it forward.
+            if (launchRequest is not null && !ForwardLaunchRequest(launchRequest))
+            {
+                singleInstance.SignalActivation();
+            }
             singleInstance.Dispose();
             Environment.Exit(0);
             return;
@@ -63,6 +71,7 @@ public partial class App : Application
             return value == key ? null : value;
         };
         services = new AppServices();
+        InstallCrashReporter();
         InitializeComponent();
         UnhandledException += App_UnhandledException;
     }
@@ -82,6 +91,7 @@ public partial class App : Application
         var onboardingAfterReinstall = !acceptanceRun && !onboardingAcceptance
             && services.SiteSettings.ApplyOnboardingAfterReinstallRequest();
         suppressAutomaticUpdateCheck = acceptanceRun || onboardingAcceptance;
+        suppressNotifications = acceptanceRun || onboardingAcceptance;
         MainWindow = new MainWindow(
             services,
             skipOnboarding: acceptanceRun,
@@ -93,8 +103,10 @@ public partial class App : Application
         MainWindow.VisibilityChanged += MainWindow_VisibilityChanged;
         MainWindow.AppWindow.Changed += MainWindow_AppWindowChanged;
         SystemEvents.PowerModeChanged += System_PowerModeChanged;
+        SubscribeNotifications();
         if (!MainWindow.RequiresOnboarding
-            && Environment.GetCommandLineArgs().Contains("--background", StringComparer.OrdinalIgnoreCase))
+            && (Environment.GetCommandLineArgs().Contains("--background", StringComparer.OrdinalIgnoreCase)
+                || IsBackgroundLaunchRequest(launchRequest)))
         {
             MainWindow.AppWindow.Hide();
             SetMainWindowVisible(false);
@@ -105,11 +117,15 @@ public partial class App : Application
             SetMainWindowVisible(true);
         }
         activationListener = ListenForActivationAsync();
+        StartCommandServer();
         if (!MainWindow.RequiresOnboarding)
         {
             _ = StartBackgroundServicesOnceAsync();
             StartAutomaticUpdateCheckOnce();
+            if (launchRequest is { } request) _ = RunLaunchRequestAsync(request);
+            NotifyPreviousCrash();
         }
+        launchRequest = null;
     }
 
     private void MainWindow_InitialSetupCompleted(object? sender, EventArgs args)
@@ -204,6 +220,7 @@ public partial class App : Application
 
         if (result.ApplicationRelease is { } release)
         {
+            NotifyUpdateAvailable(release);
             await AppUpdatePrompt.ShowAsync(xamlRoot, release);
         }
         if (exitRequested || result.Components.Updates.Count == 0) return;
@@ -388,13 +405,16 @@ public partial class App : Application
         exitRequested = true;
         singleInstance.WakeListener();
         SystemEvents.PowerModeChanged -= System_PowerModeChanged;
+        UnsubscribeNotifications();
         MainWindow.VisibilityChanged -= MainWindow_VisibilityChanged;
         MainWindow.AppWindow.Changed -= MainWindow_AppWindowChanged;
         MainWindow.PrepareForShutdown();
         SetMainWindowVisible(false);
         trayIcon?.Dispose();
         trayIcon = null;
+        await StopAndLogAsync("command pipe", StopCommandServerAsync);
         await StopAndLogAsync("background operations", backgroundTasks.StopAsync);
+        await StopAndLogAsync("site folder watcher", StopSiteRootWatcherAsync);
         await StopAndLogAsync("activation listener", () => activationListener);
         await StopAndLogAsync(
             "application services",
@@ -422,6 +442,16 @@ public partial class App : Application
 
     private async void StartCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)
     {
+        await StartAllAsync();
+    }
+
+    private async void StopCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)
+    {
+        await StopAllAsync();
+    }
+
+    private async Task StartAllAsync()
+    {
         await backgroundTasks.RunAsync(async cancellationToken =>
         {
             services.SiteSettings.UpdateStartAutomatically(true);
@@ -431,7 +461,7 @@ public partial class App : Application
         });
     }
 
-    private async void StopCommand_ExecuteRequested(object? sender, ExecuteRequestedEventArgs args)
+    private async Task StopAllAsync()
     {
         await backgroundTasks.RunAsync(async _ =>
         {
@@ -462,6 +492,8 @@ public partial class App : Application
         var commandLinePath = StartAndLogAsync("command-line path", () => Task.Run(() =>
         {
             services.NodeInstaller.RepairActiveCommandShims();
+            HerdMeCommandShim.Ensure(services.SiteSettings.SupportRoot, AppContext.BaseDirectory);
+            RepairShellIntegration();
             services.UserPath.Synchronize(
                 services.ComposerTools.CommandLineDirectories(
                     services.RuntimePolicy.Load().PhpCycle
@@ -497,6 +529,8 @@ public partial class App : Application
             cancellationToken
         );
         await Task.WhenAll(commandLinePath, mailCapture, dumpCapture, managedServices, environment);
+        await StartAndLogAsync("jump list", () => RefreshJumpListAsync(cancellationToken), cancellationToken);
+        await StartAndLogAsync("site folder watcher", () => Task.Run(StartSiteRootWatcher, cancellationToken), cancellationToken);
         // Tool installation rewrites PHP configuration and the user PATH, so it waits for the
         // path repair and the running environment above.
         await StartAndLogAsync(
@@ -511,9 +545,11 @@ public partial class App : Application
 
     private Task StartBackgroundServicesOnceAsync()
     {
-        return Interlocked.Exchange(ref backgroundServicesStarted, 1) == 0
-            ? backgroundTasks.RunAsync(StartBackgroundServicesAsync)
-            : Task.CompletedTask;
+        if (Interlocked.Exchange(ref backgroundServicesStarted, 1) == 0)
+        {
+            backgroundServicesStartup = backgroundTasks.RunAsync(StartBackgroundServicesAsync);
+        }
+        return backgroundServicesStartup;
     }
 
     private static async Task StartAndLogAsync(
@@ -544,7 +580,12 @@ public partial class App : Application
         Microsoft.UI.Xaml.UnhandledExceptionEventArgs args
     )
     {
-        if (!UnhandledExceptionPolicy.CanRecover(args.Exception)) return;
+        if (!UnhandledExceptionPolicy.CanRecover(args.Exception))
+        {
+            // HerdMe is about to close: keep a local crash report for the next start.
+            crashReporter?.TryWrite(args.Exception, writeDump: true);
+            return;
+        }
         args.Handled = true;
         _ = ReportUnhandledExceptionAsync(args.Exception);
     }

@@ -1253,4 +1253,78 @@ Recovery backup: {1}</value></data>
   <data name="TinkerStartFailed" xml:space="preserve"><value>The selected PHP runtime could not start.</value></data>
   <data name="TinkerTimeoutSubject" xml:space="preserve"><value>The Tinker code</value></data>
   <data name="TinkerCodeBox.PlaceholderText" xml:space="preserve"><value>return App\Models\User::count();</value></data>
+  <data name="AppCommandFailedTitle" xml:space="preserve"><value>HerdMe could not do that</value></data>
+  <data name="JumpListStartAll" xml:space="preserve"><value>Start all</value></data>
+  <data name="JumpListStartAllDescription" xml:space="preserve"><value>Start the environment and enabled services</value></data>
+  <data name="JumpListStopAll" xml:space="preserve"><value>Stop all</value></data>
+  <data name="JumpListStopAllDescription" xml:space="preserve"><value>Stop the environment and all services</value></data>
+  <data name="JumpListSites" xml:space="preserve"><value>Sites</value></data>
+  <data name="JumpListSitesDescription" xml:space="preserve"><value>Show the Sites page</value></data>
+  <data name="JumpListTinker" xml:space="preserve"><value>Tinker</value></data>
+  <data name="JumpListTinkerDescription" xml:space="preserve"><value>Show the Tinker page</value></data>
+  <data name="JumpListSitesCategory" xml:space="preserve"><value>Sites</value></data>
+  <data name="GeneralWindowsIntegrationSectionTitle.Text" xml:space="preserve"><value>Windows integration</value></data>
+  <data name="GeneralWindowsIntegrationDescription.Text" xml:space="preserve"><value>Optional. Each switch writes one HerdMe entry for your Windows account only and removes it when turned off or when HerdMe is uninstalled.</value></data>
+  <data name="GeneralExplorerLinkTitle.Text" xml:space="preserve"><value>Link with HerdMe in Explorer</value></data>
+  <data name="GeneralExplorerLinkDescription.Text" xml:space="preserve"><value>Adds "Link with HerdMe" when you right-click a folder (under Show more options on Windows 11).</value></data>
+  <data name="GeneralUriProtocolTitle.Text" xml:space="preserve"><value>herdme:// links</value></data>
+  <data name="GeneralUriProtocolDescription.Text" xml:space="preserve"><value>Lets links such as herdme://site/blog show a site in HerdMe. Links can only show pages; they cannot start, stop, share, or change anything.</value></data>
+  <data name="GeneralTerminalProfileTitle.Text" xml:space="preserve"><value>Windows Terminal profile</value></data>
+  <data name="GeneralTerminalProfileDescription.Text" xml:space="preserve"><value>Adds a HerdMe profile with PHP, Composer, Node.js, and the herdme command on PATH.</value></data>
+  <data name="ExplorerLinkToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Link with HerdMe in Explorer</value></data>
+  <data name="UriProtocolToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>herdme:// links</value></data>
+  <data name="TerminalProfileToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Windows Terminal profile</value></data>
+  <data name="GeneralWindowsIntegrationFailedTitle" xml:space="preserve"><value>HerdMe could not change Windows integration</value></data>
+  <data name="ShellLinkWithHerdMe" xml:space="preserve"><value>Link with HerdMe</value></data>
+  <data name="NotificationServiceStoppedTitle" xml:space="preserve"><value>Service stopped</value></data>
+  <data name="NotificationServiceStoppedWithCode" xml:space="preserve"><value>{0} stopped unexpectedly (exit code {1}).</value></data>
+  <data name="NotificationServiceStoppedMessage" xml:space="preserve"><value>{0} stopped unexpectedly.</value></data>
+  <data name="NotificationSiteProcessStoppedTitle" xml:space="preserve"><value>Site process stopped</value></data>
+  <data name="NotificationSiteProcessStoppedMessage" xml:space="preserve"><value>{0} for {1} stopped with exit code {2}.</value></data>
+  <data name="NotificationShareEndedTitle" xml:space="preserve"><value>Public link ended</value></data>
+  <data name="NotificationShareEndedMessage" xml:space="preserve"><value>The public link for {0} stopped. The site is private again.</value></data>
+  <data name="NotificationUpdateTitle" xml:space="preserve"><value>HerdMe update available</value></data>
+  <data name="NotificationUpdateMessage" xml:space="preserve"><value>HerdMe {0} is ready. Open HerdMe to install it.</value></data>
+  <data name="NotificationCrashTitle" xml:space="preserve"><value>HerdMe closed unexpectedly</value></data>
+  <data name="NotificationCrashMessage" xml:space="preserve"><value>A crash report was saved on this PC. Use Export diagnostics in General if you want to share it.</value></data>
+  <data name="NotificationProcessQueue" xml:space="preserve"><value>Queue worker</value></data>
+  <data name="NotificationProcessScheduler" xml:space="preserve"><value>Scheduler</value></data>
+  <data name="NotificationProcessDevelopment" xml:space="preserve"><value>Development server</value></data>
+  <data name="GeneralNotificationsTitle.Text" xml:space="preserve"><value>Notifications</value></data>
+  <data name="GeneralNotificationsDescription.Text" xml:space="preserve"><value>Show a tray notification when a service, worker, or public link stops unexpectedly, or when an update is ready while HerdMe is in the tray.</value></data>
+  <data name="NotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Notifications</value></data>
+  <data name="GeneralDiagnosticsTitle.Text" xml:space="preserve"><value>Diagnostics</value></data>
+  <data name="GeneralDiagnosticsDescription.Text" xml:space="preserve"><value>Save HerdMe logs, settings, and crash reports to a zip you can attach to a bug report. Secrets are masked and nothing is sent.</value></data>
+  <data name="GeneralIncludeCrashDumps.Content" xml:space="preserve"><value>Include crash dumps</value></data>
+  <data name="GeneralExportDiagnostics.Content" xml:space="preserve"><value>Export diagnostics</value></data>
+  <data name="GeneralDiagnosticsZipType" xml:space="preserve"><value>Zip archive</value></data>
+  <data name="GeneralDiagnosticsSaved" xml:space="preserve"><value>Saved {0} files to {1}. Review the zip before sharing it.</value></data>
+  <data name="GeneralDiagnosticsFailed" xml:space="preserve"><value>Diagnostics could not be exported: {0}</value></data>
+  <data name="LogsLevelBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Minimum log level</value></data>
+  <data name="LogsOpenLastErrorButton.Content" xml:space="preserve"><value>Open last error</value></data>
+  <data name="LogsOpenLastErrorButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open last error in editor</value></data>
+  <data name="LogsLevelAll" xml:space="preserve"><value>All levels</value></data>
+  <data name="LogsLevelInfo" xml:space="preserve"><value>Info and above</value></data>
+  <data name="LogsLevelWarning" xml:space="preserve"><value>Warnings and above</value></data>
+  <data name="LogsLevelError" xml:space="preserve"><value>Errors and above</value></data>
+  <data name="LogsLevelCounts" xml:space="preserve"><value>{0} errors, {1} warnings, {2} entries</value></data>
+  <data name="LogsOpenedWithoutLine" xml:space="preserve"><value>Opened in the default app. Install Visual Studio Code to jump straight to line {0}.</value></data>
+  <data name="LogsOpenLastErrorFailed" xml:space="preserve"><value>The file could not be opened: {0}</value></data>
+  <data name="SitesQualityCommand.Text" xml:space="preserve"><value>Code quality</value></data>
+  <data name="SitesQualityPintCommand.Text" xml:space="preserve"><value>Check code style (Pint)</value></data>
+  <data name="SitesQualityPhpStanCommand.Text" xml:space="preserve"><value>Static analysis (PHPStan)</value></data>
+  <data name="SitesQualityTestsCommand.Text" xml:space="preserve"><value>Run tests</value></data>
+  <data name="SitesQualityToolPint" xml:space="preserve"><value>Pint</value></data>
+  <data name="SitesQualityToolPhpStan" xml:space="preserve"><value>PHPStan</value></data>
+  <data name="SitesQualityToolTests" xml:space="preserve"><value>Tests</value></data>
+  <data name="SitesQualityRunning" xml:space="preserve"><value>Running {0} for {1}</value></data>
+  <data name="SitesQualityPassed" xml:space="preserve"><value>{0} passed.</value></data>
+  <data name="SitesQualityIssues" xml:space="preserve"><value>{0}: {1} items to review.</value></data>
+  <data name="SitesQualityFailedNoIssues" xml:space="preserve"><value>{0} exited with code {1}. See the output below.</value></data>
+  <data name="SitesQualityOpenHint" xml:space="preserve"><value>Select an item to open it in your editor at that line.</value></data>
+  <data name="SitesQualityIssuesList" xml:space="preserve"><value>Findings</value></data>
+  <data name="SitesQualityOpenedWithoutLine" xml:space="preserve"><value>Opened in the default app. Install Visual Studio Code to jump straight to line {0}.</value></data>
+  <data name="SitesQualityOpenFailed" xml:space="preserve"><value>The file could not be opened: {0}</value></data>
+  <data name="SitesQualityOutput" xml:space="preserve"><value>Output</value></data>
+  <data name="SitesQualityDialogTitle" xml:space="preserve"><value>{0} - {1}</value></data>
 </root>

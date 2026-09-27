@@ -363,6 +363,11 @@
                                             <MenuFlyoutItem x:Uid="SitesNpmCommand" x:Name="NpmButton" Text="Run npm script" Click="Npm_Click" />
                                             <MenuFlyoutItem x:Uid="SitesComposerCommand" x:Name="ComposerButton" Text="Run Composer command" Click="Composer_Click" />
                                             <MenuFlyoutItem x:Uid="SitesDoctorCommand" Text="Check and repair site" Click="SiteDoctor_Click" />
+                                            <MenuFlyoutSubItem x:Uid="SitesQualityCommand" x:Name="QualityMenu" Text="Code quality">
+                                                <MenuFlyoutItem x:Uid="SitesQualityPintCommand" Text="Check code style (Pint)" Click="QualityPint_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesQualityPhpStanCommand" Text="Static analysis (PHPStan)" Click="QualityPhpStan_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesQualityTestsCommand" Text="Run tests" Click="QualityTests_Click" />
+                                            </MenuFlyoutSubItem>
                                             <MenuFlyoutSeparator />
                                             <MenuFlyoutSubItem x:Uid="SitesAutomationCommand" Text="Automations">
                                                 <MenuFlyoutItem x:Uid="SitesAutomationUpdateLaravel" Text="Update Laravel project" Click="UpdateLaravelWorkflow_Click" />

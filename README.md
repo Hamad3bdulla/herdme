@@ -116,7 +116,9 @@ an available unreserved port, and can repair the stopped service configuration.
 
 > Valkey and Typesense are visible on Windows but installation is currently
 > disabled because their upstream projects do not publish verifiable native
-> Windows x64 packages.
+> Windows x64 packages. On Windows, use the Redis service where a project
+> expects Valkey (same protocol and `.env` variables) and Meilisearch for
+> Laravel Scout search.
 
 ### Development tools
 
@@ -129,6 +131,27 @@ an available unreserved port, and can repair the stopped service configuration.
 - Optional launch at login.
 - Stable and beta updates through a cryptographically signed HTTPS feed.
 - Single-instance enforcement to prevent duplicate background listeners.
+
+### Windows integration
+
+- A `herdme` command for terminals: `herdme status`, `herdme link`,
+  `herdme open <site>`, `herdme start`/`stop`, and more (`herdme help`). It talks
+  to the running app over a per-user local pipe and never starts a second copy.
+- A taskbar Jump List with Start all, Stop all, Sites, Tinker, and your sites.
+- New projects in a parked folder appear without pressing Refresh.
+- Opt-in, off by default, in General: an Explorer **Link with HerdMe** menu
+  entry, `herdme://` links that can only open HerdMe pages, and a Windows
+  Terminal profile. Each writes only HerdMe-named per-user entries, needs no
+  administrator rights, and is removed when turned off or on uninstall.
+- Tray notifications when a service, worker, or public link stops unexpectedly
+  (can be turned off).
+- Local crash reports and **Export diagnostics**: a zip of HerdMe logs,
+  settings, and crash reports with secrets masked. Nothing is uploaded.
+- Laravel code-quality actions per site: the project's own Pint (check only),
+  PHPStan, and `artisan test`, with each finding opening in the editor at its
+  line.
+- A live per-site Laravel log with a level filter (All, Info, Warning, Error),
+  entry counts, and **Open last error** at the file and line.
 
 ## Out of scope
 
@@ -264,6 +287,18 @@ Create the portable ZIP and Windows installer:
 .\Windows\package-portable.ps1 -Architecture x64 -Configuration Release
 .\Windows\package-installer.ps1 -Architecture x64 -Configuration Release
 ```
+
+Check accessibility (every page, UI Automation names and keyboard focus) and a
+first install on a clean Windows profile in Windows Sandbox:
+
+```powershell
+.\Windows\test-accessibility.ps1
+.\Windows\start-clean-acceptance.ps1
+```
+
+ARM64 is a build preview (not released yet): `.\Windows\build.ps1 -Architecture
+ARM64 -Configuration Release -SkipTests` cross-compiles the app and core. The x64
+installer also runs on Windows 11 on ARM through x64 emulation.
 
 Read [`Windows/README.md`](Windows/README.md) and
 [`Windows/ACCEPTANCE.md`](Windows/ACCEPTANCE.md) before treating a Windows build

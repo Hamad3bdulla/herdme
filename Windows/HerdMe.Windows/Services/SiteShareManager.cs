@@ -223,6 +223,9 @@ public sealed partial class SiteShareManager : IAsyncDisposable
 
     public event EventHandler? SharesChanged;
 
+    // Raised when cloudflared ends a public share that the user did not stop.
+    public event EventHandler<SiteShare>? ShareEndedUnexpectedly;
+
     public IReadOnlyList<SiteShare> Active => tunnels.Values.Select(tunnel => tunnel.Share).ToArray();
 
     public SiteShare? Find(string domain) =>
@@ -268,6 +271,7 @@ public sealed partial class SiteShareManager : IAsyncDisposable
         if (!tunnels.TryRemove(new KeyValuePair<string, ActiveTunnel>(key, tunnel))) return;
         _ = tunnel.DisposeAsync(environment);
         SharesChanged?.Invoke(this, EventArgs.Empty);
+        ShareEndedUnexpectedly?.Invoke(this, tunnel.Share);
     }
 
     public async Task StopAsync(string domain)

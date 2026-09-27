@@ -35,6 +35,13 @@ public sealed partial class LogsPage : Page
     private CancellationTokenSource? reloadCancellation;
     private CancellationTokenSource? contentCancellation;
     private CancellationTokenSource? searchCancellation;
+    private SourceLocation? lastErrorLocation;
+    private LaravelLogSummary? laravelSummary;
+
+    private sealed record LevelOption(string Label, LaravelLogLevel? Level)
+    {
+        public override string ToString() => Label;
+    }
 
     public ObservableCollection<LogSourceRecord> Sources { get; } = [];
     public ObservableCollection<LogFileRecord> Logs { get; } = [];
@@ -42,6 +49,13 @@ public sealed partial class LogsPage : Page
     private string ApplicationLogRoot => Path.Combine(siteSettings.SupportRoot, "Log");
 
     private LogSourceRecord? SelectedSource => SourceBox.SelectedItem as LogSourceRecord;
+
+    // Laravel sources get the level filter, counts, and Open last error.
+    private bool IsLaravelSource => SelectedSource is { IsApplication: false };
+
+    private LaravelLogLevel? SelectedLevel => IsLaravelSource && LevelBox.SelectedItem is LevelOption option
+        ? option.Level
+        : null;
 
     public LogsPage(
         CoreClient coreClient,
@@ -54,6 +68,14 @@ public sealed partial class LogsPage : Page
         pendingSitePath = requestedSitePath;
         InitializeComponent();
         TailNoticeText.Text = AppLocalization.Get("LogsTailNoticeLimited");
+        LevelBox.ItemsSource = new[]
+        {
+            new LevelOption(AppLocalization.Get("LogsLevelAll"), null),
+            new LevelOption(AppLocalization.Get("LogsLevelInfo"), LaravelLogLevel.Info),
+            new LevelOption(AppLocalization.Get("LogsLevelWarning"), LaravelLogLevel.Warning),
+            new LevelOption(AppLocalization.Get("LogsLevelError"), LaravelLogLevel.Error)
+        };
+        LevelBox.SelectedIndex = 0;
         refreshTimer.Tick += RefreshTimer_Tick;
         searchTimer.Tick += SearchTimer_Tick;
     }
@@ -170,11 +192,68 @@ public sealed partial class LogsPage : Page
 
     private async void SourceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        UpdateLaravelControls();
         if (!pageActive || loadingSources || SourceBox.SelectedItem is null) return;
         reloadCancellation?.Cancel();
         ClearContent();
         Logs.Clear();
         await ReloadAsync(force: true);
+    }
+
+    private async void LevelBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!pageActive) return;
+        await ApplySearchAsync();
+    }
+
+    private void UpdateLaravelControls()
+    {
+        var laravel = IsLaravelSource;
+        LevelBox.Visibility = laravel ? Visibility.Visible : Visibility.Collapsed;
+        OpenLastErrorButton.Visibility = laravel ? Visibility.Visible : Visibility.Collapsed;
+        ShowLaravelSummary(laravel ? laravelSummary : null);
+    }
+
+    private void ShowLaravelSummary(LaravelLogSummary? summary)
+    {
+        laravelSummary = summary;
+        lastErrorLocation = summary?.LastError;
+        OpenLastErrorButton.IsEnabled = lastErrorLocation is not null;
+        if (summary is null || !IsLaravelSource)
+        {
+            LevelCountsText.Visibility = Visibility.Collapsed;
+            return;
+        }
+        LevelCountsText.Text = AppLocalization.Format("LogsLevelCounts", summary.Errors, summary.Warnings, summary.Entries);
+        LevelCountsText.Visibility = Visibility.Visible;
+        if (lastErrorLocation is { } location)
+        {
+            ToolTipService.SetToolTip(OpenLastErrorButton, location.Path + ":" + location.Line);
+        }
+    }
+
+    private async void OpenLastError_Click(object sender, RoutedEventArgs e)
+    {
+        if (lastErrorLocation is not { } location) return;
+        try
+        {
+            var opened = await Task.Run(() => EditorLauncher.Open(location.Path, location.Line));
+            if (opened == EditorOpenKind.DefaultApp)
+            {
+                EditorBar.Message = AppLocalization.Format("LogsOpenedWithoutLine", location.Line);
+                EditorBar.Severity = InfoBarSeverity.Informational;
+                EditorBar.IsOpen = true;
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException
+            or Win32Exception or InvalidOperationException or ArgumentException)
+        {
+            EditorBar.Message = AppLocalization.Format("LogsOpenLastErrorFailed", UserErrorPresentation.Describe(error));
+            EditorBar.Severity = InfoBarSeverity.Warning;
+            EditorBar.IsOpen = true;
+            await DiagnosticLog.WriteFailureAsync("logs", "open-editor",
+                "The file from the last Laravel error could not be opened.", error.ToString());
+        }
     }
 
     private async void OpenFolder_Click(object sender, RoutedEventArgs e)
@@ -223,10 +302,12 @@ public sealed partial class LogsPage : Page
         var baseContent = state is null ? string.Empty : currentContent;
         var baseTruncated = state is not null && contentTruncated;
         var query = SearchBox.Text;
+        var level = SelectedLevel;
+        var laravel = IsLaravelSource;
         try
         {
             var view = await Task.Run(
-                () => ReadLogView(log.Path, state, baseContent, baseTruncated, query, cancellation.Token),
+                () => ReadLogView(log.Path, state, baseContent, baseTruncated, query, level, laravel, cancellation.Token),
                 cancellation.Token
             );
             if (!pageActive || cancellation.IsCancellationRequested || !IsSelectedLog(log.Path)) return;
@@ -236,9 +317,11 @@ public sealed partial class LogsPage : Page
             contentTruncated = view.Truncated;
             displayTrimmed = view.DisplayTrimmed;
             UpdateTailNotice();
+            ShowLaravelSummary(view.Summary);
             ShowText(view.Display, scrollToEnd: view.Reset);
-            // A search typed during the read re-renders from the cached text.
-            if (!string.Equals(query, SearchBox.Text, StringComparison.Ordinal)) await ApplySearchAsync();
+            // A search or level picked during the read re-renders from the cached text.
+            if (!string.Equals(query, SearchBox.Text, StringComparison.Ordinal) || level != SelectedLevel)
+                await ApplySearchAsync();
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
@@ -277,9 +360,10 @@ public sealed partial class LogsPage : Page
         searchCancellation = cancellation;
         var text = currentContent;
         var query = SearchBox.Text;
+        var level = SelectedLevel;
         try
         {
-            var (display, trimmed) = await Task.Run(() => BuildDisplay(text, query, cancellation.Token),
+            var (display, trimmed) = await Task.Run(() => BuildDisplay(text, query, level, cancellation.Token),
                 cancellation.Token);
             if (!pageActive || cancellation.IsCancellationRequested) return;
             displayTrimmed = trimmed;
@@ -326,6 +410,7 @@ public sealed partial class LogsPage : Page
         LogContentText.Text = string.Empty;
         LogTitleText.Text = AppLocalization.Get("LogsSelectLog");
         TailNoticeText.Visibility = Visibility.Collapsed;
+        ShowLaravelSummary(null);
     }
 
     private void UpdateReadProgress()
@@ -526,7 +611,8 @@ public sealed partial class LogsPage : Page
         string Display,
         bool DisplayTrimmed,
         bool Reset,
-        bool Unchanged
+        bool Unchanged,
+        LaravelLogSummary? Summary
     );
 
     private sealed record LogChunk(LogTailState State, string Text, bool Truncated);
@@ -537,13 +623,15 @@ public sealed partial class LogsPage : Page
         string baseContent,
         bool baseTruncated,
         string query,
+        LaravelLogLevel? level,
+        bool laravel,
         CancellationToken cancellationToken
     )
     {
         var appended = state is null ? null : ReadAppended(state, cancellationToken);
         if (appended is not null && appended.Text.Length == 0)
         {
-            return new LogView(appended.State, baseContent, baseTruncated, string.Empty, false, false, true);
+            return new LogView(appended.State, baseContent, baseTruncated, string.Empty, false, false, true, null);
         }
         var reset = appended is null;
         var chunk = appended ?? ReadTail(path, cancellationToken);
@@ -554,17 +642,22 @@ public sealed partial class LogsPage : Page
             content = TrimToLineStart(content, ContentCharacterLimit);
             truncated = true;
         }
-        var (display, displayTrimmed) = BuildDisplay(content, query, cancellationToken);
-        return new LogView(chunk.State, content, truncated, display, displayTrimmed, reset, false);
+        var (display, displayTrimmed) = BuildDisplay(content, query, level, cancellationToken);
+        var summary = laravel ? LaravelLog.Summarize(content, cancellationToken) : null;
+        return new LogView(chunk.State, content, truncated, display, displayTrimmed, reset, false, summary);
     }
 
+    // The level filter keeps whole Laravel entries (with their stack traces); search then
+    // narrows to matching lines.
     private static (string Display, bool Trimmed) BuildDisplay(
         string content,
         string? query,
+        LaravelLogLevel? level,
         CancellationToken cancellationToken
     )
     {
-        var filtered = LogPresentation.FilterLines(content, query, cancellationToken);
+        var leveled = LaravelLog.FilterByMinimumLevel(content, level, cancellationToken);
+        var filtered = LogPresentation.FilterLines(leveled, query, cancellationToken);
         return filtered.Length > DisplayCharacterLimit
             ? (TrimToLineStart(filtered, DisplayCharacterLimit), true)
             : (filtered, false);

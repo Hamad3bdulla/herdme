@@ -317,7 +317,8 @@ public sealed partial class MainWindow : Window
                     services.SiteSettings,
                     services.Updates,
                     services.ComponentUpdates,
-                    services.UserPath
+                    services.UserPath,
+                    services.ShellIntegration
                 );
             case "sites":
                 return new SitesPage(
@@ -428,6 +429,31 @@ public sealed partial class MainWindow : Window
         else
         {
             Navigation.SelectedItem = logsItem;
+        }
+    }
+
+    // Selects a site on the Sites page (from the herdme CLI, Jump List, or a herdme:// link).
+    public void NavigateToSite(string sitePath)
+    {
+        if (shuttingDown) return;
+        if (!cachedPages.TryGetValue("sites", out var page))
+        {
+            page = CreatePage("sites");
+            cachedPages["sites"] = page;
+        }
+        if (page is SitesPage sitesPage) sitesPage.RequestSelectSite(sitePath);
+        NavigateToPage("sites");
+        if (Navigation.SelectedItem is NavigationViewItem { Tag: "sites" }) ShowPage("sites");
+    }
+
+    // Sites changed outside the Sites page (linked from Explorer or the CLI, or a new folder
+    // appeared in a parked root). A cached, visible page rescans; a hidden one on next show.
+    public void NotifySitesChanged()
+    {
+        if (shuttingDown) return;
+        if (cachedPages.TryGetValue("sites", out var page) && page is SitesPage sitesPage)
+        {
+            sitesPage.RequestRescan();
         }
     }
 

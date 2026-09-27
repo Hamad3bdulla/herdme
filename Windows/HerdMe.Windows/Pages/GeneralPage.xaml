@@ -58,6 +58,68 @@
                         </StackPanel>
                         <ToggleSwitch x:Name="CompactModeToggle" Grid.Column="2" MinWidth="0" Toggled="CompactModeToggle_Toggled" />
                     </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xEA8F;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Uid="GeneralNotificationsTitle" Text="Notifications" Style="{StaticResource SettingsRowTitleStyle}" />
+                            <TextBlock x:Uid="GeneralNotificationsDescription" Text="Show a tray notification when a service, worker, or public link stops unexpectedly, or when an update is ready while HerdMe is in the tray." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="NotificationsToggle" x:Uid="NotificationsToggle" Grid.Column="2" MinWidth="0" Toggled="NotificationsToggle_Toggled" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <TextBlock x:Uid="GeneralWindowsIntegrationSectionTitle" Text="Windows integration" Style="{StaticResource SectionHeaderStyle}" />
+            <TextBlock x:Uid="GeneralWindowsIntegrationDescription" Text="Optional. Each switch writes one HerdMe entry for your Windows account only and removes it when turned off or when HerdMe is uninstalled." Style="{StaticResource SettingsRowDescriptionStyle}" TextWrapping="Wrap" Margin="0,0,0,8" />
+            <Border Style="{StaticResource SettingsGroupStyle}">
+                <StackPanel>
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE8B7;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Uid="GeneralExplorerLinkTitle" Text="Link with HerdMe in Explorer" Style="{StaticResource SettingsRowTitleStyle}" />
+                            <TextBlock x:Uid="GeneralExplorerLinkDescription" Text="Adds &quot;Link with HerdMe&quot; when you right-click a folder (under Show more options on Windows 11)." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="ExplorerLinkToggle" x:Uid="ExplorerLinkToggle" Grid.Column="2" MinWidth="0" Toggled="ShellIntegrationToggle_Toggled" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE71B;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Uid="GeneralUriProtocolTitle" Text="herdme:// links" Style="{StaticResource SettingsRowTitleStyle}" />
+                            <TextBlock x:Uid="GeneralUriProtocolDescription" Text="Lets links such as herdme://site/blog show a site in HerdMe. Links can only show pages; they cannot start, stop, share, or change anything." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="UriProtocolToggle" x:Uid="UriProtocolToggle" Grid.Column="2" MinWidth="0" Toggled="ShellIntegrationToggle_Toggled" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE756;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Uid="GeneralTerminalProfileTitle" Text="Windows Terminal profile" Style="{StaticResource SettingsRowTitleStyle}" />
+                            <TextBlock x:Uid="GeneralTerminalProfileDescription" Text="Adds a HerdMe profile with PHP, Composer, Node.js, and the herdme command on PATH." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="TerminalProfileToggle" x:Uid="TerminalProfileToggle" Grid.Column="2" MinWidth="0" Toggled="ShellIntegrationToggle_Toggled" />
+                    </Grid>
                 </StackPanel>
             </Border>
 
@@ -240,6 +302,27 @@
                             </ToolTipService.ToolTip>
                             <SymbolIcon Symbol="OpenLocal" />
                         </Button>
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xEBE8;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Uid="GeneralDiagnosticsTitle" Text="Diagnostics" Style="{StaticResource SettingsRowTitleStyle}" />
+                            <TextBlock x:Name="DiagnosticsStatusText" x:Uid="GeneralDiagnosticsDescription" Text="Save HerdMe logs, settings, and crash reports to a zip you can attach to a bug report. Secrets are masked and nothing is sent." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                            <CheckBox x:Name="IncludeCrashDumpsCheckBox" x:Uid="GeneralIncludeCrashDumps" Content="Include crash dumps" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <Button
+                            x:Name="ExportDiagnosticsButton"
+                            x:Uid="GeneralExportDiagnostics"
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Content="Export diagnostics"
+                            Click="ExportDiagnostics_Click" />
                     </Grid>
                 </StackPanel>
             </Border>

@@ -1,4 +1,5 @@
 param(
+    [ValidateSet("x64", "ARM64")]
     [string]$Architecture = "x64",
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Debug",
@@ -7,21 +8,29 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
-if ($Architecture -ne "x64") {
-    throw "HerdMe for Windows currently supports x64 only."
+# ARM64 is a build preview: the app and core compile natively for ARM64, while PHP, Node, and
+# the services stay the official x64 builds that Windows 11 on ARM runs under emulation.
+# Releases, the installer, and the acceptance suite are x64.
+$Architecture = if ($Architecture -eq "ARM64") { "ARM64" } else { "x64" }
+$hostArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+$crossCompiling = -not $hostArchitecture.Equals($Architecture, [StringComparison]::OrdinalIgnoreCase)
+# x64 binaries run on ARM64 Windows under emulation, but ARM64 binaries cannot run on x64.
+if ($Architecture -eq "ARM64" -and $crossCompiling -and -not $SkipTests) {
+    throw "The $Architecture core tests cannot run on this $hostArchitecture PC. Run the tests with the x64 build (or on an ARM64 PC) and pass -SkipTests for a cross-compiled $Architecture build."
 }
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $coreBuild = Join-Path $repoRoot "build\windows-core-$Architecture"
 $project = Join-Path $PSScriptRoot "HerdMe.Windows\HerdMe.Windows.csproj"
 $contractProject = Join-Path $PSScriptRoot "HerdMe.Windows.ContractTests\HerdMe.Windows.ContractTests.csproj"
 $runtimeDirectory = Join-Path $PSScriptRoot "HerdMe.Windows\Runtime"
-$runtimeIdentifier = "win-x64"
+$runtimeIdentifier = if ($Architecture -eq "ARM64") { "win-arm64" } else { "win-x64" }
 $nativeBuildLog = Join-Path $repoRoot "build\windows-native-build.log"
 $nativeBuildBinaryLog = Join-Path $repoRoot "build\windows-native-build.binlog"
 $nativeBuildLogDirectory = Split-Path -Parent $nativeBuildLog
 $vcRuntimeDirectory = Join-Path $repoRoot "build\windows-vc143-runtime"
 . (Join-Path $PSScriptRoot "windows-build-tools.ps1")
 
+# These are the x64 runtime files HerdMe copies next to the x64 PHP builds, on every architecture.
 Copy-HerdMeVCRuntime -DestinationDirectory $vcRuntimeDirectory
 
 $singleConfigurationGenerators = @("Ninja", "NMake Makefiles")
@@ -31,6 +40,9 @@ $cmakeConfigureArguments = @(
     "-B", $coreBuild,
     "-DBUILD_TESTING=ON"
 )
+if ($singleConfigurationBuild -and $crossCompiling) {
+    throw "Cross-compiling $Architecture needs the Visual Studio CMake generator; unset CMAKE_GENERATOR."
+}
 if ($singleConfigurationBuild) {
     $cmakeConfigureArguments += "-DCMAKE_BUILD_TYPE=$Configuration"
 } else {
@@ -95,6 +107,12 @@ if (-not $SkipTests) {
     finally {
         $env:HERDME_CORE_TEST_EXECUTABLE = $previousCoreTestExecutable
     }
+
+    $cliProject = Join-Path $PSScriptRoot "HerdMe.Cli\HerdMe.Cli.csproj"
+    dotnet build $cliProject `
+        --configuration $Configuration `
+        -p:TreatWarningsAsErrors=true
+    if ($LASTEXITCODE -ne 0) { throw "The herdme command-line build failed." }
 
     $xamlProjectRoot = Join-Path $PSScriptRoot "HerdMe.Windows"
     $xamlFiles = @(Get-ChildItem $xamlProjectRoot -Recurse -Filter "*.xaml" -File |

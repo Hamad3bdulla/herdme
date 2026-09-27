@@ -14,7 +14,9 @@ public sealed class SingleInstanceCoordinator : IDisposable
     public bool ShutdownRequested { get; private set; }
     private bool ownsMutex;
 
-    public SingleInstanceCoordinator()
+    // A secondary instance that forwards a command over the command pipe passes
+    // signalActivation: false and calls SignalActivation() itself only as a fallback.
+    public SingleInstanceCoordinator(bool signalActivation = true)
     {
         mutex = new Mutex(
             initiallyOwned: true,
@@ -25,7 +27,7 @@ public sealed class SingleInstanceCoordinator : IDisposable
         ownsMutex = createdNew;
         if (!createdNew)
         {
-            SignalExistingInstance();
+            if (signalActivation) SignalExistingInstance();
             return;
         }
 
@@ -48,6 +50,11 @@ public sealed class SingleInstanceCoordinator : IDisposable
     }
 
     public void WakeListener() => activationEvent?.Set();
+
+    public void SignalActivation()
+    {
+        if (!IsPrimary) SignalExistingInstance();
+    }
 
     public void Dispose()
     {

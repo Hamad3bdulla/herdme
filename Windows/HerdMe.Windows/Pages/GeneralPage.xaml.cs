@@ -4,6 +4,8 @@ using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.Storage.Pickers;
+using WinRT.Interop;
 
 namespace HerdMe.Windows.Pages;
 
@@ -22,9 +24,13 @@ public sealed partial class GeneralPage : Page
     private readonly AppUpdateManager updateManager;
     private readonly ManagedComponentUpdateManager componentUpdateManager;
     private readonly WindowsUserPathManager userPathManager;
+    private readonly WindowsShellIntegration shellIntegration;
     private bool loadingStartup;
+    private bool loadingShellIntegration;
     private bool loadingUpdateSettings;
     private bool loadingCompactMode;
+    private bool loadingNotifications;
+    private bool exportingDiagnostics;
     private bool updateEventSubscribed;
     private bool pageActive;
 
@@ -43,7 +49,8 @@ public sealed partial class GeneralPage : Page
         SiteConfigurationStore settingsStore,
         AppUpdateManager updateManager,
         ManagedComponentUpdateManager componentUpdateManager,
-        WindowsUserPathManager userPathManager
+        WindowsUserPathManager userPathManager,
+        WindowsShellIntegration shellIntegration
     )
     {
         this.coreClient = coreClient;
@@ -59,6 +66,7 @@ public sealed partial class GeneralPage : Page
         this.updateManager = updateManager;
         this.componentUpdateManager = componentUpdateManager;
         this.userPathManager = userPathManager;
+        this.shellIntegration = shellIntegration;
         InitializeComponent();
         CoreExecutableText.Text = coreClient.ExecutablePath;
         ToolTipService.SetToolTip(
@@ -68,10 +76,14 @@ public sealed partial class GeneralPage : Page
         loadingStartup = true;
         StartupToggle.IsOn = startupManager.IsEnabled;
         loadingStartup = false;
+        LoadShellIntegration();
         var settings = settingsStore.Load();
         loadingCompactMode = true;
         CompactModeToggle.IsOn = settings.CompactMode;
         loadingCompactMode = false;
+        loadingNotifications = true;
+        NotificationsToggle.IsOn = settings.ShowNotifications;
+        loadingNotifications = false;
         TldTextBox.Text = settings.Tld;
         loadingUpdateSettings = true;
         AutomaticUpdatesToggle.IsOn = settings.AutomaticUpdates;
@@ -93,6 +105,92 @@ public sealed partial class GeneralPage : Page
     {
         if (loadingCompactMode) return;
         settingsStore.UpdateCompactMode(CompactModeToggle.IsOn);
+    }
+
+    private void NotificationsToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (loadingNotifications) return;
+        settingsStore.UpdateShowNotifications(NotificationsToggle.IsOn);
+    }
+
+    private async void ExportDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        if (exportingDiagnostics) return;
+        exportingDiagnostics = true;
+        ExportDiagnosticsButton.IsEnabled = false;
+        try
+        {
+            var picker = new FileSavePicker
+            {
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+                SuggestedFileName = Path.GetFileNameWithoutExtension(DiagnosticsExporter.DefaultFileName(DateTimeOffset.Now))
+            };
+            picker.FileTypeChoices.Add(AppLocalization.Get("GeneralDiagnosticsZipType"), [".zip"]);
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
+            var file = await picker.PickSaveFileAsync();
+            if (file is null) return;
+            var includeDumps = IncludeCrashDumpsCheckBox.IsChecked == true;
+            var exporter = new DiagnosticsExporter(settingsStore.SupportRoot, updateManager.CurrentVersion);
+            var result = await Task.Run(() => exporter.ExportAsync(file.Path, includeDumps));
+            DiagnosticsStatusText.Text = AppLocalization.Format("GeneralDiagnosticsSaved", result.Files, result.Path);
+        }
+        catch (Exception error) when (error is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or InvalidOperationException
+            or System.Runtime.InteropServices.COMException)
+        {
+            DiagnosticsStatusText.Text = AppLocalization.Format("GeneralDiagnosticsFailed", error.Message);
+        }
+        finally
+        {
+            exportingDiagnostics = false;
+            ExportDiagnosticsButton.IsEnabled = true;
+        }
+    }
+
+    private void LoadShellIntegration()
+    {
+        loadingShellIntegration = true;
+        ExplorerLinkToggle.IsOn = shellIntegration.IsEnabled(ShellIntegrationFeature.ExplorerLink);
+        UriProtocolToggle.IsOn = shellIntegration.IsEnabled(ShellIntegrationFeature.UriProtocol);
+        TerminalProfileToggle.IsOn = shellIntegration.IsEnabled(ShellIntegrationFeature.TerminalProfile);
+        loadingShellIntegration = false;
+    }
+
+    private async void ShellIntegrationToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (loadingShellIntegration || sender is not ToggleSwitch toggle) return;
+        var feature = toggle == ExplorerLinkToggle
+            ? ShellIntegrationFeature.ExplorerLink
+            : toggle == UriProtocolToggle
+                ? ShellIntegrationFeature.UriProtocol
+                : ShellIntegrationFeature.TerminalProfile;
+        var enabled = toggle.IsOn;
+        try
+        {
+            var executable = Environment.ProcessPath
+                ?? throw new InvalidOperationException("HerdMe could not determine its executable path.");
+            var startingDirectory = settingsStore.Load().Roots.FirstOrDefault(Directory.Exists);
+            await Task.Run(() => shellIntegration.SetEnabled(feature, enabled, executable, startingDirectory));
+        }
+        catch (Exception error) when (error is IOException
+            or UnauthorizedAccessException
+            or System.Security.SecurityException
+            or ArgumentException
+            or InvalidOperationException)
+        {
+            LoadShellIntegration();
+            var dialog = new ContentDialog
+            {
+                FlowDirection = AppLocalization.LayoutDirection,
+                XamlRoot = XamlRoot,
+                Title = AppLocalization.Get("GeneralWindowsIntegrationFailedTitle"),
+                Content = error.Message,
+                CloseButtonText = AppLocalization.Get("CommonOk")
+            };
+            await dialog.ShowAsync();
+        }
     }
 
     private async void StartupToggle_Toggled(object sender, RoutedEventArgs e)

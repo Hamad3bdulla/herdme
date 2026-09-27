@@ -63,6 +63,9 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     public event EventHandler? Changed;
 
+    // Raised when a running service exits without HerdMe stopping it (crash or kill).
+    public event EventHandler<ServiceExitedEventArgs>? ExitedUnexpectedly;
+
     public event EventHandler<ServiceInstallationProgress>? InstallationProgress;
 
     public string SupportRoot { get; }
@@ -507,9 +510,19 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         }
         if (service is not null)
         {
+            int? exitCode = null;
+            try
+            {
+                exitCode = service.Process.ExitCode;
+            }
+            catch (InvalidOperationException)
+            {
+            }
             service.Process.Dispose();
             service.Job.Dispose();
             RaiseChanged();
+            var name = service.StopContext?.Name ?? id.ToString("D");
+            ExitedUnexpectedly?.Invoke(this, new ServiceExitedEventArgs(id, name, exitCode));
         }
     }
 
@@ -1488,3 +1501,5 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         }
     }
 }
+
+public sealed record ServiceExitedEventArgs(Guid Id, string Name, int? ExitCode);

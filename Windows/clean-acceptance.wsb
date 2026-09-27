@@ -1,0 +1,30 @@
+<!--
+  Windows Sandbox template for a clean-profile HerdMe check. Do not open this file directly:
+  Windows\start-clean-acceptance.ps1 fills in the two host folders and starts the sandbox.
+  The repository is mapped read-only; only the results folder is writable. Nothing in the
+  sandbox survives after it closes.
+-->
+<Configuration>
+  <VGpu>Enable</VGpu>
+  <Networking>Enable</Networking>
+  <ClipboardRedirection>Disable</ClipboardRedirection>
+  <PrinterRedirection>Disable</PrinterRedirection>
+  <AudioInput>Disable</AudioInput>
+  <VideoInput>Disable</VideoInput>
+  <MemoryInMB>8192</MemoryInMB>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>{{REPOSITORY}}</HostFolder>
+      <SandboxFolder>C:\HerdMe\repo</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+    <MappedFolder>
+      <HostFolder>{{RESULTS}}</HostFolder>
+      <SandboxFolder>C:\HerdMe\results</SandboxFolder>
+      <ReadOnly>false</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\HerdMe\repo\Windows\clean-acceptance-sandbox.ps1</Command>
+  </LogonCommand>
+</Configuration>

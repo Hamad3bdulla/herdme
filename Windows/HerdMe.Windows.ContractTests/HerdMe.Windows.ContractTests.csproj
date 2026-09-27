@@ -38,6 +38,11 @@
     <Compile Include="PerformanceContractChecks.cs" />
     <Compile Include="ProxySiteContractChecks.cs" />
     <Compile Include="ShareContractChecks.cs" />
+    <Compile Include="AppCommandContractChecks.cs" />
+    <Compile Include="ShellIntegrationContractChecks.cs" />
+    <Compile Include="NotificationContractChecks.cs" />
+    <Compile Include="LaravelToolsContractChecks.cs" />
+    <Compile Include="PlatformToolingContractChecks.cs" />
     <Compile Include="ManifestContractChecks.cs" />
     <Compile Include="ProfilerContractChecks.cs" />
     <Compile Include="TinkerContractChecks.cs" />
@@ -131,6 +136,17 @@
     <Compile Include="../HerdMe.Windows/Services/SiteShareManager.cs" Link="Services/SiteShareManager.cs" />
     <Compile Include="../HerdMe.Windows/Services/ProjectManifest.cs" Link="Services/ProjectManifest.cs" />
     <Compile Include="../HerdMe.Windows/Services/ServiceText.cs" Link="Services/ServiceText.cs" />
+    <Compile Include="../HerdMe.Windows/Services/AppCommandProtocol.cs" Link="Services/AppCommandProtocol.cs" />
+    <Compile Include="../HerdMe.Windows/Services/HerdMeCommandShim.cs" Link="Services/HerdMeCommandShim.cs" />
+    <Compile Include="../HerdMe.Windows/Services/JumpListManager.cs" Link="Services/JumpListManager.cs" />
+    <Compile Include="../HerdMe.Windows/Services/WindowsShellIntegration.cs" Link="Services/WindowsShellIntegration.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SiteRootWatcher.cs" Link="Services/SiteRootWatcher.cs" />
+    <Compile Include="../HerdMe.Windows/Services/AppNotifications.cs" Link="Services/AppNotifications.cs" />
+    <Compile Include="../HerdMe.Windows/Services/CrashReporter.cs" Link="Services/CrashReporter.cs" />
+    <Compile Include="../HerdMe.Windows/Services/DiagnosticsExporter.cs" Link="Services/DiagnosticsExporter.cs" />
+    <Compile Include="../HerdMe.Windows/Services/LaravelLog.cs" Link="Services/LaravelLog.cs" />
+    <Compile Include="../HerdMe.Windows/Services/EditorLauncher.cs" Link="Services/EditorLauncher.cs" />
+    <Compile Include="../HerdMe.Windows/Services/LaravelQualityTools.cs" Link="Services/LaravelQualityTools.cs" />
   </ItemGroup>
 
   <ItemGroup>

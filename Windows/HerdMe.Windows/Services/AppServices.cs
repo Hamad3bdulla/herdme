@@ -57,6 +57,7 @@ public sealed class AppServices : IAsyncDisposable
         Shares = new SiteShareManager(Tunnels, Environment);
         Services = new WindowsServiceManager();
         Startup = new WindowsStartupManager();
+        ShellIntegration = new WindowsShellIntegration(SiteSettings.SupportRoot);
         Updates = AppUpdateManager.Configured();
         ComponentUpdates = new ManagedComponentUpdateManager(
             PhpInstaller,
@@ -119,6 +120,7 @@ public sealed class AppServices : IAsyncDisposable
     public WindowsServiceManager Services { get; }
 
     public WindowsStartupManager Startup { get; }
+    public WindowsShellIntegration ShellIntegration { get; }
 
     public AppUpdateManager Updates { get; }
 

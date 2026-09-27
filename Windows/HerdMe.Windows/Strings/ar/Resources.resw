@@ -1253,4 +1253,78 @@
   <data name="TinkerStartFailed" xml:space="preserve"><value>تعذّر تشغيل إصدار PHP المحدد.</value></data>
   <data name="TinkerTimeoutSubject" xml:space="preserve"><value>كود Tinker</value></data>
   <data name="TinkerCodeBox.PlaceholderText" xml:space="preserve"><value>أدخل تعبير PHP مثل: return App\Models\User::count();</value></data>
+  <data name="AppCommandFailedTitle" xml:space="preserve"><value>تعذّر على HerdMe تنفيذ ذلك</value></data>
+  <data name="JumpListStartAll" xml:space="preserve"><value>تشغيل الكل</value></data>
+  <data name="JumpListStartAllDescription" xml:space="preserve"><value>تشغيل البيئة والخدمات المفعّلة</value></data>
+  <data name="JumpListStopAll" xml:space="preserve"><value>إيقاف الكل</value></data>
+  <data name="JumpListStopAllDescription" xml:space="preserve"><value>إيقاف البيئة وكل الخدمات</value></data>
+  <data name="JumpListSites" xml:space="preserve"><value>المواقع</value></data>
+  <data name="JumpListSitesDescription" xml:space="preserve"><value>عرض صفحة المواقع</value></data>
+  <data name="JumpListTinker" xml:space="preserve"><value>مجرّب Tinker</value></data>
+  <data name="JumpListTinkerDescription" xml:space="preserve"><value>عرض صفحة Tinker</value></data>
+  <data name="JumpListSitesCategory" xml:space="preserve"><value>المواقع</value></data>
+  <data name="GeneralWindowsIntegrationSectionTitle.Text" xml:space="preserve"><value>التكامل مع ويندوز</value></data>
+  <data name="GeneralWindowsIntegrationDescription.Text" xml:space="preserve"><value>اختياري. كل مفتاح يكتب إدخالاً واحداً باسم HerdMe لحسابك في ويندوز فقط، ويُحذف عند إيقافه أو عند إلغاء تثبيت HerdMe.</value></data>
+  <data name="GeneralExplorerLinkTitle.Text" xml:space="preserve"><value>«ربط مع HerdMe» في المستكشف</value></data>
+  <data name="GeneralExplorerLinkDescription.Text" xml:space="preserve"><value>يضيف «ربط مع HerdMe» عند النقر بزر الماوس الأيمن على مجلد (ضمن «إظهار المزيد من الخيارات» في ويندوز 11).</value></data>
+  <data name="GeneralUriProtocolTitle.Text" xml:space="preserve"><value>روابط herdme://</value></data>
+  <data name="GeneralUriProtocolDescription.Text" xml:space="preserve"><value>يسمح لروابط مثل herdme://site/blog بعرض موقع في HerdMe. الروابط تعرض الصفحات فقط؛ لا يمكنها التشغيل أو الإيقاف أو المشاركة أو تغيير أي شيء.</value></data>
+  <data name="GeneralTerminalProfileTitle.Text" xml:space="preserve"><value>ملف تعريف في Windows Terminal</value></data>
+  <data name="GeneralTerminalProfileDescription.Text" xml:space="preserve"><value>يضيف ملف تعريف HerdMe فيه PHP وComposer وNode.js والأمر herdme ضمن PATH.</value></data>
+  <data name="ExplorerLinkToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>«ربط مع HerdMe» في المستكشف</value></data>
+  <data name="UriProtocolToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>روابط herdme://</value></data>
+  <data name="TerminalProfileToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>ملف تعريف في Windows Terminal</value></data>
+  <data name="GeneralWindowsIntegrationFailedTitle" xml:space="preserve"><value>تعذّر على HerdMe تغيير التكامل مع ويندوز</value></data>
+  <data name="ShellLinkWithHerdMe" xml:space="preserve"><value>ربط مع HerdMe</value></data>
+  <data name="NotificationServiceStoppedTitle" xml:space="preserve"><value>توقفت خدمة</value></data>
+  <data name="NotificationServiceStoppedWithCode" xml:space="preserve"><value>توقفت {0} بشكل غير متوقع (رمز الخروج {1}).</value></data>
+  <data name="NotificationServiceStoppedMessage" xml:space="preserve"><value>توقفت {0} بشكل غير متوقع.</value></data>
+  <data name="NotificationSiteProcessStoppedTitle" xml:space="preserve"><value>توقفت عملية الموقع</value></data>
+  <data name="NotificationSiteProcessStoppedMessage" xml:space="preserve"><value>توقف {0} للموقع {1} برمز الخروج {2}.</value></data>
+  <data name="NotificationShareEndedTitle" xml:space="preserve"><value>انتهى الرابط العام</value></data>
+  <data name="NotificationShareEndedMessage" xml:space="preserve"><value>توقف الرابط العام لـ {0}. الموقع خاص مرة أخرى.</value></data>
+  <data name="NotificationUpdateTitle" xml:space="preserve"><value>يتوفر تحديث لـ HerdMe</value></data>
+  <data name="NotificationUpdateMessage" xml:space="preserve"><value>الإصدار {0} من HerdMe جاهز. افتح HerdMe لتثبيته.</value></data>
+  <data name="NotificationCrashTitle" xml:space="preserve"><value>أُغلق HerdMe بشكل غير متوقع</value></data>
+  <data name="NotificationCrashMessage" xml:space="preserve"><value>حُفظ تقرير الانهيار على هذا الجهاز. استخدم تصدير التشخيص في الإعدادات العامة إذا أردت مشاركته.</value></data>
+  <data name="NotificationProcessQueue" xml:space="preserve"><value>عامل الطابور</value></data>
+  <data name="NotificationProcessScheduler" xml:space="preserve"><value>المجدول</value></data>
+  <data name="NotificationProcessDevelopment" xml:space="preserve"><value>خادم التطوير</value></data>
+  <data name="GeneralNotificationsTitle.Text" xml:space="preserve"><value>الإشعارات</value></data>
+  <data name="GeneralNotificationsDescription.Text" xml:space="preserve"><value>عرض إشعار في شريط المهام عند توقف خدمة أو عامل أو رابط عام بشكل غير متوقع، أو عند توفر تحديث وHerdMe في شريط المهام.</value></data>
+  <data name="NotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>الإشعارات</value></data>
+  <data name="GeneralDiagnosticsTitle.Text" xml:space="preserve"><value>التشخيص</value></data>
+  <data name="GeneralDiagnosticsDescription.Text" xml:space="preserve"><value>احفظ سجلات HerdMe وإعداداته وتقارير الانهيار في ملف zip يمكنك إرفاقه ببلاغ خطأ. تُخفى الأسرار ولا يُرسل أي شيء.</value></data>
+  <data name="GeneralIncludeCrashDumps.Content" xml:space="preserve"><value>تضمين ملفات تفريغ الانهيار</value></data>
+  <data name="GeneralExportDiagnostics.Content" xml:space="preserve"><value>تصدير التشخيص</value></data>
+  <data name="GeneralDiagnosticsZipType" xml:space="preserve"><value>أرشيف Zip</value></data>
+  <data name="GeneralDiagnosticsSaved" xml:space="preserve"><value>حُفظ {0} ملف في {1}. راجع الملف قبل مشاركته.</value></data>
+  <data name="GeneralDiagnosticsFailed" xml:space="preserve"><value>تعذر تصدير التشخيص: {0}</value></data>
+  <data name="LogsLevelBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>أدنى مستوى للسجل</value></data>
+  <data name="LogsOpenLastErrorButton.Content" xml:space="preserve"><value>فتح آخر خطأ</value></data>
+  <data name="LogsOpenLastErrorButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح آخر خطأ في المحرر</value></data>
+  <data name="LogsLevelAll" xml:space="preserve"><value>كل المستويات</value></data>
+  <data name="LogsLevelInfo" xml:space="preserve"><value>معلومات فأعلى</value></data>
+  <data name="LogsLevelWarning" xml:space="preserve"><value>تحذيرات فأعلى</value></data>
+  <data name="LogsLevelError" xml:space="preserve"><value>أخطاء فأعلى</value></data>
+  <data name="LogsLevelCounts" xml:space="preserve"><value>{0} أخطاء، {1} تحذيرات، {2} سجلات</value></data>
+  <data name="LogsOpenedWithoutLine" xml:space="preserve"><value>فُتح الملف بالتطبيق الافتراضي. ثبّت Visual Studio Code للانتقال مباشرة إلى السطر {0}.</value></data>
+  <data name="LogsOpenLastErrorFailed" xml:space="preserve"><value>تعذر فتح الملف: {0}</value></data>
+  <data name="SitesQualityCommand.Text" xml:space="preserve"><value>جودة الكود</value></data>
+  <data name="SitesQualityPintCommand.Text" xml:space="preserve"><value>فحص تنسيق الكود (Pint)</value></data>
+  <data name="SitesQualityPhpStanCommand.Text" xml:space="preserve"><value>تحليل ثابت (PHPStan)</value></data>
+  <data name="SitesQualityTestsCommand.Text" xml:space="preserve"><value>تشغيل الاختبارات</value></data>
+  <data name="SitesQualityToolPint" xml:space="preserve"><value>فاحص Pint</value></data>
+  <data name="SitesQualityToolPhpStan" xml:space="preserve"><value>فاحص PHPStan</value></data>
+  <data name="SitesQualityToolTests" xml:space="preserve"><value>الاختبارات</value></data>
+  <data name="SitesQualityRunning" xml:space="preserve"><value>تشغيل {0} لموقع {1}</value></data>
+  <data name="SitesQualityPassed" xml:space="preserve"><value>نجح {0}.</value></data>
+  <data name="SitesQualityIssues" xml:space="preserve"><value>{0}: {1} عناصر تحتاج مراجعة.</value></data>
+  <data name="SitesQualityFailedNoIssues" xml:space="preserve"><value>انتهى {0} بالرمز {1}. راجع المخرجات بالأسفل.</value></data>
+  <data name="SitesQualityOpenHint" xml:space="preserve"><value>اختر عنصراً لفتحه في المحرر عند السطر نفسه.</value></data>
+  <data name="SitesQualityIssuesList" xml:space="preserve"><value>النتائج</value></data>
+  <data name="SitesQualityOpenedWithoutLine" xml:space="preserve"><value>فُتح الملف بالتطبيق الافتراضي. ثبّت Visual Studio Code للانتقال مباشرة إلى السطر {0}.</value></data>
+  <data name="SitesQualityOpenFailed" xml:space="preserve"><value>تعذر فتح الملف: {0}</value></data>
+  <data name="SitesQualityOutput" xml:space="preserve"><value>المخرجات</value></data>
+  <data name="SitesQualityDialogTitle" xml:space="preserve"><value>{0} - نتيجة الفحص: {1}</value></data>
 </root>

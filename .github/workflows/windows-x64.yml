@@ -93,12 +93,18 @@ jobs:
               Stop-Transcript | Out-Null
           }
 
+      - name: Run Windows accessibility checks
+        shell: pwsh
+        run: ./Windows/test-accessibility.ps1
+
       - name: Upload Windows UI evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: HerdMe-${{ github.run_number }}-win-x64-${{ matrix.ui-language }}-UI
-          path: build/windows-ui-evidence
+          path: |
+            build/windows-ui-evidence
+            build/windows-accessibility
           if-no-files-found: warn
           retention-days: 14
 
@@ -150,3 +156,55 @@ jobs:
             dist/HerdMe-*-win-x64-setup.exe.sha256
           if-no-files-found: error
           retention-days: 14
+
+  arm64-build:
+    name: Build Windows ARM64 preview
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install .NET 8
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 8.0.x
+
+      # The x64 job runs every test and the acceptance suite. ARM64 binaries cannot run on this
+      # x64 runner, so this job proves the app and core compile for ARM64.
+      - name: Cross-compile Release Windows ARM64
+        shell: pwsh
+        run: ./Windows/build.ps1 -Architecture ARM64 -Configuration Release -SkipTests
+
+      - name: Verify ARM64 executables
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          function Get-PeMachine([string]$Path) {
+              $bytes = [System.IO.File]::ReadAllBytes($Path)
+              $offset = [BitConverter]::ToInt32($bytes, 0x3c)
+              return [BitConverter]::ToUInt16($bytes, $offset + 4)
+          }
+          $app = Get-ChildItem Windows/HerdMe.Windows/bin -Recurse -Filter HerdMe.Windows.exe |
+              Where-Object { $_.FullName -like "*\ARM64\Release\*" -and $_.FullName -like "*\win-arm64\*" } |
+              Select-Object -First 1
+          if ($null -eq $app) { throw "The ARM64 app was not produced." }
+          foreach ($path in @($app.FullName, (Join-Path $app.DirectoryName "Runtime\herdme-core.exe"))) {
+              $machine = Get-PeMachine $path
+              if ($machine -ne 0xAA64) { throw "$path is not ARM64 (machine 0x$($machine.ToString('X4')))." }
+              Write-Host "ARM64: $path"
+          }
+          $destination = Join-Path $env:GITHUB_WORKSPACE "build\windows-arm64-preview"
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          Copy-Item -Path (Join-Path $app.DirectoryName "*") -Destination $destination -Recurse -Force
+
+      - name: Upload ARM64 preview build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: HerdMe-${{ github.run_number }}-win-arm64-unsigned-preview
+          path: build/windows-arm64-preview
+          if-no-files-found: error
+          retention-days: 7

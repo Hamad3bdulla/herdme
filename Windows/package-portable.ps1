@@ -18,7 +18,7 @@ if ($releaseMode -eq "public" -and $Configuration -ne "Release") {
     throw "Public packages must use the Release configuration."
 }
 if ($Architecture -ne "x64") {
-    throw "HerdMe for Windows currently supports x64 only."
+    throw "HerdMe packages are x64 only. ARM64 is a build preview: run Windows\build.ps1 -Architecture ARM64 -SkipTests."
 }
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $PSScriptRoot "HerdMe.Windows\HerdMe.Windows.csproj"
@@ -54,15 +54,58 @@ $msbuild = Find-HerdMeMSBuild
     "/p:RuntimeIdentifier=$runtimeIdentifier" `
     "/p:Platform=$Architecture" `
     /p:SelfContained=true `
+    /p:PublishReadyToRun=true `
     "/p:PublishDir=$publishDirectory\" `
     /p:WindowsPackageType=None `
     /p:UseXamlCompilerExecutable=false `
     /p:TreatWarningsAsErrors=true
 if ($LASTEXITCODE -ne 0) { throw "The self-contained Windows publish failed." }
 
+# herdme.exe (the command-line tool) is published self-contained with the same SDK, then only
+# its own files are copied next to HerdMe.Windows.exe. Every runtime file it depends on must
+# already be in the app publish and match, so both executables share one .NET runtime.
+$cliProject = Join-Path $PSScriptRoot "HerdMe.Cli\HerdMe.Cli.csproj"
+$cliPublishDirectory = Join-Path $repoRoot "build\windows-cli-$runtimeIdentifier"
+if (Test-Path $cliPublishDirectory) {
+    Remove-Item -Recurse -Force $cliPublishDirectory
+}
+dotnet publish $cliProject `
+    --configuration $Configuration `
+    --runtime $runtimeIdentifier `
+    --self-contained true `
+    --output $cliPublishDirectory `
+    -p:TreatWarningsAsErrors=true
+if ($LASTEXITCODE -ne 0) { throw "Publishing the herdme command failed." }
+$cliOwnFiles = @("herdme.exe", "herdme.dll", "herdme.deps.json", "herdme.runtimeconfig.json")
+foreach ($cliFile in Get-ChildItem -LiteralPath $cliPublishDirectory -Recurse -File) {
+    $relativePath = $cliFile.FullName.Substring($cliPublishDirectory.Length).TrimStart("\")
+    if ($relativePath -like "*.pdb") { continue }
+    $target = Join-Path $publishDirectory $relativePath
+    if ($cliOwnFiles -contains $relativePath) {
+        Copy-Item -LiteralPath $cliFile.FullName -Destination $target -Force
+        continue
+    }
+    if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
+        throw "herdme.exe needs $relativePath, which the app publish does not contain."
+    }
+    $cliHash = (Get-FileHash -LiteralPath $cliFile.FullName -Algorithm SHA256).Hash
+    $appHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+    if ($cliHash -ne $appHash) {
+        $cliVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($cliFile.FullName).FileVersion
+        $appVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($target).FileVersion
+        if ([string]::IsNullOrWhiteSpace($cliVersion) -or $cliVersion -ne $appVersion) {
+            throw "herdme.exe and HerdMe.Windows.exe use different builds of $relativePath ($cliVersion vs $appVersion)."
+        }
+    }
+}
+
 $requiredFiles = @(
     "HerdMe.Windows.exe",
     "HerdMe.Windows.pri",
+    "herdme.exe",
+    "herdme.dll",
+    "herdme.deps.json",
+    "herdme.runtimeconfig.json",
     "Assets\HerdMe.ico",
     "Prerequisites\VC143\concrt140.dll",
     "Prerequisites\VC143\msvcp140.dll",
@@ -120,6 +163,8 @@ if ($releaseMode -eq "public") {
 
     $signTool = Find-HerdMeSignTool
     Sign-HerdMePublicArtifact (Join-Path $publishDirectory "HerdMe.Windows.exe") $signTool
+    Sign-HerdMePublicArtifact (Join-Path $publishDirectory "herdme.exe") $signTool
+    Sign-HerdMePublicArtifact (Join-Path $publishDirectory "herdme.dll") $signTool
     Sign-HerdMePublicArtifact (Join-Path $publishDirectory "Runtime\herdme-core.exe") $signTool
 }
 
@@ -142,6 +187,12 @@ function Assert-X64PortableExecutable([string]$Path) {
 
 Assert-X64PortableExecutable (Join-Path $publishDirectory "HerdMe.Windows.exe")
 Assert-X64PortableExecutable (Join-Path $publishDirectory "Runtime\herdme-core.exe")
+Assert-X64PortableExecutable (Join-Path $publishDirectory "herdme.exe")
+
+$cliVersionOutput = @(& (Join-Path $publishDirectory "herdme.exe") --version 2>&1)
+if ($LASTEXITCODE -ne 0 -or ($cliVersionOutput -join "`n").Trim() -ne "herdme $version") {
+    throw "The packaged herdme command did not report version ${version}: $($cliVersionOutput -join ' ')"
+}
 
 & (Join-Path $publishDirectory "Runtime\herdme-core.exe") doctor
 if ($LASTEXITCODE -ne 0) { throw "The packaged portable core health check failed." }

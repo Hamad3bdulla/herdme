@@ -77,6 +77,10 @@ public sealed class SiteProcessManager : IAsyncDisposable
 
     public event EventHandler? Changed;
 
+    // Raised when a worker, scheduler, or Reverb process ends with an error that the user
+    // did not ask for (Stop and app exit cancel first and are not reported).
+    public event EventHandler<SiteBackgroundProcessState>? ExitedUnexpectedly;
+
     public SiteBackgroundProcessState State(string sitePath, SiteBackgroundProcessKind kind)
     {
         var path = Path.GetFullPath(sitePath);
@@ -217,14 +221,21 @@ public sealed class SiteProcessManager : IAsyncDisposable
         }
         finally
         {
+            SiteBackgroundProcessState finished;
+            var stoppedByUser = cancellationToken.IsCancellationRequested;
             lock (sync)
             {
                 var previous = states[key];
-                states[key] = previous with { Running = false, ExitCode = exitCode };
+                finished = previous with { Running = false, ExitCode = exitCode };
+                states[key] = finished;
                 running.Remove(key);
                 process.Cancellation.Dispose();
             }
             RaiseChanged();
+            if (!stoppedByUser && exitCode is not null and not 0)
+            {
+                ExitedUnexpectedly?.Invoke(this, finished);
+            }
         }
     }
 

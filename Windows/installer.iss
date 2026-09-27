@@ -49,7 +49,7 @@ WizardResizable=no
 #endif
 WizardSizePercent=100
 CloseApplications=yes
-CloseApplicationsFilter=HerdMe.Windows.exe
+CloseApplicationsFilter=HerdMe.Windows.exe,herdme.exe
 RestartApplications=no
 ; PrepareToInstall closes older versions which otherwise only hide on WM_CLOSE.
 SetupLogging=yes
@@ -71,9 +71,16 @@ Name: "{autodesktop}\HerdMe"; Filename: "{app}\HerdMe.Windows.exe"; WorkingDir: 
 [Registry]
 ; The app owns this opt-in value. Setup only registers uninstall cleanup.
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "HerdMe"; Flags: dontcreatekey uninsdeletevalue
+; Opt-in shell integration written by the app (Settings > General). Setup never creates
+; these keys; it only removes them on uninstall.
+Root: HKCU; Subkey: "Software\Classes\herdme"; Flags: dontcreatekey uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\HerdMe.Link"; Flags: dontcreatekey uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\HerdMe.Link"; Flags: dontcreatekey uninsdeletekey
 
 [UninstallDelete]
 Type: files; Name: "{userstartup}\HerdMe.lnk"
+Type: files; Name: "{localappdata}\HerdMe\bin\herdme.cmd"
+Type: filesandordirs; Name: "{localappdata}\Microsoft\Windows Terminal\Fragments\HerdMe"
 
 [Run]
 Filename: "{app}\HerdMe.Windows.exe"; Description: "Launch HerdMe"; Flags: nowait postinstall skipifsilent

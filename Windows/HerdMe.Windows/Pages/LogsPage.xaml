@@ -48,7 +48,9 @@
             <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <ComboBox
@@ -60,9 +62,18 @@
                     ItemsSource="{x:Bind Sources}"
                     DisplayMemberPath="Name"
                     SelectionChanged="SourceBox_SelectionChanged" />
+                <ComboBox
+                    x:Name="LevelBox"
+                    Grid.Column="1"
+                    x:Uid="LogsLevelBox"
+                    Width="170"
+                    VerticalAlignment="Center"
+                    Visibility="Collapsed"
+                    AutomationProperties.Name="Minimum log level"
+                    SelectionChanged="LevelBox_SelectionChanged" />
                 <TextBox
                     x:Name="SearchBox"
-                    Grid.Column="1"
+                    Grid.Column="2"
                     x:Uid="LogsSearchField"
                     VerticalAlignment="Center"
                     PlaceholderText="Search current log"
@@ -71,9 +82,19 @@
                         <KeyboardAccelerator Modifiers="Control" Key="F" Invoked="SearchAccelerator_Invoked" />
                     </TextBox.KeyboardAccelerators>
                 </TextBox>
+                <Button
+                    x:Name="OpenLastErrorButton"
+                    Grid.Column="3"
+                    x:Uid="LogsOpenLastErrorButton"
+                    VerticalAlignment="Center"
+                    Visibility="Collapsed"
+                    IsEnabled="False"
+                    Content="Open last error"
+                    AutomationProperties.Name="Open last error in editor"
+                    Click="OpenLastError_Click" />
                 <ToggleSwitch
                     x:Name="LiveRefreshToggle"
-                    Grid.Column="2"
+                    Grid.Column="4"
                     x:Uid="LogsLiveRefreshToggle"
                     MinWidth="0"
                     VerticalAlignment="Center"
@@ -83,14 +104,16 @@
             </Grid>
         </Border>
 
-        <InfoBar
-            x:Name="SourceWarning"
-            x:Uid="LogsSourceWarning"
-            Grid.Row="2"
-            IsOpen="False"
-            IsClosable="True"
-            Severity="Warning"
-            Message="Some log sources could not be loaded. HerdMe application logs remain available." />
+        <StackPanel Grid.Row="2" Spacing="8">
+            <InfoBar
+                x:Name="SourceWarning"
+                x:Uid="LogsSourceWarning"
+                IsOpen="False"
+                IsClosable="True"
+                Severity="Warning"
+                Message="Some log sources could not be loaded. HerdMe application logs remain available." />
+            <InfoBar x:Name="EditorBar" IsOpen="False" IsClosable="True" />
+        </StackPanel>
 
         <Grid Grid.Row="3" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
@@ -128,7 +151,14 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <TextBlock x:Name="LogTitleText" x:Uid="LogsSelectLogInitial" Margin="16,12,16,8" Text="Select a log" Style="{StaticResource SectionTitleStyle}" />
+                    <Grid Margin="16,12,16,8" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="LogTitleText" x:Uid="LogsSelectLogInitial" Text="Select a log" Style="{StaticResource SectionTitleStyle}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="LevelCountsText" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SettingsRowDescriptionStyle}" Visibility="Collapsed" />
+                    </Grid>
                     <TextBlock x:Name="TailNoticeText" x:Uid="LogsTailNotice" Grid.Row="1" Margin="16,0,16,8" Text="Showing the latest 4 MB. Search applies to this portion of the log." Style="{StaticResource SettingsRowDescriptionStyle}" Visibility="Collapsed" />
                     <Border Grid.Row="2" Background="{ThemeResource SubtleSurfaceBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" CornerRadius="0,0,8,8">
                         <ScrollViewer x:Name="LogScroll" Padding="16,10,16,10" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">

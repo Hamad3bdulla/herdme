@@ -192,3 +192,35 @@ before they can be marked installable.
   with no activation, subscription, license key, or paid feature gate. Open the
   repository, documentation, and release-note links; copy the version; then
   check for updates on both Stable and Beta channels.
+
+## Windows integration and Laravel tools
+
+- [ ] Run `Windows\test-accessibility.ps1` in English and Arabic and confirm it
+  reports no findings; tab through Sites, Logs, and General with the keyboard only
+  and confirm Narrator reads every control.
+- [ ] Run `Windows\start-clean-acceptance.ps1` and confirm every check in
+  `build\clean-acceptance-results\summary.json` passes.
+- [ ] In a new terminal run `herdme status`, `herdme sites`, `herdme link` in a
+  project folder, `herdme open <site>`, `herdme unlink`, `herdme stop`, and
+  `herdme start`; confirm `herdme ping` exits 3 when HerdMe is closed and that no
+  command starts a second HerdMe process.
+- [ ] Use every taskbar Jump List entry, including a site, and confirm one
+  process remains.
+- [ ] Create, rename, and delete a folder in a parked directory and confirm Sites
+  updates without Refresh; confirm `npm install` inside a project does not
+  trigger rescans.
+- [ ] In General, turn on the Explorer entry, `herdme://` links, and the Windows
+  Terminal profile. Use **Link with HerdMe** on a folder (Windows 11: under
+  **Show more options**), open `herdme://site/<name>` from the Run dialog,
+  confirm `herdme://share/<name>` is rejected, and open the HerdMe Terminal
+  profile. Turn each off and confirm its registry key or fragment is gone.
+- [ ] Stop a running service's process in Task Manager and confirm one tray
+  notification; turn notifications off and confirm none appears.
+- [ ] Export diagnostics with and without crash dumps and confirm the zip has
+  HerdMe files only, with passwords, tokens, and the Windows user name masked.
+- [ ] On a Laravel site with Pint, Larastan, and tests installed, run each Code
+  quality action, open a finding at its line in VS Code, and confirm Pint left
+  the files unchanged. On a project without Pint, confirm the `composer require`
+  hint.
+- [ ] Throw an exception in a route, open the site's Laravel log, filter by
+  Error, confirm counts, and use **Open last error** to reach the file and line.

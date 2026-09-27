@@ -122,7 +122,8 @@ public sealed partial class SitesPage : Page
             : new Thickness(28, 24, 28, 24);
         SitesLayout.RowSpacing = compactMode ? 8 : 14;
         SubscribePageEvents();
-        if (hasLoadedOnce && Sites.Count > 0)
+        var externalRescan = ConsumeExternalRescan();
+        if (hasLoadedOnce && Sites.Count > 0 && !externalRescan)
         {
             // The page instance is cached by the main window: reuse the scanned list and
             // the detection cache instead of rescanning every parked folder.
@@ -172,6 +173,11 @@ public sealed partial class SitesPage : Page
             if (visible) timer.Start();
             else timer.Stop();
         }
+        if (visible && loaded && ConsumeExternalRescan())
+        {
+            _ = ScanAsync();
+            return;
+        }
         if (!visible || !loaded || !listRefreshDeferred) return;
         listRefreshDeferred = false;
         RefreshWorkflowStatuses();
@@ -196,6 +202,7 @@ public sealed partial class SitesPage : Page
         var generation = siteScanGeneration.Begin();
         CancelGitInspection();
         ApplyFilter(selectedSite?.Path);
+        ApplyPendingSelection();
         SiteCountText.Text = AppLocalization.Format("SitesCount", Sites.Count);
         UpdateEnvironmentState();
         UpdateBackgroundProcessState();
@@ -510,6 +517,8 @@ public sealed partial class SitesPage : Page
             Sites.Clear();
             foreach (var site in scanned) Sites.Add(site);
             ApplyFilter(selectedPath);
+            ApplyPendingSelection();
+            App.RequestJumpListRefresh(scanned);
             SiteCountText.Text = AppLocalization.Format("SitesCount", Sites.Count);
             if (scanned.Count > 0 && !environment.IsRunning)
             {
@@ -663,6 +672,7 @@ public sealed partial class SitesPage : Page
         var favorites = settingsStore.Load().FavoriteSites;
         foreach (var site in Sites) site.IsFavorite = favorites.Contains(site.Path, StringComparer.OrdinalIgnoreCase);
         ApplyFilter(selectedSite?.Path);
+        App.RequestJumpListRefresh(Sites);
     }
 
     private void SearchBox_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
@@ -815,6 +825,7 @@ public sealed partial class SitesPage : Page
     {
         ArtisanButton.IsEnabled = site.Framework == "Laravel" && detection?.HasArtisan == true;
         StartLaravelButton.IsEnabled = ArtisanButton.IsEnabled;
+        QualityMenu.IsEnabled = ArtisanButton.IsEnabled;
         NpmButton.IsEnabled = detection?.HasPackageJson == true;
         ComposerButton.IsEnabled = detection?.HasComposerJson == true;
     }

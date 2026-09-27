@@ -151,6 +151,11 @@ try
     VerifyProfilerContracts(supportRoot);
     VerifyTinkerContracts(repositoryRoot, supportRoot);
     VerifyCaptureSummaryContracts(supportRoot);
+    await VerifyAppCommandContractsAsync(repositoryRoot, supportRoot);
+    await VerifyShellIntegrationContractsAsync(repositoryRoot, supportRoot);
+    await VerifyNotificationAndDiagnosticsContractsAsync(repositoryRoot, supportRoot);
+    await VerifyLaravelToolsContractsAsync(repositoryRoot, supportRoot);
+    VerifyPlatformToolingContracts(repositoryRoot);
 }
 finally
 {

@@ -385,7 +385,7 @@ internal static partial class ContractChecks
         );
         Check(
             setup.GetValueOrDefault("CloseApplications") == "yes"
-                && setup.GetValueOrDefault("CloseApplicationsFilter") == "HerdMe.Windows.exe"
+                && setup.GetValueOrDefault("CloseApplicationsFilter") == "HerdMe.Windows.exe,herdme.exe"
                 && setup.GetValueOrDefault("RestartApplications") == "no",
             "the Windows installer closes HerdMe safely without restarting it during upgrades"
         );

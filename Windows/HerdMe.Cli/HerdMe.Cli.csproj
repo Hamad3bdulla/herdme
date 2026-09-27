@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    herdme.exe: a small console front end that talks to the running HerdMe window over the
+    per-session named pipe. It is published self-contained with the same SDK as the app;
+    package-portable.ps1 copies only herdme.* into the app folder after checking that every
+    runtime file it needs is already there and identical, so both share one .NET runtime.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <AssemblyName>herdme</AssemblyName>
+    <RootNamespace>HerdMe.Cli</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <HerdMeVersionFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../VERSION'))</HerdMeVersionFile>
+    <HerdMeBuildNumberFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../BUILD_NUMBER'))</HerdMeBuildNumberFile>
+    <HerdMeVersion>$([System.IO.File]::ReadAllText('$(HerdMeVersionFile)').Trim())</HerdMeVersion>
+    <HerdMeBuildNumber>$([System.IO.File]::ReadAllText('$(HerdMeBuildNumberFile)').Trim())</HerdMeBuildNumber>
+    <Version>$(HerdMeVersion)</Version>
+    <AssemblyVersion>$(HerdMeVersion).$(HerdMeBuildNumber)</AssemblyVersion>
+    <FileVersion>$(HerdMeVersion).$(HerdMeBuildNumber)</FileVersion>
+    <ApplicationIcon>..\HerdMe.Windows\Assets\HerdMe.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Collections.Immutable" Version="9.0.1" />
+    <PackageReference Include="System.Reflection.Metadata" Version="9.0.1" />
+    <Compile Include="Program.cs" />
+    <Compile Include="../HerdMe.Windows/Services/AppCommandProtocol.cs" Link="Services/AppCommandProtocol.cs" />
+    <Compile Include="../HerdMe.Windows/Services/AppCommandClient.cs" Link="Services/AppCommandClient.cs" />
+  </ItemGroup>
+</Project>

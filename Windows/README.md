@@ -68,6 +68,63 @@ native build with a verified checksum is provided.
 The dated upstream evidence and the gates required before enabling either
 service are recorded in [`docs/WINDOWS_NATIVE_SERVICE_AUDIT.md`](../docs/WINDOWS_NATIVE_SERVICE_AUDIT.md).
 
+On Windows, the Redis service covers projects that expect Valkey (same protocol
+and `.env` variables), and Meilisearch covers Laravel Scout search in place of
+Typesense.
+
+## Windows integration
+
+- **`herdme` command.** `herdme.exe` ships next to the app. HerdMe writes
+  `%LOCALAPPDATA%\HerdMe\bin\herdme.cmd`, and that folder is already on the user
+  PATH, so a new terminal can run `herdme status`, `herdme sites`,
+  `herdme link [folder]`, `herdme unlink [site]`, `herdme open <site>`,
+  `herdme start`, `herdme stop`, `herdme share <site>` (you still confirm in the
+  window), `herdme logs [site]`, `herdme tinker [site]`, and `herdme help`.
+  Requests go to the running app over a per-user named pipe
+  (`HerdMe.Command.<session>`, created first-instance only, current user only,
+  network logons denied, one small JSON line per request).
+- **Jump List.** Right-click the taskbar icon for Start all, Stop all, Sites,
+  Tinker, and up to six sites (favorites first). Each entry is sent to the running
+  instance, so it never starts a second HerdMe.
+- **Folder watcher.** Only the top level of each parked folder is watched, so a
+  project created, renamed, or removed there appears without Refresh; changes
+  inside projects (`vendor`, `node_modules`, `.git`) never cause a rescan.
+- **Opt-in shell integration** (General, all off by default, no administrator
+  rights, removed when turned off and on uninstall):
+  - Explorer **Link with HerdMe** on folders and folder backgrounds
+    (`HKCU\Software\Classes\Directory\shell\HerdMe.Link` and
+    `...\Directory\Background\shell\HerdMe.Link`). On Windows 11 it is under
+    **Show more options**, because the new menu only lists packaged apps.
+  - `herdme://` links (`HKCU\Software\Classes\herdme`). A link can only open a
+    page, a site, Logs, or Tinker; it cannot change settings, start anything, or
+    share a site.
+  - A Windows Terminal profile written as a fragment under
+    `%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\HerdMe`, so Terminal's
+    own settings are never edited.
+- **Notifications.** A tray notification when a service, queue worker, or public
+  link stops without being asked, and when an update is found while HerdMe is in
+  the tray. They use the tray icon, are rate-limited, and can be turned off.
+- **Crash reports and diagnostics.** An unrecoverable error writes a report and a
+  small minidump (thread stacks and modules only, no heap) to
+  `%LOCALAPPDATA%\HerdMe\Log\Crashes`, keeping the newest five. **General >
+  Export diagnostics** saves a zip of HerdMe logs, settings, and crash reports with
+  secrets and the Windows user name masked; minidumps are added only when you tick
+  the box. Nothing is uploaded.
+
+## Laravel tools
+
+- **Code quality** (site menu): runs the project's own `vendor/bin/pint --test`
+  (check only, never rewrites files), `vendor/bin/phpstan analyse`, and
+  `php artisan test` with the site's HerdMe PHP, hidden and bound to a job object.
+  Findings are listed; clicking one opens VS Code at the line (or the default app
+  when VS Code is not installed). A missing tool shows the `composer require`
+  command instead of downloading anything.
+- **Live Laravel log** (Logs page, site sources): a level filter (All, Info and
+  above, Warning and above, Error and above) that keeps whole entries with their
+  stack traces, entry/warning/error counts, and **Open last error**, which opens
+  the project file and line the newest error points at (vendor frames are used
+  only when nothing else is known).
+
 Local-domain changes use HerdMe's own elevated GUI helper. Windows displays its
 normal UAC consent prompt, but HerdMe does not open PowerShell, Command Prompt,
 or another console window. The helper accepts only a staged HerdMe hosts file
@@ -76,7 +133,8 @@ and can write only to the Windows hosts path.
 Requirements:
 
 - Windows 10 version 2004 or newer
-- x64 processor; build and packaging scripts reject every other architecture
+- x64 processor for releases, the installer, and acceptance (ARM64 is a build
+  preview; see below)
 - Windows PowerShell 5.1 or newer
 - Visual Studio 2022 with Desktop development with C++
 - .NET 8 SDK
@@ -182,3 +240,48 @@ and VarDumper probes, performs an isolated silent install/core-health/uninstall
 cycle, and uploads the portable and Setup artifacts for 14 days. It does not replace
 the interactive display, certificate, UAC, browser, and service checklist above.
 A public Windows release still requires an actual Authenticode certificate.
+
+## Accessibility check
+
+`Windows\test-accessibility.ps1` starts the portable build, opens every page, and
+uses the UI Automation client built into Windows (no download) to fail on any
+enabled, visible control without an accessible name, and on buttons, fields,
+check boxes, combo boxes, links, radio buttons, and sliders that cannot take
+keyboard focus. It writes `build\windows-accessibility\accessibility-<culture>.json`.
+CI runs it after acceptance in both English and Arabic and uploads the report
+with the UI evidence. Fix a finding in XAML (`AutomationProperties.Name`, a
+`Header`, or content text); do not exempt it in the script.
+
+## Clean-profile check in Windows Sandbox
+
+Acceptance on a PC that already ran HerdMe cannot prove a first install. With the
+Windows Sandbox feature enabled:
+
+```powershell
+.\Windows\package-installer.ps1 -Architecture x64 -Configuration Release
+.\Windows\start-clean-acceptance.ps1
+```
+
+The sandbox maps the repository read-only and only `build\clean-acceptance-results`
+writable. Inside it, `clean-acceptance-sandbox.ps1` checks that the profile has no
+HerdMe data, installs silently per user, runs `herdme --version`, confirms first run
+shows onboarding and a second launch keeps one process, confirms every listener is
+loopback-only, confirms the Explorer, `herdme://`, and Terminal entries are absent
+until enabled, runs the accessibility scan, and uninstalls. `summary.json` records
+each result. Closing the sandbox discards everything.
+
+## ARM64 (build preview)
+
+`build.ps1 -Architecture ARM64 -Configuration Release -SkipTests` cross-compiles the
+WinUI app (`win-arm64`) and `herdme-core.exe` for ARM64. PHP, Node.js, and the
+services stay the official x64 builds, which Windows 11 on ARM runs under x64
+emulation, so the app keeps shipping the x64 Visual C++ runtime for PHP. ARM64
+binaries cannot run on an x64 PC, so a cross-compiled build requires `-SkipTests`;
+the x64 build runs every test. CI uploads the result as an unsigned
+`win-arm64-unsigned-preview` artifact after checking both executables are ARM64.
+Packaging and the installer stay x64 until the preview passes acceptance on ARM64
+hardware. Until then, the x64 installer (`ArchitecturesAllowed=x64compatible`) is
+the supported way to use HerdMe on Windows on ARM.
+
+ReadyToRun: `package-portable.ps1` publishes with `PublishReadyToRun=true`, so the
+app starts from precompiled code instead of JIT-compiling at launch.

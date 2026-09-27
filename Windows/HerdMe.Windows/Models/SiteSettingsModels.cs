@@ -18,6 +18,8 @@ public sealed class WindowsSiteSettings
 
     public bool CompactMode { get; set; }
 
+    public bool ShowNotifications { get; set; } = true;
+
     public bool AutomaticUpdates { get; set; } = true;
 
     public string UpdateChannel { get; set; } = "Stable";
