@@ -16,6 +16,8 @@ macOS and Windows.
 
 <p><a href="assets/herdme-demo.mp4"><img src="assets/herdme-demo.jpg" alt="HerdMe demo preview" width="960"></a></p>
 
+https://youtu.be/aQxHwEIDXBo
+
 HerdMe provides the everyday tools needed to run Laravel projects locally from
 a native desktop application, without subscriptions, activation, or license
 keys. The project uses SwiftUI on macOS, WinUI 3 on Windows, and a portable
