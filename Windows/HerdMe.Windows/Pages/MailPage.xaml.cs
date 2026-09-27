@@ -365,8 +365,11 @@ public sealed partial class MailPage : Page
         DeleteButton.IsEnabled = !mutating && MessageList.SelectedItem is CapturedMail;
         ExportButton.IsEnabled = !exporting && MessageList.SelectedItem is CapturedMail;
         EmptyState.Text = AppLocalization.Get(allMessages.Count == 0 ? "MailInboxEmpty" : "MailSearchEmpty");
-        EmptyState.Visibility = Messages.Count == 0 && !busy && !loadFailed
+        EmptyStatePanel.Visibility = Messages.Count == 0 && !busy && !loadFailed
             ? Visibility.Visible : Visibility.Collapsed;
+        var inboxEmpty = allMessages.Count == 0;
+        if (inboxEmpty) SmtpSnippetText.Text = SmtpSnippet();
+        SmtpSetupPanel.Visibility = inboxEmpty ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ApplyFilter()
@@ -560,11 +563,19 @@ public sealed partial class MailPage : Page
         args.Cancel = true;
     }
 
+    // The same lines "Add to .env" writes; selectable so they can also be copied by hand.
+    private string SmtpSnippet() => string.Join(
+        "\n",
+        MailEnvironmentConfiguration.Variables(mail.Port ?? MailCaptureService.DefaultPort)
+            .Select(variable => variable.Key + "=" + variable.Value)
+    );
+
     private void UpdateServerState()
     {
         ServerStatusText.Text = mail.IsRunning
             ? AppLocalization.Format("MailRunningOn", mail.Port)
             : AppLocalization.Get("MailStopped");
+        if (SmtpSetupPanel.Visibility == Visibility.Visible) SmtpSnippetText.Text = SmtpSnippet();
         ServerButtonIcon.Symbol = mail.IsRunning ? Symbol.Stop : Symbol.Play;
         ServerStatusDot.Style = Views.StatusStyles.Dot(
             mail.IsRunning ? Views.StatusTone.Success : Views.StatusTone.Neutral

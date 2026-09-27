@@ -41,6 +41,10 @@
     <Compile Include="AppCommandContractChecks.cs" />
     <Compile Include="ShellIntegrationContractChecks.cs" />
     <Compile Include="NotificationContractChecks.cs" />
+    <Compile Include="UxContractChecks.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SiteListFilter.cs" Link="Services/SiteListFilter.cs" />
+    <Compile Include="../HerdMe.Windows/Services/TrayPresentation.cs" Link="Services/TrayPresentation.cs" />
+    <Compile Include="../HerdMe.Windows/Services/TaskbarOverlay.cs" Link="Services/TaskbarOverlay.cs" />
     <Compile Include="LaravelToolsContractChecks.cs" />
     <Compile Include="PlatformToolingContractChecks.cs" />
     <Compile Include="ManifestContractChecks.cs" />

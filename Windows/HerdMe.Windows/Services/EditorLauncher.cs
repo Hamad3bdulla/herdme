@@ -61,6 +61,34 @@ public static class EditorLauncher
         if (!string.IsNullOrWhiteSpace(programs)) yield return Path.Combine(programs, "Microsoft VS Code", "Code.exe");
     }
 
+    public static IReadOnlyList<string> VisualStudioCodeFolderArguments(string folder) =>
+        [Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder))];
+
+    // Opens a project folder as a VS Code workspace. Returns false when VS Code is not
+    // installed so the caller can explain instead of silently doing nothing.
+    public static bool OpenFolder(string folder)
+    {
+        var target = Path.GetFullPath(folder);
+        if (!Directory.Exists(target)) throw new DirectoryNotFoundException(target);
+        if (FindVisualStudioCode() is not { } code) return false;
+        var startInfo = new ProcessStartInfo(code)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = target
+        };
+        foreach (var argument in VisualStudioCodeFolderArguments(target)) startInfo.ArgumentList.Add(argument);
+        try
+        {
+            using var editor = Process.Start(startInfo);
+            return true;
+        }
+        catch (Win32Exception)
+        {
+            return false;
+        }
+    }
+
     public static EditorOpenKind Open(string path, int? line)
     {
         var target = Path.GetFullPath(path);

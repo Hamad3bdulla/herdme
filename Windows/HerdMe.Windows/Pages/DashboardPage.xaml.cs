@@ -43,6 +43,7 @@ public sealed partial class DashboardPage : Page
     private CancellationTokenSource? refreshCancellation;
     private bool? usesCompactLayout;
     private bool lifecycleAttached;
+    private bool summaryCountsShown;
     private RepairSession? observedRepair;
     private readonly HashSet<string> failedSiteNames = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<string> lastHealthWarnings = [];
@@ -410,6 +411,7 @@ public sealed partial class DashboardPage : Page
                 dumpCapture.IsRunning ? "DashboardCaptureRunning" : "DashboardCaptureStopped"
             );
             DumpsStatusDot.Style = StatusStyles.Dot(CaptureStatusTone(dumpCapture.IsRunning));
+            ShowSummaryCounts();
 
             UpdateEnvironmentStatus(domainsConfigured, certificateTrusted, settings.Tld);
             UpdateHealth(domainsConfigured, certificateTrusted, failure: null, siteHealth);
@@ -424,6 +426,7 @@ public sealed partial class DashboardPage : Page
         catch (Exception error)
         {
             UpdateHealth(domainsConfigured: false, certificateTrusted: false, failure: error.Message, []);
+            ShowSummaryCounts();
             displayedEnvironment = (environment.IsRunning, environment.IsDegraded,
                 environment.HttpPort, environment.HttpsPort);
         }
@@ -435,6 +438,25 @@ public sealed partial class DashboardPage : Page
                 RefreshButton.IsEnabled = activeRepair is null;
                 RefreshProgress.IsActive = activeRepair is not null;
             }
+        }
+    }
+
+    // The summary numbers stay as placeholders until the first refresh, so "0 sites" is never
+    // shown for a moment before the real count.
+    private void ShowSummaryCounts()
+    {
+        if (summaryCountsShown) return;
+        summaryCountsShown = true;
+        foreach (var (count, skeleton) in new (FrameworkElement, FrameworkElement)[]
+        {
+            (SitesCountText, SitesCountSkeleton),
+            (ServicesCountText, ServicesCountSkeleton),
+            (MailCountText, MailCountSkeleton),
+            (DumpsCountText, DumpsCountSkeleton)
+        })
+        {
+            skeleton.Visibility = Visibility.Collapsed;
+            count.Visibility = Visibility.Visible;
         }
     }
 

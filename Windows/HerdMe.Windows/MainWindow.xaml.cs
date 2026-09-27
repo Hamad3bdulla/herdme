@@ -1,3 +1,4 @@
+using HerdMe.Windows.Models;
 using HerdMe.Windows.Pages;
 using HerdMe.Windows.Services;
 using HerdMe.Windows.Views;
@@ -63,6 +64,8 @@ public sealed partial class MainWindow : Window
         if (ContentFrame.Content is null) ShowPage("dashboard");
         UpdateTitleBarStatus();
         App.MainWindowVisibilityChanged += App_MainWindowVisibilityChanged;
+        toastTimer.Tick += ToastTimer_Tick;
+        SubscribeActivity();
     }
 
     public bool RequiresOnboarding { get; private set; }
@@ -74,6 +77,9 @@ public sealed partial class MainWindow : Window
         shuttingDown = true;
         App.MainWindowVisibilityChanged -= App_MainWindowVisibilityChanged;
         titleBarStatusTimer.Stop();
+        toastTimer.Stop();
+        toastTimer.Tick -= ToastTimer_Tick;
+        UnsubscribeActivity();
         AppWindow.Hide();
         RootLayout.IsHitTestVisible = false;
         ContentFrame.Content = null;
@@ -135,6 +141,7 @@ public sealed partial class MainWindow : Window
         {
             UpdateTitleBarStatus();
             titleBarStatusTimer.Start();
+            MarkPageSeen(currentPageTag);
         }
         else
         {
@@ -273,6 +280,7 @@ public sealed partial class MainWindow : Window
         }
 
         if (!ReferenceEquals(ContentFrame.Content, page)) ContentFrame.Content = page;
+        MarkPageSeen(tag);
     }
 
     private static string NormalizePageTag(string tag)
@@ -479,5 +487,22 @@ public sealed partial class MainWindow : Window
         Navigation.Visibility = Visibility.Visible;
         UpdateTitleBarStatus();
         InitialSetupCompleted?.Invoke(this, EventArgs.Empty);
+        if (Onboarding.RequestedNextStep != OnboardingNextStep.None)
+        {
+            StartSitesNextStep(Onboarding.RequestedNextStep);
+        }
+    }
+
+    // Opens Sites and, once its folders are loaded, starts Create Laravel or Park a folder.
+    private void StartSitesNextStep(OnboardingNextStep step)
+    {
+        if (!cachedPages.TryGetValue("sites", out var page))
+        {
+            page = CreatePage("sites");
+            cachedPages["sites"] = page;
+        }
+        if (page is SitesPage sitesPage) sitesPage.RequestNextStep(step);
+        NavigateToPage("sites");
+        if (Navigation.SelectedItem is NavigationViewItem { Tag: "sites" }) ShowPage("sites");
     }
 }

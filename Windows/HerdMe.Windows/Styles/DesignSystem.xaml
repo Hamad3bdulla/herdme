@@ -20,6 +20,15 @@
             <SolidColorBrush x:Key="ServicesInkBrush" Color="#13765D" />
             <SolidColorBrush x:Key="MailInkBrush" Color="#315EAD" />
             <SolidColorBrush x:Key="DumpsInkBrush" Color="#956300" />
+            <SolidColorBrush x:Key="FrameworkLaravelTintBrush" Color="#FDE8E6" />
+            <SolidColorBrush x:Key="FrameworkLaravelInkBrush" Color="#C7291C" />
+            <SolidColorBrush x:Key="FrameworkWordPressTintBrush" Color="#E3EFF7" />
+            <SolidColorBrush x:Key="FrameworkWordPressInkBrush" Color="#1D5F8A" />
+            <SolidColorBrush x:Key="FrameworkPhpTintBrush" Color="#ECEAF7" />
+            <SolidColorBrush x:Key="FrameworkPhpInkBrush" Color="#4F4B93" />
+            <SolidColorBrush x:Key="FrameworkNodeTintBrush" Color="#E6F4E4" />
+            <SolidColorBrush x:Key="FrameworkNodeInkBrush" Color="#2F7A2A" />
+            <SolidColorBrush x:Key="SkeletonBrush" Color="#E8EAED" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Default">
             <SolidColorBrush x:Key="WorkspaceBackgroundBrush" Color="#202124" />
@@ -39,6 +48,15 @@
             <SolidColorBrush x:Key="ServicesInkBrush" Color="#78D9B3" />
             <SolidColorBrush x:Key="MailInkBrush" Color="#97BEFF" />
             <SolidColorBrush x:Key="DumpsInkBrush" Color="#F3CE7C" />
+            <SolidColorBrush x:Key="FrameworkLaravelTintBrush" Color="#4A2522" />
+            <SolidColorBrush x:Key="FrameworkLaravelInkBrush" Color="#FF8A80" />
+            <SolidColorBrush x:Key="FrameworkWordPressTintBrush" Color="#1F3445" />
+            <SolidColorBrush x:Key="FrameworkWordPressInkBrush" Color="#8CC4EC" />
+            <SolidColorBrush x:Key="FrameworkPhpTintBrush" Color="#2E2C47" />
+            <SolidColorBrush x:Key="FrameworkPhpInkBrush" Color="#B3AEF2" />
+            <SolidColorBrush x:Key="FrameworkNodeTintBrush" Color="#233A22" />
+            <SolidColorBrush x:Key="FrameworkNodeInkBrush" Color="#93D98C" />
+            <SolidColorBrush x:Key="SkeletonBrush" Color="#33363B" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
             <SolidColorBrush x:Key="WorkspaceBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
@@ -58,6 +76,15 @@
             <SolidColorBrush x:Key="ServicesInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="MailInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="DumpsInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="FrameworkLaravelTintBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="FrameworkLaravelInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="FrameworkWordPressTintBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="FrameworkWordPressInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="FrameworkPhpTintBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="FrameworkPhpInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="FrameworkNodeTintBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="FrameworkNodeInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SkeletonBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
@@ -266,6 +293,74 @@
         <Setter Property="Padding" Value="16,12,16,12" />
         <Setter Property="MinHeight" Value="64" />
         <Setter Property="ColumnSpacing" Value="16" />
+    </Style>
+    <!-- Sites list tiles: a tinted square with the framework monogram, tinted per framework. -->
+    <Style x:Key="SiteTileLaravelStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource FrameworkLaravelTintBrush}" />
+    </Style>
+    <Style x:Key="SiteMonogramLaravelStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource FrameworkLaravelInkBrush}" />
+    </Style>
+    <Style x:Key="SiteTileWordPressStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource FrameworkWordPressTintBrush}" />
+    </Style>
+    <Style x:Key="SiteMonogramWordPressStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource FrameworkWordPressInkBrush}" />
+    </Style>
+    <Style x:Key="SiteTilePhpStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource FrameworkPhpTintBrush}" />
+    </Style>
+    <Style x:Key="SiteMonogramPhpStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource FrameworkPhpInkBrush}" />
+    </Style>
+    <Style x:Key="SiteTileNodeStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource FrameworkNodeTintBrush}" />
+    </Style>
+    <Style x:Key="SiteMonogramNodeStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource FrameworkNodeInkBrush}" />
+    </Style>
+    <Style x:Key="SiteTileSiteStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource SitesTintBrush}" />
+    </Style>
+    <Style x:Key="SiteMonogramSiteStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource BrandBrush}" />
+    </Style>
+    <!-- Placeholder blocks shown while a page loads for the first time. -->
+    <Style x:Key="SkeletonBlockStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource SkeletonBrush}" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Height" Value="12" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <!-- Collapsible General sections: the expander draws the card, the rows sit flush inside. -->
+    <Style x:Key="GeneralSectionExpanderStyle" TargetType="Expander">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style x:Key="GeneralSectionHeaderTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="SettingsGroupInExpanderStyle" TargetType="Border">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <!-- Full-width action tiles in the Sites Tools and Database tabs. -->
+    <Style x:Key="SitesToolButtonStyle" TargetType="Button">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="Padding" Value="14,8,14,8" />
+    </Style>
+    <Style x:Key="SitesToolDropDownStyle" TargetType="DropDownButton">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="Padding" Value="14,8,14,8" />
     </Style>
     <Style x:Key="EmptyStateGlyphStyle" TargetType="FontIcon">
         <Setter Property="FontSize" Value="32" />

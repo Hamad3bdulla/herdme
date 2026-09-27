@@ -67,9 +67,11 @@
             <NavigationViewItemHeader x:Uid="NavToolsGroup" Content="Tools" />
             <NavigationViewItem x:Uid="NavMail" AutomationProperties.AutomationId="NavMail" Content="Mail" Tag="mail">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Mail" /></NavigationViewItem.Icon>
+                <NavigationViewItem.InfoBadge><InfoBadge x:Name="MailBadge" Visibility="Collapsed" /></NavigationViewItem.InfoBadge>
             </NavigationViewItem>
             <NavigationViewItem x:Uid="NavDumps" AutomationProperties.AutomationId="NavDumps" Content="Dumps" Tag="dumps">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="View" /></NavigationViewItem.Icon>
+                <NavigationViewItem.InfoBadge><InfoBadge x:Name="DumpsBadge" Visibility="Collapsed" /></NavigationViewItem.InfoBadge>
             </NavigationViewItem>
             <NavigationViewItem x:Uid="NavDebugger" AutomationProperties.AutomationId="NavDebugger" Content="Debugger" Tag="debugger">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Repair" /></NavigationViewItem.Icon>
@@ -79,6 +81,7 @@
             </NavigationViewItem>
             <NavigationViewItem x:Uid="NavLogs" AutomationProperties.AutomationId="NavLogs" Content="Logs" Tag="logs">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Document" /></NavigationViewItem.Icon>
+                <NavigationViewItem.InfoBadge><InfoBadge x:Name="LogsBadge" Visibility="Collapsed" /></NavigationViewItem.InfoBadge>
             </NavigationViewItem>
             </NavigationView.MenuItems>
             <NavigationView.FooterMenuItems>
@@ -101,5 +104,42 @@
             x:Name="Onboarding"
             Grid.Row="1"
             SetupCompleted="Onboarding_SetupCompleted" />
+
+        <!-- One light confirmation surface ("Copied", "Saved", Undo) for the whole window. -->
+        <Border
+            x:Name="ToastHost"
+            Grid.RowSpan="2"
+            Margin="0,0,0,28"
+            Padding="16,10,10,10"
+            MinHeight="44"
+            MaxWidth="520"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Bottom"
+            Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Opacity="0"
+            Visibility="Collapsed"
+            AutomationProperties.AutomationId="ToastHost">
+            <Border.OpacityTransition>
+                <ScalarTransition />
+            </Border.OpacityTransition>
+            <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE73E;" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                <TextBlock
+                    x:Name="ToastText"
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    TextWrapping="Wrap"
+                    AutomationProperties.LiveSetting="Polite" />
+                <Button x:Name="ToastActionButton" Grid.Column="2" Visibility="Collapsed" Click="ToastAction_Click" />
+            </Grid>
+        </Border>
     </Grid>
 </Window>

@@ -104,6 +104,7 @@ public partial class App : Application
         MainWindow.AppWindow.Changed += MainWindow_AppWindowChanged;
         SystemEvents.PowerModeChanged += System_PowerModeChanged;
         SubscribeNotifications();
+        StartTrayStatus();
         if (!MainWindow.RequiresOnboarding
             && (Environment.GetCommandLineArgs().Contains("--background", StringComparer.OrdinalIgnoreCase)
                 || IsBackgroundLaunchRequest(launchRequest)))
@@ -309,6 +310,7 @@ public partial class App : Application
             Text = openCommand.Label
         });
         contextMenu.Items.Add(new MenuFlyoutSeparator());
+        AddTrayDynamicItems(contextMenu);
         contextMenu.Items.Add(new MenuFlyoutItem
         {
             Command = startCommand,
@@ -410,6 +412,7 @@ public partial class App : Application
         MainWindow.AppWindow.Changed -= MainWindow_AppWindowChanged;
         MainWindow.PrepareForShutdown();
         SetMainWindowVisible(false);
+        StopTrayStatus();
         trayIcon?.Dispose();
         trayIcon = null;
         await StopAndLogAsync("command pipe", StopCommandServerAsync);

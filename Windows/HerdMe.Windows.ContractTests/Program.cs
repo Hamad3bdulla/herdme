@@ -113,6 +113,7 @@ VerifyRuntimeCatalogContracts(repositoryRoot);
 await VerifyApplicationLifecycleContractsAsync();
 await VerifyCapturePresentationAsync();
 VerifyDumpParsing();
+VerifyUxContracts(repositoryRoot);
 
 var supportRoot = Path.Combine(
     Path.GetTempPath(),

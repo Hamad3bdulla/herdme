@@ -59,6 +59,7 @@ public sealed partial class AboutPage : Page
             Clipboard.SetContent(package);
             Clipboard.Flush();
             CopyVersionStatusText.Text = AppLocalization.Get("AboutCopied");
+            App.MainWindow.ShowToast(AppLocalization.Get("CommonCopiedToast"));
         }
         catch (Exception error)
         {

@@ -185,59 +185,155 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <TextBox
-                        x:Uid="SitesSearchField"
-                        x:Name="SearchBox"
-                        Margin="8,8,8,6"
-                        PlaceholderText="Search sites"
-                        TextChanged="SearchBox_TextChanged"
-                        KeyDown="SearchBox_KeyDown">
-                        <TextBox.KeyboardAccelerators>
-                            <KeyboardAccelerator Modifiers="Control" Key="F" Invoked="SearchAccelerator_Invoked" />
-                        </TextBox.KeyboardAccelerators>
-                    </TextBox>
+                    <Grid Margin="8,8,8,6" ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox
+                            x:Uid="SitesSearchField"
+                            x:Name="SearchBox"
+                            PlaceholderText="Search sites"
+                            TextChanged="SearchBox_TextChanged"
+                            KeyDown="SearchBox_KeyDown">
+                            <TextBox.KeyboardAccelerators>
+                                <KeyboardAccelerator Modifiers="Control" Key="F" Invoked="SearchAccelerator_Invoked" />
+                            </TextBox.KeyboardAccelerators>
+                        </TextBox>
+                        <DropDownButton
+                            x:Uid="SitesFilterButton"
+                            x:Name="FilterButton"
+                            Grid.Column="1"
+                            Padding="8,5,8,6"
+                            AutomationProperties.Name="Filter and sort sites">
+                            <ToolTipService.ToolTip>
+                                <ToolTip><TextBlock x:Uid="SitesFilterTooltip" Text="Filter and sort" /></ToolTip>
+                            </ToolTipService.ToolTip>
+                            <FontIcon Glyph="&#xE71C;" FontSize="14" />
+                            <DropDownButton.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                    <RadioMenuFlyoutItem x:Uid="SitesFilterAll" x:Name="FilterAllItem" GroupName="SitesFilter" Tag="All" Text="All sites" IsChecked="True" Click="FilterOption_Click" />
+                                    <RadioMenuFlyoutItem x:Uid="SitesFilterFavorites" GroupName="SitesFilter" Tag="Favorites" Text="Favorites" Click="FilterOption_Click" />
+                                    <RadioMenuFlyoutItem x:Uid="SitesFilterLaravel" GroupName="SitesFilter" Tag="Laravel" Text="Laravel" Click="FilterOption_Click" />
+                                    <RadioMenuFlyoutItem x:Uid="SitesFilterRunning" GroupName="SitesFilter" Tag="Running" Text="Running" Click="FilterOption_Click" />
+                                    <RadioMenuFlyoutItem x:Uid="SitesFilterErrors" GroupName="SitesFilter" Tag="Errors" Text="Has errors" Click="FilterOption_Click" />
+                                    <RadioMenuFlyoutItem x:Uid="SitesFilterShared" GroupName="SitesFilter" Tag="Shared" Text="Shared publicly" Click="FilterOption_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <RadioMenuFlyoutItem x:Uid="SitesSortFavorites" x:Name="SortFavoritesItem" GroupName="SitesSort" Tag="FavoritesFirst" Text="Sort: favorites first" IsChecked="True" Click="SortOption_Click" />
+                                    <RadioMenuFlyoutItem x:Uid="SitesSortName" GroupName="SitesSort" Tag="Name" Text="Sort: name" Click="SortOption_Click" />
+                                    <RadioMenuFlyoutItem x:Uid="SitesSortFramework" GroupName="SitesSort" Tag="Framework" Text="Sort: framework" Click="SortOption_Click" />
+                                </MenuFlyout>
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                    </Grid>
+                    <Button
+                        x:Uid="SitesClearFilterChip"
+                        x:Name="ActiveFilterChip"
+                        Grid.Row="1"
+                        Margin="8,0,8,6"
+                        Padding="10,3,8,4"
+                        CornerRadius="12"
+                        Visibility="Collapsed"
+                        Click="ClearFilter_Click"
+                        AutomationProperties.Name="Clear filter">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock x:Name="ActiveFilterText" FontSize="12" VerticalAlignment="Center" />
+                            <FontIcon Glyph="&#xE711;" FontSize="10" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                     <ListView
                         x:Name="SiteList"
-                        Grid.Row="1"
+                        Grid.Row="2"
                         Padding="0,2,0,4"
                         ItemsSource="{x:Bind VisibleSites}"
                         ItemContainerStyle="{StaticResource SitesListItemStyle}"
-                        SelectionChanged="SiteList_SelectionChanged">
+                        SelectionChanged="SiteList_SelectionChanged"
+                        DoubleTapped="SiteList_DoubleTapped"
+                        KeyDown="SiteList_KeyDown">
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="viewmodels:SitesListItem">
                                 <Grid Padding="8,8,8,8" ColumnSpacing="12">
                                     <Grid.ContextFlyout>
                                         <MenuFlyout>
-                                            <MenuFlyoutItem x:Uid="SitesFavoriteAction" Text="Toggle favorite" Tag="{x:Bind Path}" Click="FavoriteSite_Click" />
-                                            <MenuFlyoutItem x:Uid="SitesContextCopyLink" Text="Copy link" Tag="{x:Bind Path}" Click="CopySiteLinkFromMenu_Click" />
-                                            <MenuFlyoutItem x:Uid="SitesContextCopyPath" Text="Copy path" Tag="{x:Bind Path}" Click="CopySitePathFromMenu_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesContextOpenBrowser" Text="Open in browser" Tag="{x:Bind Path}" Click="ContextOpenBrowser_Click">
+                                                <MenuFlyoutItem.Icon><SymbolIcon Symbol="Globe" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem x:Uid="SitesContextOpenEditor" Text="Open in VS Code" Tag="{x:Bind Path}" Click="ContextOpenEditor_Click">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE943;" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem x:Uid="SitesContextOpenTerminal" Text="Open terminal" Tag="{x:Bind Path}" Click="ContextOpenTerminal_Click">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE756;" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem x:Uid="SitesContextOpenFolder" Text="Open in File Explorer" Tag="{x:Bind Path}" Click="ContextOpenFolder_Click">
+                                                <MenuFlyoutItem.Icon><SymbolIcon Symbol="Folder" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem x:Uid="SitesContextOpenLogs" Text="Open logs" Tag="{x:Bind Path}" Click="ContextOpenLogs_Click">
+                                                <MenuFlyoutItem.Icon><SymbolIcon Symbol="Document" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
                                             <MenuFlyoutSeparator />
-                                            <MenuFlyoutItem x:Uid="SitesContextRemoveSite" Text="Remove site..." Tag="{x:Bind Path}" Click="RemoveSiteFromMenu_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesFavoriteAction" Text="Toggle favorite" Tag="{x:Bind Path}" Click="FavoriteSite_Click">
+                                                <MenuFlyoutItem.Icon><SymbolIcon Symbol="Favorite" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem x:Uid="SitesContextCopyLink" Text="Copy link" Tag="{x:Bind Path}" Click="CopySiteLinkFromMenu_Click">
+                                                <MenuFlyoutItem.Icon><SymbolIcon Symbol="Link" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem x:Uid="SitesContextCopyPath" Text="Copy path" Tag="{x:Bind Path}" Click="CopySitePathFromMenu_Click">
+                                                <MenuFlyoutItem.Icon><SymbolIcon Symbol="Copy" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutSeparator />
+                                            <MenuFlyoutItem x:Uid="SitesContextRemoveSite" Text="Remove site..." Tag="{x:Bind Path}" Click="RemoveSiteFromMenu_Click">
+                                                <MenuFlyoutItem.Icon><SymbolIcon Symbol="Delete" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
                                         </MenuFlyout>
                                     </Grid.ContextFlyout>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <Border
-                                        Width="32"
-                                        Height="32"
-                                        Background="{ThemeResource SitesTintBrush}"
-                                        CornerRadius="8"
-                                        VerticalAlignment="Top">
-                                        <FontIcon Glyph="&#xE774;" FontSize="16" Foreground="{ThemeResource BrandBrush}" />
-                                    </Border>
+                                    <Grid Width="34" Height="34" VerticalAlignment="Top">
+                                        <Border
+                                            Width="32"
+                                            Height="32"
+                                            CornerRadius="8"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Top"
+                                            Style="{x:Bind TileStyle, Mode=OneWay}">
+                                            <Grid>
+                                                <TextBlock
+                                                    Text="{x:Bind Monogram, Mode=OneWay}"
+                                                    FontSize="15"
+                                                    FontWeight="Bold"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    Style="{x:Bind MonogramStyle, Mode=OneWay}"
+                                                    Visibility="{x:Bind MonogramVisibility, Mode=OneWay}" />
+                                                <FontIcon Glyph="&#xE774;" FontSize="16" Foreground="{ThemeResource BrandBrush}" Visibility="{x:Bind GlobeVisibility, Mode=OneWay}" />
+                                            </Grid>
+                                        </Border>
+                                        <Ellipse
+                                            Width="10"
+                                            Height="10"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Bottom"
+                                            Stroke="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            StrokeThickness="2"
+                                            Style="{x:Bind StatusDotStyle, Mode=OneWay}"
+                                            Visibility="{x:Bind StatusDotVisibility, Mode=OneWay}" />
+                                    </Grid>
                                     <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
                                         <Grid ColumnSpacing="6">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{x:Bind Domain, Mode=OneWay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                            <FontIcon Grid.Column="1" Glyph="&#xE735;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource BrandBrush}" Visibility="{x:Bind FavoriteVisibility, Mode=OneWay}" />
+                                            <FontIcon Grid.Column="1" Glyph="&#xE72D;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource SystemFillColorCautionBrush}" Visibility="{x:Bind SharedVisibility, Mode=OneWay}" />
+                                            <FontIcon Grid.Column="2" Glyph="&#xE735;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource BrandBrush}" Visibility="{x:Bind FavoriteVisibility, Mode=OneWay}" />
                                         </Grid>
                                         <Grid ColumnSpacing="8">
                                             <Grid.ColumnDefinitions>
@@ -254,11 +350,79 @@
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
-                    <StackPanel x:Name="EmptyState" Grid.Row="1" Margin="16" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" IsHitTestVisible="False">
-                        <FontIcon Glyph="&#xE8B7;" Style="{StaticResource EmptyStateGlyphStyle}" />
-                        <TextBlock x:Uid="SitesEmptyState" Text="No sites found" TextAlignment="Center" Style="{StaticResource SecondaryTextStyle}" />
+                    <!-- Placeholder rows while the first scan runs. -->
+                    <StackPanel x:Name="SitesSkeleton" Grid.Row="2" Padding="12,10,12,10" Spacing="18" Visibility="Collapsed" IsHitTestVisible="False">
+                        <StackPanel.OpacityTransition>
+                            <ScalarTransition />
+                        </StackPanel.OpacityTransition>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="32" Height="32" Style="{StaticResource SkeletonBlockStyle}" CornerRadius="8" />
+                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
+                                <Border Width="150" Style="{StaticResource SkeletonBlockStyle}" />
+                                <Border Width="90" Height="10" Style="{StaticResource SkeletonBlockStyle}" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="32" Height="32" Style="{StaticResource SkeletonBlockStyle}" CornerRadius="8" />
+                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
+                                <Border Width="120" Style="{StaticResource SkeletonBlockStyle}" />
+                                <Border Width="110" Height="10" Style="{StaticResource SkeletonBlockStyle}" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="32" Height="32" Style="{StaticResource SkeletonBlockStyle}" CornerRadius="8" />
+                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
+                                <Border Width="170" Style="{StaticResource SkeletonBlockStyle}" />
+                                <Border Width="70" Height="10" Style="{StaticResource SkeletonBlockStyle}" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="32" Height="32" Style="{StaticResource SkeletonBlockStyle}" CornerRadius="8" />
+                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
+                                <Border Width="135" Style="{StaticResource SkeletonBlockStyle}" />
+                                <Border Width="95" Height="10" Style="{StaticResource SkeletonBlockStyle}" />
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
-                    <Grid Grid.Row="2" Padding="12,8,12,8" ColumnSpacing="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                    <StackPanel x:Name="EmptyState" Grid.Row="2" Margin="16" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                        <FontIcon Glyph="&#xE8B7;" Style="{StaticResource EmptyStateGlyphStyle}" />
+                        <TextBlock x:Uid="SitesEmptyState" x:Name="EmptyStateTitle" Text="No sites found" TextAlignment="Center" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock x:Name="EmptyStateDescription" TextAlignment="Center" Style="{StaticResource SecondaryTextStyle}" />
+                        <StackPanel x:Name="EmptyStateActions" Spacing="8" HorizontalAlignment="Center">
+                            <Button x:Name="EmptyParkFolderButton" HorizontalAlignment="Stretch" Click="ParkFolder_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <SymbolIcon Symbol="Folder" />
+                                    <TextBlock x:Uid="SitesEmptyParkFolderButton" Text="Park a folder" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="EmptyCreateLaravelButton" HorizontalAlignment="Stretch" Click="CreateLaravel_Click" Style="{StaticResource AccentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <SymbolIcon Symbol="Add" />
+                                    <TextBlock x:Uid="SitesEmptyCreateLaravelButton" Text="Create a Laravel app" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <Button x:Name="EmptyClearFilterButton" HorizontalAlignment="Center" Click="ClearFilter_Click" Visibility="Collapsed">
+                            <TextBlock x:Uid="SitesEmptyClearFilterButton" Text="Clear search and filter" />
+                        </Button>
+                    </StackPanel>
+                    <Grid Grid.Row="3" Padding="12,8,12,8" ColumnSpacing="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -280,6 +444,8 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
@@ -289,8 +455,11 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <Border Style="{StaticResource IconTileStyle}" Background="{ThemeResource SitesTintBrush}" VerticalAlignment="Center">
-                                <FontIcon Glyph="&#xE774;" FontSize="18" Foreground="{ThemeResource BrandBrush}" />
+                            <Border x:Name="SiteHeaderTile" Width="40" Height="40" CornerRadius="10" VerticalAlignment="Center" Background="{ThemeResource SitesTintBrush}">
+                                <Grid>
+                                    <TextBlock x:Name="SiteHeaderMonogram" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+                                    <FontIcon x:Name="SiteHeaderGlobe" Glyph="&#xE774;" FontSize="18" Foreground="{ThemeResource BrandBrush}" />
+                                </Grid>
                             </Border>
                             <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
                                 <TextBlock
@@ -311,6 +480,7 @@
                             </StackPanel>
                         </Grid>
 
+                        <!-- Everyday actions stay one click away; destructive ones live under More. -->
                         <CommandBar
                             Grid.Row="1"
                             Margin="12,0,12,0"
@@ -321,6 +491,9 @@
                             <CommandBar.PrimaryCommands>
                                 <AppBarButton x:Uid="SitesOpenBrowserCommand" Label="Open in browser" Click="OpenSite_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Globe" /></AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton x:Uid="SitesOpenEditorCommand" Label="Open in VS Code" Click="OpenEditor_Click">
+                                    <AppBarButton.Icon><FontIcon Glyph="&#xE943;" /></AppBarButton.Icon>
                                 </AppBarButton>
                                 <AppBarButton x:Uid="SitesCopyCommand" Label="Copy site link or path">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Copy" /></AppBarButton.Icon>
@@ -340,14 +513,11 @@
                                 <AppBarButton x:Uid="SitesOpenTerminalCommand" Label="Open terminal" Click="OpenTerminal_Click">
                                     <AppBarButton.Icon><FontIcon Glyph="&#xE756;" /></AppBarButton.Icon>
                                 </AppBarButton>
+                                <AppBarButton x:Uid="SitesOpenLogsButton" Label="Open site logs" Click="OpenLogs_Click">
+                                    <AppBarButton.Icon><SymbolIcon Symbol="Document" /></AppBarButton.Icon>
+                                </AppBarButton>
                                 <AppBarButton x:Uid="SitesEditEnvironmentCommand" Label="Edit .env" Click="EditEnvironment_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Edit" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesCreateDatabaseCommand" x:Name="CreateDatabaseButton" Label="Create database" Click="CreateDatabase_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Add" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesOpenDatabaseCommand" Label="Open in TablePlus" Click="OpenDatabase_Click">
-                                    <AppBarButton.Icon><FontIcon Glyph="&#xE968;" /></AppBarButton.Icon>
                                 </AppBarButton>
                             </CommandBar.PrimaryCommands>
                             <CommandBar.SecondaryCommands>
@@ -355,31 +525,8 @@
                                     <AppBarButton.Icon><SymbolIcon Symbol="More" /></AppBarButton.Icon>
                                     <AppBarButton.Flyout>
                                         <MenuFlyout>
-                                            <MenuFlyoutItem x:Uid="SitesOpenLogsCommand" Text="Open site logs" Click="OpenLogs_Click" />
-                                            <MenuFlyoutItem x:Uid="SitesManageDatabaseCommand" Text="Manage database" Click="ManageDatabase_Click" />
-                                            <MenuFlyoutItem x:Uid="SitesImportDatabaseCommand" Text="Import database" Click="ImportDatabase_Click" />
-                                            <MenuFlyoutSeparator />
-                                            <MenuFlyoutItem x:Uid="SitesArtisanCommand" x:Name="ArtisanButton" Text="Run Artisan command" Click="Artisan_Click" />
-                                            <MenuFlyoutItem x:Uid="SitesNpmCommand" x:Name="NpmButton" Text="Run npm script" Click="Npm_Click" />
-                                            <MenuFlyoutItem x:Uid="SitesComposerCommand" x:Name="ComposerButton" Text="Run Composer command" Click="Composer_Click" />
-                                            <MenuFlyoutItem x:Uid="SitesDoctorCommand" Text="Check and repair site" Click="SiteDoctor_Click" />
-                                            <MenuFlyoutSubItem x:Uid="SitesQualityCommand" x:Name="QualityMenu" Text="Code quality">
-                                                <MenuFlyoutItem x:Uid="SitesQualityPintCommand" Text="Check code style (Pint)" Click="QualityPint_Click" />
-                                                <MenuFlyoutItem x:Uid="SitesQualityPhpStanCommand" Text="Static analysis (PHPStan)" Click="QualityPhpStan_Click" />
-                                                <MenuFlyoutItem x:Uid="SitesQualityTestsCommand" Text="Run tests" Click="QualityTests_Click" />
-                                            </MenuFlyoutSubItem>
-                                            <MenuFlyoutSeparator />
-                                            <MenuFlyoutSubItem x:Uid="SitesAutomationCommand" Text="Automations">
-                                                <MenuFlyoutItem x:Uid="SitesAutomationUpdateLaravel" Text="Update Laravel project" Click="UpdateLaravelWorkflow_Click" />
-                                                <MenuFlyoutItem x:Uid="SitesAutomationCleanProject" Text="Clean and rebuild project" Click="CleanProjectWorkflow_Click" />
-                                                <MenuFlyoutItem x:Uid="SitesAutomationResetProject" Text="Reset local project" Click="ResetProjectWorkflow_Click" />
-                                                <MenuFlyoutItem x:Uid="SitesAutomationExportProject" Text="Export transferable package" Click="ExportProjectWorkflow_Click" />
-                                                <MenuFlyoutItem x:Uid="SitesAutomationSetupMail" Text="Configure local mail" Click="SetupMailWorkflow_Click" />
-                                                <MenuFlyoutItem x:Uid="SitesAutomationHandoffAudit" Text="Run handoff audit" Click="HandoffAuditWorkflow_Click" />
-                                            </MenuFlyoutSubItem>
-                                            <MenuFlyoutItem x:Uid="SitesPerformanceCommand" Text="Performance" Click="Performance_Click" />
-                                            <MenuFlyoutItem x:Uid="SitesPhpExtensionsCommand" Text="PHP extensions" Click="PhpExtensions_Click" />
                                             <MenuFlyoutItem x:Uid="SitesConfigureRuntimesCommand" Text="Configure PHP and Node.js" Click="EditRuntimes_Click" />
+                                            <MenuFlyoutItem x:Uid="SitesPhpExtensionsCommand" Text="PHP extensions" Click="PhpExtensions_Click" />
                                             <MenuFlyoutSubItem x:Uid="SitesManifestCommand" Text="Project settings (herdme.yml)">
                                                 <MenuFlyoutItem x:Uid="SitesManifestApplyCommand" Text="Apply herdme.yml" Click="ApplyManifest_Click" />
                                                 <MenuFlyoutItem x:Uid="SitesManifestExportCommand" Text="Export herdme.yml" Click="ExportManifest_Click" />
@@ -397,127 +544,290 @@
                             </CommandBar.SecondaryCommands>
                         </CommandBar>
 
-                        <ScrollViewer Grid.Row="2" Padding="20,8,20,20" VerticalScrollBarVisibility="Auto" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
-                            <StackPanel Spacing="14" Margin="0,8,0,0">
-                                <InfoBar x:Name="ShareBar" x:Uid="SitesShareBar" Severity="Warning" IsOpen="False" IsClosable="False" Title="Shared publicly">
-                                    <InfoBar.ActionButton>
-                                        <Button x:Uid="SitesShareStopButton" Content="Stop sharing" Click="StopShare_Click" />
-                                    </InfoBar.ActionButton>
-                                    <InfoBar.Content>
-                                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
-                                            <HyperlinkButton x:Name="ShareLinkButton" Click="OpenShareLink_Click" />
-                                            <Button x:Uid="SitesShareCopyButton" Content="Copy link" Click="CopyShareLink_Click" />
-                                        </StackPanel>
-                                    </InfoBar.Content>
-                                </InfoBar>
-                                <Border Style="{StaticResource SettingsGroupStyle}">
-                                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <!-- Status that must stay visible whichever tab is open. -->
+                        <StackPanel Grid.Row="2" Padding="20,0,20,0" Spacing="8">
+                            <InfoBar x:Name="ShareBar" x:Uid="SitesShareBar" Severity="Warning" IsOpen="False" IsClosable="False" Title="Shared publicly">
+                                <InfoBar.ActionButton>
+                                    <Button x:Uid="SitesShareStopButton" Content="Stop sharing" Click="StopShare_Click" />
+                                </InfoBar.ActionButton>
+                                <InfoBar.Content>
+                                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+                                        <HyperlinkButton x:Name="ShareLinkButton" Click="OpenShareLink_Click" />
+                                        <Button x:Uid="SitesShareCopyButton" Content="Copy link" Click="CopyShareLink_Click" />
+                                    </StackPanel>
+                                </InfoBar.Content>
+                            </InfoBar>
+                            <InfoBar
+                                x:Name="SiteOperationBar"
+                                IsOpen="False"
+                                IsClosable="True"
+                                Severity="Informational">
+                                <InfoBar.ActionButton>
+                                    <Button x:Uid="SitesCancelOperationButton" x:Name="SiteOperationCancelButton" Content="Cancel" Click="CancelSiteOperation_Click" />
+                                </InfoBar.ActionButton>
+                            </InfoBar>
+                            <ProgressBar x:Name="SiteOperationProgress" IsIndeterminate="True" Visibility="Collapsed" />
+                            <Border
+                                x:Name="SiteOperationLogPanel"
+                                Visibility="Collapsed"
+                                Style="{StaticResource ToolPaneStyle}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock
+                                        x:Uid="SitesOperationLogLabel"
+                                        Margin="14,10,14,8"
+                                        Text="Operation log"
+                                        Style="{StaticResource SettingsRowTitleStyle}"
+                                        FontWeight="SemiBold" />
+                                    <TextBox
+                                        x:Name="SiteOperationLogText"
+                                        Grid.Row="1"
+                                        Height="170"
+                                        Padding="12,8"
+                                        AcceptsReturn="True"
+                                        IsReadOnly="True"
+                                        TextWrapping="NoWrap"
+                                        FlowDirection="LeftToRight"
+                                        FontFamily="Cascadia Mono, Consolas"
+                                        FontSize="12"
+                                        Background="{ThemeResource SubtleSurfaceBrush}"
+                                        BorderThickness="0,1,0,0"
+                                        CornerRadius="0,0,8,8"
+                                        ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                        ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+
+                        <SelectorBar x:Name="SiteDetailTabs" Grid.Row="3" Margin="12,4,12,0" SelectionChanged="SiteDetailTabs_SelectionChanged">
+                            <SelectorBarItem x:Uid="SitesTabOverview" x:Name="OverviewTab" Tag="overview" Text="Overview" IsSelected="True" />
+                            <SelectorBarItem x:Uid="SitesTabDatabase" x:Name="DatabaseTab" Tag="database" Text="Database" />
+                            <SelectorBarItem x:Uid="SitesTabTools" x:Name="ToolsTab" Tag="tools" Text="Tools" />
+                            <SelectorBarItem x:Uid="SitesTabDetails" x:Name="DetailsTab" Tag="details" Text="Details" />
+                        </SelectorBar>
+
+                        <ScrollViewer x:Name="SiteDetailScroll" Grid.Row="4" Padding="20,8,20,20" VerticalScrollBarVisibility="Auto" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                            <Grid Margin="0,8,0,0">
+                                <!-- Overview -->
+                                <StackPanel x:Name="OverviewPanel" Spacing="14">
+                                    <Border Style="{StaticResource SettingsGroupStyle}">
+                                        <Grid Style="{StaticResource SettingsRowStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#xE756;" Style="{StaticResource SettingsRowIconStyle}" />
+                                            <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                                <TextBlock x:Uid="SitesDevelopmentTitle" Text="Development processes" Style="{StaticResource SettingsRowTitleStyle}" />
+                                                <TextBlock x:Name="BackgroundProcessesText" Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Style="{StaticResource SettingsRowControlStyle}">
+                                                <Button x:Uid="SitesBackgroundOutputButton" Click="BackgroundOutput_Click" VerticalAlignment="Stretch" />
+                                                <Button
+                                                    x:Name="StartLaravelButton"
+                                                    Click="StartLaravel_Click"
+                                                    IsEnabled="False"
+                                                    MaxWidth="280"
+                                                    Style="{StaticResource AccentButtonStyle}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <SymbolIcon x:Name="StartLaravelIcon" Symbol="Play" />
+                                                        <TextBlock x:Name="StartLaravelLabel" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                    <Border
+                                        x:Name="PreviewBorder"
+                                        Height="280"
+                                        SizeChanged="PreviewBorder_SizeChanged"
+                                        Background="{ThemeResource SubtleSurfaceBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="{StaticResource CardCornerRadius}">
+                                        <Grid>
+                                            <WebView2
+                                                x:Name="SitePreview"
+                                                NavigationCompleted="SitePreview_NavigationCompleted"
+                                                SizeChanged="SitePreview_SizeChanged" />
+                                            <StackPanel
+                                                x:Name="PreviewFailureState"
+                                                Visibility="Collapsed"
+                                                Spacing="8"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE783;" Style="{StaticResource EmptyStateGlyphStyle}" />
+                                                <TextBlock x:Uid="SitesPreviewUnavailable" Text="Preview unavailable" TextAlignment="Center" Style="{StaticResource SecondaryTextStyle}" />
+                                                <Button
+                                                    x:Uid="SitesRetryPreviewButton"
+                                                    HorizontalAlignment="Center"
+                                                    Click="RetryPreview_Click"
+                                                    AutomationProperties.Name="Retry site preview">
+                                                    <ToolTipService.ToolTip>
+                                                        <ToolTip><TextBlock x:Uid="SitesRetryPreviewTooltip" Text="Retry preview" /></ToolTip>
+                                                    </ToolTipService.ToolTip>
+                                                    <SymbolIcon Symbol="Refresh" />
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                    <Border Style="{StaticResource SettingsGroupStyle}" Padding="16,6,16,6">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*" MinWidth="96" MaxWidth="220" />
+                                                <ColumnDefinition Width="5*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <TextBlock x:Uid="SitesFrameworkLabel" Text="Framework" Style="{StaticResource SitesDetailLabelStyle}" />
+                                            <TextBlock x:Name="FrameworkText" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
+                                            <TextBlock x:Uid="SitesRuntimeLabel" Grid.Row="1" Text="Runtime" Style="{StaticResource SitesDetailLabelStyle}" />
+                                            <TextBlock x:Name="RuntimeText" Grid.Row="1" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
+                                            <TextBlock x:Uid="SitesUrlLabel" Grid.Row="2" Text="URL" Style="{StaticResource SitesDetailLabelStyle}" />
+                                            <HyperlinkButton x:Name="UrlButton" Grid.Row="2" Grid.Column="1" Padding="0" Margin="0,6,0,6" VerticalAlignment="Center" Click="OpenSite_Click" />
+                                            <TextBlock x:Uid="SitesPathLabel" Grid.Row="3" Text="Path" Style="{StaticResource SitesDetailLabelStyle}" />
+                                            <TextBlock x:Name="PathText" Grid.Row="3" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" FlowDirection="LeftToRight" />
+                                            <TextBlock x:Uid="SitesGitLabel" Grid.Row="4" Text="Git" Style="{StaticResource SitesDetailLabelStyle}" />
+                                            <TextBlock x:Name="GitText" Grid.Row="4" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
+                                            <TextBlock x:Uid="SitesHealthDetailsLabel" Grid.Row="5" Text="Site health" Style="{StaticResource SitesDetailLabelStyle}" />
+                                            <TextBlock x:Name="HealthDetailsText" Grid.Row="5" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- Database -->
+                                <StackPanel x:Name="DatabasePanel" Spacing="14" Visibility="Collapsed">
+                                    <Border Style="{StaticResource SettingsGroupStyle}" Padding="16,6,16,6">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*" MinWidth="96" MaxWidth="220" />
+                                                <ColumnDefinition Width="5*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesDatabaseDetailsLabel" Text="Database" Style="{StaticResource SitesDetailLabelStyle}" />
+                                            <TextBlock x:Name="DatabaseDetailsText" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
+                                        </Grid>
+                                    </Border>
+                                    <Grid ColumnSpacing="10" RowSpacing="10">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <FontIcon Glyph="&#xE756;" Style="{StaticResource SettingsRowIconStyle}" />
-                                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                                            <TextBlock x:Uid="SitesDevelopmentTitle" Text="Development processes" Style="{StaticResource SettingsRowTitleStyle}" />
-                                            <TextBlock x:Name="BackgroundProcessesText" Style="{StaticResource SettingsRowDescriptionStyle}" />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="2" Style="{StaticResource SettingsRowControlStyle}">
-                                            <Button x:Uid="SitesBackgroundOutputButton" Click="BackgroundOutput_Click" VerticalAlignment="Stretch" />
-                                            <Button
-                                                x:Name="StartLaravelButton"
-                                                Click="StartLaravel_Click"
-                                                IsEnabled="False"
-                                                MaxWidth="280"
-                                                Style="{StaticResource AccentButtonStyle}">
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <SymbolIcon x:Name="StartLaravelIcon" Symbol="Play" />
-                                                    <TextBlock x:Name="StartLaravelLabel" TextWrapping="Wrap" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                            </Button>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                                <InfoBar
-                                    x:Name="SiteOperationBar"
-                                    IsOpen="False"
-                                    IsClosable="True"
-                                    Severity="Informational">
-                                    <InfoBar.ActionButton>
-                                        <Button x:Uid="SitesCancelOperationButton" x:Name="SiteOperationCancelButton" Content="Cancel" Click="CancelSiteOperation_Click" />
-                                    </InfoBar.ActionButton>
-                                </InfoBar>
-                                <ProgressBar x:Name="SiteOperationProgress" IsIndeterminate="True" Visibility="Collapsed" />
-                                <Border
-                                    x:Name="SiteOperationLogPanel"
-                                    Visibility="Collapsed"
-                                    Style="{StaticResource ToolPaneStyle}">
-                                    <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
-                                        <TextBlock
-                                            x:Uid="SitesOperationLogLabel"
-                                            Margin="14,10,14,8"
-                                            Text="Operation log"
-                                            Style="{StaticResource SettingsRowTitleStyle}"
-                                            FontWeight="SemiBold" />
-                                        <TextBox
-                                            x:Name="SiteOperationLogText"
-                                            Grid.Row="1"
-                                            Height="170"
-                                            Padding="12,8"
-                                            AcceptsReturn="True"
-                                            IsReadOnly="True"
-                                            TextWrapping="NoWrap"
-                                            FlowDirection="LeftToRight"
-                                            FontFamily="Cascadia Mono, Consolas"
-                                            FontSize="12"
-                                            Background="{ThemeResource SubtleSurfaceBrush}"
-                                            BorderThickness="0,1,0,0"
-                                            CornerRadius="0,0,8,8"
-                                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                            ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                                        <Button x:Name="CreateDatabaseButton" Style="{StaticResource SitesToolButtonStyle}" Click="CreateDatabase_Click">
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <SymbolIcon Symbol="Add" />
+                                                <TextBlock x:Uid="SitesDatabaseCreateButton" Text="Create database" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="1" Style="{StaticResource SitesToolButtonStyle}" Click="OpenDatabase_Click">
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <FontIcon Glyph="&#xE968;" />
+                                                <TextBlock x:Uid="SitesDatabaseOpenTablePlusButton" Text="Open in TablePlus" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Row="1" Style="{StaticResource SitesToolButtonStyle}" Click="ManageDatabase_Click">
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <FontIcon Glyph="&#xE912;" />
+                                                <TextBlock x:Uid="SitesDatabaseManage" Text="Manage database" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Row="1" Grid.Column="1" Style="{StaticResource SitesToolButtonStyle}" Click="ImportDatabase_Click">
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <SymbolIcon Symbol="Import" />
+                                                <TextBlock x:Uid="SitesDatabaseImportButton" Text="Import database" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Button>
                                     </Grid>
-                                </Border>
-                                <Border
-                                    x:Name="PreviewBorder"
-                                    Height="280"
-                                    SizeChanged="PreviewBorder_SizeChanged"
-                                    Background="{ThemeResource SubtleSurfaceBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="{StaticResource CardCornerRadius}">
-                                    <Grid>
-                                        <WebView2
-                                            x:Name="SitePreview"
-                                            NavigationCompleted="SitePreview_NavigationCompleted"
-                                            SizeChanged="SitePreview_SizeChanged" />
-                                        <StackPanel
-                                            x:Name="PreviewFailureState"
-                                            Visibility="Collapsed"
-                                            Spacing="8"
-                                            HorizontalAlignment="Center"
-                                            VerticalAlignment="Center">
-                                            <FontIcon Glyph="&#xE783;" Style="{StaticResource EmptyStateGlyphStyle}" />
-                                            <TextBlock x:Uid="SitesPreviewUnavailable" Text="Preview unavailable" TextAlignment="Center" Style="{StaticResource SecondaryTextStyle}" />
-                                            <Button
-                                                x:Uid="SitesRetryPreviewButton"
-                                                HorizontalAlignment="Center"
-                                                Click="RetryPreview_Click"
-                                                AutomationProperties.Name="Retry site preview">
-                                                <ToolTipService.ToolTip>
-                                                    <ToolTip><TextBlock x:Uid="SitesRetryPreviewTooltip" Text="Retry preview" /></ToolTip>
-                                                </ToolTipService.ToolTip>
-                                                <SymbolIcon Symbol="Refresh" />
-                                            </Button>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
+                                </StackPanel>
 
-                                <TextBlock x:Uid="SitesProjectDetailsTitle" Text="Project details" Style="{StaticResource SectionHeaderStyle}" />
-                                <Border Style="{StaticResource SettingsGroupStyle}" Padding="16,6,16,6">
+                                <!-- Tools -->
+                                <Grid x:Name="ToolsPanel" ColumnSpacing="10" RowSpacing="10" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Button x:Name="ArtisanButton" Style="{StaticResource SitesToolButtonStyle}" Click="Artisan_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <FontIcon Glyph="&#xE756;" />
+                                            <TextBlock x:Uid="SitesToolArtisan" Text="Run Artisan command" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button x:Name="ComposerButton" Grid.Column="1" Style="{StaticResource SitesToolButtonStyle}" Click="Composer_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <FontIcon Glyph="&#xE7B8;" />
+                                            <TextBlock x:Uid="SitesToolComposer" Text="Run Composer command" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button x:Name="NpmButton" Grid.Row="1" Style="{StaticResource SitesToolButtonStyle}" Click="Npm_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <FontIcon Glyph="&#xE768;" />
+                                            <TextBlock x:Uid="SitesToolNpm" Text="Run npm script" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Button>
+                                    <DropDownButton x:Name="QualityMenu" Grid.Row="1" Grid.Column="1" Style="{StaticResource SitesToolDropDownStyle}">
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <FontIcon Glyph="&#xE73E;" />
+                                            <TextBlock x:Uid="SitesToolQuality" Text="Code quality" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <DropDownButton.Flyout>
+                                            <MenuFlyout Placement="Bottom">
+                                                <MenuFlyoutItem x:Uid="SitesQualityPintCommand" Text="Check code style (Pint)" Click="QualityPint_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesQualityPhpStanCommand" Text="Static analysis (PHPStan)" Click="QualityPhpStan_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesQualityTestsCommand" Text="Run tests" Click="QualityTests_Click" />
+                                            </MenuFlyout>
+                                        </DropDownButton.Flyout>
+                                    </DropDownButton>
+                                    <Button Grid.Row="2" Style="{StaticResource SitesToolButtonStyle}" Click="SiteDoctor_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <FontIcon Glyph="&#xE90F;" />
+                                            <TextBlock x:Uid="SitesToolDoctor" Text="Check and repair site" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Grid.Row="2" Grid.Column="1" Style="{StaticResource SitesToolButtonStyle}" Click="Performance_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <FontIcon Glyph="&#xEC4A;" />
+                                            <TextBlock x:Uid="SitesToolPerformance" Text="Performance" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Button>
+                                    <DropDownButton Grid.Row="3" Style="{StaticResource SitesToolDropDownStyle}">
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <FontIcon Glyph="&#xE945;" />
+                                            <TextBlock x:Uid="SitesToolAutomations" Text="Automations" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <DropDownButton.Flyout>
+                                            <MenuFlyout Placement="Bottom">
+                                                <MenuFlyoutItem x:Uid="SitesAutomationUpdateLaravel" Text="Update Laravel project" Click="UpdateLaravelWorkflow_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesAutomationCleanProject" Text="Clean and rebuild project" Click="CleanProjectWorkflow_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesAutomationResetProject" Text="Reset local project" Click="ResetProjectWorkflow_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesAutomationExportProject" Text="Export transferable package" Click="ExportProjectWorkflow_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesAutomationSetupMail" Text="Configure local mail" Click="SetupMailWorkflow_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesAutomationHandoffAudit" Text="Run handoff audit" Click="HandoffAuditWorkflow_Click" />
+                                            </MenuFlyout>
+                                        </DropDownButton.Flyout>
+                                    </DropDownButton>
+                                </Grid>
+
+                                <!-- Details -->
+                                <Border x:Name="DetailsPanel" Style="{StaticResource SettingsGroupStyle}" Padding="16,6,16,6" Visibility="Collapsed">
                                     <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="2*" MinWidth="96" MaxWidth="220" />
@@ -531,45 +841,24 @@
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
-                                        <TextBlock x:Uid="SitesFrameworkLabel" Text="Framework" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="FrameworkText" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesRuntimeLabel" Grid.Row="1" Text="Runtime" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="RuntimeText" Grid.Row="1" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesRegistrationLabel" Grid.Row="2" Text="Registration" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="RegistrationText" Grid.Row="2" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesPathLabel" Grid.Row="3" Text="Path" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="PathText" Grid.Row="3" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" FlowDirection="LeftToRight" />
-                                        <TextBlock x:Uid="SitesUrlLabel" Grid.Row="4" Text="URL" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <HyperlinkButton x:Name="UrlButton" Grid.Row="4" Grid.Column="1" Padding="0" Margin="0,6,0,6" VerticalAlignment="Center" Click="OpenSite_Click" />
-                                        <TextBlock x:Uid="SitesEnvironmentFileLabel" Grid.Row="5" Text="Environment file" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="EnvironmentFileText" Grid.Row="5" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesLogsLabel" Grid.Row="6" Text="Logs" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="LogsText" Grid.Row="6" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesRoutesLabel" Grid.Row="7" Text="Laravel routes" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="RoutesText" Grid.Row="7" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesGitLabel" Grid.Row="8" Text="Git" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="GitText" Grid.Row="8" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesAssociatedServicesLabel" Grid.Row="9" Text="Associated services" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="AssociatedServicesText" Grid.Row="9" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesDatabaseDetailsLabel" Grid.Row="10" Text="Database" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="DatabaseDetailsText" Grid.Row="10" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesProcessesDetailsLabel" Grid.Row="11" Text="Background processes" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="ProcessesDetailsText" Grid.Row="11" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesHealthDetailsLabel" Grid.Row="12" Text="Site health" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="HealthDetailsText" Grid.Row="12" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesPerformanceDetailsLabel" Grid.Row="13" Text="Performance" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="PerformanceDetailsText" Grid.Row="13" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
+                                        <TextBlock x:Uid="SitesRegistrationLabel" Text="Registration" Style="{StaticResource SitesDetailLabelStyle}" />
+                                        <TextBlock x:Name="RegistrationText" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
+                                        <TextBlock x:Uid="SitesEnvironmentFileLabel" Grid.Row="1" Text="Environment file" Style="{StaticResource SitesDetailLabelStyle}" />
+                                        <TextBlock x:Name="EnvironmentFileText" Grid.Row="1" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
+                                        <TextBlock x:Uid="SitesLogsLabel" Grid.Row="2" Text="Logs" Style="{StaticResource SitesDetailLabelStyle}" />
+                                        <TextBlock x:Name="LogsText" Grid.Row="2" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
+                                        <TextBlock x:Uid="SitesRoutesLabel" Grid.Row="3" Text="Laravel routes" Style="{StaticResource SitesDetailLabelStyle}" />
+                                        <TextBlock x:Name="RoutesText" Grid.Row="3" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
+                                        <TextBlock x:Uid="SitesAssociatedServicesLabel" Grid.Row="4" Text="Associated services" Style="{StaticResource SitesDetailLabelStyle}" />
+                                        <TextBlock x:Name="AssociatedServicesText" Grid.Row="4" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
+                                        <TextBlock x:Uid="SitesProcessesDetailsLabel" Grid.Row="5" Text="Background processes" Style="{StaticResource SitesDetailLabelStyle}" />
+                                        <TextBlock x:Name="ProcessesDetailsText" Grid.Row="5" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
+                                        <TextBlock x:Uid="SitesPerformanceDetailsLabel" Grid.Row="6" Text="Performance" Style="{StaticResource SitesDetailLabelStyle}" />
+                                        <TextBlock x:Name="PerformanceDetailsText" Grid.Row="6" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
                                     </Grid>
                                 </Border>
-                            </StackPanel>
+                            </Grid>
                         </ScrollViewer>
                     </Grid>
                 </Grid>

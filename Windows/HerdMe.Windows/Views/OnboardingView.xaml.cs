@@ -20,9 +20,17 @@ public sealed partial class OnboardingView : UserControl
             RuntimeCatalog.DefaultPhpCycle,
             RuntimeCatalog.DefaultNodeMajor
         );
+        ExplainRuntimesText.Text = AppLocalization.Format(
+            "OnboardingExplainRuntimesText",
+            RuntimeCatalog.DefaultPhpCycle,
+            RuntimeCatalog.DefaultNodeMajor
+        );
     }
 
     public event EventHandler? SetupCompleted;
+
+    // Read by the main window when SetupCompleted is raised.
+    public OnboardingNextStep RequestedNextStep { get; private set; }
 
     public void Configure(InitialSetupManager setupManager)
     {
@@ -57,8 +65,25 @@ public sealed partial class OnboardingView : UserControl
         }
     }
 
-    private void Continue_Click(object sender, RoutedEventArgs e)
+    private void LearnMore_Click(object sender, RoutedEventArgs e)
     {
+        if (!isRunning) ShowOnly(ExplainPanel);
+    }
+
+    private void Back_Click(object sender, RoutedEventArgs e)
+    {
+        if (!isRunning) ShowOnly(WelcomePanel);
+    }
+
+    private void Continue_Click(object sender, RoutedEventArgs e) => Finish(OnboardingNextStep.None);
+
+    private void CreateLaravel_Click(object sender, RoutedEventArgs e) => Finish(OnboardingNextStep.CreateLaravel);
+
+    private void ParkFolder_Click(object sender, RoutedEventArgs e) => Finish(OnboardingNextStep.ParkFolder);
+
+    private void Finish(OnboardingNextStep nextStep)
+    {
+        RequestedNextStep = nextStep;
         SetupCompleted?.Invoke(this, EventArgs.Empty);
     }
 
@@ -68,6 +93,7 @@ public sealed partial class OnboardingView : UserControl
         package.SetText(FailureDetailsText.Text);
         Clipboard.SetContent(package);
         Clipboard.Flush();
+        App.MainWindow.ShowToast(AppLocalization.Get("CommonCopiedToast"));
     }
 
     private void UpdateProgress(InitialSetupStage stage)
@@ -110,6 +136,7 @@ public sealed partial class OnboardingView : UserControl
     private void ShowOnly(FrameworkElement visible)
     {
         WelcomePanel.Visibility = Visibility.Collapsed;
+        ExplainPanel.Visibility = Visibility.Collapsed;
         ProgressPanel.Visibility = Visibility.Collapsed;
         FailurePanel.Visibility = Visibility.Collapsed;
         CompletedPanel.Visibility = Visibility.Collapsed;

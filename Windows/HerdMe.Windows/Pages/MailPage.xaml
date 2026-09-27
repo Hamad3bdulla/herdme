@@ -126,7 +126,22 @@
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
-                    <TextBlock x:Name="EmptyState" Grid.Row="2" Margin="16" Visibility="Collapsed" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource SecondaryTextStyle}" IsHitTestVisible="False" />
+                    <StackPanel x:Name="EmptyStatePanel" Grid.Row="2" Margin="16" MaxWidth="340" Spacing="10" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock x:Name="EmptyState" TextAlignment="Center" HorizontalAlignment="Center" TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
+                        <!-- First run: show exactly what to put in a Laravel .env and offer to write it. -->
+                        <StackPanel x:Name="SmtpSetupPanel" Spacing="8" Visibility="Collapsed">
+                            <TextBlock x:Uid="MailSmtpSetupHint" Text="Send your app's email here by using these settings in its .env file:" TextAlignment="Center" TextWrapping="Wrap" Style="{StaticResource CaptionTextStyle}" />
+                            <Border Padding="12,8" CornerRadius="6" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                <TextBlock x:Name="SmtpSnippetText" FontFamily="Cascadia Mono, Consolas" FontSize="12" IsTextSelectionEnabled="True" FlowDirection="LeftToRight" TextWrapping="Wrap" />
+                            </Border>
+                            <Button HorizontalAlignment="Center" Click="AddToEnvironment_Click" Style="{StaticResource AccentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <SymbolIcon Symbol="Edit" />
+                                    <TextBlock x:Uid="MailSmtpSetupButton" Text="Add to a site's .env..." />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
                 </Grid>
             </Border>
             <Border Grid.Column="1" Style="{StaticResource ToolPaneStyle}" Padding="16,10,8,8">

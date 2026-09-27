@@ -128,10 +128,12 @@ public sealed partial class SitesPage : Page
             // The page instance is cached by the main window: reuse the scanned list and
             // the detection cache instead of rescanning every parked folder.
             await RefreshFromCacheAsync();
+            RunPendingNextStep();
             return;
         }
         hasLoadedOnce = true;
         await ScanAsync();
+        RunPendingNextStep();
     }
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
@@ -203,7 +205,7 @@ public sealed partial class SitesPage : Page
         CancelGitInspection();
         ApplyFilter(selectedSite?.Path);
         ApplyPendingSelection();
-        SiteCountText.Text = AppLocalization.Format("SitesCount", Sites.Count);
+        UpdateSiteCount();
         UpdateEnvironmentState();
         UpdateBackgroundProcessState();
         if (selectedSite is { } site) _ = RefreshSiteDetailsAsync(site);
@@ -285,9 +287,21 @@ public sealed partial class SitesPage : Page
 
     private async Task UnlinkSiteAsync(SiteRecord site)
     {
-        settingsStore.RemoveLinkedSite(site.Path);
-        detectionCache.Invalidate(site.Path);
+        var path = site.Path;
+        settingsStore.RemoveLinkedSite(path);
+        detectionCache.Invalidate(path);
         await ScanAsync();
+        // Unlinking only forgets the registration, so it can be undone for a few seconds.
+        App.MainWindow.ShowToast(
+            AppLocalization.Format("SitesUnlinkedToast", site.Name),
+            AppLocalization.Get("CommonUndo"),
+            async () =>
+            {
+                settingsStore.AddLinkedSite(path);
+                RequestSelectSite(path);
+                await ScanAsync();
+            }
+        );
     }
 
     private async void MoveSelectedSiteToRecycleBin_Click(object sender, RoutedEventArgs e)
@@ -445,6 +459,7 @@ public sealed partial class SitesPage : Page
             siteRuntimeStore.SetNode(path, string.IsNullOrEmpty(node) ? null : node);
             detectionCache.Invalidate(path);
             await ScanAsync();
+            App.MainWindow.ShowToast(AppLocalization.Get("CommonSavedToast"));
         }
         catch (Exception error)
         {
@@ -496,6 +511,7 @@ public sealed partial class SitesPage : Page
         }
 
         ScanProgress.IsActive = true;
+        BeginSitesScan();
         try
         {
             var normalizedSettings = settingsStore.Load();
@@ -519,7 +535,7 @@ public sealed partial class SitesPage : Page
             ApplyFilter(selectedPath);
             ApplyPendingSelection();
             App.RequestJumpListRefresh(scanned);
-            SiteCountText.Text = AppLocalization.Format("SitesCount", Sites.Count);
+            UpdateSiteCount();
             if (scanned.Count > 0 && !environment.IsRunning)
             {
                 EnvironmentStatusText.Text = AppLocalization.Get("SitesEnvironmentStarting");
@@ -543,7 +559,7 @@ public sealed partial class SitesPage : Page
             if (siteScanGeneration.IsCurrent(generation))
             {
                 ScanProgress.IsActive = false;
-                SiteCountText.Text = AppLocalization.Format("SitesCount", Sites.Count);
+                EndSitesScan();
                 UpdateEnvironmentState();
             }
         }
@@ -687,15 +703,11 @@ public sealed partial class SitesPage : Page
     private void ApplyFilter(string? preferredPath)
     {
         var query = SearchBox.Text.Trim();
-        var desired = SitePresentation.Filter(Sites, query)
-            .OrderByDescending(site => site.IsFavorite)
-            .ToList();
+        // Running and shared state feed the quick filters, so refresh it for every site.
+        foreach (var site in Sites) UpdateWorkflowStatus(site);
+        var desired = SiteListFilter.Apply(Sites, query, siteFilter, siteSort);
         var desiredPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var site in desired)
-        {
-            UpdateWorkflowStatus(site);
-            desiredPaths.Add(site.Path);
-        }
+        foreach (var site in desired) desiredPaths.Add(site.Path);
 
         SitesListItem? selection;
         suppressSiteSelection = true;
@@ -722,7 +734,7 @@ public sealed partial class SitesPage : Page
             }
             while (VisibleSites.Count > position) VisibleSites.RemoveAt(VisibleSites.Count - 1);
 
-            EmptyState.Visibility = VisibleSites.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            UpdateListChrome();
             selection = VisibleSites.FirstOrDefault(item => item.Path.Equals(
                 preferredPath,
                 StringComparison.OrdinalIgnoreCase
@@ -749,6 +761,10 @@ public sealed partial class SitesPage : Page
     private void UpdateWorkflowStatus(SiteRecord site)
     {
         var process = siteProcesses.State(site.Path, SiteBackgroundProcessKind.Development);
+        site.IsRunning = process.Running
+            || siteProcesses.State(site.Path, SiteBackgroundProcessKind.Queue).Running
+            || siteProcesses.State(site.Path, SiteBackgroundProcessKind.Scheduler).Running;
+        site.IsShared = shares.Find(site.Domain) is not null;
         site.WorkflowStatus = process.Running ? AppLocalization.Get("SitesRunning")
             : process.ExitCode is not null and not 0 ? AppLocalization.Get("SitesOperationFailed")
             : AppLocalization.Get("SitesStopped");
@@ -758,6 +774,12 @@ public sealed partial class SitesPage : Page
 
     private void RefreshWorkflowStatuses()
     {
+        // A running or shared filter can gain or lose rows when process state changes.
+        if (siteFilter is SiteListFilterKind.Running or SiteListFilterKind.Shared or SiteListFilterKind.Errors)
+        {
+            ApplyFilter(selectedSite?.Path);
+            return;
+        }
         foreach (var item in VisibleSites)
         {
             UpdateWorkflowStatus(item.Site);
@@ -787,6 +809,7 @@ public sealed partial class SitesPage : Page
         if (site is null) return;
 
         SiteNameText.Text = site.Name;
+        UpdateHeaderTile(site);
         DomainText.Text = site.Domain;
         FrameworkText.Text = site.Framework;
         var phpCycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;

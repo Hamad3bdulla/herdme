@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using HerdMe.Windows.Models;
+using HerdMe.Windows.Views;
 using Microsoft.UI.Xaml;
 
 namespace HerdMe.Windows.ViewModels;
@@ -17,6 +18,8 @@ public sealed class SitesListItem : INotifyPropertyChanged
     private bool isFavorite;
     private string? workflowStatus;
     private string? lastError;
+    private bool isRunning;
+    private bool isShared;
 
     public SitesListItem(SiteRecord site)
     {
@@ -49,6 +52,26 @@ public sealed class SitesListItem : INotifyPropertyChanged
         ? Visibility.Collapsed
         : Visibility.Visible;
 
+    // Framework tile: a monogram for known frameworks, a globe for plain sites.
+    public string Monogram => FrameworkVisuals.Monogram(framework);
+
+    public Visibility MonogramVisibility => Monogram.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility GlobeVisibility => Monogram.Length > 0 ? Visibility.Collapsed : Visibility.Visible;
+
+    public Style TileStyle => FrameworkVisuals.TileStyle(framework);
+
+    public Style MonogramStyle => FrameworkVisuals.MonogramStyle(framework);
+
+    // Corner dot on the tile: red after a failure, green while something runs.
+    public Visibility StatusDotVisibility => HasError || isRunning ? Visibility.Visible : Visibility.Collapsed;
+
+    public Style StatusDotStyle => StatusStyles.Dot(HasError ? StatusTone.Critical : StatusTone.Success);
+
+    public Visibility SharedVisibility => isShared ? Visibility.Visible : Visibility.Collapsed;
+
+    private bool HasError => !string.IsNullOrWhiteSpace(lastError);
+
     public void Update(SiteRecord site)
     {
         Site = site;
@@ -61,6 +84,11 @@ public sealed class SitesListItem : INotifyPropertyChanged
         {
             framework = site.Framework;
             Raise(nameof(Framework));
+            Raise(nameof(Monogram));
+            Raise(nameof(MonogramVisibility));
+            Raise(nameof(GlobeVisibility));
+            Raise(nameof(TileStyle));
+            Raise(nameof(MonogramStyle));
         }
         if (!string.Equals(gitSummary, site.GitSummary, StringComparison.Ordinal))
         {
@@ -78,11 +106,28 @@ public sealed class SitesListItem : INotifyPropertyChanged
             workflowStatus = site.WorkflowStatus;
             Raise(nameof(WorkflowStatus));
         }
+        var statusChanged = false;
         if (!string.Equals(lastError, site.LastError, StringComparison.Ordinal))
         {
             lastError = site.LastError;
+            statusChanged = true;
             Raise(nameof(LastError));
             Raise(nameof(LastErrorVisibility));
+        }
+        if (isRunning != site.IsRunning)
+        {
+            isRunning = site.IsRunning;
+            statusChanged = true;
+        }
+        if (statusChanged)
+        {
+            Raise(nameof(StatusDotVisibility));
+            Raise(nameof(StatusDotStyle));
+        }
+        if (isShared != site.IsShared)
+        {
+            isShared = site.IsShared;
+            Raise(nameof(SharedVisibility));
         }
     }
 
@@ -90,4 +135,32 @@ public sealed class SitesListItem : INotifyPropertyChanged
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
+}
+
+// Framework names come from the core scanner: Laravel, WordPress, PHP, Node.js, or Site.
+internal static class FrameworkVisuals
+{
+    public static string Monogram(string framework) => Key(framework) switch
+    {
+        "Laravel" => "L",
+        "WordPress" => "W",
+        "Php" => "P",
+        "Node" => "N",
+        _ => string.Empty
+    };
+
+    public static Style TileStyle(string framework) =>
+        (Style)Application.Current.Resources[$"SiteTile{Key(framework)}Style"];
+
+    public static Style MonogramStyle(string framework) =>
+        (Style)Application.Current.Resources[$"SiteMonogram{Key(framework)}Style"];
+
+    private static string Key(string framework) => framework switch
+    {
+        "Laravel" => "Laravel",
+        "WordPress" => "WordPress",
+        "PHP" => "Php",
+        "Node.js" => "Node",
+        _ => "Site"
+    };
 }

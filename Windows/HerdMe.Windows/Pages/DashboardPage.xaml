@@ -240,7 +240,8 @@
                                 <SymbolIcon Symbol="Folder" Foreground="{ThemeResource BrandBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <FontIcon Style="{StaticResource DashboardCardChevronStyle}" />
-                            <TextBlock x:Name="SitesCountText" Grid.Row="1" Margin="0,12,0,0" Text="0" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            <TextBlock x:Name="SitesCountText" Grid.Row="1" Margin="0,12,0,0" Text="0" Visibility="Collapsed" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            <Border x:Name="SitesCountSkeleton" Grid.Row="1" Margin="0,16,0,6" Width="44" Height="24" Style="{StaticResource SkeletonBlockStyle}" />
                             <TextBlock x:Uid="DashboardSitesLabel" Grid.Row="2" Text="Sites" Style="{StaticResource DashboardSummaryLabelStyle}" />
                             <StackPanel Grid.Row="3" Margin="0,8,0,0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
                                 <Ellipse x:Name="SitesStatusDot" Style="{StaticResource StatusDotNeutralStyle}" />
@@ -266,7 +267,8 @@
                                 <SymbolIcon Symbol="AllApps" Foreground="{ThemeResource ServicesInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <FontIcon Style="{StaticResource DashboardCardChevronStyle}" />
-                            <TextBlock x:Name="ServicesCountText" Grid.Row="1" Margin="0,12,0,0" Text="0" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            <TextBlock x:Name="ServicesCountText" Grid.Row="1" Margin="0,12,0,0" Text="0" Visibility="Collapsed" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            <Border x:Name="ServicesCountSkeleton" Grid.Row="1" Margin="0,16,0,6" Width="44" Height="24" Style="{StaticResource SkeletonBlockStyle}" />
                             <TextBlock x:Uid="DashboardServicesLabel" Grid.Row="2" Text="Services" Style="{StaticResource DashboardSummaryLabelStyle}" />
                             <StackPanel Grid.Row="3" Margin="0,8,0,0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
                                 <Ellipse x:Name="ServicesStatusDot" Style="{StaticResource StatusDotNeutralStyle}" />
@@ -292,7 +294,8 @@
                                 <SymbolIcon Symbol="Mail" Foreground="{ThemeResource MailInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <FontIcon Style="{StaticResource DashboardCardChevronStyle}" />
-                            <TextBlock x:Name="MailCountText" Grid.Row="1" Margin="0,12,0,0" Text="0" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            <TextBlock x:Name="MailCountText" Grid.Row="1" Margin="0,12,0,0" Text="0" Visibility="Collapsed" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            <Border x:Name="MailCountSkeleton" Grid.Row="1" Margin="0,16,0,6" Width="44" Height="24" Style="{StaticResource SkeletonBlockStyle}" />
                             <TextBlock x:Uid="DashboardMailLabel" Grid.Row="2" Text="Mail" Style="{StaticResource DashboardSummaryLabelStyle}" />
                             <StackPanel Grid.Row="3" Margin="0,8,0,0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
                                 <Ellipse x:Name="MailStatusDot" Style="{StaticResource StatusDotNeutralStyle}" />
@@ -318,7 +321,8 @@
                                 <SymbolIcon Symbol="View" Foreground="{ThemeResource DumpsInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <FontIcon Style="{StaticResource DashboardCardChevronStyle}" />
-                            <TextBlock x:Name="DumpsCountText" Grid.Row="1" Margin="0,12,0,0" Text="0" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            <TextBlock x:Name="DumpsCountText" Grid.Row="1" Margin="0,12,0,0" Text="0" Visibility="Collapsed" Style="{StaticResource DashboardSummaryCountStyle}" />
+                            <Border x:Name="DumpsCountSkeleton" Grid.Row="1" Margin="0,16,0,6" Width="44" Height="24" Style="{StaticResource SkeletonBlockStyle}" />
                             <TextBlock x:Uid="DashboardDumpsLabel" Grid.Row="2" Text="Dumps" Style="{StaticResource DashboardSummaryLabelStyle}" />
                             <StackPanel Grid.Row="3" Margin="0,8,0,0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
                                 <Ellipse x:Name="DumpsStatusDot" Style="{StaticResource StatusDotNeutralStyle}" />

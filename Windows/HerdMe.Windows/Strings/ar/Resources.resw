@@ -275,9 +275,6 @@
   <data name="SitesOpenFolderCommand.Label" xml:space="preserve"><value>فتح مجلد المشروع</value></data>
   <data name="SitesOpenTerminalCommand.Label" xml:space="preserve"><value>فتح الطرفية</value></data>
   <data name="SitesEditEnvironmentCommand.Label" xml:space="preserve"><value>تعديل .env</value></data>
-  <data name="SitesOpenLogsCommand.Text" xml:space="preserve"><value>فتح سجلات الموقع</value></data>
-  <data name="SitesArtisanCommand.Text" xml:space="preserve"><value>تشغيل أمر Artisan</value></data>
-  <data name="SitesNpmCommand.Text" xml:space="preserve"><value>تشغيل سكربت npm</value></data>
   <data name="SitesConfigureRuntimesCommand.Text" xml:space="preserve"><value>ضبط PHP وNode.js</value></data>
   <data name="SitesUnlinkCommand.Text" xml:space="preserve"><value>إلغاء ربط المشروع</value></data>
   <data name="SitesMoveToRecycleBinCommand.Text" xml:space="preserve"><value>نقل المشروع إلى سلة المحذوفات</value></data>
@@ -291,7 +288,6 @@
   <data name="SitesPreviewUnavailable.Text" xml:space="preserve"><value>المعاينة غير متاحة</value></data>
   <data name="SitesRetryPreviewButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إعادة محاولة معاينة الموقع</value></data>
   <data name="SitesRetryPreviewTooltip.Text" xml:space="preserve"><value>إعادة محاولة المعاينة</value></data>
-  <data name="SitesProjectDetailsTitle.Text" xml:space="preserve"><value>تفاصيل المشروع</value></data>
   <data name="SitesFrameworkLabel.Text" xml:space="preserve"><value>إطار العمل</value></data>
   <data name="SitesRuntimeLabel.Text" xml:space="preserve"><value>بيئة التشغيل</value></data>
   <data name="SitesRegistrationLabel.Text" xml:space="preserve"><value>نوع الإضافة</value></data>
@@ -630,8 +626,6 @@
   <data name="GeneralGitUpdated" xml:space="preserve"><value>أصبح Git {0} جاهزًا.</value></data>
   <data name="DebuggerUpdateButton" xml:space="preserve"><value>تحديث</value></data>
   <data name="DebuggerUpdateAvailable" xml:space="preserve"><value>يتوفر Xdebug {0}.</value></data>
-  <data name="SitesCreateDatabaseCommand.Label" xml:space="preserve"><value>إنشاء قاعدة بيانات</value></data>
-  <data name="SitesImportDatabaseCommand.Text" xml:space="preserve"><value>استيراد قاعدة بيانات</value></data>
   <data name="SitesDatabaseNoRunningService" xml:space="preserve"><value>أضف خدمة MySQL أو MariaDB أو PostgreSQL من صفحة الخدمات أولًا. سيتم تشغيلها تلقائيًا.</value></data>
   <data name="SitesDatabaseServiceField" xml:space="preserve"><value>خدمة قاعدة البيانات</value></data>
   <data name="SitesDatabaseNameField" xml:space="preserve"><value>اسم قاعدة البيانات</value></data>
@@ -644,9 +638,6 @@
   <data name="SitesDatabaseCreatedTitle" xml:space="preserve"><value>تم إنشاء قاعدة البيانات</value></data>
   <data name="SitesDatabaseAddToEnvironment" xml:space="preserve"><value>إضافة إلى .env</value></data>
   <data name="SitesDatabaseEnvironmentUpdated" xml:space="preserve"><value>تمت إضافة {0} متغيرات وتحديث {1} متغيرات في .env.</value></data>
-  <data name="SitesComposerCommand.Text" xml:space="preserve"><value>تشغيل أمر Composer</value></data>
-  <data name="SitesDoctorCommand.Text" xml:space="preserve"><value>فحص وإصلاح الموقع</value></data>
-  <data name="SitesPerformanceCommand.Text" xml:space="preserve"><value>الأداء</value></data>
   <data name="SitesPerformanceDetailsLabel.Text" xml:space="preserve"><value>الأداء</value></data>
   <data name="SitesPerformanceSummary" xml:space="preserve"><value>{0} طلب، متوسط {1:0.0} مللي ثانية، {2} أخطاء خادم</value></data>
   <data name="SitesPerformanceReport" xml:space="preserve"><value>الطلبات: {0}&#xA;النشطة: {1}&#xA;أخطاء الخادم: {2}&#xA;المتوسط: {3:0.0} مللي ثانية&#xA;الأبطأ: {4:0.0} مللي ثانية&#xA;آخر طلب: {5}</value></data>
@@ -702,7 +693,6 @@
   <data name="SitesOperationFailed" xml:space="preserve"><value>فشلت العملية</value></data>
   <data name="SitesOperationLogLabel.Text" xml:space="preserve"><value>سجل العملية</value></data>
   <data name="SitesNoCommandOutput" xml:space="preserve"><value>اكتمل الأمر دون مخرجات.</value></data>
-  <data name="SitesManageDatabaseCommand.Text" xml:space="preserve"><value>إدارة قاعدة البيانات</value></data>
   <data name="SitesDatabaseManageTitle" xml:space="preserve"><value>قاعدة بيانات الموقع {0}</value></data>
   <data name="SitesDatabaseActionField" xml:space="preserve"><value>الإجراء</value></data>
   <data name="SitesDatabaseBackup" xml:space="preserve"><value>نسخ احتياطي إلى SQL</value></data>
@@ -847,7 +837,6 @@
   <data name="SitesDatabaseImportCreateTitle" xml:space="preserve"><value>إنشاء القاعدة والاستيراد؟</value></data>
   <data name="SitesDatabaseImportCreateMessage" xml:space="preserve"><value>قاعدة {0} غير موجودة. سينشئها HerdMe ويستورد بيانات SQL ويضيف بيانات الاتصال المولدة إلى ملف .env للموقع.</value></data>
   <data name="SitesDatabaseImport" xml:space="preserve"><value>استيراد</value></data>
-  <data name="SitesAutomationCommand.Text" xml:space="preserve"><value>الإجراءات التلقائية</value></data>
   <data name="SitesAutomationUpdateLaravel.Text" xml:space="preserve"><value>تحديث مشروع Laravel</value></data>
   <data name="SitesAutomationCleanProject.Text" xml:space="preserve"><value>تنظيف المشروع وإعادة بنائه</value></data>
   <data name="SitesAutomationResetProject.Text" xml:space="preserve"><value>إعادة ضبط المشروع المحلي</value></data>
@@ -925,7 +914,6 @@
   <data name="UpdatesCategoryService" xml:space="preserve"><value>خدمة محلية</value></data>
   <data name="UpdatesCategoryDebugger" xml:space="preserve"><value>المصحح</value></data>
   <data name="UpdatesCategoryTool" xml:space="preserve"><value>أداة سطر أوامر</value></data>
-  <data name="SitesOpenDatabaseCommand.Label" xml:space="preserve"><value>فتح في TablePlus</value></data>
   <data name="SitesDatabaseQuickSetupDescription" xml:space="preserve"><value>سننشئ قاعدة البيانات ونحدّث إعدادات اتصال الموقع في .env تلقائيًا. يمكنك تعديل الاسم المقترح.</value></data>
   <data name="SitesDatabaseOpenAfterCreate" xml:space="preserve"><value>فتح في TablePlus بعد الإنشاء</value></data>
   <data name="SitesDatabaseEnvironmentReady" xml:space="preserve"><value>قاعدة البيانات جاهزة وتم حفظ إعدادات الاتصال في .env.</value></data>
@@ -1310,7 +1298,6 @@
   <data name="LogsLevelCounts" xml:space="preserve"><value>{0} أخطاء، {1} تحذيرات، {2} سجلات</value></data>
   <data name="LogsOpenedWithoutLine" xml:space="preserve"><value>فُتح الملف بالتطبيق الافتراضي. ثبّت Visual Studio Code للانتقال مباشرة إلى السطر {0}.</value></data>
   <data name="LogsOpenLastErrorFailed" xml:space="preserve"><value>تعذر فتح الملف: {0}</value></data>
-  <data name="SitesQualityCommand.Text" xml:space="preserve"><value>جودة الكود</value></data>
   <data name="SitesQualityPintCommand.Text" xml:space="preserve"><value>فحص تنسيق الكود (Pint)</value></data>
   <data name="SitesQualityPhpStanCommand.Text" xml:space="preserve"><value>تحليل ثابت (PHPStan)</value></data>
   <data name="SitesQualityTestsCommand.Text" xml:space="preserve"><value>تشغيل الاختبارات</value></data>
@@ -1327,4 +1314,106 @@
   <data name="SitesQualityOpenFailed" xml:space="preserve"><value>تعذر فتح الملف: {0}</value></data>
   <data name="SitesQualityOutput" xml:space="preserve"><value>المخرجات</value></data>
   <data name="SitesQualityDialogTitle" xml:space="preserve"><value>{0} - نتيجة الفحص: {1}</value></data>
+  <data name="GeneralSettingsSearch.PlaceholderText" xml:space="preserve"><value>ابحث عن إعداد</value></data>
+  <data name="GeneralSettingsSearch.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>ابحث عن إعداد</value></data>
+  <data name="GeneralSettingsSearchEmpty.Text" xml:space="preserve"><value>لا توجد إعدادات تطابق بحثك.</value></data>
+  <data name="GeneralStartupSection.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>بدء التشغيل والمظهر</value></data>
+  <data name="GeneralIntegrationSection.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>التكامل مع Windows</value></data>
+  <data name="GeneralDomainsSection.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>النطاقات المحلية وHTTPS</value></data>
+  <data name="GeneralUpdatesSection.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تحديثات التطبيق</value></data>
+  <data name="GeneralCoreSection.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>النواة المحمولة</value></data>
+  <data name="GeneralRuntimeSection.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فحص بيئة التشغيل</value></data>
+  <data name="GeneralExtensionsSection.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إضافات PHP المطلوبة لـ Laravel</value></data>
+  <data name="MailSmtpSetupHint.Text" xml:space="preserve"><value>لتصل رسائل تطبيقك إلى هنا، استخدم هذه الإعدادات في ملف .env الخاص به:</value></data>
+  <data name="MailSmtpSetupButton.Text" xml:space="preserve"><value>إضافة إلى ملف .env لموقع...</value></data>
+  <data name="SitesFilterButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تصفية المواقع وترتيبها</value></data>
+  <data name="SitesFilterTooltip.Text" xml:space="preserve"><value>تصفية وترتيب</value></data>
+  <data name="SitesFilterAll.Text" xml:space="preserve"><value>كل المواقع</value></data>
+  <data name="SitesFilterFavorites.Text" xml:space="preserve"><value>المفضلة</value></data>
+  <data name="SitesFilterLaravel.Text" xml:space="preserve"><value>مشاريع Laravel</value></data>
+  <data name="SitesFilterRunning.Text" xml:space="preserve"><value>قيد التشغيل</value></data>
+  <data name="SitesFilterErrors.Text" xml:space="preserve"><value>فيها أخطاء</value></data>
+  <data name="SitesFilterShared.Text" xml:space="preserve"><value>مشاركة للعامة</value></data>
+  <data name="SitesSortFavorites.Text" xml:space="preserve"><value>الترتيب: المفضلة أولًا</value></data>
+  <data name="SitesSortName.Text" xml:space="preserve"><value>الترتيب: الاسم</value></data>
+  <data name="SitesSortFramework.Text" xml:space="preserve"><value>الترتيب: إطار العمل</value></data>
+  <data name="SitesClearFilterChip.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إزالة التصفية</value></data>
+  <data name="SitesContextOpenBrowser.Text" xml:space="preserve"><value>فتح في المتصفح</value></data>
+  <data name="SitesContextOpenEditor.Text" xml:space="preserve"><value>فتح في VS Code</value></data>
+  <data name="SitesContextOpenTerminal.Text" xml:space="preserve"><value>فتح الطرفية</value></data>
+  <data name="SitesContextOpenFolder.Text" xml:space="preserve"><value>فتح في مستكشف الملفات</value></data>
+  <data name="SitesContextOpenLogs.Text" xml:space="preserve"><value>فتح السجلات</value></data>
+  <data name="SitesEmptyParkFolderButton.Text" xml:space="preserve"><value>إضافة مجلد مشاريع</value></data>
+  <data name="SitesEmptyCreateLaravelButton.Text" xml:space="preserve"><value>إنشاء تطبيق Laravel</value></data>
+  <data name="SitesEmptyClearFilterButton.Text" xml:space="preserve"><value>مسح البحث والتصفية</value></data>
+  <data name="SitesOpenEditorCommand.Label" xml:space="preserve"><value>فتح في VS Code</value></data>
+  <data name="SitesOpenLogsButton.Label" xml:space="preserve"><value>فتح سجلات الموقع</value></data>
+  <data name="SitesTabOverview.Text" xml:space="preserve"><value>نظرة عامة</value></data>
+  <data name="SitesTabDatabase.Text" xml:space="preserve"><value>قاعدة البيانات</value></data>
+  <data name="SitesTabTools.Text" xml:space="preserve"><value>الأدوات</value></data>
+  <data name="SitesTabDetails.Text" xml:space="preserve"><value>التفاصيل</value></data>
+  <data name="SitesDatabaseCreateButton.Text" xml:space="preserve"><value>إنشاء قاعدة بيانات</value></data>
+  <data name="SitesDatabaseOpenTablePlusButton.Text" xml:space="preserve"><value>فتح في TablePlus</value></data>
+  <data name="SitesDatabaseManage.Text" xml:space="preserve"><value>إدارة قاعدة البيانات</value></data>
+  <data name="SitesDatabaseImportButton.Text" xml:space="preserve"><value>استيراد قاعدة بيانات</value></data>
+  <data name="SitesToolArtisan.Text" xml:space="preserve"><value>تشغيل أمر Artisan</value></data>
+  <data name="SitesToolComposer.Text" xml:space="preserve"><value>تشغيل أمر Composer</value></data>
+  <data name="SitesToolNpm.Text" xml:space="preserve"><value>تشغيل سكربت npm</value></data>
+  <data name="SitesToolQuality.Text" xml:space="preserve"><value>جودة الكود</value></data>
+  <data name="SitesToolDoctor.Text" xml:space="preserve"><value>فحص وإصلاح الموقع</value></data>
+  <data name="SitesToolPerformance.Text" xml:space="preserve"><value>الأداء</value></data>
+  <data name="SitesToolAutomations.Text" xml:space="preserve"><value>الإجراءات التلقائية</value></data>
+  <data name="SitesFilterNameFavorites" xml:space="preserve"><value>المفضلة</value></data>
+  <data name="SitesFilterNameLaravel" xml:space="preserve"><value>مشاريع Laravel</value></data>
+  <data name="SitesFilterNameRunning" xml:space="preserve"><value>قيد التشغيل</value></data>
+  <data name="SitesFilterNameErrors" xml:space="preserve"><value>فيها أخطاء</value></data>
+  <data name="SitesFilterNameShared" xml:space="preserve"><value>مشاركة للعامة</value></data>
+  <data name="SitesCountFiltered" xml:space="preserve"><value>{0} من {1} موقع</value></data>
+  <data name="SitesEditorMissing" xml:space="preserve"><value>لم يُعثر على VS Code. ثبّته أو أضف الأمر code إلى PATH ثم حاول مرة أخرى.</value></data>
+  <data name="SitesEmptyNoSitesTitle" xml:space="preserve"><value>لا توجد مواقع بعد</value></data>
+  <data name="SitesEmptyNoSitesDescription" xml:space="preserve"><value>أضف مجلدًا يحتوي مشاريعك أو أنشئ تطبيق Laravel جديدًا. كل مشروع يفتح على https://name.test/.</value></data>
+  <data name="SitesEmptyNoMatchTitle" xml:space="preserve"><value>لا توجد مواقع مطابقة</value></data>
+  <data name="SitesEmptyNoMatchDescription" xml:space="preserve"><value>جرّب بحثًا آخر أو أزل التصفية.</value></data>
+  <data name="SitesUnlinkedToast" xml:space="preserve"><value>تم فصل {0}</value></data>
+  <data name="CommonUndo" xml:space="preserve"><value>تراجع</value></data>
+  <data name="CommonCopiedToast" xml:space="preserve"><value>تم النسخ</value></data>
+  <data name="CommonSavedToast" xml:space="preserve"><value>تم الحفظ</value></data>
+  <data name="NavMailBadge" xml:space="preserve"><value>{0} رسائل جديدة</value></data>
+  <data name="NavDumpsBadge" xml:space="preserve"><value>{0} تفريغات جديدة</value></data>
+  <data name="NavLogsBadge" xml:space="preserve"><value>{0} توقفات غير متوقعة</value></data>
+  <data name="OnboardingLearnMoreButton.Content" xml:space="preserve"><value>ما الذي سيغيّره الإعداد؟</value></data>
+  <data name="OnboardingExplainTitle.Text" xml:space="preserve"><value>ماذا سيفعل الإعداد</value></data>
+  <data name="OnboardingExplainDomainsTitle.Text" xml:space="preserve"><value>نطاقات .test المحلية</value></data>
+  <data name="OnboardingExplainDomainsText.Text" xml:space="preserve"><value>يضيف HerdMe قسمًا واحدًا معلَّمًا إلى ملف hosts في Windows حتى يفتح https://name.test/ مشاريعك. لا يستطيع تعديل هذا الملف إلا المسؤول، ولهذا يطلب Windows موافقتك.</value></data>
+  <data name="OnboardingExplainCertificateTitle.Text" xml:space="preserve"><value>شهادة HTTPS المحلية</value></data>
+  <data name="OnboardingExplainCertificateText.Text" xml:space="preserve"><value>ينشئ HerdMe جهة شهادات على هذا الجهاز ويثق بها لحسابك في Windows فقط، فتقبل المتصفحات مواقعك المحلية. يطلب Windows تأكيدك مرة واحدة.</value></data>
+  <data name="OnboardingExplainRuntimesTitle.Text" xml:space="preserve"><value>PHP وأدوات التطوير</value></data>
+  <data name="OnboardingExplainRuntimesText" xml:space="preserve"><value>يُنزَّل PHP {0} وGit وComposer ومثبّت Laravel وNode.js {1} من مصادرها الرسمية، ويُتحقق منها ببصمة SHA-256، وتُحفظ في مجلد المستخدم.</value></data>
+  <data name="OnboardingExplainPrivacyTitle.Text" xml:space="preserve"><value>يبقى على هذا الجهاز</value></data>
+  <data name="OnboardingExplainPrivacyText.Text" xml:space="preserve"><value>كل خدمات HerdMe تستمع على هذا الجهاز فقط. لا يُشارَك أي شيء حتى تشارك موقعًا بنفسك.</value></data>
+  <data name="OnboardingBackButton.Text" xml:space="preserve"><value>رجوع</value></data>
+  <data name="OnboardingExplainSetupButton.Text" xml:space="preserve"><value>إعداد HerdMe</value></data>
+  <data name="OnboardingNextStepsTitle.Text" xml:space="preserve"><value>ابدأ بمشروع</value></data>
+  <data name="OnboardingCreateLaravelButton.Text" xml:space="preserve"><value>إنشاء مشروع Laravel</value></data>
+  <data name="OnboardingParkFolderButton.Text" xml:space="preserve"><value>إضافة مجلد مشاريع</value></data>
+  <data name="TraySitesMenuLabel" xml:space="preserve"><value>المواقع</value></data>
+  <data name="TraySiteOpenBrowser" xml:space="preserve"><value>فتح في المتصفح</value></data>
+  <data name="TraySiteShowInHerdMe" xml:space="preserve"><value>عرض في HerdMe</value></data>
+  <data name="TraySitesShowAll" xml:space="preserve"><value>كل المواقع...</value></data>
+  <data name="TraySitesEmpty" xml:space="preserve"><value>إضافة موقع...</value></data>
+  <data name="TrayPhpMenuLabel" xml:space="preserve"><value>إصدار PHP</value></data>
+  <data name="TrayPhpVersion" xml:space="preserve"><value>إصدار PHP {0}</value></data>
+  <data name="TrayPhpManage" xml:space="preserve"><value>إدارة PHP...</value></data>
+  <data name="TrayPhpInstall" xml:space="preserve"><value>تثبيت PHP...</value></data>
+  <data name="TrayPhpSwitchedToast" xml:space="preserve"><value>أصبح PHP {0} الإصدار الافتراضي</value></data>
+  <data name="TrayMailLabel" xml:space="preserve"><value>البريد</value></data>
+  <data name="TrayMailUnseenLabel" xml:space="preserve"><value>البريد ({0} جديدة)</value></data>
+  <data name="TrayStopSharingLabel" xml:space="preserve"><value>إيقاف المشاركة ({0})</value></data>
+  <data name="TrayTooltipSetup" xml:space="preserve"><value>HerdMe - يحتاج إلى إعداد</value></data>
+  <data name="TrayTooltipRunning" xml:space="preserve"><value>HerdMe - يعمل - {0} مواقع</value></data>
+  <data name="TrayTooltipRunningNoSites" xml:space="preserve"><value>HerdMe - يعمل</value></data>
+  <data name="TrayTooltipRecovering" xml:space="preserve"><value>HerdMe - جارٍ الاستعادة</value></data>
+  <data name="TrayTooltipStopped" xml:space="preserve"><value>HerdMe - متوقف</value></data>
+  <data name="TaskbarOverlayErrors" xml:space="preserve"><value>{0} توقفات غير متوقعة</value></data>
+  <data name="TaskbarOverlayActivity" xml:space="preserve"><value>{0} عناصر جديدة</value></data>
 </root>

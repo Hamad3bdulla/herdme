@@ -51,6 +51,26 @@
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       <TargetPath>Assets\HerdMe.ico</TargetPath>
     </Content>
+    <Content Include="Assets\HerdMe-Degraded.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>Assets\HerdMe-Degraded.ico</TargetPath>
+    </Content>
+    <Content Include="Assets\HerdMe-Stopped.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>Assets\HerdMe-Stopped.ico</TargetPath>
+    </Content>
+    <Content Include="Assets\Overlay-Activity.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>Assets\Overlay-Activity.ico</TargetPath>
+    </Content>
+    <Content Include="Assets\Overlay-Error.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>Assets\Overlay-Error.ico</TargetPath>
+    </Content>
     <Content Include="..\..\HerdMe\Resources\Assets.xcassets\AppIcon.appiconset\icon-128.png" Link="Assets\HerdMe.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>

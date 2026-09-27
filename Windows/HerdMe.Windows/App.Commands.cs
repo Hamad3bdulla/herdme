@@ -144,7 +144,9 @@ public partial class App
     // site list is written.
     internal static void RequestJumpListRefresh(IEnumerable<SiteRecord> sites)
     {
-        Volatile.Write(ref pendingJumpListSites, sites.ToList());
+        var list = sites.ToList();
+        RememberKnownSites(list);
+        Volatile.Write(ref pendingJumpListSites, list);
         _ = Task.Run(async () =>
         {
             await JumpListGate.WaitAsync();

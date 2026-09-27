@@ -90,6 +90,13 @@ public sealed class SiteRecord
     [JsonIgnore]
     public string? WorkflowStatus { get; set; }
 
+    // A development server, queue worker, or scheduler is running for this site.
+    [JsonIgnore]
+    public bool IsRunning { get; set; }
+
+    [JsonIgnore]
+    public bool IsShared { get; set; }
+
     public string Runtime => PhpVersion is not null
         ? $"PHP {PhpVersion}"
         : NodeVersion is not null ? $"Node {NodeVersion}" : "Default";

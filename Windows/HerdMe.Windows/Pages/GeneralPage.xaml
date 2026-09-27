@@ -28,341 +28,400 @@
                 </Button>
             </Grid>
 
-            <TextBlock x:Uid="GeneralStartupSectionTitle" Text="Startup and appearance" Style="{StaticResource SectionHeaderStyle}" />
-            <Border Style="{StaticResource SettingsGroupStyle}">
-                <StackPanel>
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE7E8;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                            <TextBlock x:Uid="GeneralLaunchAtSigninTitle" Text="Launch at sign-in" Style="{StaticResource SettingsRowTitleStyle}" />
-                            <TextBlock x:Uid="GeneralLaunchAtSigninDescription" Text="Keep local sites available after signing in to Windows." Style="{StaticResource SettingsRowDescriptionStyle}" />
-                        </StackPanel>
-                        <ToggleSwitch x:Name="StartupToggle" Grid.Column="2" MinWidth="0" Toggled="StartupToggle_Toggled" />
-                    </Grid>
-                    <Rectangle Style="{StaticResource CardDividerStyle}" />
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE8A9;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                            <TextBlock x:Uid="GeneralCompactModeTitle" Text="Compact interface" Style="{StaticResource SettingsRowTitleStyle}" />
-                            <TextBlock x:Uid="GeneralCompactModeDescription" Text="Use tighter spacing on sites and dashboard pages." Style="{StaticResource SettingsRowDescriptionStyle}" />
-                        </StackPanel>
-                        <ToggleSwitch x:Name="CompactModeToggle" Grid.Column="2" MinWidth="0" Toggled="CompactModeToggle_Toggled" />
-                    </Grid>
-                    <Rectangle Style="{StaticResource CardDividerStyle}" />
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xEA8F;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                            <TextBlock x:Uid="GeneralNotificationsTitle" Text="Notifications" Style="{StaticResource SettingsRowTitleStyle}" />
-                            <TextBlock x:Uid="GeneralNotificationsDescription" Text="Show a tray notification when a service, worker, or public link stops unexpectedly, or when an update is ready while HerdMe is in the tray." Style="{StaticResource SettingsRowDescriptionStyle}" />
-                        </StackPanel>
-                        <ToggleSwitch x:Name="NotificationsToggle" x:Uid="NotificationsToggle" Grid.Column="2" MinWidth="0" Toggled="NotificationsToggle_Toggled" />
-                    </Grid>
-                </StackPanel>
-            </Border>
+            <AutoSuggestBox
+                x:Uid="GeneralSettingsSearch"
+                x:Name="SettingsSearchBox"
+                MaxWidth="480"
+                HorizontalAlignment="Left"
+                MinWidth="280"
+                PlaceholderText="Find a setting"
+                QueryIcon="Find"
+                AutomationProperties.Name="Find a setting"
+                TextChanged="SettingsSearch_TextChanged" />
+            <TextBlock
+                x:Uid="GeneralSettingsSearchEmpty"
+                x:Name="SettingsSearchEmpty"
+                Text="No settings match your search."
+                Visibility="Collapsed"
+                Style="{StaticResource SecondaryTextStyle}" />
 
-            <TextBlock x:Uid="GeneralWindowsIntegrationSectionTitle" Text="Windows integration" Style="{StaticResource SectionHeaderStyle}" />
-            <TextBlock x:Uid="GeneralWindowsIntegrationDescription" Text="Optional. Each switch writes one HerdMe entry for your Windows account only and removes it when turned off or when HerdMe is uninstalled." Style="{StaticResource SettingsRowDescriptionStyle}" TextWrapping="Wrap" Margin="0,0,0,8" />
-            <Border Style="{StaticResource SettingsGroupStyle}">
+            <Expander x:Uid="GeneralStartupSection" x:Name="StartupSection" AutomationProperties.Name="Startup and appearance" IsExpanded="True" Style="{StaticResource GeneralSectionExpanderStyle}">
+                <Expander.Header>
+                    <TextBlock x:Uid="GeneralStartupSectionTitle" Text="Startup and appearance" Style="{StaticResource GeneralSectionHeaderTextStyle}" />
+                </Expander.Header>
                 <StackPanel>
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE8B7;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                            <TextBlock x:Uid="GeneralExplorerLinkTitle" Text="Link with HerdMe in Explorer" Style="{StaticResource SettingsRowTitleStyle}" />
-                            <TextBlock x:Uid="GeneralExplorerLinkDescription" Text="Adds &quot;Link with HerdMe&quot; when you right-click a folder (under Show more options on Windows 11)." Style="{StaticResource SettingsRowDescriptionStyle}" />
-                        </StackPanel>
-                        <ToggleSwitch x:Name="ExplorerLinkToggle" x:Uid="ExplorerLinkToggle" Grid.Column="2" MinWidth="0" Toggled="ShellIntegrationToggle_Toggled" />
-                    </Grid>
-                    <Rectangle Style="{StaticResource CardDividerStyle}" />
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE71B;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                            <TextBlock x:Uid="GeneralUriProtocolTitle" Text="herdme:// links" Style="{StaticResource SettingsRowTitleStyle}" />
-                            <TextBlock x:Uid="GeneralUriProtocolDescription" Text="Lets links such as herdme://site/blog show a site in HerdMe. Links can only show pages; they cannot start, stop, share, or change anything." Style="{StaticResource SettingsRowDescriptionStyle}" />
-                        </StackPanel>
-                        <ToggleSwitch x:Name="UriProtocolToggle" x:Uid="UriProtocolToggle" Grid.Column="2" MinWidth="0" Toggled="ShellIntegrationToggle_Toggled" />
-                    </Grid>
-                    <Rectangle Style="{StaticResource CardDividerStyle}" />
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE756;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                            <TextBlock x:Uid="GeneralTerminalProfileTitle" Text="Windows Terminal profile" Style="{StaticResource SettingsRowTitleStyle}" />
-                            <TextBlock x:Uid="GeneralTerminalProfileDescription" Text="Adds a HerdMe profile with PHP, Composer, Node.js, and the herdme command on PATH." Style="{StaticResource SettingsRowDescriptionStyle}" />
-                        </StackPanel>
-                        <ToggleSwitch x:Name="TerminalProfileToggle" x:Uid="TerminalProfileToggle" Grid.Column="2" MinWidth="0" Toggled="ShellIntegrationToggle_Toggled" />
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <TextBlock x:Uid="GeneralDomainsSectionTitle" Text="Local domains and HTTPS" Style="{StaticResource SectionHeaderStyle}" />
-            <Border Style="{StaticResource SettingsGroupStyle}">
-                <StackPanel>
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE774;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                            <TextBlock x:Uid="GeneralLocalDomainsTitle" Text="Local domains" Style="{StaticResource SettingsRowTitleStyle}" />
-                            <TextBlock x:Name="DomainsStatusText" x:Uid="GeneralDomainsChecking" Text="Checking" Style="{StaticResource SettingsRowDescriptionStyle}" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2" Style="{StaticResource SettingsRowControlStyle}">
-                            <Button x:Name="RemoveDomainsButton" x:Uid="GeneralRemoveDomains" Content="Remove" Click="RemoveDomains_Click" />
-                            <Button x:Name="InstallDomainsButton" x:Uid="GeneralSetupDomains" Content="Set Up" Click="InstallDomains_Click" />
-                        </StackPanel>
-                    </Grid>
-                    <Rectangle Style="{StaticResource CardDividerStyle}" />
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE71B;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                            <TextBlock x:Uid="GeneralDomainSuffixLabel" Text="Domain suffix" Style="{StaticResource SettingsRowTitleStyle}" />
-                            <TextBlock x:Uid="GeneralDomainSuffixDescription" Text="Sites open at https://name.suffix/. Changes apply when the field loses focus." Style="{StaticResource SettingsRowDescriptionStyle}" />
-                        </StackPanel>
-                        <TextBox
-                            x:Name="TldTextBox"
-                            x:Uid="GeneralDomainSuffixInput"
-                            Grid.Column="2"
-                            Width="180"
-                            VerticalAlignment="Center"
-                            AutomationProperties.Name="Domain suffix"
-                            LostFocus="TldTextBox_LostFocus" />
-                    </Grid>
-                    <Rectangle Style="{StaticResource CardDividerStyle}" />
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE72E;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                            <TextBlock x:Uid="GeneralHttpsCertificateTitle" Text="HTTPS certificate" Style="{StaticResource SettingsRowTitleStyle}" />
-                            <TextBlock x:Name="CertificateStatusText" x:Uid="GeneralCertificateChecking" Text="Checking" Style="{StaticResource SettingsRowDescriptionStyle}" />
-                        </StackPanel>
-                        <Button
-                            x:Name="TrustCertificateButton"
-                            x:Uid="GeneralTrustCertificate"
-                            Grid.Column="2"
-                            VerticalAlignment="Center"
-                            Content="Trust"
-                            Click="TrustCertificate_Click" />
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <TextBlock x:Uid="GeneralApplicationUpdatesTitle" Text="Application updates" Style="{StaticResource SectionHeaderStyle}" />
-            <Border Style="{StaticResource SettingsGroupStyle}">
-                <StackPanel>
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE895;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                            <TextBlock x:Name="CurrentVersionText" Style="{StaticResource SettingsRowTitleStyle}" />
-                            <TextBlock x:Name="UpdateStatusText" x:Uid="GeneralStableChannel" Text="Stable channel" Style="{StaticResource SettingsRowDescriptionStyle}" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2" Style="{StaticResource SettingsRowControlStyle}">
-                            <ProgressRing x:Name="UpdateProgress" Width="18" Height="18" IsActive="False" />
-                            <Button
-                                x:Name="UpdateGitButton"
-                                Visibility="Collapsed"
-                                Click="UpdateGit_Click">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <SymbolIcon Symbol="Download" />
-                                    <TextBlock x:Name="UpdateGitButtonText" />
-                                </StackPanel>
-                            </Button>
-                            <Button x:Name="CheckNowButton" Click="CheckNow_Click">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <SymbolIcon Symbol="Sync" />
-                                    <TextBlock x:Uid="GeneralCheckNow" Text="Check Now" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </Grid>
-                    <Rectangle Style="{StaticResource CardDividerStyle}" />
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE823;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <TextBlock x:Uid="GeneralCheckAutomatically" Grid.Column="1" Text="Check automatically" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
-                        <ToggleSwitch x:Name="AutomaticUpdatesToggle" Grid.Column="2" MinWidth="0" Toggled="AutomaticUpdatesToggle_Toggled" />
-                    </Grid>
-                    <Rectangle Style="{StaticResource CardDividerStyle}" />
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE8AB;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <TextBlock x:Uid="GeneralUpdateChannel" Grid.Column="1" Text="Update channel" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
-                        <ComboBox x:Name="UpdateChannelBox" x:Uid="GeneralUpdateChannelBox" Grid.Column="2" Width="180" VerticalAlignment="Center" AutomationProperties.Name="Update channel" SelectionChanged="UpdateChannelBox_SelectionChanged">
-                            <ComboBoxItem x:Uid="GeneralStableOption" Content="Stable" Tag="Stable" />
-                            <ComboBoxItem x:Uid="GeneralBetaOption" Content="Beta" Tag="Beta" />
-                        </ComboBox>
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <TextBlock x:Uid="GeneralPortableCoreTitle" Text="Portable core" Style="{StaticResource SectionHeaderStyle}" />
-            <Border Style="{StaticResource SettingsGroupStyle}">
-                <StackPanel>
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE9D9;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <TextBlock x:Uid="GeneralStatusLabel" Grid.Column="1" Text="Status" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
-                        <StackPanel Grid.Column="2" Style="{StaticResource SettingsRowControlStyle}">
-                            <ProgressRing x:Name="CoreProgress" Width="16" Height="16" />
-                            <TextBlock x:Name="CoreStatusText" x:Uid="GeneralCoreChecking" Text="Checking" MaxWidth="360" VerticalAlignment="Center" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Grid>
-                    <Rectangle Style="{StaticResource CardDividerStyle}" />
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE756;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                            <TextBlock x:Uid="GeneralExecutableLabel" Text="Executable" Style="{StaticResource SettingsRowTitleStyle}" />
-                            <TextBlock x:Name="CoreExecutableText" Style="{StaticResource SettingsValueTextStyle}" />
-                        </StackPanel>
-                    </Grid>
-                    <Rectangle Style="{StaticResource CardDividerStyle}" />
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE8B7;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                            <TextBlock x:Uid="GeneralApplicationDataLabel" Text="Application data" Style="{StaticResource SettingsRowTitleStyle}" />
-                            <TextBlock x:Name="SupportPathText" Style="{StaticResource SettingsValueTextStyle}" />
-                        </StackPanel>
-                        <Button
-                            x:Name="OpenDataButton"
-                            x:Uid="GeneralOpenDataButton"
-                            Grid.Column="2"
-                            VerticalAlignment="Center"
-                            AutomationProperties.Name="Open application data folder"
-                            IsEnabled="False"
-                            Style="{StaticResource ToolbarIconButtonStyle}"
-                            Click="OpenData_Click">
-                            <ToolTipService.ToolTip>
-                                <ToolTip><TextBlock x:Uid="GeneralOpenDataTooltip" Text="Open application data folder" /></ToolTip>
-                            </ToolTipService.ToolTip>
-                            <SymbolIcon Symbol="OpenLocal" />
-                        </Button>
-                    </Grid>
-                    <Rectangle Style="{StaticResource CardDividerStyle}" />
-                    <Grid Style="{StaticResource SettingsRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xEBE8;" Style="{StaticResource SettingsRowIconStyle}" />
-                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                            <TextBlock x:Uid="GeneralDiagnosticsTitle" Text="Diagnostics" Style="{StaticResource SettingsRowTitleStyle}" />
-                            <TextBlock x:Name="DiagnosticsStatusText" x:Uid="GeneralDiagnosticsDescription" Text="Save HerdMe logs, settings, and crash reports to a zip you can attach to a bug report. Secrets are masked and nothing is sent." Style="{StaticResource SettingsRowDescriptionStyle}" />
-                            <CheckBox x:Name="IncludeCrashDumpsCheckBox" x:Uid="GeneralIncludeCrashDumps" Content="Include crash dumps" Margin="0,4,0,0" />
-                        </StackPanel>
-                        <Button
-                            x:Name="ExportDiagnosticsButton"
-                            x:Uid="GeneralExportDiagnostics"
-                            Grid.Column="2"
-                            VerticalAlignment="Center"
-                            Content="Export diagnostics"
-                            Click="ExportDiagnostics_Click" />
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <TextBlock x:Uid="GeneralRuntimeCheckTitle" Text="Runtime check" Style="{StaticResource SectionHeaderStyle}" />
-            <Border Style="{StaticResource SettingsGroupStyle}" Padding="6">
-                <ListView ItemsSource="{x:Bind Runtimes}" SelectionMode="None">
-                    <ListView.ItemTemplate>
-                        <DataTemplate x:DataType="models:RuntimeCheck">
-                            <Grid Padding="4,2" ColumnSpacing="16">
+                    <Border Style="{StaticResource SettingsGroupInExpanderStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="140" />
-                                    <ColumnDefinition Width="170" />
+                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Name}" />
-                                <TextBlock Grid.Column="1" Text="{x:Bind Status}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Status}" />
-                                <TextBlock Grid.Column="2" Text="{x:Bind Path}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Path}" Style="{StaticResource SettingsValueTextStyle}" />
+                                <FontIcon Glyph="&#xE7E8;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralLaunchAtSigninTitle" Text="Launch at sign-in" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Uid="GeneralLaunchAtSigninDescription" Text="Keep local sites available after signing in to Windows." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="StartupToggle" Grid.Column="2" MinWidth="0" Toggled="StartupToggle_Toggled" />
                             </Grid>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
-            </Border>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE8A9;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralCompactModeTitle" Text="Compact interface" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Uid="GeneralCompactModeDescription" Text="Use tighter spacing on sites and dashboard pages." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="CompactModeToggle" Grid.Column="2" MinWidth="0" Toggled="CompactModeToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xEA8F;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralNotificationsTitle" Text="Notifications" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Uid="GeneralNotificationsDescription" Text="Show a tray notification when a service, worker, or public link stops unexpectedly, or when an update is ready while HerdMe is in the tray." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="NotificationsToggle" x:Uid="NotificationsToggle" Grid.Column="2" MinWidth="0" Toggled="NotificationsToggle_Toggled" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Expander>
 
-            <TextBlock x:Uid="GeneralLaravelExtensionsTitle" Text="Laravel PHP extensions" Style="{StaticResource SectionHeaderStyle}" />
-            <Border Style="{StaticResource SettingsGroupStyle}">
-                <Grid Style="{StaticResource SettingsRowStyle}">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <FontIcon Glyph="&#xE943;" Style="{StaticResource SettingsRowIconStyle}" />
-                    <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                        <TextBlock x:Name="PhpExtensionStatusText" x:Uid="GeneralPhpUnavailable" Text="PHP unavailable" Style="{StaticResource SettingsRowTitleStyle}" />
-                        <TextBlock x:Name="PhpExtensionDetailText" Style="{StaticResource SettingsRowDescriptionStyle}" />
-                    </StackPanel>
-                    <ProgressRing x:Name="PhpExtensionProgress" Grid.Column="2" Width="16" Height="16" />
-                </Grid>
-            </Border>
+            <Expander x:Uid="GeneralIntegrationSection" x:Name="IntegrationSection" AutomationProperties.Name="Windows integration" IsExpanded="True" Style="{StaticResource GeneralSectionExpanderStyle}">
+                <Expander.Header>
+                    <TextBlock x:Uid="GeneralWindowsIntegrationSectionTitle" Text="Windows integration" Style="{StaticResource GeneralSectionHeaderTextStyle}" />
+                </Expander.Header>
+                <StackPanel>
+                    <TextBlock x:Uid="GeneralWindowsIntegrationDescription" Text="Optional. Each switch writes one HerdMe entry for your Windows account only and removes it when turned off or when HerdMe is uninstalled." Style="{StaticResource SettingsRowDescriptionStyle}" TextWrapping="Wrap" Margin="16,12,16,4" />
+                    <Border Style="{StaticResource SettingsGroupInExpanderStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE8B7;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralExplorerLinkTitle" Text="Link with HerdMe in Explorer" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Uid="GeneralExplorerLinkDescription" Text="Adds &quot;Link with HerdMe&quot; when you right-click a folder (under Show more options on Windows 11)." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="ExplorerLinkToggle" x:Uid="ExplorerLinkToggle" Grid.Column="2" MinWidth="0" Toggled="ShellIntegrationToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE71B;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralUriProtocolTitle" Text="herdme:// links" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Uid="GeneralUriProtocolDescription" Text="Lets links such as herdme://site/blog show a site in HerdMe. Links can only show pages; they cannot start, stop, share, or change anything." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="UriProtocolToggle" x:Uid="UriProtocolToggle" Grid.Column="2" MinWidth="0" Toggled="ShellIntegrationToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE756;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralTerminalProfileTitle" Text="Windows Terminal profile" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Uid="GeneralTerminalProfileDescription" Text="Adds a HerdMe profile with PHP, Composer, Node.js, and the herdme command on PATH." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="TerminalProfileToggle" x:Uid="TerminalProfileToggle" Grid.Column="2" MinWidth="0" Toggled="ShellIntegrationToggle_Toggled" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Expander>
+
+            <Expander x:Uid="GeneralDomainsSection" x:Name="DomainsSection" AutomationProperties.Name="Local domains and HTTPS" IsExpanded="True" Style="{StaticResource GeneralSectionExpanderStyle}">
+                <Expander.Header>
+                    <TextBlock x:Uid="GeneralDomainsSectionTitle" Text="Local domains and HTTPS" Style="{StaticResource GeneralSectionHeaderTextStyle}" />
+                </Expander.Header>
+                <StackPanel>
+                    <Border Style="{StaticResource SettingsGroupInExpanderStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE774;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralLocalDomainsTitle" Text="Local domains" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Name="DomainsStatusText" x:Uid="GeneralDomainsChecking" Text="Checking" Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Style="{StaticResource SettingsRowControlStyle}">
+                                    <Button x:Name="RemoveDomainsButton" x:Uid="GeneralRemoveDomains" Content="Remove" Click="RemoveDomains_Click" />
+                                    <Button x:Name="InstallDomainsButton" x:Uid="GeneralSetupDomains" Content="Set Up" Click="InstallDomains_Click" />
+                                </StackPanel>
+                            </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE71B;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralDomainSuffixLabel" Text="Domain suffix" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Uid="GeneralDomainSuffixDescription" Text="Sites open at https://name.suffix/. Changes apply when the field loses focus." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <TextBox
+                                    x:Name="TldTextBox"
+                                    x:Uid="GeneralDomainSuffixInput"
+                                    Grid.Column="2"
+                                    Width="180"
+                                    VerticalAlignment="Center"
+                                    AutomationProperties.Name="Domain suffix"
+                                    LostFocus="TldTextBox_LostFocus" />
+                            </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE72E;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralHttpsCertificateTitle" Text="HTTPS certificate" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Name="CertificateStatusText" x:Uid="GeneralCertificateChecking" Text="Checking" Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <Button
+                                    x:Name="TrustCertificateButton"
+                                    x:Uid="GeneralTrustCertificate"
+                                    Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Content="Trust"
+                                    Click="TrustCertificate_Click" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Expander>
+
+            <Expander x:Uid="GeneralUpdatesSection" x:Name="UpdatesSection" AutomationProperties.Name="Application updates" IsExpanded="True" Style="{StaticResource GeneralSectionExpanderStyle}">
+                <Expander.Header>
+                    <TextBlock x:Uid="GeneralApplicationUpdatesTitle" Text="Application updates" Style="{StaticResource GeneralSectionHeaderTextStyle}" />
+                </Expander.Header>
+                <StackPanel>
+                    <Border Style="{StaticResource SettingsGroupInExpanderStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE895;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Name="CurrentVersionText" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Name="UpdateStatusText" x:Uid="GeneralStableChannel" Text="Stable channel" Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Style="{StaticResource SettingsRowControlStyle}">
+                                    <ProgressRing x:Name="UpdateProgress" Width="18" Height="18" IsActive="False" />
+                                    <Button
+                                        x:Name="UpdateGitButton"
+                                        Visibility="Collapsed"
+                                        Click="UpdateGit_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <SymbolIcon Symbol="Download" />
+                                            <TextBlock x:Name="UpdateGitButtonText" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button x:Name="CheckNowButton" Click="CheckNow_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <SymbolIcon Symbol="Sync" />
+                                            <TextBlock x:Uid="GeneralCheckNow" Text="Check Now" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE823;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <TextBlock x:Uid="GeneralCheckAutomatically" Grid.Column="1" Text="Check automatically" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                                <ToggleSwitch x:Name="AutomaticUpdatesToggle" Grid.Column="2" MinWidth="0" Toggled="AutomaticUpdatesToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE8AB;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <TextBlock x:Uid="GeneralUpdateChannel" Grid.Column="1" Text="Update channel" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                                <ComboBox x:Name="UpdateChannelBox" x:Uid="GeneralUpdateChannelBox" Grid.Column="2" Width="180" VerticalAlignment="Center" AutomationProperties.Name="Update channel" SelectionChanged="UpdateChannelBox_SelectionChanged">
+                                    <ComboBoxItem x:Uid="GeneralStableOption" Content="Stable" Tag="Stable" />
+                                    <ComboBoxItem x:Uid="GeneralBetaOption" Content="Beta" Tag="Beta" />
+                                </ComboBox>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Expander>
+
+            <Expander x:Uid="GeneralCoreSection" x:Name="CoreSection" AutomationProperties.Name="Portable core" IsExpanded="False" Style="{StaticResource GeneralSectionExpanderStyle}">
+                <Expander.Header>
+                    <TextBlock x:Uid="GeneralPortableCoreTitle" Text="Portable core" Style="{StaticResource GeneralSectionHeaderTextStyle}" />
+                </Expander.Header>
+                <StackPanel>
+                    <Border Style="{StaticResource SettingsGroupInExpanderStyle}">
+                        <StackPanel>
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE9D9;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <TextBlock x:Uid="GeneralStatusLabel" Grid.Column="1" Text="Status" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
+                                <StackPanel Grid.Column="2" Style="{StaticResource SettingsRowControlStyle}">
+                                    <ProgressRing x:Name="CoreProgress" Width="16" Height="16" />
+                                    <TextBlock x:Name="CoreStatusText" x:Uid="GeneralCoreChecking" Text="Checking" MaxWidth="360" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE756;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralExecutableLabel" Text="Executable" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Name="CoreExecutableText" Style="{StaticResource SettingsValueTextStyle}" />
+                                </StackPanel>
+                            </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE8B7;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralApplicationDataLabel" Text="Application data" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Name="SupportPathText" Style="{StaticResource SettingsValueTextStyle}" />
+                                </StackPanel>
+                                <Button
+                                    x:Name="OpenDataButton"
+                                    x:Uid="GeneralOpenDataButton"
+                                    Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    AutomationProperties.Name="Open application data folder"
+                                    IsEnabled="False"
+                                    Style="{StaticResource ToolbarIconButtonStyle}"
+                                    Click="OpenData_Click">
+                                    <ToolTipService.ToolTip>
+                                        <ToolTip><TextBlock x:Uid="GeneralOpenDataTooltip" Text="Open application data folder" /></ToolTip>
+                                    </ToolTipService.ToolTip>
+                                    <SymbolIcon Symbol="OpenLocal" />
+                                </Button>
+                            </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xEBE8;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralDiagnosticsTitle" Text="Diagnostics" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Name="DiagnosticsStatusText" x:Uid="GeneralDiagnosticsDescription" Text="Save HerdMe logs, settings, and crash reports to a zip you can attach to a bug report. Secrets are masked and nothing is sent." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                    <CheckBox x:Name="IncludeCrashDumpsCheckBox" x:Uid="GeneralIncludeCrashDumps" Content="Include crash dumps" Margin="0,4,0,0" />
+                                </StackPanel>
+                                <Button
+                                    x:Name="ExportDiagnosticsButton"
+                                    x:Uid="GeneralExportDiagnostics"
+                                    Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Content="Export diagnostics"
+                                    Click="ExportDiagnostics_Click" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Expander>
+
+            <Expander x:Uid="GeneralRuntimeSection" x:Name="RuntimeSection" AutomationProperties.Name="Runtime check" IsExpanded="False" Style="{StaticResource GeneralSectionExpanderStyle}">
+                <Expander.Header>
+                    <TextBlock x:Uid="GeneralRuntimeCheckTitle" Text="Runtime check" Style="{StaticResource GeneralSectionHeaderTextStyle}" />
+                </Expander.Header>
+                <StackPanel>
+                    <Border Style="{StaticResource SettingsGroupInExpanderStyle}" Padding="6">
+                        <ListView ItemsSource="{x:Bind Runtimes}" SelectionMode="None">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="models:RuntimeCheck">
+                                    <Grid Padding="4,2" ColumnSpacing="16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="140" />
+                                            <ColumnDefinition Width="170" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Name}" />
+                                        <TextBlock Grid.Column="1" Text="{x:Bind Status}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Status}" />
+                                        <TextBlock Grid.Column="2" Text="{x:Bind Path}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Path}" Style="{StaticResource SettingsValueTextStyle}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Border>
+                </StackPanel>
+            </Expander>
+
+            <Expander x:Uid="GeneralExtensionsSection" x:Name="ExtensionsSection" AutomationProperties.Name="Laravel PHP extensions" IsExpanded="False" Style="{StaticResource GeneralSectionExpanderStyle}">
+                <Expander.Header>
+                    <TextBlock x:Uid="GeneralLaravelExtensionsTitle" Text="Laravel PHP extensions" Style="{StaticResource GeneralSectionHeaderTextStyle}" />
+                </Expander.Header>
+                <StackPanel>
+                    <Border Style="{StaticResource SettingsGroupInExpanderStyle}">
+                        <Grid Style="{StaticResource SettingsRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE943;" Style="{StaticResource SettingsRowIconStyle}" />
+                            <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                <TextBlock x:Name="PhpExtensionStatusText" x:Uid="GeneralPhpUnavailable" Text="PHP unavailable" Style="{StaticResource SettingsRowTitleStyle}" />
+                                <TextBlock x:Name="PhpExtensionDetailText" Style="{StaticResource SettingsRowDescriptionStyle}" />
+                            </StackPanel>
+                            <ProgressRing x:Name="PhpExtensionProgress" Grid.Column="2" Width="16" Height="16" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Expander>
         </StackPanel>
     </ScrollViewer>
 </Page>

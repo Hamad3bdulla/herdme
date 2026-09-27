@@ -492,6 +492,7 @@ public sealed partial class SitesPage
         package.SetText(value);
         Clipboard.SetContent(package);
         Clipboard.Flush();
+        App.MainWindow.ShowToast(AppLocalization.Get("CommonCopiedToast"));
     }
 
     private async void OpenFolder_Click(object sender, RoutedEventArgs e)

@@ -83,6 +83,10 @@ if (-not $SkipPortableBuild) {
 $requiredFiles = @(
     "HerdMe.Windows.exe",
     "Assets\HerdMe.ico",
+    "Assets\HerdMe-Degraded.ico",
+    "Assets\HerdMe-Stopped.ico",
+    "Assets\Overlay-Activity.ico",
+    "Assets\Overlay-Error.ico",
     "Prerequisites\VC143\concrt140.dll",
     "Prerequisites\VC143\msvcp140.dll",
     "Prerequisites\VC143\msvcp140_1.dll",

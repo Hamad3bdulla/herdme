@@ -16,7 +16,12 @@ public sealed partial class SitesPage
 
     private void Shares_Changed(object? sender, EventArgs e)
     {
-        DispatcherQueue.TryEnqueue(UpdateShareState);
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            UpdateShareState();
+            // Rows show a share badge and the Shared filter depends on it.
+            if (loaded) RefreshWorkflowStatuses();
+        });
     }
 
     private void UpdateShareState()

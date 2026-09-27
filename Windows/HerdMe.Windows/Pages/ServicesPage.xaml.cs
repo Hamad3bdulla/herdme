@@ -551,6 +551,7 @@ public sealed partial class ServicesPage : Page
                 "ServicesConnectionCopied",
                 instance.Name
             );
+            App.MainWindow.ShowToast(OperationStatusText.Text);
         }
         catch (Exception error)
         {
