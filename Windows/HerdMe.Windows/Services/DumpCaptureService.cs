@@ -111,6 +111,15 @@ public sealed class DumpCaptureService : IAsyncDisposable
         return item.IsSummary ? database.LoadDump(item.Id) : item;
     }
 
+    // Undo-able clear: only the dumps the user saw are removed; new ones stay.
+    public void Delete(CapturedDump dump)
+    {
+        lock (storageSync)
+        {
+            database.DeleteDump(dump.Id);
+        }
+    }
+
     public void Clear()
     {
         lock (storageSync)

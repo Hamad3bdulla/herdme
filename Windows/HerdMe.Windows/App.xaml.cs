@@ -50,6 +50,11 @@ public partial class App : Application
             Environment.Exit(helperExitCode);
             return;
         }
+        if (TryRunUnregisterNotifications(Environment.GetCommandLineArgs()))
+        {
+            Environment.Exit(0);
+            return;
+        }
         launchRequest = ParseLaunchRequest();
         singleInstance = new SingleInstanceCoordinator(signalActivation: launchRequest is null);
         if (!singleInstance.IsPrimary)
@@ -71,12 +76,25 @@ public partial class App : Application
             return value == key ? null : value;
         };
         services = new AppServices();
+        StartupSnapshot = services.StartupSnapshot;
+        SeedKnownSitesFromSnapshot();
         // Before any resource lookup or XAML load, so x:Uid, ResourceLoader and FlowDirection
         // all agree on the language chosen in General.
         ApplyLanguageOverride(services.SiteSettings.Load().UiLanguage);
         InstallCrashReporter();
         InitializeComponent();
         UnhandledException += App_UnhandledException;
+    }
+
+    // Shared with the Dashboard and the Jump List refresh; one instance, so writes never race.
+    internal static StartupSnapshotStore? StartupSnapshot { get; private set; }
+
+    // The tray, the quick panel and the Sites page start from the sites the last session saw;
+    // the first scan replaces them a moment later. Acceptance runs always start empty.
+    private static void SeedKnownSitesFromSnapshot()
+    {
+        if (KnownSites.Count > 0 || Environment.GetCommandLineArgs().Contains("--acceptance", StringComparer.OrdinalIgnoreCase)) return;
+        if (StartupSnapshot?.Load()?.Sites is { Count: > 0 } sites) RememberKnownSites(sites);
     }
 
     private static void ApplyLanguageOverride(string? language)
@@ -115,6 +133,7 @@ public partial class App : Application
             && services.SiteSettings.ApplyOnboardingAfterReinstallRequest();
         suppressAutomaticUpdateCheck = acceptanceRun || onboardingAcceptance;
         suppressNotifications = acceptanceRun || onboardingAcceptance;
+        InitializeActionNotifications();
         MainWindow = new MainWindow(
             services,
             skipOnboarding: acceptanceRun,
@@ -148,6 +167,7 @@ public partial class App : Application
             StartAutomaticUpdateCheckOnce();
             if (launchRequest is { } request) _ = RunLaunchRequestAsync(request);
             NotifyPreviousCrash();
+            RunColdStartNotificationAction();
         }
         launchRequest = null;
     }
@@ -325,6 +345,9 @@ public partial class App : Application
             IconSource = new SymbolIconSource { Symbol = Symbol.Stop }
         };
         stopCommand.ExecuteRequested += StopCommand_ExecuteRequested;
+        // A left click opens the quick panel (App.TrayPanel.cs); "Open HerdMe" is in it.
+        var panelCommand = new XamlUICommand { Label = openCommand.Label };
+        panelCommand.ExecuteRequested += (_, _) => TrayIcon_LeftClicked();
 
         var contextMenu = new MenuFlyout { AreOpenCloseAnimationsEnabled = false };
         contextMenu.Items.Add(new MenuFlyoutItem
@@ -357,11 +380,12 @@ public partial class App : Application
             ToolTipText = "HerdMe",
             ContextMenuMode = ContextMenuMode.PopupMenu,
             MenuActivation = PopupActivationMode.RightClick,
-            LeftClickCommand = openCommand,
+            LeftClickCommand = panelCommand,
             NoLeftClickDelay = true,
             IconSource = new BitmapImage(new Uri("ms-appx:///Assets/HerdMe.ico")),
             ContextFlyout = contextMenu
         };
+        // Clicking a tray balloon runs that notification's main action (App.Notifications.cs).
         trayIcon.ForceCreate();
     }
 
@@ -431,11 +455,15 @@ public partial class App : Application
         singleInstance.WakeListener();
         SystemEvents.PowerModeChanged -= System_PowerModeChanged;
         UnsubscribeNotifications();
+        UnregisterActionNotifications(removeRegistration: false);
         MainWindow.VisibilityChanged -= MainWindow_VisibilityChanged;
         MainWindow.AppWindow.Changed -= MainWindow_AppWindowChanged;
+        // Deletes still showing Undo are carried out before the window goes away.
+        await MainWindow.FlushDeferredActionsAsync();
         MainWindow.PrepareForShutdown();
         SetMainWindowVisible(false);
         StopTrayStatus();
+        CloseTrayPanel();
         trayIcon?.Dispose();
         trayIcon = null;
         await StopAndLogAsync("command pipe", StopCommandServerAsync);

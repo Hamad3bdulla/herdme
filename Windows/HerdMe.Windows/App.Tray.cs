@@ -125,6 +125,7 @@ public partial class App
             trayIcon.ToolTipText = tooltip;
         }
         RefreshTrayMenu();
+        RefreshTrayPanel();
     }
 
     private void UpdateTaskbarOverlay(bool force)
@@ -276,7 +277,7 @@ public partial class App
         MainWindow.NavigateToSite(path);
     }
 
-    private void OpenSiteFromTray(string path)
+    internal void OpenSiteFromTray(string path)
     {
         var site = KnownSites.FirstOrDefault(candidate =>
             string.Equals(candidate.Path, path, StringComparison.OrdinalIgnoreCase));
@@ -287,6 +288,7 @@ public partial class App
         {
             // Handing a URL to the default browser needs the shell association.
             using var browser = Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+            MainWindow.RememberOpenedSite(site.Path);
         }
         catch (Exception error) when (error is Win32Exception or InvalidOperationException)
         {

@@ -119,15 +119,16 @@ internal static class TaskbarOverlay
     [DllImport("user32.dll")]
     private static extern int GetSystemMetricsForDpi(int index, uint dpi);
 
+    // Also used by TaskbarThumbnailToolbar.
     [ComImport]
     [Guid("56FDF344-FD6D-11D0-958A-006097C9A090")]
-    private sealed class TaskbarList;
+    internal sealed class TaskbarList;
 
     // ITaskbarList, ITaskbarList2 and ITaskbarList3 methods in vtable order.
     [ComImport]
     [Guid("EA1AFB91-9E28-4B86-90E9-9E9F8A5EEFAF")]
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface ITaskbarList3
+    internal interface ITaskbarList3
     {
         [PreserveSig] int HrInit();
         [PreserveSig] int AddTab(IntPtr window);

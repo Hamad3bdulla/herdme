@@ -30,6 +30,7 @@ public sealed partial class DashboardPage : Page
     private readonly NodeRuntimeInstaller nodeInstaller;
     private readonly GitRuntimeInstaller gitInstaller;
     private readonly OperationJournal repairJournal;
+    private readonly StartupSnapshotStore? startupSnapshot;
     // Repair all can run for many minutes (composer/npm). It is shared by every dashboard
     // instance so a second click, a recreated page, or a cached page that is loaded again
     // reattaches to the running repair instead of starting another one.
@@ -66,7 +67,8 @@ public sealed partial class DashboardPage : Page
         PhpRuntimePolicy runtimePolicy,
         ComposerToolManager composerTools,
         NodeRuntimeInstaller nodeInstaller,
-        GitRuntimeInstaller gitInstaller
+        GitRuntimeInstaller gitInstaller,
+        StartupSnapshotStore? startupSnapshot = null
     )
     {
         this.coreClient = coreClient;
@@ -82,6 +84,7 @@ public sealed partial class DashboardPage : Page
         this.composerTools = composerTools;
         this.nodeInstaller = nodeInstaller;
         this.gitInstaller = gitInstaller;
+        this.startupSnapshot = startupSnapshot;
         repairJournal = new OperationJournal(Path.Combine(settingsStore.SupportRoot, "Repair"));
         InitializeComponent();
         environmentRefreshTimer.Tick += EnvironmentRefresh_Tick;
@@ -96,6 +99,7 @@ public sealed partial class DashboardPage : Page
             lifecycleAttached = true;
             App.MainWindowVisibilityChanged += App_MainWindowVisibilityChanged;
             App.MainWindow.TimelineChanged += MainWindow_TimelineChanged;
+            App.MainWindow.GettingStartedChanged += MainWindow_GettingStartedChanged;
         }
         loadedPage = this;
         RenderTimeline();
@@ -105,6 +109,7 @@ public sealed partial class DashboardPage : Page
         ShowPendingRepairSummary();
         if (App.IsMainWindowVisible) environmentRefreshTimer.Start();
         else environmentRefreshTimer.Stop();
+        ShowSnapshotCounts();
         await RefreshAsync();
     }
 
@@ -216,6 +221,7 @@ public sealed partial class DashboardPage : Page
             lifecycleAttached = false;
             App.MainWindowVisibilityChanged -= App_MainWindowVisibilityChanged;
             App.MainWindow.TimelineChanged -= MainWindow_TimelineChanged;
+            App.MainWindow.GettingStartedChanged -= MainWindow_GettingStartedChanged;
         }
         if (ReferenceEquals(loadedPage, this)) loadedPage = null;
         StopObservingRepair();
@@ -276,6 +282,44 @@ public sealed partial class DashboardPage : Page
             var dumps = await dumpsTask;
             var domainsConfigured = await domainsTask;
             var certificateTrusted = await certificateTask;
+            // Counts, recent items and quick actions come first; the health checks below can
+            // take seconds (PHP and endpoint probes) and fill in the rest afterwards.
+            var runningSites = environment.IsRunning ? sites.Count : 0;
+            var runningServices = instances.Count(instance =>
+                serviceManager.State(instance.Id, instance.DefinitionId) == ManagedServiceState.Running
+            );
+
+            SitesCountText.Text = sites.Count.ToString();
+            SitesStatusText.Text = AppLocalization.Format(
+                "DashboardRunningCount",
+                runningSites,
+                sites.Count
+            );
+            SitesStatusDot.Style = StatusStyles.Dot(SummaryStatusTone(runningSites, sites.Count));
+            ServicesCountText.Text = instances.Count.ToString();
+            ServicesStatusText.Text = AppLocalization.Format(
+                "DashboardRunningCount",
+                runningServices,
+                instances.Count
+            );
+            ServicesStatusDot.Style = StatusStyles.Dot(
+                SummaryStatusTone(runningServices, instances.Count)
+            );
+            MailCountText.Text = messages.Count.ToString();
+            MailStatusText.Text = AppLocalization.Get(
+                mailCapture.IsRunning ? "DashboardCaptureRunning" : "DashboardCaptureStopped"
+            );
+            MailStatusDot.Style = StatusStyles.Dot(CaptureStatusTone(mailCapture.IsRunning));
+            DumpsCountText.Text = dumps.Count.ToString();
+            DumpsStatusText.Text = AppLocalization.Get(
+                dumpCapture.IsRunning ? "DashboardCaptureRunning" : "DashboardCaptureStopped"
+            );
+            DumpsStatusDot.Style = StatusStyles.Dot(CaptureStatusTone(dumpCapture.IsRunning));
+            ShowSummaryCounts();
+            RenderRecentMail(messages);
+            RenderRecentDumps(dumps);
+            UpdateQuickActions(sites, settings);
+            UpdateGettingStarted(settings, sites, messages.Count, dumps.Count);
             var defaultPhpCycle = (await Task.Run(runtimePolicy.Load, cancellation.Token)).PhpCycle;
             var certificateExpiryTask = Task.Run(
                 certificateManager.ServerCertificateExpiresAt,
@@ -387,47 +431,12 @@ public sealed partial class DashboardPage : Page
                     string.Join(", ", group.Select(instance => instance.Name))
                 ));
             siteHealth = siteHealth.Concat(duplicatePorts).ToArray();
-            var runningSites = environment.IsRunning ? sites.Count : 0;
-            var runningServices = instances.Count(instance =>
-                serviceManager.State(instance.Id, instance.DefinitionId) == ManagedServiceState.Running
-            );
-
-            SitesCountText.Text = sites.Count.ToString();
-            SitesStatusText.Text = AppLocalization.Format(
-                "DashboardRunningCount",
-                runningSites,
-                sites.Count
-            );
-            SitesStatusDot.Style = StatusStyles.Dot(SummaryStatusTone(runningSites, sites.Count));
-            ServicesCountText.Text = instances.Count.ToString();
-            ServicesStatusText.Text = AppLocalization.Format(
-                "DashboardRunningCount",
-                runningServices,
-                instances.Count
-            );
-            ServicesStatusDot.Style = StatusStyles.Dot(
-                SummaryStatusTone(runningServices, instances.Count)
-            );
-            MailCountText.Text = messages.Count.ToString();
-            MailStatusText.Text = AppLocalization.Get(
-                mailCapture.IsRunning ? "DashboardCaptureRunning" : "DashboardCaptureStopped"
-            );
-            MailStatusDot.Style = StatusStyles.Dot(CaptureStatusTone(mailCapture.IsRunning));
-            DumpsCountText.Text = dumps.Count.ToString();
-            DumpsStatusText.Text = AppLocalization.Get(
-                dumpCapture.IsRunning ? "DashboardCaptureRunning" : "DashboardCaptureStopped"
-            );
-            DumpsStatusDot.Style = StatusStyles.Dot(CaptureStatusTone(dumpCapture.IsRunning));
-            ShowSummaryCounts();
-
             UpdateEnvironmentStatus(domainsConfigured, certificateTrusted, settings.Tld);
             UpdateHealth(domainsConfigured, certificateTrusted, failure: null, siteHealth);
             displayedEnvironment = (environment.IsRunning, environment.IsDegraded,
                 environment.HttpPort, environment.HttpsPort);
-            RenderRecentMail(messages);
-            RenderRecentDumps(dumps);
-            UpdateQuickActions(sites, settings);
             RenderTimeline();
+            SaveStartupCounts(instances.Count, messages.Count, dumps.Count, lastHealthWarnings.Count);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {

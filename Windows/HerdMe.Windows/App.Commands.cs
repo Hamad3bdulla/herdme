@@ -154,6 +154,7 @@ public partial class App
             {
                 var next = Interlocked.Exchange(ref pendingJumpListSites, null);
                 if (next is null) return;
+                StartupSnapshot?.SaveSites(next);
                 var executable = Environment.ProcessPath
                     ?? Path.Combine(AppContext.BaseDirectory, "HerdMe.Windows.exe");
                 JumpListManager.Apply(executable, next);

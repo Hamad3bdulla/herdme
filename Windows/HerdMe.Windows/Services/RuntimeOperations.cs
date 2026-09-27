@@ -50,6 +50,28 @@ public sealed class RuntimeOperations
         }
     }
 
+    // Work without a result (tool installs) goes through the same bar, Cancel and Retry.
+    public Task RunAsync(string id, string name,
+        Func<CancellationToken, IProgress<ServiceInstallationProgress>, Task> action,
+        CancellationToken cancellationToken, Func<Task>? retry = null)
+    {
+        return RunAsync<bool>(id, name, async (token, progress) =>
+        {
+            await action(token, progress);
+            return true;
+        }, cancellationToken, retry ?? (async () => { await RunAsync(id, name, action, CancellationToken.None); }));
+    }
+
+    // The window's "in progress" bar has one Cancel for everything that is running.
+    public int CancelAll()
+    {
+        lock (sync)
+        {
+            foreach (var cancellation in cancellations.Values) cancellation.Cancel();
+            return cancellations.Count;
+        }
+    }
+
     public void Cancel(string id)
     {
         lock (sync)

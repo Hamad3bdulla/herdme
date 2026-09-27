@@ -6,6 +6,7 @@ using System.Text;
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
 using HerdMe.Windows.ViewModels;
+using HerdMe.Windows.Views;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -230,33 +231,75 @@ public sealed partial class SitesPage
             SelectedIndex = 0,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
-        IReadOnlyList<string> artisanSuggestions = ArtisanCommandCatalog.Suggestions;
+        // Autocomplete: the project's own commands (cached per site, refreshed when Composer
+        // changes them) with descriptions, and this site's recent commands first.
+        IReadOnlyList<ArtisanCommandInfo> artisanCommands = ArtisanCommandIndex.WithFallback([]);
+        IReadOnlyList<string> recentCommands = LoadRecentCommands(site, "artisan");
+        var recentLabel = AppLocalization.Get("SitesArtisanRecentLabel");
         var customBox = new AutoSuggestBox
         {
-            Header = AppLocalization.Get("SitesArtisanCustomCommandField"),
-            PlaceholderText = "route:list --path=api",
-            ItemsSource = artisanSuggestions,
-            UpdateTextOnSelect = true,
-            Visibility = Visibility.Collapsed
+            Header = AppLocalization.Get("SitesArtisanTypeCommandField"),
+            PlaceholderText = AppLocalization.Get("SitesArtisanTypeCommandPlaceholder"),
+            UpdateTextOnSelect = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
         };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(
+            customBox,
+            AppLocalization.Get("SitesArtisanTypeCommandField")
+        );
+        var commandHint = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Style = StatusStyles.Text(StatusTone.Neutral),
+            Visibility = Visibility.Collapsed,
+            IsTextSelectionEnabled = true
+        };
+        void RefreshArtisanSuggestions()
+        {
+            customBox.ItemsSource = ArtisanCommandIndex.Suggest(
+                customBox.Text,
+                artisanCommands,
+                recentCommands,
+                recentLabel
+            );
+            var info = ArtisanCommandIndex.Describe(customBox.Text, artisanCommands);
+            commandHint.Text = info is null
+                ? string.Empty
+                : string.Join(Environment.NewLine, new[] { info.Description, info.Usage }
+                    .Where(part => part.Length > 0));
+            commandHint.Visibility = commandHint.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        var suppressPresetReset = false;
         customBox.TextChanged += (_, args) =>
         {
-            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
-            var query = customBox.Text.Trim();
-            customBox.ItemsSource = artisanSuggestions
-                .Where(command => query.Length == 0
-                    || command.Contains(query, StringComparison.OrdinalIgnoreCase))
-                .ToArray();
+            if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput && customBox.Text.Length > 0)
+            {
+                // Typing a command switches to "Custom" so what is typed is what runs.
+                suppressPresetReset = true;
+                presetBox.SelectedItem = presetOptions.Single(item => item.Value == "custom");
+                suppressPresetReset = false;
+            }
+            RefreshArtisanSuggestions();
+        };
+        customBox.GotFocus += (_, _) =>
+        {
+            RefreshArtisanSuggestions();
+            customBox.IsSuggestionListOpen = customBox.Text.Length == 0 && recentCommands.Count > 0;
         };
         customBox.SuggestionChosen += (_, args) =>
         {
-            if (args.SelectedItem is string command) customBox.Text = command;
+            if (args.SelectedItem is not ArtisanSuggestion suggestion) return;
+            suppressPresetReset = true;
+            presetBox.SelectedItem = presetOptions.Single(item => item.Value == "custom");
+            suppressPresetReset = false;
+            // A bare command name gets a trailing space so arguments can follow at once.
+            customBox.Text = suggestion.IsRecent ? suggestion.Command : suggestion.Command + " ";
         };
         presetBox.SelectionChanged += (_, _) =>
         {
-            customBox.Visibility = (presetBox.SelectedItem as DisplayOption)?.Value == "custom"
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            if (suppressPresetReset) return;
+            if ((presetBox.SelectedItem as DisplayOption)?.Value != "custom") customBox.Text = string.Empty;
         };
         var favorites = CreateCommandFavoritesRow(
             site,
@@ -282,6 +325,7 @@ public sealed partial class SitesPage
         content.Children.Add(favorites);
         content.Children.Add(presetBox);
         content.Children.Add(customBox);
+        content.Children.Add(commandHint);
         console.AddTo(content);
         var dialog = new ContentDialog
         {
@@ -298,6 +342,13 @@ public sealed partial class SitesPage
         {
             try
             {
+                var cached = await Task.Run(() => ArtisanCache.Load(site.Path));
+                if (cached is { } hit)
+                {
+                    artisanCommands = ArtisanCommandIndex.WithFallback(hit.Commands);
+                    RefreshArtisanSuggestions();
+                    if (hit.Fresh) return;
+                }
                 var cycle = site.PhpVersion ?? runtimePolicy.Load().PhpCycle;
                 var php = phpInstaller.PhpExecutable(cycle);
                 await runtimePolicy.PrepareLaunchAsync(
@@ -305,13 +356,15 @@ public sealed partial class SitesPage
                     cycle,
                     suggestionCancellation.Token
                 );
-                artisanSuggestions = await ArtisanCommandRunner.DiscoverCommandsAsync(
+                var discovered = await ArtisanCommandRunner.DiscoverCommandInfoAsync(
                     php,
                     site.Path,
                     composerTools.ManagedEnvironment(cycle),
                     suggestionCancellation.Token
                 );
-                customBox.ItemsSource = artisanSuggestions;
+                _ = Task.Run(() => ArtisanCache.Save(site.Path, discovered));
+                artisanCommands = ArtisanCommandIndex.WithFallback(discovered);
+                RefreshArtisanSuggestions();
             }
             catch (OperationCanceledException) when (suggestionCancellation.IsCancellationRequested)
             {
@@ -346,6 +399,13 @@ public sealed partial class SitesPage
                 console.OutputBox.Text = error.Message;
                 return;
             }
+            recentCommands = RememberCommand(
+                site,
+                "artisan",
+                selectedPreset.Value == "custom"
+                    ? customBox.Text.Trim()
+                    : ArtisanCommandIndex.HistoryText(command.Arguments)
+            );
 
             await console.RunAsync(
                 AppLocalization.Get("SitesArtisanValidatingPhp"),

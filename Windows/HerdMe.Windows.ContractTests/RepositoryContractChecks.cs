@@ -2023,8 +2023,8 @@ internal static partial class ContractChecks
         ));
         Check(
             sitesSource.Contains("new AutoSuggestBox", StringComparison.Ordinal)
-                && sitesSource.Contains("ArtisanCommandCatalog.Suggestions", StringComparison.Ordinal)
-                && sitesSource.Contains("DiscoverCommandsAsync", StringComparison.Ordinal)
+                && sitesSource.Contains("ArtisanCommandIndex.WithFallback(", StringComparison.Ordinal)
+                && sitesSource.Contains("DiscoverCommandInfoAsync", StringComparison.Ordinal)
                 && sitesSource.Contains("AccentButtonStyle", StringComparison.Ordinal)
                 && sitesSource.Contains("content.Children.Add(buttons);", StringComparison.Ordinal)
                 && Regex.Matches(

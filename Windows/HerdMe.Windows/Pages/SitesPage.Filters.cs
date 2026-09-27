@@ -114,6 +114,14 @@ public sealed partial class SitesPage
 
     private void SiteList_KeyDown(object sender, KeyRoutedEventArgs e)
     {
+        // Keys typed in the inline rename box stay with the box.
+        if (renamingItem is not null) return;
+        if (e.Key == global::Windows.System.VirtualKey.F2 && selectedSite is { } renamed)
+        {
+            e.Handled = true;
+            BeginRename(renamed);
+            return;
+        }
         if (e.Key != global::Windows.System.VirtualKey.Enter || selectedSite is null) return;
         e.Handled = true;
         OpenSite_Click(sender, e);

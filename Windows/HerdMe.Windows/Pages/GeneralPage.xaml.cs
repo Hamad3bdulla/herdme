@@ -83,6 +83,8 @@ public sealed partial class GeneralPage : Page
         loadingCompactMode = false;
         loadingNotifications = true;
         NotificationsToggle.IsOn = settings.ShowNotifications;
+        ActionNotificationsToggle.IsOn = settings.ActionNotifications;
+        ActionNotificationsToggle.IsEnabled = settings.ShowNotifications;
         loadingNotifications = false;
         LoadAppearance(settings);
         TldTextBox.Text = settings.Tld;
@@ -112,6 +114,21 @@ public sealed partial class GeneralPage : Page
     {
         if (loadingNotifications) return;
         settingsStore.UpdateShowNotifications(NotificationsToggle.IsOn);
+        ActionNotificationsToggle.IsEnabled = NotificationsToggle.IsOn;
+    }
+
+    // Registers or removes HerdMe's Windows notification registration right away; a refusal
+    // puts the switch back and says why.
+    private async void ActionNotificationsToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (loadingNotifications) return;
+        var wanted = ActionNotificationsToggle.IsOn;
+        if (((App)Application.Current).SetActionNotifications(wanted, out var problem)) return;
+        loadingNotifications = true;
+        ActionNotificationsToggle.IsOn = !wanted;
+        loadingNotifications = false;
+        if (XamlRoot is null) return;
+        await Views.ErrorDialog.ShowAsync(XamlRoot, AppLocalization.Get("GeneralActionNotificationsFailed"), problem);
     }
 
     private async void ExportDiagnostics_Click(object sender, RoutedEventArgs e)

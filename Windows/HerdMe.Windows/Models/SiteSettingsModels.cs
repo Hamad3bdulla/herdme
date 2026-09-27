@@ -20,6 +20,19 @@ public sealed class WindowsSiteSettings
 
     public bool ShowNotifications { get; set; } = true;
 
+    // Opt-in: Windows notifications with buttons (Open mail, Restart service, Open site).
+    // Off keeps the tray balloon, which needs no Windows registration.
+    public bool ActionNotifications { get; set; }
+
+    // Width of the Sites list pane, set by dragging the splitter.
+    public double SitesListWidth { get; set; } = SitesListWidthDefault;
+
+    public const double SitesListWidthDefault = 280;
+
+    public const double SitesListWidthMinimum = 240;
+
+    public const double SitesListWidthMaximum = 560;
+
     // "" follows Windows; otherwise one of UiLanguageSettings.Supported. Applied at startup.
     public string UiLanguage { get; set; } = string.Empty;
 
@@ -37,4 +50,10 @@ public sealed class WindowsSiteSettings
 
     // Feature tips (TeachingTip ids) already shown once.
     public List<string> SeenTips { get; set; } = [];
+
+    // Dashboard "Getting started" steps already done (GettingStarted.Step* ids).
+    public List<string> GettingStartedSteps { get; set; } = [];
+
+    // The user closed the checklist before finishing it.
+    public bool GettingStartedDismissed { get; set; }
 }

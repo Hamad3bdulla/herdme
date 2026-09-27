@@ -59,6 +59,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition x:Name="ServiceTypeColumn" Width="180" />
@@ -73,8 +74,8 @@
                         ItemsSource="{x:Bind Definitions}"
                         DisplayMemberPath="Name"
                         SelectionChanged="ServiceType_SelectionChanged" />
-                    <TextBox x:Uid="ServicesNameField" x:Name="ServiceNameBox" Grid.Column="1" Header="Name" TextWrapping="Wrap" />
-                    <NumberBox x:Uid="ServicesPortField" x:Name="ServicePortBox" Grid.Column="2" Header="Port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Compact" />
+                    <TextBox x:Uid="ServicesNameField" x:Name="ServiceNameBox" Grid.Column="1" Header="Name" TextWrapping="Wrap" TextChanged="ServiceInput_Changed" />
+                    <NumberBox x:Uid="ServicesPortField" x:Name="ServicePortBox" Grid.Column="2" Header="Port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Compact" ValueChanged="ServicePort_ValueChanged" />
                     <Button
                         x:Name="AddServiceButton"
                         Style="{StaticResource AccentButtonStyle}"
@@ -94,6 +95,10 @@
                         TextWrapping="Wrap"
                         Visibility="Collapsed" />
                     <ComboBox x:Name="ServiceVersionBox" x:Uid="ServicesVersionBox" Grid.Row="2" Grid.ColumnSpan="4" HorizontalAlignment="Stretch" AutomationProperties.Name="Service version" />
+                    <StackPanel Grid.Row="4" Grid.ColumnSpan="4" Spacing="2">
+                        <TextBlock x:Name="ServiceNameMessage" AutomationProperties.AutomationId="ServiceNameMessage" Visibility="Collapsed" />
+                        <TextBlock x:Name="ServicePortMessage" AutomationProperties.AutomationId="ServicePortMessage" Visibility="Collapsed" />
+                    </StackPanel>
                 </Grid>
             </StackPanel>
         </Border>
@@ -138,126 +143,159 @@
 
         <Border Grid.Row="3" Style="{StaticResource SettingsGroupStyle}">
             <Grid>
-                <ListView x:Name="ServiceList" ItemsSource="{x:Bind Rows}" SelectionMode="None" HorizontalContentAlignment="Stretch">
-                    <ListView.Header>
-                        <Grid Padding="22,10,22,10" ColumnSpacing="10" Background="{ThemeResource SubtleFillColorTertiaryBrush}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" MinWidth="100" />
-                                <ColumnDefinition Width="64" />
-                                <ColumnDefinition Width="96" />
-                                <ColumnDefinition Width="110" />
-                                <ColumnDefinition Width="184" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock x:Uid="ServicesServiceColumn" Text="Service" FontWeight="SemiBold" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" />
-                            <TextBlock x:Uid="ServicesPortColumn" Grid.Column="1" Text="Port" FontWeight="SemiBold" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" />
-                            <TextBlock x:Uid="ServicesVersionColumn" Grid.Column="2" Text="Version" FontWeight="SemiBold" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" />
-                            <TextBlock x:Uid="ServicesStatusColumn" Grid.Column="3" Text="Status" FontWeight="SemiBold" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" />
-                        </Grid>
-                    </ListView.Header>
-                    <ListView.ItemTemplate>
+                <GridView x:Name="ServiceList" ItemsSource="{x:Bind Rows}" SelectionMode="None" IsItemClickEnabled="False" Padding="12,12,12,12" AutomationProperties.AutomationId="ServiceCards">
+                    <GridView.ItemContainerStyle>
+                        <Style TargetType="GridViewItem" BasedOn="{StaticResource DefaultGridViewItemStyle}">
+                            <Setter Property="Margin" Value="0,0,12,12" />
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                        </Style>
+                    </GridView.ItemContainerStyle>
+                    <GridView.ItemTemplate>
                         <DataTemplate x:DataType="models:ManagedServiceRow">
-                            <Grid Padding="10,8" ColumnSpacing="10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" MinWidth="100" />
-                                    <ColumnDefinition Width="64" />
-                                    <ColumnDefinition Width="96" />
-                                    <ColumnDefinition Width="110" />
-                                    <ColumnDefinition Width="184" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Name}" />
-                                    <TextBlock Text="{x:Bind Subtitle}" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Subtitle}" />
-                                </StackPanel>
-                                <TextBlock Grid.Column="1" Text="{x:Bind Port}" VerticalAlignment="Center" FlowDirection="LeftToRight" />
-                                <TextBlock Grid.Column="2" Text="{x:Bind Version}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FlowDirection="LeftToRight" />
-                                <TextBlock Grid.Column="3" Text="{x:Bind Status}" VerticalAlignment="Center" TextWrapping="Wrap" />
-                                <StackPanel Grid.Column="4" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="6">
-                                    <Button Style="{StaticResource ToolbarIconButtonStyle}"
-                                        Tag="{x:Bind Id}"
-                                        Click="Install_Click"
-                                        AutomationProperties.Name="{x:Bind InstallLabel}"
-                                        Visibility="{x:Bind CanInstallOrUpdate}">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="ServicesInstallTooltip" Text="Install or update runtime" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="Download" />
-                                    </Button>
-                                    <Button Tag="{x:Bind Id}" Click="Toggle_Click" IsEnabled="{x:Bind CanToggle}">
-                                        <TextBlock Text="{x:Bind ToggleLabel}" />
-                                    </Button>
-                                    <Button x:Uid="ServicesMoreButton" IsEnabled="{x:Bind CanManage}" AutomationProperties.Name="More service actions" Style="{StaticResource ToolbarIconButtonStyle}">
-                                        <ToolTipService.ToolTip>
-                                            <ToolTip><TextBlock x:Uid="ServicesMoreTooltip" Text="More service actions" /></ToolTip>
-                                        </ToolTipService.ToolTip>
-                                        <SymbolIcon Symbol="More" />
-                                        <Button.Flyout>
-                                            <MenuFlyout>
-                                                <MenuFlyoutItem x:Uid="ServicesBackupsAction" Text="Data backups" Tag="{x:Bind Id}" Click="Backups_Click" />
-                                                <ToggleMenuFlyoutItem
-                                                    x:Uid="ServicesAutomaticStartMenu"
-                                                    Text="Start automatically"
-                                                    Tag="{x:Bind Id}"
-                                                    IsChecked="{x:Bind StartAutomatically, Mode=OneTime}"
-                                                    Click="AutomaticStart_Toggled" />
-                                                <MenuFlyoutSeparator />
-                                                <MenuFlyoutItem
-                                                    x:Uid="ServicesOpenDataTooltip"
-                                                    Text="Open data directory"
-                                                    Tag="{x:Bind Id}"
-                                                    Click="OpenData_Click">
-                                                    <MenuFlyoutItem.Icon><SymbolIcon Symbol="Folder" /></MenuFlyoutItem.Icon>
-                                                </MenuFlyoutItem>
-                                                <MenuFlyoutItem
-                                                    x:Uid="ServicesInspectPortMenu"
-                                                    Text="Inspect port"
-                                                    Tag="{x:Bind Id}"
-                                                    Click="InspectPort_Click">
-                                                    <MenuFlyoutItem.Icon><SymbolIcon Symbol="Find" /></MenuFlyoutItem.Icon>
-                                                </MenuFlyoutItem>
-                                                <MenuFlyoutItem
-                                                    x:Uid="ServicesEnvironmentTooltip"
-                                                    Text="Add service connection to a site .env"
-                                                    Tag="{x:Bind Id}"
-                                                    Click="AddToEnvironment_Click">
-                                                    <MenuFlyoutItem.Icon><SymbolIcon Symbol="Edit" /></MenuFlyoutItem.Icon>
-                                                </MenuFlyoutItem>
-                                                <MenuFlyoutItem
-                                                    x:Uid="ServicesConsoleTooltip"
-                                                    Text="Open service console"
-                                                    Tag="{x:Bind Id}"
-                                                    Click="OpenConsole_Click"
-                                                    Visibility="{x:Bind CanOpenConsole}" />
-                                                <MenuFlyoutItem
-                                                    x:Uid="ServicesCopyConnectionTooltip"
-                                                    Text="Copy database connection URL"
-                                                    Tag="{x:Bind Id}"
-                                                    Click="CopyConnection_Click"
-                                                    Visibility="{x:Bind CanOpenInTablePlus}">
-                                                    <MenuFlyoutItem.Icon><SymbolIcon Symbol="Copy" /></MenuFlyoutItem.Icon>
-                                                </MenuFlyoutItem>
-                                                <MenuFlyoutItem
-                                                    x:Uid="ServicesTablePlusTooltip"
-                                                    Text="Open database in TablePlus"
-                                                    Tag="{x:Bind Id}"
-                                                    Click="OpenTablePlus_Click"
-                                                    Visibility="{x:Bind CanOpenInTablePlus}" />
-                                                <MenuFlyoutSeparator />
-                                                <MenuFlyoutItem
-                                                    x:Uid="ServicesDeleteTooltip"
-                                                    Text="Delete service instance"
-                                                    Tag="{x:Bind Id}"
-                                                    Click="Delete_Click"
-                                                    Style="{StaticResource DangerMenuFlyoutItemStyle}">
-                                                    <MenuFlyoutItem.Icon><SymbolIcon Symbol="Delete" /></MenuFlyoutItem.Icon>
-                                                </MenuFlyoutItem>
-                                            </MenuFlyout>
-                                        </Button.Flyout>
-                                    </Button>
-                                </StackPanel>
-                            </Grid>
+                            <Border Width="312" MinHeight="176" Padding="14,12" CornerRadius="{StaticResource OverlayCornerRadius}"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                AutomationProperties.Name="{x:Bind CardName}">
+                                <Grid RowSpacing="8">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid Width="10" Height="10" VerticalAlignment="Center">
+                                            <Ellipse Fill="{ThemeResource SystemFillColorSuccessBrush}" Visibility="{x:Bind IsRunning}" />
+                                            <Ellipse Fill="{ThemeResource ControlStrongFillColorDisabledBrush}" Visibility="{x:Bind IsNotRunning}" />
+                                        </Grid>
+                                        <StackPanel Grid.Column="1" MinWidth="0">
+                                            <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Name}" />
+                                            <TextBlock Text="{x:Bind Status}" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2" VerticalAlignment="Top" x:Uid="ServicesMoreButton" IsEnabled="{x:Bind CanManage}" AutomationProperties.Name="More service actions" Style="{StaticResource ToolbarIconButtonStyle}">
+                                            <ToolTipService.ToolTip>
+                                                <ToolTip><TextBlock x:Uid="ServicesMoreTooltip" Text="More service actions" /></ToolTip>
+                                            </ToolTipService.ToolTip>
+                                            <SymbolIcon Symbol="More" />
+                                            <Button.Flyout>
+                                                <MenuFlyout>
+                                                    <MenuFlyoutItem x:Uid="ServicesBackupsAction" Text="Data backups" Tag="{x:Bind Id}" Click="Backups_Click" />
+                                                    <ToggleMenuFlyoutItem
+                                                        x:Uid="ServicesAutomaticStartMenu"
+                                                        Text="Start automatically"
+                                                        Tag="{x:Bind Id}"
+                                                        IsChecked="{x:Bind StartAutomatically, Mode=OneTime}"
+                                                        Click="AutomaticStart_Toggled" />
+                                                    <MenuFlyoutSeparator />
+                                                    <MenuFlyoutItem
+                                                        x:Uid="ServicesOpenDataTooltip"
+                                                        Text="Open data directory"
+                                                        Tag="{x:Bind Id}"
+                                                        Click="OpenData_Click">
+                                                        <MenuFlyoutItem.Icon><SymbolIcon Symbol="Folder" /></MenuFlyoutItem.Icon>
+                                                    </MenuFlyoutItem>
+                                                    <MenuFlyoutItem
+                                                        x:Uid="ServicesInspectPortMenu"
+                                                        Text="Inspect port"
+                                                        Tag="{x:Bind Id}"
+                                                        Click="InspectPort_Click">
+                                                        <MenuFlyoutItem.Icon><SymbolIcon Symbol="Find" /></MenuFlyoutItem.Icon>
+                                                    </MenuFlyoutItem>
+                                                    <MenuFlyoutItem
+                                                        x:Uid="ServicesEnvironmentTooltip"
+                                                        Text="Add service connection to a site .env"
+                                                        Tag="{x:Bind Id}"
+                                                        Click="AddToEnvironment_Click">
+                                                        <MenuFlyoutItem.Icon><SymbolIcon Symbol="Edit" /></MenuFlyoutItem.Icon>
+                                                    </MenuFlyoutItem>
+                                                    <MenuFlyoutItem
+                                                        x:Uid="ServicesCopyEnvironmentMenu"
+                                                        Text="Copy Laravel .env settings"
+                                                        Tag="{x:Bind Id}"
+                                                        Click="CopyEnvironment_Click">
+                                                        <MenuFlyoutItem.Icon><SymbolIcon Symbol="Copy" /></MenuFlyoutItem.Icon>
+                                                    </MenuFlyoutItem>
+                                                    <MenuFlyoutItem
+                                                        x:Uid="ServicesConsoleTooltip"
+                                                        Text="Open service console"
+                                                        Tag="{x:Bind Id}"
+                                                        Click="OpenConsole_Click"
+                                                        Visibility="{x:Bind CanOpenConsole}" />
+                                                    <MenuFlyoutItem
+                                                        x:Uid="ServicesCopyConnectionTooltip"
+                                                        Text="Copy database connection URL"
+                                                        Tag="{x:Bind Id}"
+                                                        Click="CopyConnection_Click"
+                                                        Visibility="{x:Bind CanOpenInTablePlus}">
+                                                        <MenuFlyoutItem.Icon><SymbolIcon Symbol="Copy" /></MenuFlyoutItem.Icon>
+                                                    </MenuFlyoutItem>
+                                                    <MenuFlyoutItem
+                                                        x:Uid="ServicesTablePlusTooltip"
+                                                        Text="Open database in TablePlus"
+                                                        Tag="{x:Bind Id}"
+                                                        Click="OpenTablePlus_Click"
+                                                        Visibility="{x:Bind CanOpenInTablePlus}" />
+                                                    <MenuFlyoutSeparator />
+                                                    <MenuFlyoutItem
+                                                        x:Uid="ServicesDeleteTooltip"
+                                                        Text="Delete service instance"
+                                                        Tag="{x:Bind Id}"
+                                                        Click="Delete_Click"
+                                                        Style="{StaticResource DangerMenuFlyoutItemStyle}">
+                                                        <MenuFlyoutItem.Icon><SymbolIcon Symbol="Delete" /></MenuFlyoutItem.Icon>
+                                                    </MenuFlyoutItem>
+                                                </MenuFlyout>
+                                            </Button.Flyout>
+                                        </Button>
+                                    </Grid>
+                                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
+                                        <TextBlock Text="{x:Bind PortText}" Style="{StaticResource CaptionTextStyle}" FlowDirection="LeftToRight" />
+                                        <TextBlock Text="{x:Bind Version}" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" FlowDirection="LeftToRight" />
+                                        <TextBlock Text="{x:Bind DefinitionId}" Style="{StaticResource CaptionTextStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                    </StackPanel>
+                                    <Grid Grid.Row="2" ColumnSpacing="6" Visibility="{x:Bind CanCopyAddress}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Bind Address}" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" FontSize="12" IsTextSelectionEnabled="True" TextTrimming="CharacterEllipsis" FlowDirection="LeftToRight" ToolTipService.ToolTip="{x:Bind Address}" />
+                                        <Button Grid.Column="1" Tag="{x:Bind Id}" Click="CopyAddress_Click" Style="{StaticResource ToolbarIconButtonStyle}"
+                                            AutomationProperties.Name="{x:Bind CopyAddressLabel}" ToolTipService.ToolTip="{x:Bind CopyAddressLabel}">
+                                            <SymbolIcon Symbol="Copy" />
+                                        </Button>
+                                    </Grid>
+                                    <Border Grid.Row="3" Padding="8,4" CornerRadius="4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" Visibility="{x:Bind HasLastLogLine, Mode=OneWay}">
+                                        <TextBlock Text="{x:Bind LastLogLine, Mode=OneWay}" FontFamily="Cascadia Mono, Consolas" FontSize="11" TextTrimming="CharacterEllipsis" FlowDirection="LeftToRight"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" ToolTipService.ToolTip="{x:Bind LastLogLine, Mode=OneWay}"
+                                            AutomationProperties.LiveSetting="Off" />
+                                    </Border>
+                                    <StackPanel Grid.Row="4" VerticalAlignment="Bottom" Orientation="Horizontal" Spacing="6">
+                                        <Button Tag="{x:Bind Id}" Click="Toggle_Click" IsEnabled="{x:Bind CanToggle}">
+                                            <TextBlock Text="{x:Bind ToggleLabel}" />
+                                        </Button>
+                                        <Button Style="{StaticResource ToolbarIconButtonStyle}"
+                                            Tag="{x:Bind Id}"
+                                            Click="Install_Click"
+                                            AutomationProperties.Name="{x:Bind InstallLabel}"
+                                            Visibility="{x:Bind CanInstallOrUpdate}">
+                                            <ToolTipService.ToolTip>
+                                                <ToolTip><TextBlock x:Uid="ServicesInstallTooltip" Text="Install or update runtime" /></ToolTip>
+                                            </ToolTipService.ToolTip>
+                                            <SymbolIcon Symbol="Download" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
                         </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+                    </GridView.ItemTemplate>
+                </GridView>
                 <StackPanel
                     x:Name="EmptyState"
                     HorizontalAlignment="Center"

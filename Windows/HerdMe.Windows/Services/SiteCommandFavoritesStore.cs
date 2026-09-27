@@ -18,11 +18,24 @@ public sealed class SiteCommandFavoritesStore
         StringComparer.OrdinalIgnoreCase
     );
     private readonly string path;
+    private readonly int limit;
 
     public SiteCommandFavoritesStore(string supportRoot)
+        : this(supportRoot, "command-favorites.json", 60)
     {
-        path = Path.Combine(Path.GetFullPath(supportRoot), "Config", "command-favorites.json");
     }
+
+    private SiteCommandFavoritesStore(string supportRoot, string fileName, int limit)
+    {
+        path = Path.Combine(Path.GetFullPath(supportRoot), "Config", fileName);
+        this.limit = limit;
+    }
+
+    // Recently run commands per site (newest first), kept apart from the pinned favorites.
+    public static SiteCommandFavoritesStore History(string supportRoot) =>
+        new(supportRoot, "command-history.json", HistoryLimit);
+
+    public const int HistoryLimit = 20;
 
     public IReadOnlyList<SiteCommandFavorite> Load(string sitePath, string tool)
     {
@@ -52,7 +65,7 @@ public sealed class SiteCommandFavoritesStore
             favorites.RemoveAll(item => item.Tool == normalizedTool
                 && item.Command.Equals(normalizedCommand, StringComparison.OrdinalIgnoreCase));
             favorites.Insert(0, new SiteCommandFavorite(normalizedTool, normalizedCommand));
-            if (favorites.Count > 60) favorites.RemoveRange(60, favorites.Count - 60);
+            if (favorites.Count > limit) favorites.RemoveRange(limit, favorites.Count - limit);
             SaveDocument(document);
         }
     }
@@ -96,7 +109,7 @@ public sealed class SiteCommandFavoritesStore
                         .Where(item => item is not null
                             && ValidTool(item.Tool) && ValidCommand(item.Command))
                         .DistinctBy(item => $"{item.Tool}\0{item.Command}", StringComparer.OrdinalIgnoreCase)
-                        .Take(60)
+                        .Take(limit)
                         .ToList(),
                     StringComparer.OrdinalIgnoreCase
                 );
@@ -119,7 +132,7 @@ public sealed class SiteCommandFavoritesStore
                 path,
                 Path.Combine(
                     Path.GetDirectoryName(path)!,
-                    $"command-favorites.{reason}-{Guid.NewGuid():N}.json"
+                    $"{Path.GetFileNameWithoutExtension(path)}.{reason}-{Guid.NewGuid():N}.json"
                 )
             );
         }

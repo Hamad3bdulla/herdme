@@ -143,6 +143,20 @@
                                 </StackPanel>
                                 <ToggleSwitch x:Name="NotificationsToggle" x:Uid="NotificationsToggle" Grid.Column="2" MinWidth="0" Toggled="NotificationsToggle_Toggled" />
                             </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE8BD;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralActionNotificationsTitle" Text="Buttons on notifications" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Uid="GeneralActionNotificationsDescription" Text="Use Windows notifications with buttons such as Restart service and Open logs. This registers HerdMe for notifications under your Windows account; turning it off or uninstalling removes that." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="ActionNotificationsToggle" x:Uid="ActionNotificationsToggle" Grid.Column="2" MinWidth="0" AutomationProperties.AutomationId="ActionNotificationsToggle" AutomationProperties.Name="Buttons on notifications" Toggled="ActionNotificationsToggle_Toggled" />
+                            </Grid>
                         </StackPanel>
                     </Border>
                 </StackPanel>

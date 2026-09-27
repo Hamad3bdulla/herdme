@@ -407,6 +407,33 @@ public static class ArtisanCommandRunner
         );
     }
 
+    // Names plus descriptions and usage, for the Artisan dialog's autocomplete.
+    public static async Task<IReadOnlyList<ArtisanCommandInfo>> DiscoverCommandInfoAsync(
+        string phpExecutable,
+        string projectDirectory,
+        IReadOnlyDictionary<string, string> environment,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var result = await RunAsync(
+            phpExecutable,
+            projectDirectory,
+            ["list", "--format=json", "--no-ansi", "--no-interaction"],
+            environment,
+            TimeSpan.FromSeconds(30),
+            cancellationToken: cancellationToken
+        );
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(result.StandardError)
+                    ? "Artisan could not list the project's commands."
+                    : result.StandardError.Trim()
+            );
+        }
+        return ArtisanCommandIndex.ParseCommandInfoJson(result.StandardOutput);
+    }
+
     private static async Task PumpAsync(
         StreamReader reader,
         BoundedOutputCapture capture,

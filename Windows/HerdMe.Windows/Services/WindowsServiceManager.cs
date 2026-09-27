@@ -346,6 +346,9 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         finally { lifecycle.Release(); }
     }
 
+    // Where the service writes its output (also while it is stopped: the last run's log).
+    public string LogPath(Guid id) => Path.Combine(SupportRoot, "Log", "services", id.ToString("D") + ".log");
+
     public int? ConsolePort(Guid id)
     {
         lock (sync)
@@ -426,7 +429,7 @@ public sealed class WindowsServiceManager : IAsyncDisposable
             consolePort,
             credentials
         );
-        var logPath = Path.Combine(logDirectory, instance.Id.ToString("D") + ".log");
+        var logPath = LogPath(instance.Id);
         BoundedLog.RotateIfNeeded(logPath);
         var startInfo = new ProcessStartInfo
         {
@@ -854,6 +857,13 @@ public sealed class WindowsServiceManager : IAsyncDisposable
     {
         var credentials = credentialStore.GetOrCreate(instance.Id);
         return ServiceEnvironmentFile.Update(projectPath, instance, credentials);
+    }
+
+    // The same variables AddToEnvironment writes, for copying or previewing.
+    public IReadOnlyList<ServiceEnvironmentVariable> EnvironmentVariables(ManagedServiceInstance instance)
+    {
+        ArgumentNullException.ThrowIfNull(instance);
+        return ServiceEnvironmentConfiguration.Variables(instance, credentialStore.GetOrCreate(instance.Id));
     }
 
     public async Task<SiteDatabaseProvisioning> CreateSiteDatabaseAsync(

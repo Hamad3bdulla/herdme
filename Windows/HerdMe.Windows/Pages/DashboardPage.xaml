@@ -295,6 +295,51 @@
                     </Grid>
                 </Button>
 
+                <!-- Getting started: four first steps for a new installation. Hidden once all are
+                     done or after the user closes it. -->
+                <Border
+                    x:Name="GettingStartedCard"
+                    AutomationProperties.AutomationId="DashboardGettingStarted"
+                    Style="{StaticResource CardStyle}"
+                    Padding="20,16,20,16"
+                    Visibility="Collapsed">
+                    <StackPanel Spacing="12">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock
+                                    x:Uid="DashboardGettingStartedTitle"
+                                    Text="Getting started"
+                                    FontWeight="SemiBold"
+                                    AutomationProperties.HeadingLevel="Level2" />
+                                <TextBlock
+                                    x:Name="GettingStartedProgressText"
+                                    Style="{StaticResource SecondaryTextStyle}"
+                                    FontSize="12"
+                                    AutomationProperties.LiveSetting="Polite" />
+                            </StackPanel>
+                            <Button
+                                x:Uid="DashboardGettingStartedDismiss"
+                                x:Name="GettingStartedDismissButton"
+                                Grid.Column="1"
+                                AutomationProperties.AutomationId="DashboardGettingStartedDismiss"
+                                AutomationProperties.Name="Hide getting started"
+                                Click="GettingStartedDismiss_Click"
+                                VerticalAlignment="Top"
+                                Padding="8"
+                                Background="Transparent"
+                                BorderThickness="0">
+                                <FontIcon Glyph="&#xE711;" FontSize="12" />
+                            </Button>
+                        </Grid>
+                        <ProgressBar x:Name="GettingStartedProgress" Minimum="0" Maximum="4" />
+                        <StackPanel x:Name="GettingStartedSteps" Spacing="8" />
+                    </StackPanel>
+                </Border>
+
                 <!-- Quick actions: the four things people come to the dashboard to do. -->
                 <Grid x:Name="QuickActionsGrid" ColumnSpacing="8" RowSpacing="8">
                     <Grid.ColumnDefinitions>

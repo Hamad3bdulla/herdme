@@ -55,6 +55,7 @@ public sealed partial class SitesPage : Page
     private readonly SitesDetectionCache detectionCache = new();
     private readonly List<DispatcherTimer> visibilityPausedTimers = [];
     private readonly Dictionary<string, string> lastSiteErrors = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> pendingRecycle = new(StringComparer.OrdinalIgnoreCase);
     private DispatcherTimer? searchDebounce;
     private bool suppressPreviewToggle = true;
     private SiteRecord? selectedSite;
@@ -122,6 +123,7 @@ public sealed partial class SitesPage : Page
             ? new Thickness(16, 14, 16, 16)
             : new Thickness(28, 24, 28, 24);
         SitesLayout.RowSpacing = compactMode ? 8 : 14;
+        InitializeSplitLayout();
         SubscribePageEvents();
         var externalRescan = ConsumeExternalRescan();
         if (hasLoadedOnce && Sites.Count > 0 && !externalRescan)
@@ -292,10 +294,11 @@ public sealed partial class SitesPage : Page
         settingsStore.RemoveLinkedSite(path);
         detectionCache.Invalidate(path);
         await ScanAsync();
-        // Unlinking only forgets the registration, so it can be undone for a few seconds.
-        App.MainWindow.ShowToast(
+        // Unlinking only forgets the registration, so it happens now; the same Undo countdown
+        // as the other deletes can bring it back.
+        App.MainWindow.RunDeferred(
             AppLocalization.Format("SitesUnlinkedToast", site.Name),
-            AppLocalization.Get("CommonUndo"),
+            () => Task.CompletedTask,
             async () =>
             {
                 settingsStore.AddLinkedSite(path);
@@ -324,43 +327,92 @@ public sealed partial class SitesPage : Page
         }
     }
 
+    // No "Are you sure?": the row disappears, the toast counts down with Undo, and the folder
+    // goes to the Recycle Bin only when the countdown ends (or on exit).
     private async Task MoveSiteToRecycleBinAsync(SiteRecord site)
     {
-        var dialog = DangerStyles.Apply(new ContentDialog
-        {
-            FlowDirection = AppLocalization.LayoutDirection,
-            XamlRoot = XamlRoot,
-            Title = AppLocalization.Format("SitesMoveToRecycleBinTitle", site.Name),
-            Content = AppLocalization.Get("SitesMoveToRecycleBinMessage"),
-            PrimaryButtonText = AppLocalization.Get("SitesMoveToRecycleBin"),
-            CloseButtonText = AppLocalization.Get("CommonCancel"),
-            DefaultButton = ContentDialogButton.Close
-        });
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-
+        var roots = settingsStore.Load().Roots.ToArray();
         try
         {
-            await SiteRemovalService.MoveToRecycleBinAsync(site, settingsStore.Load().Roots);
-            detectionCache.Invalidate(site.Path);
-            await ScanAsync(throwOnError: true);
-            UpdateEnvironmentState();
+            // Rejections (linked, outside a parked folder) are reported before anything is hidden.
+            SiteRemovalService.ResolveRemovableDirectory(site, roots);
         }
         catch (SiteRemovalException error)
         {
-            var key = error.Failure switch
-            {
-                SiteRemovalFailure.LinkedProject => "SitesRemoveLinkedRejected",
-                SiteRemovalFailure.OutsideParkedFolder => "SitesRemoveOutsideRootRejected",
-                _ => "SitesRemoveUnavailable"
-            };
-            await ShowErrorAsync(AppLocalization.Get(key));
+            await ShowErrorAsync(AppLocalization.Get(RemovalFailureKey(error.Failure)));
+            return;
         }
-        catch (Exception error) when (error is IOException
-            or UnauthorizedAccessException
-            or OperationCanceledException)
+        var path = site.Path;
+        if (!pendingRecycle.Add(path)) return;
+        if (selectedSite is { } shown && shown.Path.Equals(path, StringComparison.OrdinalIgnoreCase))
         {
-            await ShowErrorAsync(error.Message);
+            SetNarrowDetailVisible(false);
         }
+        ApplyFilter(null);
+        App.MainWindow.RunDeferred(
+            AppLocalization.Format("SitesRecyclePending", site.Name),
+            async () =>
+            {
+                try
+                {
+                    await SiteRemovalService.MoveToRecycleBinAsync(site, roots);
+                    detectionCache.Invalidate(path);
+                }
+                catch (SiteRemovalException error)
+                {
+                    await ReportRemovalFailureAsync(AppLocalization.Get(RemovalFailureKey(error.Failure)));
+                }
+                catch (Exception error) when (error is IOException
+                    or UnauthorizedAccessException
+                    or OperationCanceledException)
+                {
+                    await ReportRemovalFailureAsync(error.Message);
+                }
+                finally
+                {
+                    pendingRecycle.Remove(path);
+                }
+                if (!loaded) return;
+                await ScanAsync();
+                UpdateEnvironmentState();
+            },
+            () =>
+            {
+                pendingRecycle.Remove(path);
+                if (loaded)
+                {
+                    ApplyFilter(path);
+                    RequestSelectSite(path);
+                }
+                return Task.CompletedTask;
+            }
+        );
+    }
+
+    private static string RemovalFailureKey(SiteRemovalFailure failure) => failure switch
+    {
+        SiteRemovalFailure.LinkedProject => "SitesRemoveLinkedRejected",
+        SiteRemovalFailure.OutsideParkedFolder => "SitesRemoveOutsideRootRejected",
+        _ => "SitesRemoveUnavailable"
+    };
+
+    // The page may be gone by the time the countdown ends; a toast still reaches the user.
+    private async Task ReportRemovalFailureAsync(string message)
+    {
+        if (loaded) await ShowErrorAsync(message);
+        else App.MainWindow.ShowToast(message);
+    }
+
+    private void RootPath_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        var check = InputValidation.FolderPath(RootPathTextBox.Text, Directory.Exists);
+        // "Found" is only worth saying for a folder that is not parked yet.
+        if (check.MessageKey == "InputPathFound"
+            && Roots.Contains(Path.GetFullPath(RootPathTextBox.Text.Trim().Trim('"')), StringComparer.OrdinalIgnoreCase))
+        {
+            check = new InputCheck(InputSeverity.Warning, "InputPathAlreadyParked");
+        }
+        FieldValidation.Show(RootPathMessage, RootPathTextBox, check);
     }
 
     private async void AddRoot_Click(object sender, RoutedEventArgs e)
@@ -512,6 +564,7 @@ public sealed partial class SitesPage : Page
         }
 
         ScanProgress.IsActive = true;
+        PrefillFromKnownSites();
         BeginSitesScan();
         try
         {
@@ -564,6 +617,32 @@ public sealed partial class SitesPage : Page
                 UpdateEnvironmentState();
             }
         }
+    }
+
+    // The first scan of a session starts from the sites the last one saw (the startup snapshot
+    // or a scan elsewhere), so the list is there at once; the scan then replaces them.
+    private void PrefillFromKnownSites()
+    {
+        if (Sites.Count > 0 || sitesScannedOnce || App.KnownSites.Count == 0) return;
+        IReadOnlyList<string> favorites;
+        try
+        {
+            favorites = settingsStore.Load().FavoriteSites ?? [];
+        }
+        catch (Exception error) when (error is IOException
+            or UnauthorizedAccessException
+            or InvalidOperationException
+            or System.Text.Json.JsonException)
+        {
+            favorites = [];
+        }
+        foreach (var known in App.KnownSites)
+        {
+            var site = StartupSnapshotStore.CopySite(known);
+            site.IsFavorite = favorites.Contains(site.Path, StringComparer.OrdinalIgnoreCase);
+            Sites.Add(site);
+        }
+        ApplyFilter(selectedSite?.Path);
     }
 
     private void StartGitInspection(IReadOnlyList<SiteRecord> sites, int generation)
@@ -706,7 +785,13 @@ public sealed partial class SitesPage : Page
         var query = SearchBox.Text.Trim();
         // Running and shared state feed the quick filters, so refresh it for every site.
         foreach (var site in Sites) UpdateWorkflowStatus(site);
-        var desired = SiteListFilter.Apply(Sites, query, siteFilter, siteSort);
+        // A site waiting for its Recycle Bin countdown is already gone from the list.
+        var desired = SiteListFilter.Apply(
+            Sites.Where(site => !pendingRecycle.Contains(site.Path)),
+            query,
+            siteFilter,
+            siteSort
+        );
         var desiredPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var site in desired) desiredPaths.Add(site.Path);
 
@@ -799,6 +884,8 @@ public sealed partial class SitesPage : Page
         if (suppressSiteSelection) return;
         var site = (SiteList.SelectedItem as SitesListItem)?.Site;
         if (!ReferenceEquals(site, selectedSite)) ShowSite(site);
+        // Narrow windows show one pane: choosing a row opens its details.
+        SetNarrowDetailVisible(site is not null);
     }
 
     private void ShowSite(SiteRecord? site)
@@ -905,14 +992,6 @@ public sealed partial class SitesPage : Page
             RefreshListItem(site);
         }
         if (!loaded || XamlRoot is null) return;
-        var dialog = new ContentDialog
-        {
-            FlowDirection = AppLocalization.LayoutDirection,
-            XamlRoot = XamlRoot,
-            Title = "HerdMe",
-            Content = message,
-            CloseButtonText = AppLocalization.Get("SitesOk")
-        };
-        await dialog.ShowAsync();
+        await ErrorDialog.ShowAsync(XamlRoot, message);
     }
 }

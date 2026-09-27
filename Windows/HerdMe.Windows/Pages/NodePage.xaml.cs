@@ -189,14 +189,7 @@ public sealed partial class NodePage : Page
 
     private async Task ShowErrorAsync(string message)
     {
-        var dialog = new ContentDialog
-        {
-            FlowDirection = AppLocalization.LayoutDirection,
-            XamlRoot = XamlRoot,
-            Title = "HerdMe",
-            Content = message,
-            CloseButtonText = AppLocalization.Get("CommonOk")
-        };
-        await dialog.ShowAsync();
+        if (XamlRoot is null) return;
+        await ErrorDialog.ShowAsync(XamlRoot, message);
     }
 }

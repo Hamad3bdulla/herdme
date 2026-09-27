@@ -3,6 +3,19 @@
 All notable changes to HerdMe are documented in this file. The project follows
 Semantic Versioning for public releases.
 
+## [0.1.28] - 2026-09-28
+
+### Added
+
+- Windows: richer Sites workflows with Artisan command history and autocomplete,
+  environment editing and review, project templates, service environment snippets,
+  onboarding, tray and taskbar actions, and clearer notifications.
+- Windows: expanded Arabic localization and accessibility labels across the updated surfaces.
+
+### Fixed
+
+- Windows: completed localization resources and build contracts for the new UI surfaces.
+
 ## [Unreleased]
 
 ### Added
@@ -19,9 +32,34 @@ Semantic Versioning for public releases.
   width preview; a browsable tree for dumps; coloured logs with follow tail
   and jump to next error; coloured Artisan output with Stop and Run again.
 - Windows: pick a site's PHP version straight from the Sites list.
+- Windows: drag the divider between the Sites list and the site details (double-click
+  resets it); hover a site for its status, response time and a thumbnail; F2 renames
+  a site in place.
+- Windows: one operations bar for every download and install, with Cancel (or Cancel
+  all), and a 5-second Undo before a site is removed or dumps and mail are cleared.
+- Windows: error dialogs with a plain title, a hint, Copy details and Open log;
+  ports, service names, folders and PHP time zones are checked while you type.
+- Windows: compare installed PHP versions side by side, and edit php.ini with
+  search, a backup and a check for the extensions Laravel needs.
+- Windows: services as cards with address, Copy, and the newest log line.
+- Windows: search pages, sites and actions from the title bar (Ctrl+K); the status
+  pill opens Start all, Stop all and Dashboard.
+- Windows: clicking a tray notification opens what it is about; optional Windows
+  notifications with buttons (Restart service, Open site, Open logs), off by default
+  and removed when turned off or on uninstall.
+- Windows: a Getting started list on the dashboard (create a site, open it, send a
+  test mail, try a dump) that hides itself when done or when closed, with Undo.
+- Windows: a left click on the tray icon opens a small panel with status, Start
+  all, Stop all, favourite and recent sites, mail and Stop sharing; the right-click
+  menu is unchanged.
+- Windows: Start all, Stop all and Open site buttons under the taskbar thumbnail.
+- Windows: a bell in the title bar keeps the last 50 notifications, including ones
+  Windows did not show, and clicking one opens what it is about.
 
 ### Changed
 
+- Windows: the dashboard counts, the Sites list and the tray menu open with what
+  the last session saw and refresh in the background.
 - Windows: destructive buttons share one red style, Cancel stays the default,
   and forms with unsaved changes ask before closing.
 

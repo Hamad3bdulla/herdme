@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace HerdMe.Windows.Models;
 
 public sealed record ManagedServiceDefinition(
@@ -62,8 +64,46 @@ public enum ManagedServiceState
     Running
 }
 
-public sealed class ManagedServiceRow
+public sealed class ManagedServiceRow : INotifyPropertyChanged
 {
+    private string lastLogLine = string.Empty;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    // The newest line of the service log. Refreshed in place so an open card menu stays open.
+    public string LastLogLine
+    {
+        get => lastLogLine;
+        set
+        {
+            var next = value ?? string.Empty;
+            if (string.Equals(lastLogLine, next, StringComparison.Ordinal)) return;
+            lastLogLine = next;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastLogLine)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasLastLogLine)));
+        }
+    }
+
+    public bool HasLastLogLine => lastLogLine.Length > 0;
+
+    public string PortText { get; set; } = string.Empty;
+
+    public string CardName { get; set; } = string.Empty;
+
+    public string CopyAddressLabel { get; set; } = string.Empty;
+
+    public bool IsRunning => State == ManagedServiceState.Running;
+
+    public bool IsNotRunning => State != ManagedServiceState.Running;
+
+    // Running services show their address with a copy button (a full URL with credentials
+    // for databases, host:port for the rest).
+    public bool CanCopyAddress => State == ManagedServiceState.Running && Port > 0;
+
+    public string Address => CanOpenInTablePlus && ConnectionDisplay is { Length: > 0 } display
+        ? display
+        : $"127.0.0.1:{Port}";
+
     public Guid Id { get; set; }
 
     public string DefinitionId { get; set; } = string.Empty;

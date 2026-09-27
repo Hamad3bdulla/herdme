@@ -78,6 +78,7 @@ public sealed partial class MainWindow
             "mail"
         ));
         CountActivity("mail");
+        MarkGettingStarted(GettingStarted.StepSendMail);
     }
 
     private void Dumps_DumpCaptured(object? sender, CapturedDump dump)
@@ -91,6 +92,7 @@ public sealed partial class MainWindow
             "dumps"
         ));
         CountActivity("dumps");
+        MarkGettingStarted(GettingStarted.StepTryDump);
     }
 
     private void Services_ExitedUnexpectedly(object? sender, ServiceExitedEventArgs args)
@@ -142,7 +144,9 @@ public sealed partial class MainWindow
 
     public void RememberOpenedSite(string sitePath)
     {
-        if (!string.IsNullOrWhiteSpace(sitePath)) LastOpenedSitePath = sitePath;
+        if (string.IsNullOrWhiteSpace(sitePath)) return;
+        LastOpenedSitePath = sitePath;
+        MarkGettingStarted(GettingStarted.StepOpenSite);
     }
 
     // The dashboard reports how many health issues it found; the nav item shows the count.
@@ -209,6 +213,7 @@ public sealed partial class MainWindow
     public void ShowToast(string message, string? actionLabel = null, Func<Task>? action = null)
     {
         if (shuttingDown || string.IsNullOrWhiteSpace(message)) return;
+        CommitDeferredForNewToast();
         toastAction = action;
         ToastText.Text = message;
         var hasAction = action is not null && !string.IsNullOrWhiteSpace(actionLabel);

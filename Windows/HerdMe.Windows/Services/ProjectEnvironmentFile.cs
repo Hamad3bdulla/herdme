@@ -64,6 +64,13 @@ public static class ProjectEnvironmentFile
         );
     }
 
+    // The project's .env.example, used by the editor for autocomplete and missing keys.
+    public static string? LoadExample(string projectPath)
+    {
+        var examplePath = Path.Combine(RequireProjectDirectory(projectPath), ".env.example");
+        return File.Exists(examplePath) ? Decode(ReadData(examplePath)) : null;
+    }
+
     public static ProjectEnvironmentDocument Save(
         string projectPath,
         string contents,

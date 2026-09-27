@@ -1,5 +1,6 @@
 using HerdMe.Windows.Models;
 using HerdMe.Windows.Services;
+using HerdMe.Windows.Views;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -47,6 +48,7 @@ public sealed partial class PhpPage : Page
             ? settings.PhpCycle
             : RuntimeCatalog.DefaultPhpCycle;
         LoadVersionSettings(PhpCycleBox.SelectedItem?.ToString() ?? settings.PhpCycle);
+        InitializeIniEditor();
     }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
@@ -81,6 +83,7 @@ public sealed partial class PhpPage : Page
         try
         {
             var selectedCycle = PhpCycleBox.SelectedItem?.ToString() ?? settings.PhpCycle;
+            LoadIniForCycle(selectedCycle, force: false);
             var managedPhp = runtimeInstaller.PhpExecutable(selectedCycle);
             var isInstalled = runtimeInstaller.IsInstalled(selectedCycle);
             string? phpPath = isInstalled && File.Exists(managedPhp) ? managedPhp : null;
@@ -229,7 +232,13 @@ public sealed partial class PhpPage : Page
         RuntimeStatusText.Text = AppLocalization.Get("PhpInstallingTools");
         try
         {
-            var versions = await toolManager.InstallOrUpdateAsync(cycle);
+            // Shown in the window's progress bar with Cancel, like the PHP download itself.
+            var versions = await RuntimeOperations.Shared.RunAsync(
+                "tools:" + cycle,
+                AppLocalization.Format("OperationsComposerTools", cycle),
+                (token, _) => toolManager.InstallOrUpdateAsync(cycle, token),
+                CancellationToken.None
+            );
             SynchronizeUserPath(cycle);
             ComposerVersionText.Text = AppLocalization.Format(
                 "PhpComposerVersion",
@@ -242,10 +251,15 @@ public sealed partial class PhpPage : Page
             InstallToolsButton.Visibility = Visibility.Collapsed;
             RuntimeStatusText.Text = AppLocalization.Get("PhpReadyForLaravel13");
         }
+        catch (OperationCanceledException)
+        {
+            RuntimeStatusText.Text = AppLocalization.Get("OperationsCancelled");
+        }
         catch (Exception error)
         {
             RuntimeStatusText.Text = AppLocalization.Get("PhpToolInstallationFailed");
             ExtensionDetailText.Text = error.Message;
+            if (XamlRoot is { } xamlRoot) await ErrorDialog.ShowAsync(xamlRoot, error);
         }
         finally
         {
@@ -272,10 +286,15 @@ public sealed partial class PhpPage : Page
             );
             await RefreshAsync();
         }
+        catch (OperationCanceledException)
+        {
+            RuntimeStatusText.Text = AppLocalization.Get("OperationsCancelled");
+        }
         catch (Exception error)
         {
             RuntimeStatusText.Text = AppLocalization.Get("PhpInstallFailed");
             ExtensionDetailText.Text = error.Message;
+            if (XamlRoot is { } xamlRoot) await ErrorDialog.ShowAsync(xamlRoot, error);
         }
         finally
         {
@@ -284,8 +303,24 @@ public sealed partial class PhpPage : Page
         }
     }
 
+    private void Timezone_TextChanged(object sender, TextChangedEventArgs e) => ValidateTimezone();
+
+    // A zone PHP would reject is caught here instead of as a warning in every request.
+    private bool ValidateTimezone()
+    {
+        var check = InputValidation.PhpTimezone(TimezoneBox.Text);
+        FieldValidation.Show(TimezoneMessage, TimezoneBox, check);
+        return !check.Blocks;
+    }
+
     private void Save_Click(object sender, RoutedEventArgs e)
     {
+        if (!ValidateTimezone())
+        {
+            SaveStatusText.Text = AppLocalization.Get("InputFixFieldsFirst");
+            TimezoneBox.Focus(FocusState.Programmatic);
+            return;
+        }
         var cycle = PhpCycleBox.SelectedItem?.ToString() ?? settings.PhpCycle;
         var version = PhpRuntimePolicy.ResolveVersion(settings, cycle);
         version.MemoryLimitMegabytes = double.IsNaN(MemoryLimitBox.Value)
@@ -300,7 +335,7 @@ public sealed partial class PhpPage : Page
         version.MaxFileUploads = NumberValue(FileUploadsBox, 20);
         version.DisplayErrors = DisplayErrorsToggle.IsOn;
         version.OpcacheEnabled = OpcacheToggle.IsOn;
-        version.Timezone = TimezoneBox.Text;
+        version.Timezone = TimezoneBox.Text.Trim();
         PhpRuntimePolicy.SetVersion(settings, cycle, version);
         settings.PhpCycle = cycle;
         runtimePolicy.Save(settings);

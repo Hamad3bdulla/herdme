@@ -159,23 +159,7 @@ public static class ServiceEnvironmentFile
         }
 
         var environmentPath = Path.Combine(fullProjectPath, ".env");
-        var examplePath = Path.Combine(fullProjectPath, ".env.example");
-        RejectReparsePoint(environmentPath);
-        var environmentExists = File.Exists(environmentPath);
-        string initialContents;
-        if (environmentExists)
-        {
-            initialContents = ReadUtf8(environmentPath);
-        }
-        else if (File.Exists(examplePath))
-        {
-            RejectReparsePoint(examplePath);
-            initialContents = ReadUtf8(examplePath);
-        }
-        else
-        {
-            initialContents = string.Empty;
-        }
+        var initialContents = ReadStartingContents(fullProjectPath, out var environmentExists);
 
         var merged = Merge(initialContents, variables, sourceName);
         var temporaryPath = Path.Combine(
@@ -235,6 +219,32 @@ public static class ServiceEnvironmentFile
             missing.Length,
             foundKeys.Count
         );
+    }
+
+    // What Update would start from: the site's .env, else its .env.example, else nothing.
+    // Used to preview a merge before applying it.
+    public static string ReadStartingContents(string projectPath, out bool environmentExists)
+    {
+        var fullProjectPath = Path.GetFullPath(projectPath);
+        var environmentPath = Path.Combine(fullProjectPath, ".env");
+        var examplePath = Path.Combine(fullProjectPath, ".env.example");
+        RejectReparsePoint(environmentPath);
+        environmentExists = File.Exists(environmentPath);
+        if (environmentExists) return ReadUtf8(environmentPath);
+        if (File.Exists(examplePath))
+        {
+            RejectReparsePoint(examplePath);
+            return ReadUtf8(examplePath);
+        }
+        return string.Empty;
+    }
+
+    // Ready-to-paste KEY=value lines, quoted the same way Update writes them.
+    public static string FormatLines(IReadOnlyList<ServiceEnvironmentVariable> variables, string newline = "\r\n")
+    {
+        ArgumentNullException.ThrowIfNull(variables);
+        if (variables.Count == 0) return string.Empty;
+        return string.Join(newline, variables.Select(variable => $"{variable.Key}={Encode(variable.Value)}")) + newline;
     }
 
     private static string ReadUtf8(string path)

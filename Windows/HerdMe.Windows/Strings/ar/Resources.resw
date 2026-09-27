@@ -205,10 +205,6 @@
   <data name="ServicesNameField.Header" xml:space="preserve"><value>الاسم</value></data>
   <data name="ServicesPortField.Header" xml:space="preserve"><value>المنفذ</value></data>
   <data name="ServicesAddButton.Text" xml:space="preserve"><value>إضافة</value></data>
-  <data name="ServicesServiceColumn.Text" xml:space="preserve"><value>الخدمة</value></data>
-  <data name="ServicesPortColumn.Text" xml:space="preserve"><value>المنفذ</value></data>
-  <data name="ServicesVersionColumn.Text" xml:space="preserve"><value>الإصدار</value></data>
-  <data name="ServicesStatusColumn.Text" xml:space="preserve"><value>الحالة</value></data>
   <data name="ServicesAutomaticStartMenu.Text" xml:space="preserve"><value>تشغيل تلقائي</value></data>
   <data name="ServicesMoreTooltip.Text" xml:space="preserve"><value>المزيد من إجراءات الخدمة</value></data>
   <data name="ServicesInstallTooltip.Text" xml:space="preserve"><value>تثبيت بيئة التشغيل أو تحديثها</value></data>
@@ -1525,4 +1521,269 @@
   <data name="SitesRowPhpPicker.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إصدار PHP</value></data>
   <data name="SitesRowPhpNoneInstalled" xml:space="preserve"><value>لا توجد إصدارات PHP مثبتة</value></data>
   <data name="SitesRowPhpChanged" xml:space="preserve"><value>أصبح {0} يستخدم {1}</value></data>
+  <data name="SitesSplitter.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تغيير عرض قائمة المواقع (السهمان يمين ويسار، Home يعيد الافتراضي)</value></data>
+  <data name="SitesBackToListButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>رجوع إلى المواقع</value></data>
+  <data name="SitesBackToListTooltip.Text" xml:space="preserve"><value>رجوع إلى المواقع (Alt+يسار)</value></data>
+  <data name="SitesContextRename.Text" xml:space="preserve"><value>إعادة تسمية...</value></data>
+  <data name="SitesRenameBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>الاسم الجديد للموقع</value></data>
+  <data name="SitesPreviewChecking" xml:space="preserve"><value>جارٍ فحص الموقع...</value></data>
+  <data name="SitesPreviewEnvironmentStopped" xml:space="preserve"><value>البيئة متوقفة. شغّلها لفحص هذا الموقع.</value></data>
+  <data name="SitesPreviewStatus" xml:space="preserve"><value>HTTP {0} - {1} مللي ثانية</value></data>
+  <data name="SitesPreviewNoAnswer" xml:space="preserve"><value>لا يوجد رد: {0}</value></data>
+  <data name="SitesRenameEmpty" xml:space="preserve"><value>اكتب اسمًا.</value></data>
+  <data name="SitesRenameTooLong" xml:space="preserve"><value>استخدم 63 حرفًا أو أقل.</value></data>
+  <data name="SitesRenameInvalidCharacters" xml:space="preserve"><value>استخدم أحرفًا إنجليزية صغيرة وأرقامًا وشرطات فقط.</value></data>
+  <data name="SitesRenameEdgeHyphen" xml:space="preserve"><value>لا يمكن أن يبدأ الاسم أو ينتهي بشرطة.</value></data>
+  <data name="SitesRenameUnchanged" xml:space="preserve"><value>الاسم نفسه. اضغط Esc للإلغاء.</value></data>
+  <data name="SitesRenameTaken" xml:space="preserve"><value>هناك موقع آخر يستخدم هذا الاسم.</value></data>
+  <data name="SitesRenameFolderExists" xml:space="preserve"><value>يوجد مجلد بهذا الاسم مسبقًا.</value></data>
+  <data name="SitesRenameAvailable" xml:space="preserve"><value>{0} متاح. اضغط Enter لإعادة تسمية المجلد.</value></data>
+  <data name="SitesRenameBlockedShared" xml:space="preserve"><value>أوقف مشاركة هذا الموقع قبل إعادة تسميته.</value></data>
+  <data name="SitesRenameBlockedRunning" xml:space="preserve"><value>أوقف العمليات وخادم التطوير لهذا الموقع قبل إعادة تسميته.</value></data>
+  <data name="SitesRenamed" xml:space="preserve"><value>تمت إعادة تسمية {0} إلى {1}</value></data>
+  <data name="SitesRenameFailed" xml:space="preserve"><value>تعذّرت إعادة تسمية المجلد: {0} أغلق المحررات أو الطرفيات التي تستخدمه وحاول مجددًا.</value></data>
+  <data name="DeferredUndoCountdown" xml:space="preserve"><value>{0} (متبقٍ {1})</value></data>
+  <data name="MailClearedPending" xml:space="preserve"><value>تم مسح {0} رسالة</value></data>
+  <data name="DumpsClearedPending" xml:space="preserve"><value>تم مسح {0} تفريغ</value></data>
+  <data name="SitesRecyclePending" xml:space="preserve"><value>سيُنقل {0} إلى سلة المحذوفات</value></data>
+  <data name="ErrorTitleGeneral" xml:space="preserve"><value>لم تنجح العملية</value></data>
+  <data name="ErrorTitleAccessDenied" xml:space="preserve"><value>ويندوز منع الوصول</value></data>
+  <data name="ErrorTitleFileInUse" xml:space="preserve"><value>ملف قيد الاستخدام</value></data>
+  <data name="ErrorTitleNotFound" xml:space="preserve"><value>هناك شيء مفقود</value></data>
+  <data name="ErrorTitlePortInUse" xml:space="preserve"><value>هذا المنفذ مستخدم بالفعل</value></data>
+  <data name="ErrorTitleNetwork" xml:space="preserve"><value>تعذر الوصول إلى الشبكة</value></data>
+  <data name="ErrorTitleTimeout" xml:space="preserve"><value>استغرق الأمر وقتًا طويلًا</value></data>
+  <data name="ErrorTitleCancelled" xml:space="preserve"><value>تم الإلغاء</value></data>
+  <data name="ErrorHintGeneral" xml:space="preserve"><value>تعذر على HerdMe إكمال هذا. التفاصيل أدناه توضح السبب.</value></data>
+  <data name="ErrorHintAccessDenied" xml:space="preserve"><value>تأكد أن المجلد ليس للقراءة فقط وأن مكافح الفيروسات لا يمنعه، ثم أعد المحاولة.</value></data>
+  <data name="ErrorHintFileInUse" xml:space="preserve"><value>أغلق المحررات أو الطرفيات أو نوافذ المستكشف التي تستخدم هذا المجلد، ثم أعد المحاولة.</value></data>
+  <data name="ErrorHintNotFound" xml:space="preserve"><value>ربما نُقل الملف أو المجلد أو حُذف. أعد الفحص ثم حاول مجددًا.</value></data>
+  <data name="ErrorHintPortInUse" xml:space="preserve"><value>برنامج آخر يستمع على هذا المنفذ. أوقفه أو اختر منفذًا آخر.</value></data>
+  <data name="ErrorHintNetwork" xml:space="preserve"><value>تحقق من اتصال الإنترنت أو الوكيل، ثم أعد المحاولة.</value></data>
+  <data name="ErrorHintTimeout" xml:space="preserve"><value>لم يستجب الطرف الآخر في الوقت المحدد. حاول مرة أخرى بعد قليل.</value></data>
+  <data name="ErrorHintCancelled" xml:space="preserve"><value>توقفت العملية قبل أن تكتمل.</value></data>
+  <data name="ErrorDialogMessageName" xml:space="preserve"><value>رسالة الخطأ</value></data>
+  <data name="ErrorDialogCopyDetails" xml:space="preserve"><value>نسخ التفاصيل</value></data>
+  <data name="ErrorDialogOpenLog" xml:space="preserve"><value>فتح سجل التشخيص</value></data>
+  <data name="ErrorDialogCopied" xml:space="preserve"><value>تم نسخ التفاصيل. ألصقها في بلاغ المشكلة.</value></data>
+  <data name="ErrorDialogLogOpened" xml:space="preserve"><value>سجل التشخيص مفتوح في المستكشف.</value></data>
+  <data name="ErrorDialogLogMissing" xml:space="preserve"><value>لم يُكتب أي سجل تشخيص بعد.</value></data>
+  <data name="InputPortRequired" xml:space="preserve"><value>أدخل رقم المنفذ.</value></data>
+  <data name="InputPortRange" xml:space="preserve"><value>استخدم رقمًا صحيحًا من 1 إلى 65535.</value></data>
+  <data name="InputPortSites" xml:space="preserve"><value>المنفذ {0} يخدم مواقع ‎.test‎. اختر منفذًا آخر.</value></data>
+  <data name="InputPortHerdMe" xml:space="preserve"><value>خدمة أخرى في HerdMe تستخدم المنفذ {0} بالفعل.</value></data>
+  <data name="InputPortBusy" xml:space="preserve"><value>المنفذ {0} يستخدمه برنامج آخر.</value></data>
+  <data name="InputPortLow" xml:space="preserve"><value>المنفذ {0} متاح، لكن المنافذ الأقل من 1024 تتعارض غالبًا مع خدمات النظام.</value></data>
+  <data name="InputPortFree" xml:space="preserve"><value>المنفذ {0} متاح.</value></data>
+  <data name="InputPortSuggestion" xml:space="preserve"><value>جرّب {0}.</value></data>
+  <data name="InputNameTooLong" xml:space="preserve"><value>اجعل الاسم أقل من {0} حرفًا.</value></data>
+  <data name="InputNameInvalid" xml:space="preserve"><value>يحتوي الاسم على أحرف غير مسموحة.</value></data>
+  <data name="InputNameDuplicate" xml:space="preserve"><value>لديك بالفعل خدمة باسم {0}.</value></data>
+  <data name="InputPathInvalid" xml:space="preserve"><value>هذا ليس مسار مجلد صالحًا.</value></data>
+  <data name="InputPathNotAbsolute" xml:space="preserve"><value>استخدم مسارًا كاملًا يبدأ بحرف قرص، مثل D:\Projects.</value></data>
+  <data name="InputPathMissing" xml:space="preserve"><value>هذا المجلد غير موجود.</value></data>
+  <data name="InputPathFound" xml:space="preserve"><value>تم العثور على المجلد.</value></data>
+  <data name="InputPathAlreadyParked" xml:space="preserve"><value>هذا المجلد مضاف بالفعل.</value></data>
+  <data name="InputTimezoneFormat" xml:space="preserve"><value>استخدم منطقة مثل Asia/Riyadh أو UTC.</value></data>
+  <data name="InputTimezoneUnknown" xml:space="preserve"><value>{0} ليست منطقة يعرفها ويندوز؛ قد يرفضها PHP.</value></data>
+  <data name="InputFixFieldsFirst" xml:space="preserve"><value>صحّح الحقل المميز أولًا.</value></data>
+  <data name="OperationsComposerTools" xml:space="preserve"><value>Composer ومثبت Laravel لـ PHP {0}</value></data>
+  <data name="OperationsCancelled" xml:space="preserve"><value>تم الإلغاء.</value></data>
+  <data name="OperationsCancelling" xml:space="preserve"><value>جارٍ الإلغاء...</value></data>
+  <data name="OperationsOne" xml:space="preserve"><value>عملية {0}: {1}</value></data>
+  <data name="OperationsMany" xml:space="preserve"><value>{0} عمليات قيد التنفيذ</value></data>
+  <data name="OperationsPercent" xml:space="preserve"><value>{0}٪</value></data>
+  <data name="OperationsCancelAll" xml:space="preserve"><value>إلغاء الكل</value></data>
+  <data name="OperationsBarProgress.AutomationProperties.Name" xml:space="preserve"><value>التقدم</value></data>
+  <data name="OperationsBarDetails.Content" xml:space="preserve"><value>التفاصيل</value></data>
+  <data name="OperationsBarCancel.Content" xml:space="preserve"><value>إلغاء</value></data>
+  <data name="OperationsStageBackingUp" xml:space="preserve"><value>نسخ احتياطي</value></data>
+  <data name="OperationsStageResolving" xml:space="preserve"><value>البحث عن الإصدار</value></data>
+  <data name="OperationsStageDownloading" xml:space="preserve"><value>تنزيل</value></data>
+  <data name="OperationsStageRetrying" xml:space="preserve"><value>إعادة المحاولة</value></data>
+  <data name="OperationsStageVerifying" xml:space="preserve"><value>التحقق من SHA-256</value></data>
+  <data name="OperationsStageExtracting" xml:space="preserve"><value>فك الضغط</value></data>
+  <data name="OperationsStageInstalling" xml:space="preserve"><value>تثبيت</value></data>
+  <data name="OperationsStageCompleted" xml:space="preserve"><value>اكتمل</value></data>
+  <data name="OperationsStageCancelled" xml:space="preserve"><value>أُلغي</value></data>
+  <data name="OperationsStageFailed" xml:space="preserve"><value>فشل</value></data>
+  <data name="PhpCompareTitle.Text" xml:space="preserve"><value>مقارنة إصدارات PHP</value></data>
+  <data name="PhpCompareDescription.Text" xml:space="preserve"><value>الإصدارات المثبتة جنبًا إلى جنب: رقم الإصدار والإضافات التي يحمّلها كل إصدار.</value></data>
+  <data name="PhpCompareDifferencesOnly.Content" xml:space="preserve"><value>الاختلافات فقط</value></data>
+  <data name="PhpCompareButton.Content" xml:space="preserve"><value>قارن</value></data>
+  <data name="PhpCompareRunning" xml:space="preserve"><value>جارٍ فحص كل إصدار مثبت...</value></data>
+  <data name="PhpCompareNothingInstalled" xml:space="preserve"><value>لا يوجد إصدار PHP مثبت بعد.</value></data>
+  <data name="PhpCompareOnlyOne" xml:space="preserve"><value>إصدار PHP واحد فقط مثبت. ثبّت إصدارًا آخر للمقارنة.</value></data>
+  <data name="PhpCompareDone" xml:space="preserve"><value>تمت مقارنة {0} إصدارات.</value></data>
+  <data name="PhpCompareExtensionHeader" xml:space="preserve"><value>الإضافة</value></data>
+  <data name="PhpCompareVersionRow" xml:space="preserve"><value>الإصدار</value></data>
+  <data name="PhpCompareFailed" xml:space="preserve"><value>تعذّر الفحص: {0}</value></data>
+  <data name="PhpCompareRequiredName" xml:space="preserve"><value>{0} (مطلوبة)</value></data>
+  <data name="PhpCompareNoDifferences" xml:space="preserve"><value>كل الإصدارات المثبتة تحمّل الإضافات نفسها.</value></data>
+  <data name="PhpCompareAbsent" xml:space="preserve"><value>غير متوفرة</value></data>
+  <data name="PhpCompareCellName" xml:space="preserve"><value>{0} على PHP {1}: {2}</value></data>
+  <data name="PhpIniTitle.Text" xml:space="preserve"><value>إعدادات php.ini</value></data>
+  <data name="PhpIniOverrideInfo.Title" xml:space="preserve"><value>عدّل بحذر</value></data>
+  <data name="PhpIniOverrideInfo.Message" xml:space="preserve"><value>إعدادات PHP أعلاه تُمرَّر إلى PHP عند تشغيله وتتقدّم على هذا الملف. ويعيد HerdMe أيضًا الإضافات التي يحتاجها Laravel. يُحفظ الملف السابق باسم php.ini.bak.</value></data>
+  <data name="PhpIniSearch.PlaceholderText" xml:space="preserve"><value>ابحث في php.ini</value></data>
+  <data name="PhpIniSearch.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>ابحث في php.ini</value></data>
+  <data name="PhpIniPrevious.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>النتيجة السابقة</value></data>
+  <data name="PhpIniNext.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>النتيجة التالية</value></data>
+  <data name="PhpIniPreviousTooltip" xml:space="preserve"><value>النتيجة السابقة (Shift+F3)</value></data>
+  <data name="PhpIniNextTooltip" xml:space="preserve"><value>النتيجة التالية (Enter أو F3)</value></data>
+  <data name="PhpIniEditor.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>محتوى php.ini</value></data>
+  <data name="PhpIniReload.Content" xml:space="preserve"><value>إعادة التحميل</value></data>
+  <data name="PhpIniSave.Content" xml:space="preserve"><value>حفظ php.ini</value></data>
+  <data name="PhpIniNotInstalled" xml:space="preserve"><value>ثبّت إصدار PHP هذا لتعديل ملف php.ini الخاص به.</value></data>
+  <data name="PhpIniReadFailed" xml:space="preserve"><value>تعذّرت قراءة php.ini: {0}</value></data>
+  <data name="PhpIniChangedOnDisk" xml:space="preserve"><value>تغيّر php.ini على القرص منذ فتحه. انسخ تعديلاتك ثم أعد التحميل.</value></data>
+  <data name="PhpIniUnsaved" xml:space="preserve"><value>تغييرات غير محفوظة. Ctrl+S يحفظ php.ini.</value></data>
+  <data name="PhpIniMatchCount" xml:space="preserve"><value>{0} نتيجة</value></data>
+  <data name="PhpIniMatchPosition" xml:space="preserve"><value>{0} من {1}</value></data>
+  <data name="PhpIniNoMatches" xml:space="preserve"><value>لا نتائج</value></data>
+  <data name="PhpIniMissingRequired" xml:space="preserve"><value>لم يُحفظ: هذا الملف يعطّل إضافة يحتاجها Laravel، وسيعيد HerdMe تفعيلها عند التشغيل التالي.</value></data>
+  <data name="PhpIniTooLarge" xml:space="preserve"><value>لم يُحفظ: الملف أكبر من 1 ميغابايت.</value></data>
+  <data name="PhpIniSaved" xml:space="preserve"><value>تم الحفظ. الملف السابق هو php.ini.bak.</value></data>
+  <data name="PhpIniSavedToast" xml:space="preserve"><value>تم حفظ php.ini لـ PHP {0}</value></data>
+  <data name="PhpIniSaveFailed" xml:space="preserve"><value>لم يُحفظ php.ini: {0}</value></data>
+  <data name="ServicesCardPort" xml:space="preserve"><value>المنفذ {0}</value></data>
+  <data name="ServicesCardName" xml:space="preserve"><value>{0}، {1}</value></data>
+  <data name="ServicesCardCopyAddress" xml:space="preserve"><value>نسخ عنوان {0}</value></data>
+  <data name="ServicesAddressCopied" xml:space="preserve"><value>تم نسخ {0}</value></data>
+  <data name="TitleBarSearchBox.PlaceholderText" xml:space="preserve"><value>ابحث في الصفحات والمواقع (Ctrl+K)</value></data>
+  <data name="TitleBarSearchBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>البحث في الصفحات والمواقع والإجراءات</value></data>
+  <data name="TitleBarStartAll.Text" xml:space="preserve"><value>تشغيل الكل</value></data>
+  <data name="TitleBarStopAll.Text" xml:space="preserve"><value>إيقاف الكل</value></data>
+  <data name="TitleBarOpenDashboard.Text" xml:space="preserve"><value>فتح لوحة التحكم</value></data>
+  <data name="TitleBarStatusTooltip" xml:space="preserve"><value>البيئة: تشغيل أو إيقاف أو فتح لوحة التحكم</value></data>
+  <data name="TitleBarSearchPageDetail" xml:space="preserve"><value>صفحة</value></data>
+  <data name="TitleBarSearchActionDetail" xml:space="preserve"><value>إجراء</value></data>
+  <data name="TitleBarSearchStartAll" xml:space="preserve"><value>تشغيل الكل</value></data>
+  <data name="TitleBarSearchStopAll" xml:space="preserve"><value>إيقاف الكل</value></data>
+  <data name="TitleBarSearchNoResults" xml:space="preserve"><value>لا توجد صفحات أو مواقع مطابقة</value></data>
+  <data name="NotificationActionRestartService" xml:space="preserve"><value>إعادة تشغيل الخدمة</value></data>
+  <data name="NotificationActionOpenServices" xml:space="preserve"><value>فتح الخدمات</value></data>
+  <data name="NotificationActionOpenSite" xml:space="preserve"><value>فتح الموقع</value></data>
+  <data name="NotificationActionOpenLogs" xml:space="preserve"><value>فتح السجلات</value></data>
+  <data name="NotificationActionOpenUpdates" xml:space="preserve"><value>فتح التحديثات</value></data>
+  <data name="NotificationActionOpenGeneral" xml:space="preserve"><value>فتح الإعدادات العامة</value></data>
+  <data name="GeneralActionNotificationsTitle.Text" xml:space="preserve"><value>أزرار في الإشعارات</value></data>
+  <data name="GeneralActionNotificationsDescription.Text" xml:space="preserve"><value>استخدم إشعارات Windows مع أزرار مثل إعادة تشغيل الخدمة وفتح السجلات. هذا يسجّل HerdMe للإشعارات في حساب Windows الخاص بك فقط، وإيقافه أو إلغاء التثبيت يزيل هذا التسجيل.</value></data>
+  <data name="ActionNotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>أزرار في الإشعارات</value></data>
+  <data name="GeneralActionNotificationsUnsupported" xml:space="preserve"><value>هذا الإصدار من Windows لا يدعم أزرار الإشعارات. سيستمر HerdMe في استخدام إشعار شريط المهام.</value></data>
+  <data name="GeneralActionNotificationsFailed" xml:space="preserve"><value>لم يفعّل Windows أزرار الإشعارات. سيستمر HerdMe في استخدام إشعار شريط المهام.</value></data>
+  <data name="OperationsBarProgress.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>التقدم</value></data>
+  <data name="TitleBarBellHeader.Text" xml:space="preserve"><value>الإشعارات</value></data>
+  <data name="TitleBarBellMarkRead.Content" xml:space="preserve"><value>تعليم الكل كمقروء</value></data>
+  <data name="TitleBarBellClear.Content" xml:space="preserve"><value>مسح</value></data>
+  <data name="TitleBarBellEmpty.Text" xml:space="preserve"><value>لا شيء بعد. عندما تتوقف خدمة أو عملية خلفية أو رابط عام بشكل غير متوقع، تظهر هنا حتى لو كان HerdMe في شريط المهام.</value></data>
+  <data name="TitleBarBellName" xml:space="preserve"><value>الإشعارات</value></data>
+  <data name="TitleBarBellUnread" xml:space="preserve"><value>الإشعارات، {0} غير مقروءة</value></data>
+  <data name="TitleBarBellUnreadEntry" xml:space="preserve"><value>غير مقروء: {0}</value></data>
+  <data name="TitleBarBellCleared" xml:space="preserve"><value>تم مسح الإشعارات</value></data>
+  <data name="TitleBarBellJustNow" xml:space="preserve"><value>الآن</value></data>
+  <data name="TitleBarBellMinutesAgo" xml:space="preserve"><value>قبل {0} دقيقة</value></data>
+  <data name="TitleBarBellHoursAgo" xml:space="preserve"><value>قبل {0} ساعة</value></data>
+  <data name="TitleBarBellRepeated" xml:space="preserve"><value>{0} مرات</value></data>
+  <data name="TitleBarBellNotShown" xml:space="preserve"><value>لم يعرضه Windows</value></data>
+  <data name="TaskbarThumbStartAll" xml:space="preserve"><value>تشغيل الكل</value></data>
+  <data name="TaskbarThumbStopAll" xml:space="preserve"><value>إيقاف الكل</value></data>
+  <data name="TaskbarThumbOpenSite" xml:space="preserve"><value>فتح {0}</value></data>
+  <data name="TaskbarThumbOpenSiteNone" xml:space="preserve"><value>فتح موقع (لم يُفتح أي موقع بعد)</value></data>
+  <data name="TrayPanelSitesHeader" xml:space="preserve"><value>المواقع</value></data>
+  <data name="TrayPanelSitesEmpty" xml:space="preserve"><value>لا توجد مواقع بعد. أنشئ موقعًا أو أضف مجلدًا في HerdMe.</value></data>
+  <data name="TrayPanelOpenSite" xml:space="preserve"><value>فتح {0} في المتصفح</value></data>
+  <data name="TrayPanelShowSite" xml:space="preserve"><value>عرض {0} في HerdMe</value></data>
+  <data name="TrayPanelStartFirst" xml:space="preserve"><value>شغّل البيئة أولًا</value></data>
+  <data name="DashboardUpdating" xml:space="preserve"><value>جارٍ التحديث...</value></data>
+  <data name="DashboardGettingStartedTitle.Text" xml:space="preserve"><value>البداية</value></data>
+  <data name="DashboardGettingStartedDismiss.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إخفاء البداية</value></data>
+  <data name="DashboardGettingStartedDismissTooltip" xml:space="preserve"><value>إخفاء هذه القائمة</value></data>
+  <data name="DashboardGettingStartedProgress" xml:space="preserve"><value>تم {0} من {1}</value></data>
+  <data name="DashboardGettingStartedDone" xml:space="preserve"><value>تم</value></data>
+  <data name="DashboardGettingStartedOpen" xml:space="preserve"><value>لم يتم بعد</value></data>
+  <data name="DashboardGettingStartedHidden" xml:space="preserve"><value>تم إخفاء البداية</value></data>
+  <data name="DashboardGettingStartedCreateSiteTitle" xml:space="preserve"><value>أنشئ موقعًا</value></data>
+  <data name="DashboardGettingStartedCreateSiteDescription" xml:space="preserve"><value>ابدأ مشروع Laravel جديدًا أو أضف مجلدًا موجودًا.</value></data>
+  <data name="DashboardGettingStartedCreateSiteAction" xml:space="preserve"><value>إنشاء</value></data>
+  <data name="DashboardGettingStartedOpenSiteTitle" xml:space="preserve"><value>افتحه في المتصفح</value></data>
+  <data name="DashboardGettingStartedOpenSiteDescription" xml:space="preserve"><value>كل موقع يحصل على https://name.test/ بشهادة موثوقة.</value></data>
+  <data name="DashboardGettingStartedOpenSiteAction" xml:space="preserve"><value>فتح</value></data>
+  <data name="DashboardGettingStartedSendMailTitle" xml:space="preserve"><value>أرسل بريدًا تجريبيًا</value></data>
+  <data name="DashboardGettingStartedSendMailDescription" xml:space="preserve"><value>البريد الذي يرسله تطبيقك يُلتقط هنا بدل أن يصل إلى صناديق حقيقية.</value></data>
+  <data name="DashboardGettingStartedSendMailAction" xml:space="preserve"><value>فتح البريد</value></data>
+  <data name="DashboardGettingStartedTryDumpTitle" xml:space="preserve"><value>جرّب dump</value></data>
+  <data name="DashboardGettingStartedTryDumpDescription" xml:space="preserve"><value>استدعِ dump() في الكود وشاهد القيمة في Dumps.</value></data>
+  <data name="DashboardGettingStartedTryDumpAction" xml:space="preserve"><value>فتح Dumps</value></data>
+  <data name="OperationsStage" xml:space="preserve"><value>المرحلة</value></data>
+  <data name="SitesArtisanRecentLabel" xml:space="preserve"><value>حديث</value></data>
+  <data name="SitesArtisanTypeCommandField" xml:space="preserve"><value>الأمر (اكتب للبحث)</value></data>
+  <data name="SitesArtisanTypeCommandPlaceholder" xml:space="preserve"><value>مثال: route:list --path=api</value></data>
+  <data name="SitesEnvironmentAddMissing" xml:space="preserve"><value>أضفها</value></data>
+  <data name="SitesEnvironmentAddPlaceholder" xml:space="preserve"><value>أضف متغيرًا، مثل MAIL_HOST</value></data>
+  <data name="SitesEnvironmentAddTooltip" xml:space="preserve"><value>اكتب الاسم واضغط Enter. الاقتراحات من .env.example وإعدادات Laravel الشائعة.</value></data>
+  <data name="SitesEnvironmentBack" xml:space="preserve"><value>رجوع</value></data>
+  <data name="SitesEnvironmentDiffAdded" xml:space="preserve"><value>+ {0} = {1} (جديد)</value></data>
+  <data name="SitesEnvironmentDiffChanged" xml:space="preserve"><value>تغيير {0}: من {1} إلى {2}</value></data>
+  <data name="SitesEnvironmentDiffCreates" xml:space="preserve"><value>لا يوجد .env للموقع بعد، والحفظ سينشئه.</value></data>
+  <data name="SitesEnvironmentDiffNoVariables" xml:space="preserve"><value>لا تتغير قيم أي متغير.</value></data>
+  <data name="SitesEnvironmentDiffOtherLines" xml:space="preserve"><value>تتغير أيضًا تعليقات أو أسطر فارغة.</value></data>
+  <data name="SitesEnvironmentDiffProblems" xml:space="preserve"><value>ما زال في {0} أسطر مشاكل. يمكنك الحفظ رغم ذلك.</value></data>
+  <data name="SitesEnvironmentDiffRemoved" xml:space="preserve"><value>- {0} (محذوف)</value></data>
+  <data name="SitesEnvironmentInvalidKey" xml:space="preserve"><value>الأسماء تتكون من حروف وأرقام وشرطة سفلية ولا تبدأ برقم.</value></data>
+  <data name="SitesEnvironmentMissingTitle" xml:space="preserve"><value>{0} من متغيرات .env.example غير موجودة</value></data>
+  <data name="SitesEnvironmentMoreProblems" xml:space="preserve"><value>و{0} أخرى</value></data>
+  <data name="SitesEnvironmentMultiline" xml:space="preserve"><value>قيمة من عدة أسطر. عدّلها من عرض النص.</value></data>
+  <data name="SitesEnvironmentNoVariables" xml:space="preserve"><value>لا توجد متغيرات بعد. أضف واحدًا بالأعلى أو انتقل إلى النص.</value></data>
+  <data name="SitesEnvironmentProblemDuplicate" xml:space="preserve"><value>السطر {0}: المتغير {1} معرّف أكثر من مرة، وLaravel يأخذ الأول.</value></data>
+  <data name="SitesEnvironmentProblemInvalid" xml:space="preserve"><value>السطر {0} ليس بصيغة NAME=value ولا تعليقًا.</value></data>
+  <data name="SitesEnvironmentProblemQuote" xml:space="preserve"><value>السطر {0}: علامة التنصيص في {1} غير مغلقة.</value></data>
+  <data name="SitesEnvironmentProblemWhitespace" xml:space="preserve"><value>السطر {0}: قيمة {1} فيها مسافات، ضعها بين علامتي تنصيص.</value></data>
+  <data name="SitesEnvironmentProblemsTitle" xml:space="preserve"><value>قد لا يقرأ Laravel هذه الأسطر</value></data>
+  <data name="SitesEnvironmentRemoveVariable" xml:space="preserve"><value>حذف {0}</value></data>
+  <data name="SitesEnvironmentRevealSecrets" xml:space="preserve"><value>إظهار القيم السرية</value></data>
+  <data name="SitesEnvironmentReviewButton" xml:space="preserve"><value>مراجعة التغييرات</value></data>
+  <data name="SitesEnvironmentReviewHeading" xml:space="preserve"><value>سيتم حفظ هذه التغييرات في .env:</value></data>
+  <data name="SitesEnvironmentSavedToast" xml:space="preserve"><value>تم حفظ .env للموقع {0}</value></data>
+  <data name="SitesEnvironmentTextView" xml:space="preserve"><value>النص</value></data>
+  <data name="SitesEnvironmentVariablesView" xml:space="preserve"><value>المتغيرات</value></data>
+  <data name="SitesTemplateLearnMore" xml:space="preserve"><value>اعرف المزيد عن هذا القالب</value></data>
+  <data name="SitesTemplateLearnMoreAbout" xml:space="preserve"><value>اعرف المزيد عن {0}</value></data>
+  <data name="ServicesCopyEnvironmentMenu.Text" xml:space="preserve"><value>نسخ إعدادات .env لـ Laravel</value></data>
+  <data name="ServicesEnvironmentNoVariables" xml:space="preserve"><value>لا توجد لدى HerdMe إعدادات .env لـ Laravel خاصة بـ {0}.</value></data>
+  <data name="ServicesEnvironmentPreviewHeading" xml:space="preserve"><value>التغييرات على ملف .env لهذا الموقع:</value></data>
+  <data name="ServicesEnvironmentPreviewUpToDate" xml:space="preserve"><value>ملف .env لهذا الموقع يحتوي هذه الإعدادات مسبقًا.</value></data>
+  <data name="SitesTemplateNoneName" xml:space="preserve"><value>Laravel فارغ</value></data>
+  <data name="SitesTemplateNoneDescription" xml:space="preserve"><value>تطبيق Laravel نظيف بدون تسجيل دخول أو واجهة جاهزة.</value></data>
+  <data name="SitesTemplateReactName" xml:space="preserve"><value>ريأكت</value></data>
+  <data name="SitesTemplateReactDescription" xml:space="preserve"><value>حزمة البداية الرسمية: Inertia وReact وTypeScript وTailwind وshadcn/ui مع تسجيل الدخول والتسجيل.</value></data>
+  <data name="SitesTemplateVueName" xml:space="preserve"><value>فيو</value></data>
+  <data name="SitesTemplateVueDescription" xml:space="preserve"><value>حزمة البداية الرسمية: Inertia وVue وTypeScript وTailwind وshadcn-vue مع تسجيل الدخول والتسجيل.</value></data>
+  <data name="SitesTemplateSvelteName" xml:space="preserve"><value>سفِلت</value></data>
+  <data name="SitesTemplateSvelteDescription" xml:space="preserve"><value>حزمة البداية الرسمية: Inertia وSvelte وTypeScript وTailwind مع تسجيل الدخول والتسجيل.</value></data>
+  <data name="SitesTemplateLivewireName" xml:space="preserve"><value>لايف واير</value></data>
+  <data name="SitesTemplateLivewireDescription" xml:space="preserve"><value>حزمة البداية الرسمية: Livewire وBlade وFlux UI مع تسجيل الدخول والتسجيل بدون إطار JavaScript.</value></data>
+  <data name="SitesTemplateBreezeName" xml:space="preserve"><value>بريز (Blade)</value></data>
+  <data name="SitesTemplateBreezeDescription" xml:space="preserve"><value>تسجيل دخول بسيط كلاسيكي باستخدام Blade وTailwind. يُثبَّت عبر laravel/breeze بعد إنشاء المشروع.</value></data>
+  <data name="SitesTemplateJetstreamName" xml:space="preserve"><value>جت ستريم (لايف واير)</value></data>
+  <data name="SitesTemplateJetstreamDescription" xml:space="preserve"><value>مزايا حساب كاملة: الملف الشخصي والتحقق بخطوتين والجلسات ومفاتيح API. يُثبَّت عبر laravel/jetstream.</value></data>
+  <data name="SitesTemplateFilamentName" xml:space="preserve"><value>لوحة تحكم Filament</value></data>
+  <data name="SitesTemplateFilamentDescription" xml:space="preserve"><value>لوحة تحكم على /admin مبنية بـ filament/filament. أنشئ أول مستخدم بعدها بالأمر make:filament-user.</value></data>
+  <data name="SitesTemplateCustomName" xml:space="preserve"><value>حزمة بداية من المجتمع</value></data>
+  <data name="SitesTemplateCustomDescription" xml:space="preserve"><value>أي حزمة بداية منشورة على Packagist، تُكتب بصيغة vendor/package.</value></data>
+  <data name="SitesTemplateGroupBlank" xml:space="preserve"><value>أساسي</value></data>
+  <data name="SitesTemplateGroupStarterKit" xml:space="preserve"><value>حزمة بداية رسمية</value></data>
+  <data name="SitesTemplateGroupPackage" xml:space="preserve"><value>حزمة Composer</value></data>
+  <data name="SitesTemplateGroupCustom" xml:space="preserve"><value>مخصص</value></data>
+  <data name="SitesProjectStageInstallingTemplateTitle" xml:space="preserve"><value>تثبيت القالب</value></data>
+  <data name="SitesProjectStageInstallingTemplateDetail" xml:space="preserve"><value>إضافة حزمة Composer الخاصة بالقالب وتشغيل أمر التثبيت الرسمي.</value></data>
+  <data name="ServicesEnvironmentCopied" xml:space="preserve"><value>تم نسخ {0} أسطر .env لـ {1}.</value></data>
+  <data name="ServicesEnvironmentCopiedSecret" xml:space="preserve"><value>تم نسخ {0} أسطر .env لـ {1}. تتضمن كلمة مرور محلية، فالصقها في مشروعك فقط.</value></data>
+  <data name="SitesProjectCreationOperationName" xml:space="preserve"><value>إنشاء {0}</value></data>
+  <data name="NotificationOperationSucceededTitle" xml:space="preserve"><value>اكتملت العملية</value></data>
+  <data name="NotificationOperationSucceededMessage" xml:space="preserve"><value>اكتملت {0} خلال {1}.</value></data>
+  <data name="NotificationOperationFailedTitle" xml:space="preserve"><value>تعذر إكمال العملية</value></data>
+  <data name="NotificationOperationFailedMessage" xml:space="preserve"><value>فشلت {0}.</value></data>
+  <data name="NotificationOperationFailedWithError" xml:space="preserve"><value>فشلت {0}: {1}</value></data>
+  <data name="SitesTintBrush" xml:space="preserve"><value>لون الموقع</value></data>
 </root>

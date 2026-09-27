@@ -205,10 +205,6 @@
   <data name="ServicesNameField.Header" xml:space="preserve"><value>Name</value></data>
   <data name="ServicesPortField.Header" xml:space="preserve"><value>Port</value></data>
   <data name="ServicesAddButton.Text" xml:space="preserve"><value>Add</value></data>
-  <data name="ServicesServiceColumn.Text" xml:space="preserve"><value>Service</value></data>
-  <data name="ServicesPortColumn.Text" xml:space="preserve"><value>Port</value></data>
-  <data name="ServicesVersionColumn.Text" xml:space="preserve"><value>Version</value></data>
-  <data name="ServicesStatusColumn.Text" xml:space="preserve"><value>Status</value></data>
   <data name="ServicesAutomaticStartMenu.Text" xml:space="preserve"><value>Start automatically</value></data>
   <data name="ServicesMoreTooltip.Text" xml:space="preserve"><value>More service actions</value></data>
   <data name="ServicesInstallTooltip.Text" xml:space="preserve"><value>Install or update runtime</value></data>
@@ -1525,4 +1521,269 @@ Recovery backup: {1}</value></data>
   <data name="SitesRowPhpPicker.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>PHP version</value></data>
   <data name="SitesRowPhpNoneInstalled" xml:space="preserve"><value>No PHP versions installed</value></data>
   <data name="SitesRowPhpChanged" xml:space="preserve"><value>{0} now uses {1}</value></data>
+  <data name="SitesSplitter.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Resize the sites list (Left and Right arrows, Home resets)</value></data>
+  <data name="SitesBackToListButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to sites</value></data>
+  <data name="SitesBackToListTooltip.Text" xml:space="preserve"><value>Back to sites (Alt+Left)</value></data>
+  <data name="SitesContextRename.Text" xml:space="preserve"><value>Rename...</value></data>
+  <data name="SitesRenameBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>New site name</value></data>
+  <data name="SitesPreviewChecking" xml:space="preserve"><value>Checking the site...</value></data>
+  <data name="SitesPreviewEnvironmentStopped" xml:space="preserve"><value>The environment is stopped. Start it to check this site.</value></data>
+  <data name="SitesPreviewStatus" xml:space="preserve"><value>HTTP {0} - {1} ms</value></data>
+  <data name="SitesPreviewNoAnswer" xml:space="preserve"><value>No answer: {0}</value></data>
+  <data name="SitesRenameEmpty" xml:space="preserve"><value>Type a name.</value></data>
+  <data name="SitesRenameTooLong" xml:space="preserve"><value>Use 63 characters or fewer.</value></data>
+  <data name="SitesRenameInvalidCharacters" xml:space="preserve"><value>Use lowercase letters, digits and hyphens only.</value></data>
+  <data name="SitesRenameEdgeHyphen" xml:space="preserve"><value>The name can't start or end with a hyphen.</value></data>
+  <data name="SitesRenameUnchanged" xml:space="preserve"><value>Same name. Press Esc to cancel.</value></data>
+  <data name="SitesRenameTaken" xml:space="preserve"><value>Another site already uses this name.</value></data>
+  <data name="SitesRenameFolderExists" xml:space="preserve"><value>A folder with that name already exists.</value></data>
+  <data name="SitesRenameAvailable" xml:space="preserve"><value>{0} is available. Press Enter to rename the folder.</value></data>
+  <data name="SitesRenameBlockedShared" xml:space="preserve"><value>Stop sharing this site before renaming it.</value></data>
+  <data name="SitesRenameBlockedRunning" xml:space="preserve"><value>Stop this site's workers and dev server before renaming it.</value></data>
+  <data name="SitesRenamed" xml:space="preserve"><value>Renamed {0} to {1}</value></data>
+  <data name="SitesRenameFailed" xml:space="preserve"><value>Couldn't rename the folder: {0} Close editors or terminals that use it and try again.</value></data>
+  <data name="DeferredUndoCountdown" xml:space="preserve"><value>{0} ({1})</value></data>
+  <data name="MailClearedPending" xml:space="preserve"><value>Cleared {0} messages</value></data>
+  <data name="DumpsClearedPending" xml:space="preserve"><value>Cleared {0} dumps</value></data>
+  <data name="SitesRecyclePending" xml:space="preserve"><value>{0} will move to the Recycle Bin</value></data>
+  <data name="ErrorTitleGeneral" xml:space="preserve"><value>That didn't work</value></data>
+  <data name="ErrorTitleAccessDenied" xml:space="preserve"><value>Windows blocked access</value></data>
+  <data name="ErrorTitleFileInUse" xml:space="preserve"><value>A file is in use</value></data>
+  <data name="ErrorTitleNotFound" xml:space="preserve"><value>Something is missing</value></data>
+  <data name="ErrorTitlePortInUse" xml:space="preserve"><value>That port is already taken</value></data>
+  <data name="ErrorTitleNetwork" xml:space="preserve"><value>Couldn't reach the network</value></data>
+  <data name="ErrorTitleTimeout" xml:space="preserve"><value>This took too long</value></data>
+  <data name="ErrorTitleCancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="ErrorHintGeneral" xml:space="preserve"><value>HerdMe couldn't finish this. The details below say why.</value></data>
+  <data name="ErrorHintAccessDenied" xml:space="preserve"><value>Check that the folder isn't read-only and that antivirus isn't blocking it, then try again.</value></data>
+  <data name="ErrorHintFileInUse" xml:space="preserve"><value>Close editors, terminals or Explorer windows using this folder, then try again.</value></data>
+  <data name="ErrorHintNotFound" xml:space="preserve"><value>The file or folder may have been moved or deleted. Rescan and try again.</value></data>
+  <data name="ErrorHintPortInUse" xml:space="preserve"><value>Another program is listening on this port. Stop it or choose a different port.</value></data>
+  <data name="ErrorHintNetwork" xml:space="preserve"><value>Check your internet connection or proxy, then try again.</value></data>
+  <data name="ErrorHintTimeout" xml:space="preserve"><value>The other side didn't answer in time. Try again in a moment.</value></data>
+  <data name="ErrorHintCancelled" xml:space="preserve"><value>The operation was stopped before it finished.</value></data>
+  <data name="ErrorDialogMessageName" xml:space="preserve"><value>Error message</value></data>
+  <data name="ErrorDialogCopyDetails" xml:space="preserve"><value>Copy details</value></data>
+  <data name="ErrorDialogOpenLog" xml:space="preserve"><value>Open diagnostics log</value></data>
+  <data name="ErrorDialogCopied" xml:space="preserve"><value>Details copied. Paste them into an issue report.</value></data>
+  <data name="ErrorDialogLogOpened" xml:space="preserve"><value>The diagnostics log is open in Explorer.</value></data>
+  <data name="ErrorDialogLogMissing" xml:space="preserve"><value>No diagnostics log has been written yet.</value></data>
+  <data name="InputPortRequired" xml:space="preserve"><value>Enter a port.</value></data>
+  <data name="InputPortRange" xml:space="preserve"><value>Use a whole number from 1 to 65535.</value></data>
+  <data name="InputPortSites" xml:space="preserve"><value>Port {0} serves your .test sites. Choose another port.</value></data>
+  <data name="InputPortHerdMe" xml:space="preserve"><value>Another HerdMe service already uses port {0}.</value></data>
+  <data name="InputPortBusy" xml:space="preserve"><value>Port {0} is in use by another program.</value></data>
+  <data name="InputPortLow" xml:space="preserve"><value>Port {0} is free, but ports below 1024 often clash with system services.</value></data>
+  <data name="InputPortFree" xml:space="preserve"><value>Port {0} is free.</value></data>
+  <data name="InputPortSuggestion" xml:space="preserve"><value>Try {0}.</value></data>
+  <data name="InputNameTooLong" xml:space="preserve"><value>Keep the name under {0} characters.</value></data>
+  <data name="InputNameInvalid" xml:space="preserve"><value>The name contains characters that can't be used.</value></data>
+  <data name="InputNameDuplicate" xml:space="preserve"><value>You already have a service named {0}.</value></data>
+  <data name="InputPathInvalid" xml:space="preserve"><value>This isn't a valid folder path.</value></data>
+  <data name="InputPathNotAbsolute" xml:space="preserve"><value>Use a full path that starts with a drive letter, like D:\Projects.</value></data>
+  <data name="InputPathMissing" xml:space="preserve"><value>This folder doesn't exist.</value></data>
+  <data name="InputPathFound" xml:space="preserve"><value>Folder found.</value></data>
+  <data name="InputPathAlreadyParked" xml:space="preserve"><value>This folder is already parked.</value></data>
+  <data name="InputTimezoneFormat" xml:space="preserve"><value>Use a zone like Asia/Riyadh or UTC.</value></data>
+  <data name="InputTimezoneUnknown" xml:space="preserve"><value>{0} isn't a zone Windows knows; PHP may reject it.</value></data>
+  <data name="InputFixFieldsFirst" xml:space="preserve"><value>Fix the highlighted field first.</value></data>
+  <data name="OperationsComposerTools" xml:space="preserve"><value>Composer and Laravel installer for PHP {0}</value></data>
+  <data name="OperationsCancelled" xml:space="preserve"><value>Cancelled.</value></data>
+  <data name="OperationsCancelling" xml:space="preserve"><value>Cancelling...</value></data>
+  <data name="OperationsOne" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="OperationsMany" xml:space="preserve"><value>{0} operations in progress</value></data>
+  <data name="OperationsPercent" xml:space="preserve"><value>{0}%</value></data>
+  <data name="OperationsCancelAll" xml:space="preserve"><value>Cancel all</value></data>
+  <data name="OperationsBarProgress.AutomationProperties.Name" xml:space="preserve"><value>Progress</value></data>
+  <data name="OperationsBarDetails.Content" xml:space="preserve"><value>Details</value></data>
+  <data name="OperationsBarCancel.Content" xml:space="preserve"><value>Cancel</value></data>
+  <data name="OperationsStageBackingUp" xml:space="preserve"><value>backing up</value></data>
+  <data name="OperationsStageResolving" xml:space="preserve"><value>finding the release</value></data>
+  <data name="OperationsStageDownloading" xml:space="preserve"><value>downloading</value></data>
+  <data name="OperationsStageRetrying" xml:space="preserve"><value>retrying</value></data>
+  <data name="OperationsStageVerifying" xml:space="preserve"><value>checking SHA-256</value></data>
+  <data name="OperationsStageExtracting" xml:space="preserve"><value>extracting</value></data>
+  <data name="OperationsStageInstalling" xml:space="preserve"><value>installing</value></data>
+  <data name="OperationsStageCompleted" xml:space="preserve"><value>done</value></data>
+  <data name="OperationsStageCancelled" xml:space="preserve"><value>cancelled</value></data>
+  <data name="OperationsStageFailed" xml:space="preserve"><value>failed</value></data>
+  <data name="PhpCompareTitle.Text" xml:space="preserve"><value>Compare PHP versions</value></data>
+  <data name="PhpCompareDescription.Text" xml:space="preserve"><value>Installed versions side by side: version, and which extensions each one loads.</value></data>
+  <data name="PhpCompareDifferencesOnly.Content" xml:space="preserve"><value>Only differences</value></data>
+  <data name="PhpCompareButton.Content" xml:space="preserve"><value>Compare</value></data>
+  <data name="PhpCompareRunning" xml:space="preserve"><value>Checking each installed version...</value></data>
+  <data name="PhpCompareNothingInstalled" xml:space="preserve"><value>No PHP version is installed yet.</value></data>
+  <data name="PhpCompareOnlyOne" xml:space="preserve"><value>Only one PHP version is installed. Install another to compare.</value></data>
+  <data name="PhpCompareDone" xml:space="preserve"><value>Compared {0} versions.</value></data>
+  <data name="PhpCompareExtensionHeader" xml:space="preserve"><value>Extension</value></data>
+  <data name="PhpCompareVersionRow" xml:space="preserve"><value>Version</value></data>
+  <data name="PhpCompareFailed" xml:space="preserve"><value>Could not check: {0}</value></data>
+  <data name="PhpCompareRequiredName" xml:space="preserve"><value>{0} (required)</value></data>
+  <data name="PhpCompareNoDifferences" xml:space="preserve"><value>All installed versions load the same extensions.</value></data>
+  <data name="PhpCompareAbsent" xml:space="preserve"><value>Not available</value></data>
+  <data name="PhpCompareCellName" xml:space="preserve"><value>{0} on PHP {1}: {2}</value></data>
+  <data name="PhpIniTitle.Text" xml:space="preserve"><value>php.ini</value></data>
+  <data name="PhpIniOverrideInfo.Title" xml:space="preserve"><value>Edit with care</value></data>
+  <data name="PhpIniOverrideInfo.Message" xml:space="preserve"><value>The PHP settings above are passed to PHP when it starts and win over this file. HerdMe also puts back the extensions Laravel needs. The previous file is kept as php.ini.bak.</value></data>
+  <data name="PhpIniSearch.PlaceholderText" xml:space="preserve"><value>Find in php.ini</value></data>
+  <data name="PhpIniSearch.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Find in php.ini</value></data>
+  <data name="PhpIniPrevious.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Previous match</value></data>
+  <data name="PhpIniNext.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Next match</value></data>
+  <data name="PhpIniPreviousTooltip" xml:space="preserve"><value>Previous match (Shift+F3)</value></data>
+  <data name="PhpIniNextTooltip" xml:space="preserve"><value>Next match (Enter or F3)</value></data>
+  <data name="PhpIniEditor.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>php.ini contents</value></data>
+  <data name="PhpIniReload.Content" xml:space="preserve"><value>Reload</value></data>
+  <data name="PhpIniSave.Content" xml:space="preserve"><value>Save php.ini</value></data>
+  <data name="PhpIniNotInstalled" xml:space="preserve"><value>Install this PHP version to edit its php.ini.</value></data>
+  <data name="PhpIniReadFailed" xml:space="preserve"><value>php.ini could not be read: {0}</value></data>
+  <data name="PhpIniChangedOnDisk" xml:space="preserve"><value>php.ini changed on disk since you opened it. Copy your edits, then Reload.</value></data>
+  <data name="PhpIniUnsaved" xml:space="preserve"><value>Unsaved changes. Ctrl+S saves php.ini.</value></data>
+  <data name="PhpIniMatchCount" xml:space="preserve"><value>{0} matches</value></data>
+  <data name="PhpIniMatchPosition" xml:space="preserve"><value>{0} of {1}</value></data>
+  <data name="PhpIniNoMatches" xml:space="preserve"><value>No matches</value></data>
+  <data name="PhpIniMissingRequired" xml:space="preserve"><value>Not saved: this file turns off an extension Laravel needs. HerdMe would turn it back on at the next start.</value></data>
+  <data name="PhpIniTooLarge" xml:space="preserve"><value>Not saved: the file is larger than 1 MB.</value></data>
+  <data name="PhpIniSaved" xml:space="preserve"><value>Saved. The previous file is php.ini.bak.</value></data>
+  <data name="PhpIniSavedToast" xml:space="preserve"><value>php.ini saved for PHP {0}</value></data>
+  <data name="PhpIniSaveFailed" xml:space="preserve"><value>php.ini was not saved: {0}</value></data>
+  <data name="ServicesCardPort" xml:space="preserve"><value>Port {0}</value></data>
+  <data name="ServicesCardName" xml:space="preserve"><value>{0}, {1}</value></data>
+  <data name="ServicesCardCopyAddress" xml:space="preserve"><value>Copy the address of {0}</value></data>
+  <data name="ServicesAddressCopied" xml:space="preserve"><value>Copied {0}</value></data>
+  <data name="TitleBarSearchBox.PlaceholderText" xml:space="preserve"><value>Search pages and sites (Ctrl+K)</value></data>
+  <data name="TitleBarSearchBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Search pages, sites and actions</value></data>
+  <data name="TitleBarStartAll.Text" xml:space="preserve"><value>Start all</value></data>
+  <data name="TitleBarStopAll.Text" xml:space="preserve"><value>Stop all</value></data>
+  <data name="TitleBarOpenDashboard.Text" xml:space="preserve"><value>Open dashboard</value></data>
+  <data name="TitleBarStatusTooltip" xml:space="preserve"><value>Environment: start, stop, or open the dashboard</value></data>
+  <data name="TitleBarSearchPageDetail" xml:space="preserve"><value>Page</value></data>
+  <data name="TitleBarSearchActionDetail" xml:space="preserve"><value>Action</value></data>
+  <data name="TitleBarSearchStartAll" xml:space="preserve"><value>Start all</value></data>
+  <data name="TitleBarSearchStopAll" xml:space="preserve"><value>Stop all</value></data>
+  <data name="TitleBarSearchNoResults" xml:space="preserve"><value>No matching pages or sites</value></data>
+  <data name="NotificationActionRestartService" xml:space="preserve"><value>Restart service</value></data>
+  <data name="NotificationActionOpenServices" xml:space="preserve"><value>Open Services</value></data>
+  <data name="NotificationActionOpenSite" xml:space="preserve"><value>Open site</value></data>
+  <data name="NotificationActionOpenLogs" xml:space="preserve"><value>Open logs</value></data>
+  <data name="NotificationActionOpenUpdates" xml:space="preserve"><value>Open Updates</value></data>
+  <data name="NotificationActionOpenGeneral" xml:space="preserve"><value>Open General</value></data>
+  <data name="GeneralActionNotificationsTitle.Text" xml:space="preserve"><value>Buttons on notifications</value></data>
+  <data name="GeneralActionNotificationsDescription.Text" xml:space="preserve"><value>Use Windows notifications with buttons such as Restart service and Open logs. This registers HerdMe for notifications under your Windows account; turning it off or uninstalling removes that.</value></data>
+  <data name="ActionNotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Buttons on notifications</value></data>
+  <data name="GeneralActionNotificationsUnsupported" xml:space="preserve"><value>This version of Windows does not support notification buttons. HerdMe keeps using the tray notification.</value></data>
+  <data name="GeneralActionNotificationsFailed" xml:space="preserve"><value>Windows did not turn on notification buttons. HerdMe keeps using the tray notification.</value></data>
+  <data name="OperationsBarProgress.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Progress</value></data>
+  <data name="TitleBarBellHeader.Text" xml:space="preserve"><value>Notifications</value></data>
+  <data name="TitleBarBellMarkRead.Content" xml:space="preserve"><value>Mark all read</value></data>
+  <data name="TitleBarBellClear.Content" xml:space="preserve"><value>Clear</value></data>
+  <data name="TitleBarBellEmpty.Text" xml:space="preserve"><value>Nothing yet. When a service, worker or public link stops unexpectedly, it is listed here, even if HerdMe was in the tray.</value></data>
+  <data name="TitleBarBellName" xml:space="preserve"><value>Notifications</value></data>
+  <data name="TitleBarBellUnread" xml:space="preserve"><value>Notifications, {0} unread</value></data>
+  <data name="TitleBarBellUnreadEntry" xml:space="preserve"><value>Unread: {0}</value></data>
+  <data name="TitleBarBellCleared" xml:space="preserve"><value>Notifications cleared</value></data>
+  <data name="TitleBarBellJustNow" xml:space="preserve"><value>Just now</value></data>
+  <data name="TitleBarBellMinutesAgo" xml:space="preserve"><value>{0} min ago</value></data>
+  <data name="TitleBarBellHoursAgo" xml:space="preserve"><value>{0} h ago</value></data>
+  <data name="TitleBarBellRepeated" xml:space="preserve"><value>{0} times</value></data>
+  <data name="TitleBarBellNotShown" xml:space="preserve"><value>Not shown by Windows</value></data>
+  <data name="TaskbarThumbStartAll" xml:space="preserve"><value>Start all</value></data>
+  <data name="TaskbarThumbStopAll" xml:space="preserve"><value>Stop all</value></data>
+  <data name="TaskbarThumbOpenSite" xml:space="preserve"><value>Open {0}</value></data>
+  <data name="TaskbarThumbOpenSiteNone" xml:space="preserve"><value>Open a site (none opened yet)</value></data>
+  <data name="TrayPanelSitesHeader" xml:space="preserve"><value>Sites</value></data>
+  <data name="TrayPanelSitesEmpty" xml:space="preserve"><value>No sites yet. Create or park one in HerdMe.</value></data>
+  <data name="TrayPanelOpenSite" xml:space="preserve"><value>Open {0} in the browser</value></data>
+  <data name="TrayPanelShowSite" xml:space="preserve"><value>Show {0} in HerdMe</value></data>
+  <data name="TrayPanelStartFirst" xml:space="preserve"><value>Start the environment first</value></data>
+  <data name="DashboardUpdating" xml:space="preserve"><value>Updating...</value></data>
+  <data name="DashboardGettingStartedTitle.Text" xml:space="preserve"><value>Getting started</value></data>
+  <data name="DashboardGettingStartedDismiss.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Hide getting started</value></data>
+  <data name="DashboardGettingStartedDismissTooltip" xml:space="preserve"><value>Hide this list</value></data>
+  <data name="DashboardGettingStartedProgress" xml:space="preserve"><value>{0} of {1} done</value></data>
+  <data name="DashboardGettingStartedDone" xml:space="preserve"><value>done</value></data>
+  <data name="DashboardGettingStartedOpen" xml:space="preserve"><value>not done yet</value></data>
+  <data name="DashboardGettingStartedHidden" xml:space="preserve"><value>Getting started hidden</value></data>
+  <data name="DashboardGettingStartedCreateSiteTitle" xml:space="preserve"><value>Create a site</value></data>
+  <data name="DashboardGettingStartedCreateSiteDescription" xml:space="preserve"><value>Start a new Laravel project or park a folder you already have.</value></data>
+  <data name="DashboardGettingStartedCreateSiteAction" xml:space="preserve"><value>Create</value></data>
+  <data name="DashboardGettingStartedOpenSiteTitle" xml:space="preserve"><value>Open it in the browser</value></data>
+  <data name="DashboardGettingStartedOpenSiteDescription" xml:space="preserve"><value>Every site gets https://name.test/ with a trusted certificate.</value></data>
+  <data name="DashboardGettingStartedOpenSiteAction" xml:space="preserve"><value>Open</value></data>
+  <data name="DashboardGettingStartedSendMailTitle" xml:space="preserve"><value>Send a test mail</value></data>
+  <data name="DashboardGettingStartedSendMailDescription" xml:space="preserve"><value>Mail your app sends is caught here instead of reaching real inboxes.</value></data>
+  <data name="DashboardGettingStartedSendMailAction" xml:space="preserve"><value>Open Mail</value></data>
+  <data name="DashboardGettingStartedTryDumpTitle" xml:space="preserve"><value>Try a dump</value></data>
+  <data name="DashboardGettingStartedTryDumpDescription" xml:space="preserve"><value>Call dump() in your code and see the value in Dumps.</value></data>
+  <data name="DashboardGettingStartedTryDumpAction" xml:space="preserve"><value>Open Dumps</value></data>
+  <data name="OperationsStage" xml:space="preserve"><value>stage</value></data>
+  <data name="SitesArtisanRecentLabel" xml:space="preserve"><value>recent</value></data>
+  <data name="SitesArtisanTypeCommandField" xml:space="preserve"><value>Command (type to search)</value></data>
+  <data name="SitesArtisanTypeCommandPlaceholder" xml:space="preserve"><value>e.g. route:list --path=api</value></data>
+  <data name="SitesEnvironmentAddMissing" xml:space="preserve"><value>Add them</value></data>
+  <data name="SitesEnvironmentAddPlaceholder" xml:space="preserve"><value>Add a variable, e.g. MAIL_HOST</value></data>
+  <data name="SitesEnvironmentAddTooltip" xml:space="preserve"><value>Type a name and press Enter. Suggestions come from .env.example and common Laravel settings.</value></data>
+  <data name="SitesEnvironmentBack" xml:space="preserve"><value>Back</value></data>
+  <data name="SitesEnvironmentDiffAdded" xml:space="preserve"><value>+ {0} = {1}</value></data>
+  <data name="SitesEnvironmentDiffChanged" xml:space="preserve"><value>~ {0}: {1} -&gt; {2}</value></data>
+  <data name="SitesEnvironmentDiffCreates" xml:space="preserve"><value>The site has no .env yet; saving creates it.</value></data>
+  <data name="SitesEnvironmentDiffNoVariables" xml:space="preserve"><value>No variable values change.</value></data>
+  <data name="SitesEnvironmentDiffOtherLines" xml:space="preserve"><value>Comments or blank lines also change.</value></data>
+  <data name="SitesEnvironmentDiffProblems" xml:space="preserve"><value>{0} lines still have problems. You can save anyway.</value></data>
+  <data name="SitesEnvironmentDiffRemoved" xml:space="preserve"><value>- {0}</value></data>
+  <data name="SitesEnvironmentInvalidKey" xml:space="preserve"><value>Names use letters, digits and underscores and cannot start with a digit.</value></data>
+  <data name="SitesEnvironmentMissingTitle" xml:space="preserve"><value>{0} variables from .env.example are missing</value></data>
+  <data name="SitesEnvironmentMoreProblems" xml:space="preserve"><value>and {0} more</value></data>
+  <data name="SitesEnvironmentMultiline" xml:space="preserve"><value>Multi-line value. Edit it in the Text view.</value></data>
+  <data name="SitesEnvironmentNoVariables" xml:space="preserve"><value>No variables yet. Add one above or switch to Text.</value></data>
+  <data name="SitesEnvironmentProblemDuplicate" xml:space="preserve"><value>Line {0}: {1} is defined more than once; Laravel uses the first one.</value></data>
+  <data name="SitesEnvironmentProblemInvalid" xml:space="preserve"><value>Line {0} is not a NAME=value line or a comment.</value></data>
+  <data name="SitesEnvironmentProblemQuote" xml:space="preserve"><value>Line {0}: the quote in {1} is never closed.</value></data>
+  <data name="SitesEnvironmentProblemWhitespace" xml:space="preserve"><value>Line {0}: the value of {1} has spaces; put it in double quotes.</value></data>
+  <data name="SitesEnvironmentProblemsTitle" xml:space="preserve"><value>Laravel may not read these lines</value></data>
+  <data name="SitesEnvironmentRemoveVariable" xml:space="preserve"><value>Remove {0}</value></data>
+  <data name="SitesEnvironmentRevealSecrets" xml:space="preserve"><value>Show secret values</value></data>
+  <data name="SitesEnvironmentReviewButton" xml:space="preserve"><value>Review changes</value></data>
+  <data name="SitesEnvironmentReviewHeading" xml:space="preserve"><value>These changes will be saved to .env:</value></data>
+  <data name="SitesEnvironmentSavedToast" xml:space="preserve"><value>Saved .env for {0}</value></data>
+  <data name="SitesEnvironmentTextView" xml:space="preserve"><value>Text</value></data>
+  <data name="SitesEnvironmentVariablesView" xml:space="preserve"><value>Variables</value></data>
+  <data name="SitesTemplateLearnMore" xml:space="preserve"><value>Learn more about this template</value></data>
+  <data name="SitesTemplateLearnMoreAbout" xml:space="preserve"><value>Learn more about {0}</value></data>
+  <data name="ServicesCopyEnvironmentMenu.Text" xml:space="preserve"><value>Copy Laravel .env settings</value></data>
+  <data name="ServicesEnvironmentNoVariables" xml:space="preserve"><value>HerdMe has no Laravel .env settings for {0}.</value></data>
+  <data name="ServicesEnvironmentPreviewHeading" xml:space="preserve"><value>Changes to this site's .env:</value></data>
+  <data name="ServicesEnvironmentPreviewUpToDate" xml:space="preserve"><value>This site's .env already has these settings.</value></data>
+  <data name="SitesTemplateNoneName" xml:space="preserve"><value>Blank Laravel</value></data>
+  <data name="SitesTemplateNoneDescription" xml:space="preserve"><value>A clean Laravel application with no authentication or frontend scaffolding.</value></data>
+  <data name="SitesTemplateReactName" xml:space="preserve"><value>React</value></data>
+  <data name="SitesTemplateReactDescription" xml:space="preserve"><value>Official starter kit: Inertia, React, TypeScript, Tailwind and shadcn/ui with login and registration.</value></data>
+  <data name="SitesTemplateVueName" xml:space="preserve"><value>Vue</value></data>
+  <data name="SitesTemplateVueDescription" xml:space="preserve"><value>Official starter kit: Inertia, Vue, TypeScript, Tailwind and shadcn-vue with login and registration.</value></data>
+  <data name="SitesTemplateSvelteName" xml:space="preserve"><value>Svelte</value></data>
+  <data name="SitesTemplateSvelteDescription" xml:space="preserve"><value>Official starter kit: Inertia, Svelte, TypeScript and Tailwind with login and registration.</value></data>
+  <data name="SitesTemplateLivewireName" xml:space="preserve"><value>Livewire</value></data>
+  <data name="SitesTemplateLivewireDescription" xml:space="preserve"><value>Official starter kit: Livewire, Blade and Flux UI with login and registration, no JavaScript framework.</value></data>
+  <data name="SitesTemplateBreezeName" xml:space="preserve"><value>Breeze (Blade)</value></data>
+  <data name="SitesTemplateBreezeDescription" xml:space="preserve"><value>Classic minimal authentication with Blade and Tailwind. Installed with laravel/breeze after the project is created.</value></data>
+  <data name="SitesTemplateJetstreamName" xml:space="preserve"><value>Jetstream (Livewire)</value></data>
+  <data name="SitesTemplateJetstreamDescription" xml:space="preserve"><value>Full account features: profile, two-factor login, sessions and API tokens. Installed with laravel/jetstream.</value></data>
+  <data name="SitesTemplateFilamentName" xml:space="preserve"><value>Filament admin panel</value></data>
+  <data name="SitesTemplateFilamentDescription" xml:space="preserve"><value>An admin panel at /admin built with filament/filament. Create the first user afterwards with make:filament-user.</value></data>
+  <data name="SitesTemplateCustomName" xml:space="preserve"><value>Community starter kit</value></data>
+  <data name="SitesTemplateCustomDescription" xml:space="preserve"><value>Any starter kit published on Packagist, entered as vendor/package.</value></data>
+  <data name="SitesTemplateGroupBlank" xml:space="preserve"><value>Basic</value></data>
+  <data name="SitesTemplateGroupStarterKit" xml:space="preserve"><value>Official starter kit</value></data>
+  <data name="SitesTemplateGroupPackage" xml:space="preserve"><value>Composer package</value></data>
+  <data name="SitesTemplateGroupCustom" xml:space="preserve"><value>Custom</value></data>
+  <data name="SitesProjectStageInstallingTemplateTitle" xml:space="preserve"><value>Installing the template</value></data>
+  <data name="SitesProjectStageInstallingTemplateDetail" xml:space="preserve"><value>Adding the template's Composer package and running its official install command.</value></data>
+  <data name="ServicesEnvironmentCopied" xml:space="preserve"><value>Copied {0} .env lines for {1}.</value></data>
+  <data name="ServicesEnvironmentCopiedSecret" xml:space="preserve"><value>Copied {0} .env lines for {1}. They include a local password; paste them only into your own project.</value></data>
+  <data name="SitesProjectCreationOperationName" xml:space="preserve"><value>Creating {0}</value></data>
+  <data name="NotificationOperationSucceededTitle" xml:space="preserve"><value>Finished</value></data>
+  <data name="NotificationOperationSucceededMessage" xml:space="preserve"><value>{0} finished in {1}.</value></data>
+  <data name="NotificationOperationFailedTitle" xml:space="preserve"><value>Could not finish</value></data>
+  <data name="NotificationOperationFailedMessage" xml:space="preserve"><value>{0} failed.</value></data>
+  <data name="NotificationOperationFailedWithError" xml:space="preserve"><value>{0} failed: {1}</value></data>
+  <data name="SitesTintBrush" xml:space="preserve"><value>Site color</value></data>
 </root>

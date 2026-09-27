@@ -206,7 +206,14 @@ public sealed class PhpRuntimeInstaller
         );
     }
 
-    private static bool HasRequiredConfiguration(
+    // Extensions the user turned off on the PHP page; they do not count as missing.
+    internal IReadOnlySet<string> ExplicitlyDisabledExtensions(string cycle) =>
+        PhpRuntimePolicy.ExtensionPreferences(supportRoot, cycle)
+            .Where(pair => !pair.Value)
+            .Select(pair => pair.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    internal static bool HasRequiredConfiguration(
         string configurationPath,
         IReadOnlySet<string> explicitlyDisabled
     )

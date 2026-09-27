@@ -6,6 +6,7 @@ using Microsoft.UI;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using System.Runtime.InteropServices;
@@ -69,6 +70,8 @@ public sealed partial class MainWindow : Window
         toastTimer.Tick += ToastTimer_Tick;
         SubscribeActivity();
         InitializeStatusBar();
+        InitializeThumbnailToolbar();
+        InitializeBell();
     }
 
     public bool RequiresOnboarding { get; private set; }
@@ -82,9 +85,12 @@ public sealed partial class MainWindow : Window
         titleBarStatusTimer.Stop();
         toastTimer.Stop();
         toastTimer.Tick -= ToastTimer_Tick;
+        deferredTimer.Stop();
         UnsubscribeActivity();
         ReleaseAppearance();
         ReleaseStatusBar();
+        ReleaseThumbnailToolbar();
+        ReleaseBell();
         AppWindow.Hide();
         RootLayout.IsHitTestVisible = false;
         ContentFrame.Content = null;
@@ -134,12 +140,18 @@ public sealed partial class MainWindow : Window
             UpdateTitleBarInsets();
             ApplyCaptionButtonColors();
         };
-        AppTitleBar.SizeChanged += (_, _) => UpdateTitleBarInsets();
+        AppTitleBar.SizeChanged += (_, _) =>
+        {
+            UpdateTitleBarInsets();
+            UpdateTitleBarPassthrough();
+        };
+        InitializeTitleBarSearch();
         RootLayout.ActualThemeChanged += (_, _) => ApplyCaptionButtonColors();
         titleBarStatusTimer.Tick += (_, _) =>
         {
             UpdateTitleBarStatus();
             UpdateStatusBar();
+            UpdateThumbnailToolbar();
         };
         // The status poll starts once App reports the window visible and pauses in the tray.
     }
@@ -151,6 +163,7 @@ public sealed partial class MainWindow : Window
         {
             UpdateTitleBarStatus();
             UpdateStatusBar();
+            UpdateThumbnailToolbar();
             titleBarStatusTimer.Start();
             MarkPageSeen(currentPageTag);
         }
@@ -202,12 +215,20 @@ public sealed partial class MainWindow : Window
         if (shuttingDown) return;
         if (RequiresOnboarding)
         {
-            TitleBarStatus.Visibility = Visibility.Collapsed;
+            TitleBarStatusButton.Visibility = Visibility.Collapsed;
+            TitleBarSearchBox.Visibility = Visibility.Collapsed;
+            TitleBarBellButton.Visibility = Visibility.Collapsed;
+            UpdateTitleBarPassthrough();
             return;
         }
 
         var environment = services.Environment;
         var current = (Running: environment.IsRunning, Degraded: environment.IsDegraded);
+        if (TitleBarBellButton.Visibility != Visibility.Visible)
+        {
+            TitleBarBellButton.Visibility = Visibility.Visible;
+            UpdateTitleBarPassthrough();
+        }
         if (displayedTitleBarStatus == current) return;
         displayedTitleBarStatus = current;
         var tone = current.Running
@@ -223,7 +244,11 @@ public sealed partial class MainWindow : Window
                     : current.Degraded ? "DashboardRecovering" : "DashboardStopped"
             )
         );
-        TitleBarStatus.Visibility = Visibility.Visible;
+        AutomationProperties.SetName(TitleBarStatusButton, TitleBarStatusText.Text);
+        ToolTipService.SetToolTip(TitleBarStatusButton, AppLocalization.Get("TitleBarStatusTooltip"));
+        TitleBarStatusButton.Visibility = Visibility.Visible;
+        TitleBarSearchBox.Visibility = Visibility.Visible;
+        UpdateTitleBarPassthrough();
     }
 
     private void ResizeWindow()
@@ -320,7 +345,8 @@ public sealed partial class MainWindow : Window
                     services.RuntimePolicy,
                     services.ComposerTools,
                     services.NodeInstaller,
-                    services.GitInstaller
+                    services.GitInstaller,
+                    services.StartupSnapshot
                 );
             case "general":
                 return new GeneralPage(

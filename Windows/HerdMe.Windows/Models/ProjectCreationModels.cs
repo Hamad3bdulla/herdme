@@ -129,6 +129,7 @@ public enum LaravelProjectCreationStage
     ValidatingRequest,
     PreparingLaravelInstaller,
     CreatingLaravelProject,
+    InstallingTemplate,
     InstallingLaravelBoost,
     PreparingNodeRuntime,
     InstallingFrontendDependencies,
@@ -161,10 +162,15 @@ public static class LaravelProjectCreationStages
             LaravelProjectCreationStage.PreparingLaravelInstaller,
             LaravelProjectCreationStage.CreatingLaravelProject
         };
+        var template = ProjectTemplateCatalog.Find(request.StarterKit);
+        var packageTemplate = template?.Group == ProjectTemplateGroup.Package;
+        // Package installers (Breeze, Jetstream) call npm themselves, so Node.js is ready first.
+        if (packageTemplate && RequiresFrontendAssets(request)) stages.Add(LaravelProjectCreationStage.PreparingNodeRuntime);
+        if (packageTemplate) stages.Add(LaravelProjectCreationStage.InstallingTemplate);
         if (request.InstallBoost) stages.Add(LaravelProjectCreationStage.InstallingLaravelBoost);
         if (RequiresFrontendAssets(request))
         {
-            stages.Add(LaravelProjectCreationStage.PreparingNodeRuntime);
+            if (!packageTemplate) stages.Add(LaravelProjectCreationStage.PreparingNodeRuntime);
             stages.Add(LaravelProjectCreationStage.InstallingFrontendDependencies);
             stages.Add(LaravelProjectCreationStage.BuildingFrontendAssets);
         }
@@ -177,8 +183,7 @@ public static class LaravelProjectCreationStages
 
     public static bool RequiresFrontendAssets(LaravelProjectRequest request)
     {
-        return request.StarterKit.Trim().ToLowerInvariant()
-            is "react" or "vue" or "svelte" or "livewire";
+        return ProjectTemplateCatalog.Find(request.StarterKit)?.RequiresFrontend == true;
     }
 
     public static string Title(LaravelProjectCreationStage stage) => stage switch
@@ -186,6 +191,7 @@ public static class LaravelProjectCreationStages
         LaravelProjectCreationStage.ValidatingRequest => "Checking project details",
         LaravelProjectCreationStage.PreparingLaravelInstaller => "Preparing Laravel Installer",
         LaravelProjectCreationStage.CreatingLaravelProject => "Creating Laravel project",
+        LaravelProjectCreationStage.InstallingTemplate => "Installing the template",
         LaravelProjectCreationStage.InstallingLaravelBoost => "Installing Laravel Boost",
         LaravelProjectCreationStage.PreparingNodeRuntime => "Preparing Node.js",
         LaravelProjectCreationStage.InstallingFrontendDependencies => "Installing frontend packages",
@@ -204,6 +210,8 @@ public static class LaravelProjectCreationStages
             "Using the managed Laravel Installer already on this PC, and installing it only if needed.",
         LaravelProjectCreationStage.CreatingLaravelProject =>
             "Running the installed Laravel Installer to create and configure the application.",
+        LaravelProjectCreationStage.InstallingTemplate =>
+            "Adding the template's Composer package and running its official install command.",
         LaravelProjectCreationStage.InstallingLaravelBoost => "Adding Laravel Boost as a development dependency.",
         LaravelProjectCreationStage.PreparingNodeRuntime => "Making sure a HerdMe-managed Node.js runtime is ready.",
         LaravelProjectCreationStage.InstallingFrontendDependencies => "Restoring the starter kit's npm packages.",
@@ -214,4 +222,71 @@ public static class LaravelProjectCreationStages
         LaravelProjectCreationStage.Completed => "Your project is ready to open.",
         _ => throw new ArgumentOutOfRangeException(nameof(stage), stage, null)
     };
+}
+
+public enum ProjectTemplateGroup
+{
+    Blank,
+    StarterKit,
+    Package,
+    Custom
+}
+
+// A choice in "Create Laravel project". Starter kits are flags of "laravel new"; package
+// templates are required with Composer afterwards and set up with their own artisan command.
+public sealed record ProjectTemplate(
+    string Id,
+    ProjectTemplateGroup Group,
+    bool RequiresFrontend,
+    string ComposerPackage,
+    bool ComposerDevDependency,
+    IReadOnlyList<string> InstallCommand,
+    string DocumentationUrl
+)
+{
+    public string NameKey => $"SitesTemplate{Id}Name";
+
+    public string DescriptionKey => $"SitesTemplate{Id}Description";
+
+    // The install command with the project's test framework where the installer supports it.
+    public IReadOnlyList<string> InstallArguments(string testingFramework)
+    {
+        if (InstallCommand.Count == 0) return [];
+        var arguments = InstallCommand.ToList();
+        if (Id is "Breeze" or "Jetstream"
+            && testingFramework.Trim().Equals("Pest", StringComparison.OrdinalIgnoreCase))
+        {
+            arguments.Add("--pest");
+        }
+        arguments.Add("--no-interaction");
+        return arguments;
+    }
+}
+
+public static class ProjectTemplateCatalog
+{
+    public static IReadOnlyList<ProjectTemplate> All { get; } =
+    [
+        new("None", ProjectTemplateGroup.Blank, false, string.Empty, false, [],
+            "https://laravel.com/docs/installation"),
+        new("React", ProjectTemplateGroup.StarterKit, true, string.Empty, false, [],
+            "https://laravel.com/docs/starter-kits#react"),
+        new("Vue", ProjectTemplateGroup.StarterKit, true, string.Empty, false, [],
+            "https://laravel.com/docs/starter-kits#vue"),
+        new("Svelte", ProjectTemplateGroup.StarterKit, true, string.Empty, false, [],
+            "https://laravel.com/docs/starter-kits"),
+        new("Livewire", ProjectTemplateGroup.StarterKit, true, string.Empty, false, [],
+            "https://laravel.com/docs/starter-kits#livewire"),
+        new("Breeze", ProjectTemplateGroup.Package, true, "laravel/breeze", true,
+            ["breeze:install", "blade"], "https://github.com/laravel/breeze"),
+        new("Jetstream", ProjectTemplateGroup.Package, true, "laravel/jetstream", false,
+            ["jetstream:install", "livewire"], "https://jetstream.laravel.com"),
+        new("Filament", ProjectTemplateGroup.Package, false, "filament/filament", false,
+            ["filament:install", "--panels"], "https://filamentphp.com/docs"),
+        new("Custom", ProjectTemplateGroup.Custom, false, string.Empty, false, [],
+            "https://laravel.com/docs/starter-kits#community-maintained-starter-kits")
+    ];
+
+    public static ProjectTemplate? Find(string? id) =>
+        All.FirstOrDefault(template => template.Id.Equals(id?.Trim(), StringComparison.OrdinalIgnoreCase));
 }

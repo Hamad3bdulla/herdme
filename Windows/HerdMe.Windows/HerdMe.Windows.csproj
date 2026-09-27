@@ -71,6 +71,21 @@
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       <TargetPath>Assets\Overlay-Error.ico</TargetPath>
     </Content>
+    <Content Include="Assets\Thumb-Start.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>Assets\Thumb-Start.ico</TargetPath>
+    </Content>
+    <Content Include="Assets\Thumb-Stop.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>Assets\Thumb-Stop.ico</TargetPath>
+    </Content>
+    <Content Include="Assets\Thumb-Open.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>Assets\Thumb-Open.ico</TargetPath>
+    </Content>
     <Content Include="..\..\HerdMe\Resources\Assets.xcassets\AppIcon.appiconset\icon-128.png" Link="Assets\HerdMe.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>

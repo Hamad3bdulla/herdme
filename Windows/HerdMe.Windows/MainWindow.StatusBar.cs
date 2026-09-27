@@ -65,6 +65,7 @@ public sealed partial class MainWindow
 
     private void UpdateDownloads()
     {
+        ObserveFinishedOperations();
         var summary = StatusBarPresentation.Summarize(RuntimeOperations.Shared.Snapshot().Select(operation =>
             new DownloadItem(
                 operation.Name,
@@ -72,6 +73,8 @@ public sealed partial class MainWindow
                 operation.Progress.BytesReceived,
                 operation.Progress.TotalBytes
             )));
+        // Stage text can change while the byte counts stay the same.
+        UpdateOperationsBar(summary);
         if (summary == displayedDownloads) return;
         displayedDownloads = summary;
         var busy = summary.Active > 0;
@@ -89,6 +92,33 @@ public sealed partial class MainWindow
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(StatusBarDownloadsButton, StatusBarDownloadsText.Text);
         }
         TaskbarOverlay.ApplyProgress(WindowNative.GetWindowHandle(this), summary.State, summary.Completed, summary.Total);
+    }
+
+    private void UpdateOperationsBar(DownloadSummary summary)
+    {
+        var active = RuntimeOperations.Shared.Snapshot().Where(operation => operation.Progress.IsActive).ToArray();
+        if (active.Length == 0 || RequiresOnboarding)
+        {
+            OperationsBar.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var stage = active.Length == 1 ? AppLocalization.Get("OperationsStage" + active[0].Progress.Stage) : null;
+        OperationsBarText.Text = active.Length == 1
+            ? AppLocalization.Format("OperationsOne", active[0].Name, stage ?? string.Empty)
+            : AppLocalization.Format("OperationsMany", active.Length);
+        var known = summary.State == TaskbarProgressState.Normal;
+        OperationsBarProgress.IsIndeterminate = !known;
+        if (known) OperationsBarProgress.Value = summary.Percent;
+        OperationsBarPercent.Text = known ? AppLocalization.Format("OperationsPercent", summary.Percent) : string.Empty;
+        OperationsBarCancel.Content = AppLocalization.Get(active.Length == 1 ? "CommonCancel" : "OperationsCancelAll");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(OperationsBarProgress, OperationsBarText.Text);
+        OperationsBar.Visibility = Visibility.Visible;
+    }
+
+    private void OperationsBarCancel_Click(object sender, RoutedEventArgs e)
+    {
+        // Each operation reports Cancelled itself; the bar hides when the last one stops.
+        if (RuntimeOperations.Shared.CancelAll() > 0) OperationsBarText.Text = AppLocalization.Get("OperationsCancelling");
     }
 
     private void StatusBarDownloads_Click(object sender, RoutedEventArgs e) => NavigateToPage("updates");

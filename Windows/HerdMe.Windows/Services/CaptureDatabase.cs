@@ -104,6 +104,7 @@ public sealed class CaptureDatabase
 
     public void DeleteMail(Guid id) => Delete("mail", id.ToString());
     public void ClearMail() => Clear("mail");
+    public void DeleteDump(Guid id) => Delete("dumps", id.ToString());
     public void ClearDumps() => Clear("dumps");
 
     public void MigrateMail(string directory)

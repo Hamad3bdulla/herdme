@@ -21,6 +21,7 @@ public sealed partial class MailPage : Page
     private CaptureRefreshSession<IReadOnlyList<CapturedMail>>? refreshSession;
     private CapturedMail? displayedMessage;
     private bool mutating;
+    private bool clearPending;
     private bool exporting;
     private bool updatingList;
     private bool loadFailed;
@@ -233,27 +234,47 @@ public sealed partial class MailPage : Page
         await MutateAsync(() => mail.Delete(message));
     }
 
-    private async void Clear_Click(object sender, RoutedEventArgs e)
+    // Clear hides the inbox at once and deletes after the Undo countdown (no confirmation).
+    // Only the messages that were hidden are deleted; mail that arrives meanwhile stays.
+    private void Clear_Click(object sender, RoutedEventArgs e)
     {
-        if (mutating || !loaded || XamlRoot is not { } xamlRoot) return;
-        var generation = pageGeneration;
-        var dialog = DangerStyles.Apply(new ContentDialog
-        {
-            FlowDirection = AppLocalization.LayoutDirection,
-            XamlRoot = xamlRoot,
-            Title = AppLocalization.Get("MailClearConfirmTitle"),
-            Content = new TextBlock
+        if (mutating || clearPending || !loaded || allMessages.Count == 0) return;
+        var hidden = allMessages.ToArray();
+        clearPending = true;
+        refreshSession?.Invalidate();
+        allMessages.Clear();
+        ApplyFilter();
+        UpdateCaptureState();
+        App.MainWindow.RunDeferred(
+            AppLocalization.Format("MailClearedPending", hidden.Length),
+            async () =>
             {
-                Text = AppLocalization.Get("MailClearConfirmMessage"),
-                TextWrapping = TextWrapping.Wrap
+                // Runs even if the page was left meanwhile; the page only refreshes if shown.
+                try
+                {
+                    await Task.Run(() =>
+                    {
+                        foreach (var message in hidden) mail.Delete(message);
+                    });
+                }
+                catch (Exception error)
+                {
+                    if (loaded) ShowCaptureError("CaptureOperationFailed", error);
+                }
+                finally
+                {
+                    clearPending = false;
+                    refreshSession?.RequestRefresh();
+                    if (loaded) await ReloadAsync();
+                }
             },
-            PrimaryButtonText = AppLocalization.Get("CommonDelete"),
-            CloseButtonText = AppLocalization.Get("CommonCancel"),
-            DefaultButton = ContentDialogButton.Close
-        });
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-        if (!loaded || generation != pageGeneration) return;
-        await MutateAsync(mail.Clear);
+            async () =>
+            {
+                clearPending = false;
+                refreshSession?.RequestRefresh();
+                await ReloadAsync();
+            }
+        );
     }
 
     private async void Export_Click(object sender, RoutedEventArgs e)
@@ -316,7 +337,7 @@ public sealed partial class MailPage : Page
 
     private async Task ReloadAsync()
     {
-        if (!loaded || mutating || refreshSession is not { } session
+        if (!loaded || mutating || clearPending || refreshSession is not { } session
             || session.IsLoading || !session.NeedsRefresh) return;
         var loading = session.RefreshAsync();
         UpdateCaptureState();
@@ -592,7 +613,8 @@ public sealed partial class MailPage : Page
 
     private async Task ShowErrorAsync(string message)
     {
-        await ShowMessageAsync("HerdMe", message);
+        if (!loaded || XamlRoot is not { } xamlRoot) return;
+        await ErrorDialog.ShowAsync(xamlRoot, message);
     }
 
     private async Task ShowMessageAsync(string title, string message)

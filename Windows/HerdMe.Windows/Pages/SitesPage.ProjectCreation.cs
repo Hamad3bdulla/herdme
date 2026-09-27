@@ -31,34 +31,32 @@ public sealed partial class SitesPage
             Header = AppLocalization.Get("SitesProjectNameField"),
             PlaceholderText = "my-app"
         };
-        var starterOptions = new[]
-        {
-            new DisplayOption("None", AppLocalization.Get("SitesStarterNone")),
-            new DisplayOption("React", "React"),
-            new DisplayOption("Vue", "Vue"),
-            new DisplayOption("Svelte", "Svelte"),
-            new DisplayOption("Livewire", "Livewire"),
-            new DisplayOption("Custom", AppLocalization.Get("SitesStarterCustom"))
-        };
-        var starterBox = new ComboBox
-        {
-            Header = AppLocalization.Get("SitesStarterKitField"),
-            ItemsSource = starterOptions,
-            SelectedIndex = 0,
-            HorizontalAlignment = HorizontalAlignment.Stretch
-        };
+        var starterBox = CreateTemplatePicker();
         var customStarterBox = new TextBox
         {
             Header = AppLocalization.Get("SitesCustomComposerPackageField"),
             PlaceholderText = "vendor/package",
             Visibility = Visibility.Collapsed
         };
-        starterBox.SelectionChanged += (_, _) =>
+        var templateLink = new HyperlinkButton
         {
-            customStarterBox.Visibility = (starterBox.SelectedItem as DisplayOption)?.Value == "Custom"
+            Content = AppLocalization.Get("SitesTemplateLearnMore"),
+            Padding = new Thickness(0)
+        };
+        void UpdateTemplateDetails()
+        {
+            var template = SelectedTemplate(starterBox);
+            customStarterBox.Visibility = template.Group == ProjectTemplateGroup.Custom
                 ? Visibility.Visible
                 : Visibility.Collapsed;
-        };
+            templateLink.NavigateUri = new Uri(template.DocumentationUrl);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(
+                templateLink,
+                AppLocalization.Format("SitesTemplateLearnMoreAbout", AppLocalization.Get(template.NameKey))
+            );
+        }
+        starterBox.SelectionChanged += (_, _) => UpdateTemplateDetails();
+        UpdateTemplateDetails();
         var testingOptions = new[]
         {
             new DisplayOption("Pest", "Pest"),
@@ -80,7 +78,7 @@ public sealed partial class SitesPage
         {
             Header = AppLocalization.Get("SitesInitializeGitField")
         };
-        var content = new StackPanel { Spacing = 12, MinWidth = 380 };
+        var content = new StackPanel { Spacing = 12, MinWidth = 380, MaxWidth = 480 };
         content.Children.Add(new TextBlock
         {
             Text = AppLocalization.Format("SitesProjectLocation", parent),
@@ -89,6 +87,7 @@ public sealed partial class SitesPage
         });
         content.Children.Add(nameBox);
         content.Children.Add(starterBox);
+        content.Children.Add(templateLink);
         content.Children.Add(customStarterBox);
         content.Children.Add(testingBox);
         content.Children.Add(boostToggle);
@@ -98,21 +97,27 @@ public sealed partial class SitesPage
             FlowDirection = AppLocalization.LayoutDirection,
             XamlRoot = XamlRoot,
             Title = AppLocalization.Get("SitesCreateLaravelDialogTitle"),
-            Content = content,
+            Content = new ScrollViewer
+            {
+                Content = content,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollMode = ScrollMode.Auto
+            },
             PrimaryButtonText = AppLocalization.Get("SitesCreate"),
             CloseButtonText = AppLocalization.Get("SitesCancel"),
             DefaultButton = ContentDialogButton.Primary
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
+        var selectedTemplate = SelectedTemplate(starterBox);
         var request = new LaravelProjectRequest(
             nameBox.Text,
             parent,
-            (starterBox.SelectedItem as DisplayOption)?.Value ?? "None",
+            selectedTemplate.Id,
             (testingBox.SelectedItem as DisplayOption)?.Value ?? "Pest",
             boostToggle.IsOn,
             gitToggle.IsOn,
-            (starterBox.SelectedItem as DisplayOption)?.Value == "Custom" ? customStarterBox.Text : null
+            selectedTemplate.Group == ProjectTemplateGroup.Custom ? customStarterBox.Text : null
         );
         var stages = LaravelProjectCreationStages.For(request);
         var statusText = new TextBlock
@@ -171,9 +176,16 @@ public sealed partial class SitesPage
         ScanProgress.IsActive = true;
         var progressDialogOperation = progressDialog.ShowAsync();
         await Task.Yield();
+        var elapsed = Stopwatch.StartNew();
+        var operationName = AppLocalization.Format("SitesProjectCreationOperationName", request.Name.Trim());
+        void ReportFinished(OperationOutcome outcome, string? error, NotificationAction? primary) =>
+            App.MainWindow.ReportLongOperationFinished(
+                new FinishedOperation("create-project:" + request.Name.Trim(), operationName, outcome, elapsed.Elapsed, error),
+                primary
+            );
         try
         {
-            await projectCreator.CreateAsync(request, creationProgress, cancellation.Token);
+            var createdPath = await projectCreator.CreateAsync(request, creationProgress, cancellation.Token);
             currentStage = LaravelProjectCreationStage.RegisteringSite;
             UpdateProjectCreationProgress(stages, stageRows, statusText, currentStage);
             await ScanAsync(throwOnError: true);
@@ -182,6 +194,7 @@ public sealed partial class SitesPage
             progressRing.IsActive = false;
             progressDialog.Title = AppLocalization.Get("SitesLaravelCreatedTitle");
             progressDialog.CloseButtonText = AppLocalization.Get("SitesDone");
+            ReportFinished(OperationOutcome.Succeeded, null, NotificationActions.OpenSite(createdPath));
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
@@ -201,6 +214,7 @@ public sealed partial class SitesPage
                 AppLocalization.Get("SitesLaravelCreationFallback")
             );
             statusText.Text = failure.Message;
+            ReportFinished(OperationOutcome.Failed, failure.Message, null);
             if (failure.TechnicalDetails is not null)
             {
                 progressContent.Children.Add(new Expander
@@ -233,6 +247,54 @@ public sealed partial class SitesPage
         }
         await progressDialogOperation;
     }
+
+    // Every template is listed with a one-line description so the choice is made before creating.
+    private static ListView CreateTemplatePicker()
+    {
+        var list = new ListView
+        {
+            Header = AppLocalization.Get("SitesStarterKitField"),
+            SelectionMode = ListViewSelectionMode.Single,
+            MaxHeight = 300,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(list, AppLocalization.Get("SitesStarterKitField"));
+        foreach (var template in ProjectTemplateCatalog.All)
+        {
+            var name = AppLocalization.Get(template.NameKey);
+            var description = AppLocalization.Get(template.DescriptionKey);
+            var title = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            title.Children.Add(new TextBlock
+            {
+                Text = name,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            });
+            title.Children.Add(new TextBlock
+            {
+                Text = AppLocalization.Get($"SitesTemplateGroup{template.Group}"),
+                Style = StatusStyles.Text(StatusTone.Neutral),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            var body = new StackPanel { Spacing = 2, Padding = new Thickness(0, 6, 0, 6) };
+            body.Children.Add(title);
+            body.Children.Add(new TextBlock
+            {
+                Text = description,
+                TextWrapping = TextWrapping.Wrap,
+                Style = StatusStyles.Text(StatusTone.Neutral)
+            });
+            var item = new ListViewItem { Content = body, Tag = template.Id };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(item, name);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(item, description);
+            list.Items.Add(item);
+        }
+        list.SelectedIndex = 0;
+        return list;
+    }
+
+    private static ProjectTemplate SelectedTemplate(ListView list) =>
+        ProjectTemplateCatalog.Find((list.SelectedItem as ListViewItem)?.Tag as string)
+            ?? ProjectTemplateCatalog.All[0];
 
     private static void UpdateProjectCreationProgress(
         IReadOnlyList<LaravelProjectCreationStage> stages,

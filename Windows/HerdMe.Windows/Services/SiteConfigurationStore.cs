@@ -191,6 +191,48 @@ public sealed class SiteConfigurationStore
         Update(settings => settings.ShowNotifications = showNotifications);
     }
 
+    public void UpdateActionNotifications(bool enabled)
+    {
+        Update(settings => settings.ActionNotifications = enabled);
+    }
+
+    public void UpdateSitesListWidth(double width)
+    {
+        var clamped = ClampSitesListWidth(width);
+        Update(settings => settings.SitesListWidth = clamped);
+    }
+
+    public static double ClampSitesListWidth(double width)
+    {
+        if (double.IsNaN(width) || double.IsInfinity(width)) return WindowsSiteSettings.SitesListWidthDefault;
+        return Math.Round(Math.Clamp(
+            width,
+            WindowsSiteSettings.SitesListWidthMinimum,
+            WindowsSiteSettings.SitesListWidthMaximum
+        ));
+    }
+
+    // A renamed site folder keeps its link and favorite entries.
+    public void MoveSitePath(string oldPath, string newPath)
+    {
+        var from = Path.GetFullPath(oldPath);
+        var to = Path.GetFullPath(newPath);
+        Update(settings =>
+        {
+            for (var index = 0; index < settings.LinkedSites.Count; index++)
+            {
+                if (settings.LinkedSites[index].Equals(from, StringComparison.OrdinalIgnoreCase))
+                    settings.LinkedSites[index] = to;
+            }
+            settings.FavoriteSites ??= [];
+            for (var index = 0; index < settings.FavoriteSites.Count; index++)
+            {
+                if (settings.FavoriteSites[index].Equals(from, StringComparison.OrdinalIgnoreCase))
+                    settings.FavoriteSites[index] = to;
+            }
+        });
+    }
+
     public void UpdateUiLanguage(string? language)
     {
         var normalized = UiLanguageSettings.Normalize(language);
@@ -214,6 +256,26 @@ public sealed class SiteConfigurationStore
             settings.SeenTips ??= [];
             if (!settings.SeenTips.Contains(tipId, StringComparer.Ordinal)) settings.SeenTips.Add(tipId);
         });
+    }
+
+    // Returns true when the step was newly marked, so callers refresh the checklist only then.
+    public bool MarkGettingStartedStep(string step)
+    {
+        if (!GettingStarted.IsKnownStep(step)) return false;
+        var added = false;
+        Update(settings =>
+        {
+            settings.GettingStartedSteps ??= [];
+            if (settings.GettingStartedSteps.Contains(step, StringComparer.Ordinal)) return;
+            settings.GettingStartedSteps.Add(step);
+            added = true;
+        });
+        return added;
+    }
+
+    public void UpdateGettingStartedDismissed(bool dismissed)
+    {
+        Update(settings => settings.GettingStartedDismissed = dismissed);
     }
 
     public void UpdateTld(string tld)
@@ -377,6 +439,8 @@ public sealed class SiteConfigurationStore
             ShowPreviews = settings.ShowPreviews,
             CompactMode = settings.CompactMode,
             ShowNotifications = settings.ShowNotifications,
+            ActionNotifications = settings.ActionNotifications,
+            SitesListWidth = ClampSitesListWidth(settings.SitesListWidth),
             UiLanguage = UiLanguageSettings.Normalize(settings.UiLanguage),
             ReduceMotion = settings.ReduceMotion,
             AutomaticUpdates = settings.AutomaticUpdates,
@@ -386,7 +450,9 @@ public sealed class SiteConfigurationStore
             OnboardingCompleted = settings.OnboardingCompleted,
             LastSeenVersion = (settings.LastSeenVersion ?? string.Empty).Trim(),
             SeenTips = (settings.SeenTips ?? []).Where(item => !string.IsNullOrWhiteSpace(item))
-                .Distinct(StringComparer.Ordinal).Take(64).ToList()
+                .Distinct(StringComparer.Ordinal).Take(64).ToList(),
+            GettingStartedSteps = GettingStarted.NormalizeSteps(settings.GettingStartedSteps),
+            GettingStartedDismissed = settings.GettingStartedDismissed
         };
     }
 

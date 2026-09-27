@@ -67,6 +67,7 @@
     <Compile Include="../HerdMe.Windows/Models/SiteSettingsModels.cs" Link="Models/SiteSettingsModels.cs" />
     <Compile Include="../HerdMe.Windows/Services/AppServices.cs" Link="Services/AppServices.cs" />
     <Compile Include="../HerdMe.Windows/Services/ArtisanCommandRunner.cs" Link="Services/ArtisanCommandRunner.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ArtisanCommandIndex.cs" Link="Services/ArtisanCommandIndex.cs" />
     <Compile Include="../HerdMe.Windows/Services/TinkerRunner.cs" Link="Services/TinkerRunner.cs" />
     <Compile Include="../HerdMe.Windows/Services/NpmScriptRunner.cs" Link="Services/NpmScriptRunner.cs" />
     <Compile Include="../HerdMe.Windows/Services/ComposerToolManager.cs" Link="Services/ComposerToolManager.cs" />
@@ -123,6 +124,17 @@
     <Compile Include="../HerdMe.Windows/Services/UiLanguageSettings.cs" Link="Services/UiLanguageSettings.cs" />
     <Compile Include="../HerdMe.Windows/Models/ActivityEvent.cs" Link="Models/ActivityEvent.cs" />
     <Compile Include="Round5UxContractChecks.cs" />
+    <Compile Include="Round6UxContractChecks.cs" />
+    <Compile Include="Round7UxContractChecks.cs" />
+    <Compile Include="Round8UxContractChecks.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SiteQuickProbe.cs" Link="Services/SiteQuickProbe.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SiteRenamer.cs" Link="Services/SiteRenamer.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ErrorPresentation.cs" Link="Services/ErrorPresentation.cs" />
+    <Compile Include="../HerdMe.Windows/Services/InputValidation.cs" Link="Services/InputValidation.cs" />
+    <Compile Include="../HerdMe.Windows/Services/PhpIniEditor.cs" Link="Services/PhpIniEditor.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ServiceLogTail.cs" Link="Services/ServiceLogTail.cs" />
+    <Compile Include="../HerdMe.Windows/Services/TitleBarSearch.cs" Link="Services/TitleBarSearch.cs" />
+    <Compile Include="../HerdMe.Windows/Services/NotificationActions.cs" Link="Services/NotificationActions.cs" />
     <Compile Include="../HerdMe.Windows/Services/StatusBarPresentation.cs" Link="Services/StatusBarPresentation.cs" />
     <Compile Include="../HerdMe.Windows/Services/ChangelogReader.cs" Link="Services/ChangelogReader.cs" />
     <Compile Include="../HerdMe.Windows/Services/MailInspection.cs" Link="Services/MailInspection.cs" />
@@ -155,11 +167,18 @@
     <Compile Include="../HerdMe.Windows/Services/WindowsShellIntegration.cs" Link="Services/WindowsShellIntegration.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteRootWatcher.cs" Link="Services/SiteRootWatcher.cs" />
     <Compile Include="../HerdMe.Windows/Services/AppNotifications.cs" Link="Services/AppNotifications.cs" />
+    <Compile Include="../HerdMe.Windows/Services/OperationFinishAlert.cs" Link="Services/OperationFinishAlert.cs" />
+    <Compile Include="../HerdMe.Windows/Services/EnvironmentEditorModel.cs" Link="Services/EnvironmentEditorModel.cs" />
     <Compile Include="../HerdMe.Windows/Services/CrashReporter.cs" Link="Services/CrashReporter.cs" />
     <Compile Include="../HerdMe.Windows/Services/DiagnosticsExporter.cs" Link="Services/DiagnosticsExporter.cs" />
     <Compile Include="../HerdMe.Windows/Services/LaravelLog.cs" Link="Services/LaravelLog.cs" />
     <Compile Include="../HerdMe.Windows/Services/EditorLauncher.cs" Link="Services/EditorLauncher.cs" />
     <Compile Include="../HerdMe.Windows/Services/LaravelQualityTools.cs" Link="Services/LaravelQualityTools.cs" />
+    <Compile Include="../HerdMe.Windows/Services/GettingStarted.cs" Link="Services/GettingStarted.cs" />
+    <Compile Include="../HerdMe.Windows/Services/NotificationHistory.cs" Link="Services/NotificationHistory.cs" />
+    <Compile Include="../HerdMe.Windows/Services/StartupSnapshot.cs" Link="Services/StartupSnapshot.cs" />
+    <Compile Include="../HerdMe.Windows/Services/TaskbarThumbnailButtons.cs" Link="Services/TaskbarThumbnailButtons.cs" />
+    <Compile Include="../HerdMe.Windows/Services/TrayPanelPlacement.cs" Link="Services/TrayPanelPlacement.cs" />
   </ItemGroup>
 
   <ItemGroup>

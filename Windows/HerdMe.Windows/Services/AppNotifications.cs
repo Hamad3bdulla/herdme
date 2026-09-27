@@ -1,13 +1,22 @@
 namespace HerdMe.Windows.Services;
 
-public sealed record AppNotification(string Key, string Title, string Message);
+// Primary runs when the notification itself is clicked; Secondary is a second button. Both are
+// optional and only ever open HerdMe pages or start a HerdMe service.
+public sealed record AppNotification(
+    string Key,
+    string Title,
+    string Message,
+    NotificationAction? Primary = null,
+    NotificationAction? Secondary = null
+);
 
 // Text for the tray notifications HerdMe shows when something stops without the user asking.
-// Notifications are local tray balloons: nothing is registered with Windows and nothing is sent
-// anywhere. They are off in General when the user does not want them.
+// By default they are local tray balloons: nothing is registered with Windows and nothing is
+// sent anywhere. Buttons on Windows notifications are a separate opt-in in General. They are
+// off in General when the user does not want them.
 public static class AppNotifications
 {
-    public static AppNotification ServiceStopped(string name, int? exitCode) => new(
+    public static AppNotification ServiceStopped(string name, int? exitCode, Guid? id = null) => new(
         "service:" + name,
         ServiceText.Get("NotificationServiceStoppedTitle", "Service stopped"),
         exitCode is { } code
@@ -17,10 +26,17 @@ public static class AppNotifications
                 name,
                 code
             )
-            : ServiceText.Format("NotificationServiceStoppedMessage", "{0} stopped unexpectedly.", name)
+            : ServiceText.Format("NotificationServiceStoppedMessage", "{0} stopped unexpectedly.", name),
+        id is { } serviceId ? NotificationActions.StartService(serviceId) : null,
+        NotificationActions.OpenPage("services", "NotificationActionOpenServices")
     );
 
-    public static AppNotification SiteProcessStopped(string siteName, SiteBackgroundProcessKind kind, int exitCode) => new(
+    public static AppNotification SiteProcessStopped(
+        string siteName,
+        SiteBackgroundProcessKind kind,
+        int exitCode,
+        string? sitePath = null
+    ) => new(
         "process:" + siteName + ":" + kind,
         ServiceText.Get("NotificationSiteProcessStoppedTitle", "Site process stopped"),
         ServiceText.Format(
@@ -29,7 +45,9 @@ public static class AppNotifications
             ProcessName(kind),
             siteName,
             exitCode
-        )
+        ),
+        string.IsNullOrEmpty(sitePath) ? null : NotificationActions.OpenSite(sitePath),
+        string.IsNullOrEmpty(sitePath) ? null : NotificationActions.OpenSiteLogs(sitePath)
     );
 
     public static AppNotification ShareEnded(string domain) => new(
@@ -39,13 +57,15 @@ public static class AppNotifications
             "NotificationShareEndedMessage",
             "The public link for {0} stopped. The site is private again.",
             domain
-        )
+        ),
+        NotificationActions.OpenSite(domain)
     );
 
     public static AppNotification UpdateAvailable(string version) => new(
         "update:" + version,
         ServiceText.Get("NotificationUpdateTitle", "HerdMe update available"),
-        ServiceText.Format("NotificationUpdateMessage", "HerdMe {0} is ready. Open HerdMe to install it.", version)
+        ServiceText.Format("NotificationUpdateMessage", "HerdMe {0} is ready. Open HerdMe to install it.", version),
+        NotificationActions.OpenPage("updates", "NotificationActionOpenUpdates")
     );
 
     public static AppNotification CrashReported() => new(
@@ -54,7 +74,8 @@ public static class AppNotifications
         ServiceText.Get(
             "NotificationCrashMessage",
             "A crash report was saved on this PC. Use Export diagnostics in General if you want to share it."
-        )
+        ),
+        NotificationActions.OpenPage("general", "NotificationActionOpenGeneral")
     );
 
     private static string ProcessName(SiteBackgroundProcessKind kind) => kind switch

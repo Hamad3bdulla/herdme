@@ -147,7 +147,10 @@
                     <Grid Style="{StaticResource PhpSettingRowStyle}">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                         <TextBlock x:Name="TimezoneLabel" x:Uid="PhpTimezoneLabel" Text="Timezone" VerticalAlignment="Center" Style="{StaticResource SettingsRowTitleStyle}" />
-                        <TextBox x:Uid="PhpTimezoneInput" x:Name="TimezoneBox" Grid.Column="1" Width="160" VerticalAlignment="Center" AutomationProperties.LabeledBy="{Binding ElementName=TimezoneLabel}" PlaceholderText="UTC" />
+                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                            <TextBox x:Uid="PhpTimezoneInput" x:Name="TimezoneBox" Width="160" AutomationProperties.LabeledBy="{Binding ElementName=TimezoneLabel}" PlaceholderText="UTC" TextChanged="Timezone_TextChanged" />
+                            <TextBlock x:Name="TimezoneMessage" MaxWidth="220" AutomationProperties.AutomationId="PhpTimezoneMessage" Visibility="Collapsed" />
+                        </StackPanel>
                     </Grid>
                     <Rectangle Style="{StaticResource CardDividerStyle}" />
                     <Grid Style="{StaticResource PhpSettingRowStyle}">
@@ -197,6 +200,63 @@
                     </Grid>
                     <Rectangle Style="{StaticResource CardDividerStyle}" />
                     <StackPanel x:Name="ExtensionsPanel" Padding="8,4,8,8" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock x:Uid="PhpCompareTitle" Text="Compare PHP versions" Style="{StaticResource SectionHeaderStyle}" />
+            <Border Style="{StaticResource SettingsGroupStyle}" AutomationProperties.AutomationId="PhpCompareSection">
+                <StackPanel>
+                    <Grid Style="{StaticResource SettingsRowStyle}" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Uid="PhpCompareDescription" Text="Installed versions side by side: version, and which extensions each one loads." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                            <TextBlock x:Name="CompareStatusText" Style="{StaticResource SettingsRowDescriptionStyle}" AutomationProperties.LiveSetting="Polite" />
+                        </StackPanel>
+                        <CheckBox x:Name="CompareDifferencesOnly" x:Uid="PhpCompareDifferencesOnly" Grid.Column="1" Content="Only differences" MinWidth="0" VerticalAlignment="Center" Click="CompareDifferencesOnly_Click" />
+                        <Button x:Name="CompareButton" x:Uid="PhpCompareButton" Grid.Column="2" Content="Compare" VerticalAlignment="Center" Click="Compare_Click" AutomationProperties.AutomationId="PhpCompareButton" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto" VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+                        <Grid x:Name="CompareGrid" Padding="12,8,12,12" ColumnSpacing="16" RowSpacing="4" AutomationProperties.AutomationId="PhpCompareGrid" />
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+
+            <TextBlock x:Uid="PhpIniTitle" Text="php.ini" Style="{StaticResource SectionHeaderStyle}" />
+            <Border Style="{StaticResource SettingsGroupStyle}" AutomationProperties.AutomationId="PhpIniSection">
+                <StackPanel>
+                    <InfoBar x:Uid="PhpIniOverrideInfo" IsOpen="True" IsClosable="False" Severity="Informational" Margin="12,12,12,0" Title="Edit with care" Message="The PHP settings above are passed to PHP when it starts and win over this file. HerdMe also puts back the extensions Laravel needs. The previous file is kept as php.ini.bak." />
+                    <Grid Padding="12,12,12,8" ColumnSpacing="8" RowSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="IniSearchBox" x:Uid="PhpIniSearch" MaxWidth="420" HorizontalAlignment="Stretch" PlaceholderText="Find in php.ini" TextChanged="IniSearch_TextChanged" KeyDown="IniSearch_KeyDown" AutomationProperties.AutomationId="PhpIniSearch" />
+                        <TextBlock x:Name="IniMatchText" Grid.Column="1" VerticalAlignment="Center" MinWidth="72" Style="{StaticResource CaptionTextStyle}" AutomationProperties.LiveSetting="Polite" />
+                        <Button x:Name="IniPreviousButton" x:Uid="PhpIniPrevious" Grid.Column="2" Click="IniPrevious_Click" IsEnabled="False">
+                            <FontIcon Glyph="&#xE70E;" FontSize="12" />
+                        </Button>
+                        <Button x:Name="IniNextButton" x:Uid="PhpIniNext" Grid.Column="3" Click="IniNext_Click" IsEnabled="False">
+                            <FontIcon Glyph="&#xE70D;" FontSize="12" />
+                        </Button>
+                    </Grid>
+                    <TextBox x:Name="IniEditor" x:Uid="PhpIniEditor" Margin="12,0,12,0" Height="360" AcceptsReturn="True" TextWrapping="NoWrap" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False" FontFamily="Cascadia Mono, Consolas" FontSize="13" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" TextChanged="IniEditor_TextChanged" PreviewKeyDown="IniEditor_PreviewKeyDown" AutomationProperties.AutomationId="PhpIniEditor" />
+                    <Grid Style="{StaticResource SettingsRowStyle}" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="IniStatusText" VerticalAlignment="Center" Style="{StaticResource SettingsRowDescriptionStyle}" AutomationProperties.LiveSetting="Polite" AutomationProperties.AutomationId="PhpIniStatus" />
+                        <Button x:Name="IniReloadButton" x:Uid="PhpIniReload" Grid.Column="1" Content="Reload" Click="IniReload_Click" />
+                        <Button x:Name="IniSaveButton" x:Uid="PhpIniSave" Grid.Column="2" Content="Save php.ini" Style="{StaticResource AccentButtonStyle}" Click="IniSave_Click" IsEnabled="False" AutomationProperties.AutomationId="PhpIniSave" />
+                    </Grid>
                 </StackPanel>
             </Border>
         </StackPanel>

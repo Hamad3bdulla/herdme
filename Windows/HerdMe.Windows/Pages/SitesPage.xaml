@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:viewmodels="using:HerdMe.Windows.ViewModels"
+    xmlns:views="using:HerdMe.Windows.Views"
     AutomationProperties.AutomationId="SitesPageRoot"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
@@ -104,6 +105,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -116,7 +118,14 @@
                     x:Uid="SitesRootPathField"
                     x:Name="RootPathTextBox"
                     MinHeight="36"
-                    PlaceholderText="Site folder" />
+                    PlaceholderText="Site folder"
+                    TextChanged="RootPath_TextChanged" />
+                <TextBlock
+                    x:Name="RootPathMessage"
+                    Grid.Row="1"
+                    Grid.ColumnSpan="5"
+                    AutomationProperties.AutomationId="SitesRootPathMessage"
+                    Visibility="Collapsed" />
                 <Button x:Uid="SitesChooseFolderButton" Grid.Column="1" Click="Browse_Click" AutomationProperties.Name="Choose folder" Style="{StaticResource SitesIconButtonStyle}">
                     <ToolTipService.ToolTip>
                         <ToolTip><TextBlock x:Uid="SitesChooseFolderTooltip" Text="Choose folder" /></ToolTip>
@@ -143,7 +152,7 @@
                 </Button>
                 <ListView
                     x:Name="RootList"
-                    Grid.Row="1"
+                    Grid.Row="2"
                     Grid.ColumnSpan="5"
                     Height="40"
                     ItemsSource="{x:Bind Roots}"
@@ -175,13 +184,16 @@
             </Grid>
         </Expander>
 
-        <Grid Grid.Row="3" ColumnSpacing="12">
+        <!-- List | draggable splitter | details. Below the narrow breakpoint only one pane shows
+             (master/detail) and the details header offers Back to the list. -->
+        <Grid x:Name="SitesSplitGrid" Grid.Row="3" SizeChanged="SitesSplitGrid_SizeChanged">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" MinWidth="240" />
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="SitesListColumn" Width="280" MinWidth="240" />
+                <ColumnDefinition x:Name="SitesSplitterColumn" Width="12" />
+                <ColumnDefinition x:Name="SitesDetailColumn" Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border Style="{StaticResource ToolPaneStyle}">
+            <Border x:Name="SitesListPane" Style="{StaticResource ToolPaneStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -257,6 +269,10 @@
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="viewmodels:SitesListItem">
                                 <Grid Padding="8,8,8,8" ColumnSpacing="12">
+                                    <!-- Hover preview: thumbnail, HTTP status and response time, loaded when shown. -->
+                                    <ToolTipService.ToolTip>
+                                        <ToolTip Tag="{x:Bind Path}" Placement="Right" Opened="SiteRowPreview_Opened" AutomationProperties.AutomationId="SitesRowPreview" />
+                                    </ToolTipService.ToolTip>
                                     <Grid.ContextFlyout>
                                         <MenuFlyout>
                                             <MenuFlyoutItem x:Uid="SitesContextOpenBrowser" Text="Open in browser" Tag="{x:Bind Path}" Click="ContextOpenBrowser_Click">
@@ -283,6 +299,9 @@
                                             </MenuFlyoutItem>
                                             <MenuFlyoutItem x:Uid="SitesContextCopyPath" Text="Copy path" Tag="{x:Bind Path}" Click="CopySitePathFromMenu_Click">
                                                 <MenuFlyoutItem.Icon><SymbolIcon Symbol="Copy" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem x:Uid="SitesContextRename" Text="Rename..." KeyboardAcceleratorTextOverride="F2" Tag="{x:Bind Path}" Click="RenameSiteFromMenu_Click">
+                                                <MenuFlyoutItem.Icon><SymbolIcon Symbol="Rename" /></MenuFlyoutItem.Icon>
                                             </MenuFlyoutItem>
                                             <MenuFlyoutSeparator />
                                             <MenuFlyoutItem x:Uid="SitesContextRemoveSite" Text="Remove site..." Tag="{x:Bind Path}" Click="RemoveSiteFromMenu_Click">
@@ -332,7 +351,26 @@
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{x:Bind Domain, Mode=OneWay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{x:Bind Domain, Mode=OneWay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" />
+                                            <!-- F2: inline rename with live validation of the .test name. -->
+                                            <StackPanel Visibility="{x:Bind RenameVisibility, Mode=OneWay}" Spacing="2">
+                                                <TextBox
+                                                    x:Uid="SitesRenameBox"
+                                                    Tag="{x:Bind Path}"
+                                                    Padding="6,3,6,4"
+                                                    MinHeight="0"
+                                                    IsSpellCheckEnabled="False"
+                                                    AutomationProperties.Name="New site name"
+                                                    AutomationProperties.AutomationId="SitesRenameBox"
+                                                    TextChanged="RenameBox_TextChanged"
+                                                    KeyDown="RenameBox_KeyDown"
+                                                    LostFocus="RenameBox_LostFocus" />
+                                                <TextBlock
+                                                    Text="{x:Bind RenameMessage, Mode=OneWay}"
+                                                    TextWrapping="Wrap"
+                                                    Style="{x:Bind RenameMessageStyle, Mode=OneWay}"
+                                                    AutomationProperties.LiveSetting="Polite" />
+                                            </StackPanel>
                                             <FontIcon Grid.Column="1" Glyph="&#xE72D;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource SystemFillColorCautionBrush}" Visibility="{x:Bind SharedVisibility, Mode=OneWay}" />
                                             <FontIcon Grid.Column="2" Glyph="&#xE735;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource BrandBrush}" Visibility="{x:Bind FavoriteVisibility, Mode=OneWay}" />
                                         </Grid>
@@ -450,7 +488,14 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Column="1" Style="{StaticResource ToolPaneStyle}">
+            <views:SplitterHandle
+                x:Uid="SitesSplitter"
+                x:Name="SitesSplitter"
+                Grid.Column="1"
+                AutomationProperties.Name="Resize the sites list"
+                AutomationProperties.AutomationId="SitesSplitter" />
+
+            <Border x:Name="SitesDetailPane" Grid.Column="2" Style="{StaticResource ToolPaneStyle}">
                 <Grid>
                     <StackPanel x:Name="NoSelectionState" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
                         <FontIcon Glyph="&#xE774;" Style="{StaticResource EmptyStateGlyphStyle}" />
@@ -469,16 +514,31 @@
                         <Grid Grid.Row="0" Padding="20,16,16,4" ColumnSpacing="14">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <Border x:Name="SiteHeaderTile" Width="40" Height="40" CornerRadius="10" VerticalAlignment="Center" Background="{ThemeResource SitesTintBrush}">
+                            <Button
+                                x:Uid="SitesBackToListButton"
+                                x:Name="BackToListButton"
+                                Style="{StaticResource SitesIconButtonStyle}"
+                                VerticalAlignment="Center"
+                                Visibility="Collapsed"
+                                Click="BackToList_Click"
+                                AutomationProperties.Name="Back to sites"
+                                AutomationProperties.AutomationId="SitesBackToList">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip><TextBlock x:Uid="SitesBackToListTooltip" Text="Back to sites (Alt+Left)" /></ToolTip>
+                                </ToolTipService.ToolTip>
+                                <FontIcon Glyph="&#xE72B;" FontSize="14" />
+                            </Button>
+                            <Border x:Name="SiteHeaderTile" Grid.Column="1" Width="40" Height="40" CornerRadius="10" VerticalAlignment="Center" Background="{ThemeResource SitesTintBrush}">
                                 <Grid>
                                     <TextBlock x:Name="SiteHeaderMonogram" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
                                     <FontIcon x:Name="SiteHeaderGlobe" Glyph="&#xE774;" FontSize="18" Foreground="{ThemeResource BrandBrush}" />
                                 </Grid>
                             </Border>
-                            <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                            <StackPanel Grid.Column="2" Spacing="1" VerticalAlignment="Center">
                                 <TextBlock
                                     x:Name="SiteNameText"
                                     Style="{StaticResource SectionTitleStyle}"
@@ -491,7 +551,7 @@
                                     TextWrapping="NoWrap"
                                     TextTrimming="CharacterEllipsis" />
                             </StackPanel>
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                 <TextBlock x:Uid="SitesLivePreviewLabel" Text="Live preview" VerticalAlignment="Center" Style="{StaticResource SettingsRowDescriptionStyle}" />
                                 <ToggleSwitch x:Name="PreviewToggle" MinWidth="0" IsOn="True" Toggled="PreviewToggle_Toggled" />
                             </StackPanel>

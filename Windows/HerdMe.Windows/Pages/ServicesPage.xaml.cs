@@ -64,12 +64,14 @@ public sealed partial class ServicesPage : Page
         manager.Changed += Manager_Changed;
         manager.InstallationProgress -= Manager_InstallationProgress;
         manager.InstallationProgress += Manager_InstallationProgress;
+        StartLogTails();
         await RefreshRowsAsync();
     }
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
         loaded = false;
+        StopLogTails();
         manager.Changed -= Manager_Changed;
         manager.InstallationProgress -= Manager_InstallationProgress;
         Interlocked.Exchange(ref refreshCancellation, null)?.Cancel();
@@ -120,7 +122,7 @@ public sealed partial class ServicesPage : Page
             definition.DefaultPort,
             manager.LoadInstances().Select(instance => instance.Port)
         ) ?? definition.DefaultPort;
-        AddServiceButton.IsEnabled = definition.IsInstallable;
+        ValidateServiceInput();
         ServiceAvailabilityText.Text = UnavailableReasonFor(definition);
         ServiceAvailabilityText.Visibility = definition.IsInstallable
             ? Visibility.Collapsed
@@ -130,6 +132,41 @@ public sealed partial class ServicesPage : Page
             ServiceVersionBox.Items.Add(AppLocalization.Format("ServicesUseInstalled", manager.InstalledVersion(definition.Id)));
         ServiceVersionBox.Items.Add(AppLocalization.Format("ServicesUseLatest", definition.VersionChannel));
         ServiceVersionBox.SelectedIndex = 0;
+    }
+
+    private void ServiceInput_Changed(object sender, TextChangedEventArgs e) => ValidateServiceInput();
+
+    private void ServicePort_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args) =>
+        ValidateServiceInput();
+
+    // Name and port are checked while typing; Add stays off while either one would fail.
+    private bool ValidateServiceInput()
+    {
+        if (ServiceNameMessage is null || ServicePortMessage is null) return true;
+        var instances = manager.LoadInstances();
+        var nameCheck = InputValidation.ServiceName(ServiceNameBox.Text, instances.Select(instance => instance.Name));
+        var portCheck = InputValidation.Port(
+            ServicePortBox.Value,
+            instances.Select(instance => instance.Port),
+            WindowsServiceManager.IsPortAvailable
+        );
+        string? suggestion = null;
+        if (portCheck.MessageKey is "InputPortBusy" or "InputPortHerdMe" or "InputPortSites"
+            && !double.IsNaN(ServicePortBox.Value))
+        {
+            var port = (int)ServicePortBox.Value;
+            var next = WindowsServiceManager.AvailablePort(
+                port >= 65_535 || port < 1_024 ? 1_024 : port + 1,
+                instances.Select(instance => instance.Port)
+            );
+            if (next is { } free) suggestion = AppLocalization.Format("InputPortSuggestion", free);
+        }
+        FieldValidation.Show(ServiceNameMessage, ServiceNameBox, nameCheck);
+        FieldValidation.Show(ServicePortMessage, ServicePortBox, portCheck, suggestion);
+        var valid = !nameCheck.Blocks && !portCheck.Blocks;
+        AddServiceButton.IsEnabled = valid
+            && ServiceTypeBox.SelectedItem is ManagedServiceDefinition { IsInstallable: true };
+        return valid;
     }
 
     private async void Add_Click(object sender, RoutedEventArgs e)
@@ -450,16 +487,18 @@ public sealed partial class ServicesPage : Page
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.7
             };
-            siteBox.SelectionChanged += (_, _) =>
-            {
-                if (siteBox.SelectedItem is SiteRecord site)
-                {
-                    pathText.Text = Path.Combine(site.Path, ".env");
-                }
-            };
-            var content = new StackPanel { Spacing = 10 };
+            var variables = manager.EnvironmentVariables(instance);
+            var previewPanel = new StackPanel { Spacing = 4 };
+            var content = new StackPanel { Spacing = 10, MinWidth = 420 };
             content.Children.Add(siteBox);
             content.Children.Add(pathText);
+            content.Children.Add(new ScrollViewer
+            {
+                Content = previewPanel,
+                MaxHeight = 240,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollMode = ScrollMode.Auto
+            });
             var dialog = new ContentDialog
             {
                 FlowDirection = AppLocalization.LayoutDirection,
@@ -470,6 +509,33 @@ public sealed partial class ServicesPage : Page
                 CloseButtonText = AppLocalization.Get("CommonCancel"),
                 DefaultButton = ContentDialogButton.Primary
             };
+            var previewVersion = 0;
+            async void RefreshPreview()
+            {
+                if (siteBox.SelectedItem is not SiteRecord site) return;
+                var version = ++previewVersion;
+                dialog.IsPrimaryButtonEnabled = false;
+                var panel = new StackPanel { Spacing = 4 };
+                var hasChanges = await ShowEnvironmentPreviewAsync(panel, site.Path, variables, instance.Name);
+                // Only the preview for the site still selected is shown.
+                if (version != previewVersion) return;
+                previewPanel.Children.Clear();
+                foreach (var child in panel.Children.ToArray())
+                {
+                    panel.Children.Remove(child);
+                    previewPanel.Children.Add(child);
+                }
+                dialog.IsPrimaryButtonEnabled = hasChanges;
+            }
+            siteBox.SelectionChanged += (_, _) =>
+            {
+                if (siteBox.SelectedItem is SiteRecord site)
+                {
+                    pathText.Text = Path.Combine(site.Path, ".env");
+                }
+                RefreshPreview();
+            };
+            RefreshPreview();
             if (await dialog.ShowAsync() != ContentDialogResult.Primary
                 || siteBox.SelectedItem is not SiteRecord selectedSite)
             {
@@ -477,15 +543,12 @@ public sealed partial class ServicesPage : Page
             }
 
             var update = manager.AddToEnvironment(selectedSite.Path, instance);
-            await ShowMessageAsync(
-                AppLocalization.Get("ServicesEnvironmentUpdatedTitle"),
-                AppLocalization.Format(
-                    "ServicesEnvironmentUpdatedMessage",
-                    update.AddedKeys,
-                    update.UpdatedKeys,
-                    selectedSite.Name
-                )
-            );
+            App.MainWindow.ShowToast(AppLocalization.Format(
+                "ServicesEnvironmentUpdatedMessage",
+                update.AddedKeys,
+                update.UpdatedKeys,
+                selectedSite.Name
+            ));
         }
         catch (Exception error)
         {
@@ -653,6 +716,7 @@ public sealed partial class ServicesPage : Page
         try
         {
             var rows = new List<ManagedServiceRow>(instances.Count);
+            var previousLogLines = Rows.ToDictionary(row => row.Id, row => row.LastLogLine);
             foreach (var instance in instances)
             {
                 var installedVersion = manager.InstalledVersion(instance.DefinitionId);
@@ -660,6 +724,10 @@ public sealed partial class ServicesPage : Page
                 var state = manager.State(instance.Id, instance.DefinitionId);
                 rows.Add(new ManagedServiceRow
                 {
+                    PortText = AppLocalization.Format("ServicesCardPort", instance.Port),
+                    CardName = AppLocalization.Format("ServicesCardName", instance.Name, StateLabel(state)),
+                    CopyAddressLabel = AppLocalization.Format("ServicesCardCopyAddress", instance.Name),
+                    LastLogLine = previousLogLines.GetValueOrDefault(instance.Id) ?? string.Empty,
                     Id = instance.Id,
                     DefinitionId = instance.DefinitionId,
                     Name = instance.Name,
@@ -696,6 +764,7 @@ public sealed partial class ServicesPage : Page
                 Rows.Clear();
                 foreach (var row in rows) Rows.Add(row);
             }
+            RequestLogTails();
             ServiceList.Visibility = Rows.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
             EmptyState.Visibility = Rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             if (!working)
@@ -759,8 +828,8 @@ public sealed partial class ServicesPage : Page
         {
             if (child is Control control) control.IsEnabled = !working;
         }
-        AddServiceButton.IsEnabled = !working
-            && ServiceTypeBox.SelectedItem is ManagedServiceDefinition { IsInstallable: true };
+        if (working) AddServiceButton.IsEnabled = false;
+        else ValidateServiceInput();
         ServiceList.IsEnabled = !working;
         CancelOperationButton.Visibility = working && operationCancellation is not null
             ? Visibility.Visible : Visibility.Collapsed;
@@ -834,7 +903,12 @@ public sealed partial class ServicesPage : Page
 
     private async Task ShowErrorAsync(string message)
     {
-        await ShowMessageAsync("HerdMe", message);
+        if (!loaded || XamlRoot is not { } xamlRoot)
+        {
+            OperationStatusText.Text = message;
+            return;
+        }
+        await ErrorDialog.ShowAsync(xamlRoot, message);
     }
 
     private async Task ShowMessageAsync(string title, string message)

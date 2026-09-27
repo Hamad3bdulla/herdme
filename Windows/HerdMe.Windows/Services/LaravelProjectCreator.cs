@@ -84,6 +84,38 @@ public sealed partial class LaravelProjectCreator
                 cancellationToken
             );
 
+            var template = ProjectTemplateCatalog.Find(request.StarterKit);
+            string? nodeDirectory = null;
+            if (template is { Group: ProjectTemplateGroup.Package })
+            {
+                if (template.RequiresFrontend)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    progress?.Report(LaravelProjectCreationStage.PreparingNodeRuntime);
+                    nodeDirectory = await nodeInstaller.EnsureActiveRuntimeAsync(
+                        RuntimeCatalog.DefaultNodeMajor,
+                        cancellationToken
+                    );
+                }
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(LaravelProjectCreationStage.InstallingTemplate);
+                await ComposerToolManager.RunAsync(
+                    php,
+                    BuildTemplateRequireArguments(tools.ComposerPath, template),
+                    stagedDestination,
+                    tools.ManagedEnvironment(settings.PhpCycle),
+                    cancellationToken
+                );
+                cancellationToken.ThrowIfCancellationRequested();
+                await ComposerToolManager.RunAsync(
+                    php,
+                    ["artisan", .. template.InstallArguments(request.TestingFramework)],
+                    stagedDestination,
+                    tools.ManagedEnvironment(settings.PhpCycle),
+                    cancellationToken
+                );
+            }
+
             if (request.InstallBoost)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -107,11 +139,14 @@ public sealed partial class LaravelProjectCreator
             if (LaravelProjectCreationStages.RequiresFrontendAssets(request))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                progress?.Report(LaravelProjectCreationStage.PreparingNodeRuntime);
-                var nodeDirectory = await nodeInstaller.EnsureActiveRuntimeAsync(
-                    RuntimeCatalog.DefaultNodeMajor,
-                    cancellationToken
-                );
+                if (nodeDirectory is null)
+                {
+                    progress?.Report(LaravelProjectCreationStage.PreparingNodeRuntime);
+                    nodeDirectory = await nodeInstaller.EnsureActiveRuntimeAsync(
+                        RuntimeCatalog.DefaultNodeMajor,
+                        cancellationToken
+                    );
+                }
                 var npm = Path.Combine(nodeDirectory, "npm.cmd");
                 ValidateFrontendBuild(stagedDestination);
 
@@ -156,6 +191,13 @@ public sealed partial class LaravelProjectCreator
                     && !File.Exists(Path.Combine(stagedDestination, "public", "build", "manifest.json")))
             {
                 throw new InvalidDataException("Laravel Installer finished without creating a complete Laravel project.");
+            }
+            if (template is { Group: ProjectTemplateGroup.Package }
+                && !File.Exists(Path.Combine(
+                    [stagedDestination, "vendor", .. template.ComposerPackage.Split('/'), "composer.json"]
+                )))
+            {
+                throw new InvalidDataException("The selected template's Composer package was not installed.");
             }
             cancellationToken.ThrowIfCancellationRequested();
             if (Directory.Exists(destination) || File.Exists(destination))
@@ -247,6 +289,18 @@ public sealed partial class LaravelProjectCreator
             arguments.Add("--using=" + request.CustomStarterKit!.Trim());
             arguments.Add("--npm");
         }
+        return arguments;
+    }
+
+    public static IReadOnlyList<string> BuildTemplateRequireArguments(string composerPath, ProjectTemplate template)
+    {
+        if (template.Group != ProjectTemplateGroup.Package || template.ComposerPackage.Length == 0)
+        {
+            throw new ArgumentException("Only package templates are installed with Composer.", nameof(template));
+        }
+        var arguments = new List<string> { composerPath, "require", template.ComposerPackage };
+        if (template.ComposerDevDependency) arguments.Add("--dev");
+        arguments.AddRange(["--no-interaction", "--no-progress", "--no-ansi"]);
         return arguments;
     }
 

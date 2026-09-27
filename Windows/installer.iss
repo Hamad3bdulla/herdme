@@ -85,6 +85,11 @@ Type: filesandordirs; Name: "{localappdata}\Microsoft\Windows Terminal\Fragments
 [Run]
 Filename: "{app}\HerdMe.Windows.exe"; Description: "Launch HerdMe"; Flags: nowait postinstall skipifsilent
 
+[UninstallRun]
+; Removes the opt-in Windows notification registration (General > Buttons on notifications).
+; It does nothing when that switch was never turned on.
+Filename: "{app}\HerdMe.Windows.exe"; Parameters: "--unregister-notifications"; Flags: runhidden waituntilterminated; RunOnceId: "HerdMeUnregisterNotifications"
+
 [Code]
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var

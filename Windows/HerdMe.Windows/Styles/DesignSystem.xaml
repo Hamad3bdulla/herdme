@@ -296,6 +296,12 @@
         <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCriticalBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
+    <!-- Field messages under inputs (InputValidation): a warning that does not block. -->
+    <Style x:Key="StatusCautionTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
     <!-- Card-looking Grid for rows that code builds and diffs in place (downloads, updates). -->
     <Style x:Key="ListCardStyle" TargetType="Grid">
         <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />

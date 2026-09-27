@@ -70,6 +70,8 @@ public sealed class AppServices : IAsyncDisposable
         );
         SiteRuntimes = new SiteRuntimeStore();
         CommandFavorites = new SiteCommandFavoritesStore(SiteSettings.SupportRoot);
+        NotificationHistory = new NotificationHistory(SiteSettings.SupportRoot);
+        StartupSnapshot = new StartupSnapshotStore(SiteSettings.SupportRoot);
         SiteProcesses = new SiteProcessManager();
         InitialSetup = new InitialSetupManager(
             SiteSettings,
@@ -133,6 +135,12 @@ public sealed class AppServices : IAsyncDisposable
     public SiteCommandFavoritesStore CommandFavorites { get; }
 
     public ProxySiteStore ProxySites { get; }
+
+    // The title bar bell (App.Notifications.cs, MainWindow.Bell.cs).
+    public NotificationHistory NotificationHistory { get; }
+
+    // Last session's sites and counts, painted before the first scan finishes.
+    public StartupSnapshotStore StartupSnapshot { get; }
 
     public CloudflaredInstaller Tunnels { get; }
 

@@ -79,6 +79,43 @@ public sealed class SitesListItem : INotifyPropertyChanged
 
     private bool HasError => !string.IsNullOrWhiteSpace(lastError);
 
+    // Inline rename (F2): the row swaps its domain text for a text box and a live message.
+    private bool isRenaming;
+    private string renameMessage = string.Empty;
+    private bool renameMessageIsError;
+
+    public bool IsRenaming => isRenaming;
+
+    public Visibility DisplayVisibility => isRenaming ? Visibility.Collapsed : Visibility.Visible;
+
+    public Visibility RenameVisibility => isRenaming ? Visibility.Visible : Visibility.Collapsed;
+
+    public string RenameMessage => renameMessage;
+
+    public Style RenameMessageStyle => (Style)Application.Current.Resources[
+        renameMessageIsError ? "StatusCriticalTextStyle" : "CaptionTextStyle"
+    ];
+
+    public void SetRenaming(bool renaming)
+    {
+        if (isRenaming == renaming) return;
+        isRenaming = renaming;
+        if (!renaming) SetRenameMessage(string.Empty, false);
+        Raise(nameof(IsRenaming));
+        Raise(nameof(DisplayVisibility));
+        Raise(nameof(RenameVisibility));
+    }
+
+    public void SetRenameMessage(string message, bool isError)
+    {
+        if (string.Equals(renameMessage, message, StringComparison.Ordinal)
+            && renameMessageIsError == isError) return;
+        renameMessage = message;
+        renameMessageIsError = isError;
+        Raise(nameof(RenameMessage));
+        Raise(nameof(RenameMessageStyle));
+    }
+
     public void Update(SiteRecord site)
     {
         Site = site;
