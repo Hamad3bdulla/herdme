@@ -6,7 +6,8 @@ namespace HerdMe.Windows.Services;
 
 public sealed record JumpListEntry(string Title, string Arguments, string Description);
 
-// Builds the taskbar Jump List: fixed tasks plus a "Sites" category (favorites first).
+// Builds the taskbar Jump List: fixed tasks, a "Recent" category (sites opened last) and a
+// "Sites" category (favorites first, without the recent ones).
 // Every entry relaunches HerdMe.Windows.exe with --command, which the running instance
 // receives over the command pipe, so a click never starts a second copy of HerdMe.
 public static class JumpListManager
@@ -35,16 +36,40 @@ public static class JumpListManager
             new JumpListEntry(
                 ServiceText.Get("JumpListTinker", "Tinker"),
                 "--command show tinker",
-                ServiceText.Get("JumpListTinkerDescription", "Show the Tinker page")
+                ServiceText.Get("JumpListTinkerDescription", "Open Tinker in the Sites page")
             )
         ];
     }
 
-    // Sites whose names are not valid command arguments are left out rather than escaped.
-    public static IReadOnlyList<JumpListEntry> BuildSites(IEnumerable<SiteRecord> sites)
+    public const int MaximumRecent = 4;
+
+    // The sites opened last, newest first (RecentSitesStore). Unknown paths are skipped.
+    public static IReadOnlyList<JumpListEntry> BuildRecent(IEnumerable<SiteRecord> sites, IEnumerable<string> recentPaths)
     {
+        var known = sites
+            .Where(site => AppCommandProtocol.IsSiteName(site.Name))
+            .GroupBy(site => site.Path, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        return recentPaths
+            .Where(known.ContainsKey)
+            .Select(path => known[path])
+            .DistinctBy(site => site.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(MaximumRecent)
+            .Select(site => new JumpListEntry(site.Name, $"--command site {site.Name}", site.Domain))
+            .ToList();
+    }
+
+    // Sites whose names are not valid command arguments are left out rather than escaped.
+    // Sites already in the Recent category are not repeated.
+    public static IReadOnlyList<JumpListEntry> BuildSites(
+        IEnumerable<SiteRecord> sites,
+        IReadOnlyCollection<JumpListEntry>? recent = null
+    )
+    {
+        var shown = (recent ?? Array.Empty<JumpListEntry>()).Select(entry => entry.Title).ToHashSet(StringComparer.OrdinalIgnoreCase);
         return sites
             .Where(site => AppCommandProtocol.IsSiteName(site.Name))
+            .Where(site => !shown.Contains(site.Name))
             .OrderByDescending(site => site.IsFavorite)
             .ThenBy(site => site.Name, StringComparer.OrdinalIgnoreCase)
             .DistinctBy(site => site.Name, StringComparer.OrdinalIgnoreCase)
@@ -59,10 +84,13 @@ public static class JumpListManager
 
     public static string SitesCategory => ServiceText.Get("JumpListSitesCategory", "Sites");
 
+    public static string RecentCategory => ServiceText.Get("JumpListRecentCategory", "Recent");
+
     // Returns false when the shell rejected the list (Explorer restarting, policy disabled).
     [SupportedOSPlatform("windows")]
-    public static bool Apply(string executable, IEnumerable<SiteRecord> sites)
+    public static bool Apply(string executable, IEnumerable<SiteRecord> sites, IEnumerable<string>? recentPaths = null)
     {
+        var siteList = sites.ToList();
         object? list = null;
         try
         {
@@ -72,23 +100,9 @@ public static class JumpListManager
             destinations.BeginList(out _, ref removedGuid, out var removed);
             ReleaseComObject(removed);
 
-            var siteEntries = BuildSites(sites);
-            if (siteEntries.Count > 0)
-            {
-                var siteCollection = CreateCollection(executable, siteEntries);
-                try
-                {
-                    destinations.AppendCategory(SitesCategory, (IObjectArray)siteCollection);
-                }
-                catch (COMException)
-                {
-                    // E_ACCESSDENIED when the user turned off recent items; tasks still work.
-                }
-                finally
-                {
-                    ReleaseComObject(siteCollection);
-                }
-            }
+            var recentEntries = BuildRecent(siteList, recentPaths ?? Array.Empty<string>());
+            AppendCategory(destinations, executable, RecentCategory, recentEntries);
+            AppendCategory(destinations, executable, SitesCategory, BuildSites(siteList, recentEntries));
 
             var taskCollection = CreateCollection(executable, BuildTasks());
             try
@@ -116,6 +130,30 @@ public static class JumpListManager
         finally
         {
             ReleaseComObject(list);
+        }
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static void AppendCategory(
+        ICustomDestinationList destinations,
+        string executable,
+        string category,
+        IReadOnlyList<JumpListEntry> entries
+    )
+    {
+        if (entries.Count == 0) return;
+        var collection = CreateCollection(executable, entries);
+        try
+        {
+            destinations.AppendCategory(category, (IObjectArray)collection);
+        }
+        catch (COMException)
+        {
+            // E_ACCESSDENIED when the user turned off recent items; tasks still work.
+        }
+        finally
+        {
+            ReleaseComObject(collection);
         }
     }
 

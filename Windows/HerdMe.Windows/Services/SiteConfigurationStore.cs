@@ -196,6 +196,11 @@ public sealed class SiteConfigurationStore
         Update(settings => settings.ActionNotifications = enabled);
     }
 
+    public void UpdateMailNotifications(bool enabled)
+    {
+        Update(settings => settings.MailNotifications = enabled);
+    }
+
     public void UpdateSitesListWidth(double width)
     {
         var clamped = ClampSitesListWidth(width);
@@ -440,6 +445,7 @@ public sealed class SiteConfigurationStore
             CompactMode = settings.CompactMode,
             ShowNotifications = settings.ShowNotifications,
             ActionNotifications = settings.ActionNotifications,
+            MailNotifications = settings.MailNotifications,
             SitesListWidth = ClampSitesListWidth(settings.SitesListWidth),
             UiLanguage = UiLanguageSettings.Normalize(settings.UiLanguage),
             ReduceMotion = settings.ReduceMotion,

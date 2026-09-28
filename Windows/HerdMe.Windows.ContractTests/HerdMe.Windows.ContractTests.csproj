@@ -127,6 +127,13 @@
     <Compile Include="Round6UxContractChecks.cs" />
     <Compile Include="Round7UxContractChecks.cs" />
     <Compile Include="Round8UxContractChecks.cs" />
+    <Compile Include="ReportedIssueContractChecks.cs" />
+    <Compile Include="Round9UxContractChecks.cs" />
+    <Compile Include="../HerdMe.Windows/Services/SiteWarnings.cs" Link="Services/SiteWarnings.cs" />
+    <Compile Include="../HerdMe.Windows/Services/RecentSitesStore.cs" Link="Services/RecentSitesStore.cs" />
+    <Compile Include="../HerdMe.Windows/Services/TinkerSnippetStore.cs" Link="Services/TinkerSnippetStore.cs" />
+    <Compile Include="../HerdMe.Windows/Services/TinkerOutputFormatter.cs" Link="Services/TinkerOutputFormatter.cs" />
+    <Compile Include="../HerdMe.Windows/Services/DatabasePeek.cs" Link="Services/DatabasePeek.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteQuickProbe.cs" Link="Services/SiteQuickProbe.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteRenamer.cs" Link="Services/SiteRenamer.cs" />
     <Compile Include="../HerdMe.Windows/Services/ErrorPresentation.cs" Link="Services/ErrorPresentation.cs" />

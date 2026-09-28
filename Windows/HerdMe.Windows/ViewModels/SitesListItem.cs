@@ -1,5 +1,7 @@
 using System.ComponentModel;
+using System.Globalization;
 using HerdMe.Windows.Models;
+using HerdMe.Windows.Services;
 using HerdMe.Windows.Views;
 using Microsoft.UI.Xaml;
 
@@ -186,6 +188,27 @@ public sealed class SitesListItem : INotifyPropertyChanged
         }
     }
 
+    // Row warning badge (missing PHP, .env, APP_KEY or vendor); the flyout offers the fixes.
+    private IReadOnlyList<SiteWarning> warnings = [];
+
+    public IReadOnlyList<SiteWarning> Warnings => warnings;
+
+    public Visibility WarningVisibility => warnings.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    public string WarningCount => warnings.Count.ToString(CultureInfo.CurrentCulture);
+
+    public string WarningSummary => string.Join("\n", warnings.Select(SiteWarningText.Describe));
+
+    public void SetWarnings(IReadOnlyList<SiteWarning> next)
+    {
+        if (warnings.SequenceEqual(next)) return;
+        warnings = next;
+        Raise(nameof(Warnings));
+        Raise(nameof(WarningVisibility));
+        Raise(nameof(WarningCount));
+        Raise(nameof(WarningSummary));
+    }
+
     private void Raise(string propertyName)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -217,5 +240,25 @@ internal static class FrameworkVisuals
         "PHP" => "Php",
         "Node.js" => "Node",
         _ => "Site"
+    };
+}
+
+internal static class SiteWarningText
+{
+    public static string Describe(SiteWarning warning) => warning.Kind switch
+    {
+        SiteWarningKind.PhpNotInstalled => AppLocalization.Format("SitesWarningPhpNotInstalled", warning.Detail),
+        SiteWarningKind.EnvironmentMissing => AppLocalization.Get("SitesWarningEnvironmentMissing"),
+        SiteWarningKind.AppKeyMissing => AppLocalization.Get("SitesWarningAppKeyMissing"),
+        SiteWarningKind.DependenciesMissing => AppLocalization.Get("SitesWarningDependenciesMissing"),
+        _ => warning.Kind.ToString()
+    };
+
+    public static string FixLabel(SiteWarning warning) => warning.Kind switch
+    {
+        SiteWarningKind.PhpNotInstalled => AppLocalization.Format("SitesWarningFixInstallPhp", warning.Detail),
+        SiteWarningKind.EnvironmentMissing => AppLocalization.Get("SitesWarningFixEnvironment"),
+        SiteWarningKind.AppKeyMissing => AppLocalization.Get("SitesWarningFixAppKey"),
+        _ => AppLocalization.Get("SitesWarningFixDependencies")
     };
 }

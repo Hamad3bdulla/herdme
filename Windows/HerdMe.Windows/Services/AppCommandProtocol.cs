@@ -331,7 +331,7 @@ public static partial class AppCommandProtocol
               site <site>       Show a site in the HerdMe window
               share <site>      Open the share dialog for a site (you confirm in HerdMe)
               logs [site]       Show the Logs page
-              tinker [site]     Show the Tinker page
+              tinker [site]     Open Tinker in the Sites page
               ping              Exit 0 when HerdMe is running (does not start it)
               --version         Print the version
               help              Show this help

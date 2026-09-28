@@ -24,6 +24,10 @@ public sealed class WindowsSiteSettings
     // Off keeps the tray balloon, which needs no Windows registration.
     public bool ActionNotifications { get; set; }
 
+    // A notification with the subject and an Open button when a mail is captured while the
+    // Mail page is not in front. Uses the same switch and throttle as the other notifications.
+    public bool MailNotifications { get; set; } = true;
+
     // Width of the Sites list pane, set by dragging the splitter.
     public double SitesListWidth { get; set; } = SitesListWidthDefault;
 

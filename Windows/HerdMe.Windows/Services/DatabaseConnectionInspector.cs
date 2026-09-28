@@ -62,16 +62,16 @@ public static class DatabaseConnectionInspector
         return new(true, engine, version, (int)Math.Clamp(tableCount, 0, int.MaxValue), Math.Max(0, size), elapsed, "Connection successful.");
     }
 
-    private static string FindClient(string serverExecutable, IReadOnlyList<string> names, string serviceName)
+    internal static string FindClient(string serverExecutable, IReadOnlyList<string> names, string serviceName)
     {
         var dir = Path.GetDirectoryName(serverExecutable) ?? throw new FileNotFoundException($"The {serviceName} runtime path is invalid.");
         return names.Select(name => Path.Combine(dir, name)).FirstOrDefault(File.Exists)
             ?? throw new FileNotFoundException($"The {serviceName} runtime is missing its command-line client.");
     }
 
-    private sealed record CommandResult(int ExitCode, string Output, string Error);
+    internal sealed record CommandResult(int ExitCode, string Output, string Error);
 
-    private static async Task<CommandResult> RunAsync(string executable, IReadOnlyList<string> arguments, IReadOnlyDictionary<string, string?> environment, string sql, CancellationToken cancellationToken)
+    internal static async Task<CommandResult> RunAsync(string executable, IReadOnlyList<string> arguments, IReadOnlyDictionary<string, string?> environment, string sql, CancellationToken cancellationToken)
     {
         var info = new ProcessStartInfo { FileName = executable, UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var argument in arguments) info.ArgumentList.Add(argument);

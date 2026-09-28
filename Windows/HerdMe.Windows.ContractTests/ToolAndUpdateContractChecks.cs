@@ -416,6 +416,10 @@ internal static partial class ContractChecks
             () => XdebugManager.SelectWindowsRelease(xdebugFixture, "8.5", "nts", "x86_64"),
             "Xdebug resolver rejects a missing PHP build"
         );
+        Throws<XdebugBuildUnavailableException>(
+            () => XdebugManager.SelectWindowsRelease(xdebugFixture, "8.5", "nts", "x86_64"),
+            "a release without a build for this PHP line is reported as not yet available"
+        );
         var xdebugArchive = Path.Combine(supportRoot, "xdebug-fixture.zip");
         var xdebugDll = Path.Combine(supportRoot, "xdebug-fixture.dll");
         using (var archive = ZipFile.Open(xdebugArchive, ZipArchiveMode.Create))

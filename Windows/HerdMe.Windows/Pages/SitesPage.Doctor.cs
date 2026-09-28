@@ -108,6 +108,13 @@ public sealed partial class SitesPage
         };
         dialog.Closed += (_, _) => repairCancellation.Cancel();
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        await RepairSiteAsync(site, cycle);
+    }
+
+    // The Site Doctor repair: .env and APP_KEY, managed PHP config, Composer and vendor,
+    // Laravel folders and links, then the local server. Also used by the row warning badge.
+    private async Task RepairSiteAsync(SiteRecord site, string cycle)
+    {
         await RunSiteOperationAsync(
             AppLocalization.Get("SitesRepairing"),
             async (progress, cancellationToken) =>
@@ -225,6 +232,7 @@ public sealed partial class SitesPage
                 await RefreshSiteDetailsAsync(site);
             }
         );
+        await RefreshSiteWarningsAsync(site.Path);
     }
 
     private static string DoctorCheckRow(SiteHealthCheck check) => AppLocalization.Format(

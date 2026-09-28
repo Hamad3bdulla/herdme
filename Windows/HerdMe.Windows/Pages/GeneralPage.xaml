@@ -157,6 +157,20 @@
                                 </StackPanel>
                                 <ToggleSwitch x:Name="ActionNotificationsToggle" x:Uid="ActionNotificationsToggle" Grid.Column="2" MinWidth="0" AutomationProperties.AutomationId="ActionNotificationsToggle" AutomationProperties.Name="Buttons on notifications" Toggled="ActionNotificationsToggle_Toggled" />
                             </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE715;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralMailNotificationsTitle" Text="New mail" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Uid="GeneralMailNotificationsDescription" Text="Notify with the sender, subject and an Open button when a mail is captured while the Mail page is not open." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="MailNotificationsToggle" x:Uid="MailNotificationsToggle" Grid.Column="2" MinWidth="0" AutomationProperties.AutomationId="MailNotificationsToggle" AutomationProperties.Name="New mail notifications" Toggled="MailNotificationsToggle_Toggled" />
+                            </Grid>
                         </StackPanel>
                     </Border>
                 </StackPanel>

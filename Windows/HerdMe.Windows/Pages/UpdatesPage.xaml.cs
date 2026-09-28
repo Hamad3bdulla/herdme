@@ -490,15 +490,25 @@ public sealed partial class UpdatesPage : Page
         ManagedComponentUpdateCheck components
     )
     {
-        var unavailable = components.Failures.Select(failure => failure.Component).ToList();
-        if (applicationError is not null || latestApplication?.UsedBundledFallback == true)
-            unavailable.Insert(0, "HerdMe");
+        var unavailable = components.Failures
+            .Select(failure => (failure.Component, Reason: FailureReason(failure.Error)))
+            .ToList();
+        if (applicationError is not null)
+            unavailable.Insert(0, ("HerdMe", FailureReason(applicationError)));
+        else if (latestApplication?.UsedBundledFallback == true)
+            unavailable.Insert(0, ("HerdMe", AppLocalization.Get("UpdatesFeedNotPublished")));
         if (unavailable.Count > 0)
         {
+            // Name each reason so a failed check can be acted on instead of guessed at.
+            var details = unavailable.Select(item =>
+                AppLocalization.Format("UpdatesFailureDetail", item.Component, item.Reason));
             ShowStatus(
                 InfoBarSeverity.Warning,
                 AppLocalization.Get("UpdatesPartialTitle"),
-                AppLocalization.Format("UpdatesPartialMessage", string.Join(", ", unavailable))
+                AppLocalization.Format(
+                    "UpdatesPartialMessage",
+                    string.Join(", ", unavailable.Select(item => item.Component))
+                ) + "\n" + string.Join("\n", details)
             );
         }
         else if (latestApplication?.AvailableRelease is null && components.Updates.Count == 0)
@@ -513,6 +523,20 @@ public sealed partial class UpdatesPage : Page
         {
             StatusBar.IsOpen = false;
         }
+    }
+
+    private static string FailureReason(Exception error)
+    {
+        if (error is HttpRequestException { StatusCode: System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.TooManyRequests })
+            return AppLocalization.Get("UpdatesFailureRateLimited");
+        if (error is HttpRequestException { StatusCode: { } status })
+            return AppLocalization.Format("UpdatesFailureHttp", (int)status);
+        if (error is HttpRequestException)
+            return AppLocalization.Get("UpdatesFailureOffline");
+        if (error is OperationCanceledException or TimeoutException)
+            return AppLocalization.Get("UpdatesFailureTimeout");
+        var message = error.Message.Split('\n', 2)[0].Trim();
+        return message.Length <= 140 ? message : message[..137] + "...";
     }
 
     private void ShowStatus(InfoBarSeverity severity, string title, string message)

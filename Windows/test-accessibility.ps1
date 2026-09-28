@@ -74,7 +74,6 @@ $pages = @(
     @{ Navigation = "NavMail"; Page = "MailPageRoot" },
     @{ Navigation = "NavDumps"; Page = "DumpsPageRoot" },
     @{ Navigation = "NavDebugger"; Page = "DebuggerPageRoot" },
-    @{ Navigation = "NavTinker"; Page = "TinkerPageRoot" },
     @{ Navigation = "NavLogs"; Page = "LogsPageRoot" },
     @{ Navigation = "NavAbout"; Page = "AboutPageRoot" }
 )

@@ -85,6 +85,8 @@ public sealed partial class GeneralPage : Page
         NotificationsToggle.IsOn = settings.ShowNotifications;
         ActionNotificationsToggle.IsOn = settings.ActionNotifications;
         ActionNotificationsToggle.IsEnabled = settings.ShowNotifications;
+        MailNotificationsToggle.IsOn = settings.MailNotifications;
+        MailNotificationsToggle.IsEnabled = settings.ShowNotifications;
         loadingNotifications = false;
         LoadAppearance(settings);
         TldTextBox.Text = settings.Tld;
@@ -115,6 +117,13 @@ public sealed partial class GeneralPage : Page
         if (loadingNotifications) return;
         settingsStore.UpdateShowNotifications(NotificationsToggle.IsOn);
         ActionNotificationsToggle.IsEnabled = NotificationsToggle.IsOn;
+        MailNotificationsToggle.IsEnabled = NotificationsToggle.IsOn;
+    }
+
+    private void MailNotificationsToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (loadingNotifications) return;
+        settingsStore.UpdateMailNotifications(MailNotificationsToggle.IsOn);
     }
 
     // Registers or removes HerdMe's Windows notification registration right away; a refusal

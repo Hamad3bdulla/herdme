@@ -460,6 +460,14 @@
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
+    <!-- Same size for icon-only toggles; a Button style cannot be applied to a ToggleButton. -->
+    <Style x:Key="ToolbarIconToggleButtonStyle" TargetType="ToggleButton">
+        <Setter Property="Width" Value="36" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
     <!-- Icon-only and menu versions of a destructive action: same red, same confirmation. -->
     <Style x:Key="DangerToolbarIconButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarIconButtonStyle}">
         <Setter Property="Foreground" Value="{ThemeResource DangerInkBrush}" />

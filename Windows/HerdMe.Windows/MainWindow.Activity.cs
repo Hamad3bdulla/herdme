@@ -79,6 +79,19 @@ public sealed partial class MainWindow
         ));
         CountActivity("mail");
         MarkGettingStarted(GettingStarted.StepSendMail);
+        NotifyNewMail(mail.Subject, mail.Sender);
+    }
+
+    // Queued after CountActivity, so UnseenMail already includes this message. Nothing is
+    // shown while the user is looking at the Mail page.
+    private void NotifyNewMail(string? subject, string? sender)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (shuttingDown) return;
+            if (App.IsMainWindowVisible && currentPageTag == "mail") return;
+            ((App)Application.Current).NotifyMailCaptured(subject, sender, UnseenMail);
+        });
     }
 
     private void Dumps_DumpCaptured(object? sender, CapturedDump dump)
@@ -147,6 +160,16 @@ public sealed partial class MainWindow
         if (string.IsNullOrWhiteSpace(sitePath)) return;
         LastOpenedSitePath = sitePath;
         MarkGettingStarted(GettingStarted.StepOpenSite);
+        RememberRecentSite(sitePath);
+    }
+
+    // Editor, terminal and Tinker opens count as "recent" too, but not as the Getting started
+    // "open a site" step. The tray menu rebuilds from ActivityChanged.
+    public void RememberRecentSite(string sitePath)
+    {
+        if (shuttingDown || string.IsNullOrWhiteSpace(sitePath)) return;
+        App.RecordRecentSite(sitePath);
+        ActivityChanged?.Invoke(this, EventArgs.Empty);
     }
 
     // The dashboard reports how many health issues it found; the nav item shows the count.

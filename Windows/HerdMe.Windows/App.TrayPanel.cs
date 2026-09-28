@@ -43,7 +43,8 @@ public partial class App
             environment.IsDegraded,
             KnownSites,
             MainWindow.UnseenMail,
-            services.Shares.Active.Count
+            services.Shares.Active.Count,
+            RecentSitePaths
         );
     }
 

@@ -269,7 +269,17 @@ public sealed class ManagedComponentUpdateManager
         var php = phpInstaller.PhpExecutable(cycle);
         var installed = await xdebugManager!.InstalledAsync(php, cycle, cancellationToken);
         if (installed is null) return [];
-        var release = await xdebugManager.ResolveReleaseAsync(php, cancellationToken);
+        XdebugWindowsRelease release;
+        try
+        {
+            release = await xdebugManager.ResolveReleaseAsync(php, cancellationToken);
+        }
+        catch (XdebugBuildUnavailableException)
+        {
+            // Xdebug publishes new releases before every PHP line has a Windows build; the
+            // installed build stays current until one appears.
+            return [];
+        }
         return CreateUpdate(
             $"xdebug:{cycle}",
             $"Xdebug (PHP {cycle})",

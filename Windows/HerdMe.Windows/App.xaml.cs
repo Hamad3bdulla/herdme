@@ -77,6 +77,7 @@ public partial class App : Application
         };
         services = new AppServices();
         StartupSnapshot = services.StartupSnapshot;
+        RecentSites = services.RecentSites;
         SeedKnownSitesFromSnapshot();
         // Before any resource lookup or XAML load, so x:Uid, ResourceLoader and FlowDirection
         // all agree on the language chosen in General.
@@ -88,6 +89,11 @@ public partial class App : Application
 
     // Shared with the Dashboard and the Jump List refresh; one instance, so writes never race.
     internal static StartupSnapshotStore? StartupSnapshot { get; private set; }
+
+    // Sites opened last (browser, editor, terminal, Tinker); the tray and Jump List list them first.
+    internal static RecentSitesStore? RecentSites { get; private set; }
+
+    internal static IReadOnlyList<string> RecentSitePaths => RecentSites?.Paths ?? [];
 
     // The tray, the quick panel and the Sites page start from the sites the last session saw;
     // the first scan replaces them a moment later. Acceptance runs always start empty.

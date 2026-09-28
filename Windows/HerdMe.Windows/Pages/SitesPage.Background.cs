@@ -36,6 +36,7 @@ public sealed partial class SitesPage
             terminal.ArgumentList.Add("-d");
             terminal.ArgumentList.Add(selectedSite.Path);
             Process.Start(terminal);
+            App.MainWindow.RememberRecentSite(selectedSite.Path);
         }
         catch (Exception error) when (error is Win32Exception or InvalidOperationException)
         {

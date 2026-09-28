@@ -3,6 +3,24 @@
 All notable changes to HerdMe are documented in this file. The project follows
 Semantic Versioning for public releases.
 
+## [0.1.29] - 2026-09-28
+
+### Added
+
+- Windows: site warnings with repair actions, recently opened sites in the tray and Jump List,
+  per-site Tinker snippets and output views, captured-mail notifications, and read-only
+  database table previews.
+
+### Changed
+
+- Windows: Tinker now opens within the selected site's details.
+
+### Fixed
+
+- Windows: Logs and Mail toggle styles no longer cause a page crash.
+- Windows: update checks explain individual failures and treat unavailable Xdebug builds
+  as no update.
+
 ## [0.1.28] - 2026-09-28
 
 ### Added
@@ -55,6 +73,16 @@ Semantic Versioning for public releases.
 - Windows: Start all, Stop all and Open site buttons under the taskbar thumbnail.
 - Windows: a bell in the title bar keeps the last 50 notifications, including ones
   Windows did not show, and clicking one opens what it is about.
+- Windows: site rows show a warning badge (PHP version not installed, no .env, empty
+  APP_KEY, Composer packages not installed) with a one-click fix for each.
+- Windows: the sites opened last come first in the tray menu, the tray panel and a
+  Recent category in the Jump List.
+- Windows: Tinker saves named snippets per site, runs only the selected code when
+  there is a selection, and shows results as Dump, indented JSON or a table.
+- Windows: a notification for new captured mail with the sender, the subject and an
+  Open Mail button (its own switch in General).
+- Windows: Browse tables in the Sites Database tab lists the tables and the first 50
+  rows of one, read-only.
 
 ### Changed
 

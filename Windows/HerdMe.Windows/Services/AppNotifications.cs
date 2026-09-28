@@ -68,6 +68,36 @@ public static class AppNotifications
         NotificationActions.OpenPage("updates", "NotificationActionOpenUpdates")
     );
 
+    public const int MailSnippetCharacters = 120;
+
+    // Captured mail stays on this PC; the notification shows only sender and subject.
+    public static AppNotification MailCaptured(string? subject, string? sender, int unseen)
+    {
+        var title = string.IsNullOrWhiteSpace(subject)
+            ? ServiceText.Get("NotificationMailNoSubject", "(no subject)")
+            : subject;
+        var from = string.IsNullOrWhiteSpace(sender)
+            ? ServiceText.Get("NotificationMailTitle", "New mail")
+            : ServiceText.Format("NotificationMailFrom", "New mail from {0}", sender);
+        var message = Snippet(title);
+        if (unseen > 1)
+        {
+            message = ServiceText.Format("NotificationMailMore", "{0} ({1} unread)", message, unseen);
+        }
+        return new AppNotification(
+            "mail",
+            Snippet(from),
+            message,
+            NotificationActions.OpenPage("mail", "NotificationActionOpenMail")
+        );
+    }
+
+    private static string Snippet(string text)
+    {
+        var line = text.ReplaceLineEndings(" ").Trim();
+        return line.Length > MailSnippetCharacters ? line[..(MailSnippetCharacters - 3)] + "..." : line;
+    }
+
     public static AppNotification CrashReported() => new(
         "crash",
         ServiceText.Get("NotificationCrashTitle", "HerdMe closed unexpectedly"),

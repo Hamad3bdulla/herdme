@@ -1207,7 +1207,6 @@
   <data name="DebuggerMilliseconds" xml:space="preserve"><value>{0} مللي ث</value></data>
   <data name="DebuggerMegabytes" xml:space="preserve"><value>{0} ميجابايت</value></data>
   <data name="DebuggerKilobytes" xml:space="preserve"><value>{0} كيلوبايت</value></data>
-  <data name="NavTinker.Content" xml:space="preserve"><value>مجرّب Tinker</value></data>
   <data name="TinkerPageTitle.Text" xml:space="preserve"><value>مجرّب Tinker</value></data>
   <data name="TinkerPageSubtitle.Text" xml:space="preserve"><value>شغّل كود PHP داخل موقع مع تحميل Composer وLaravel مسبقاً.</value></data>
   <data name="TinkerSiteLabel.Text" xml:space="preserve"><value>الموقع</value></data>
@@ -1215,7 +1214,7 @@
   <data name="TinkerClearHistoryButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>مسح الكود الأخير</value></data>
   <data name="TinkerCodeTitle.Text" xml:space="preserve"><value>الكود</value></data>
   <data name="TinkerCodeBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>كود PHP</value></data>
-  <data name="TinkerReady.Text" xml:space="preserve"><value>استخدم return لعرض قيمة. Ctrl+Enter يشغّل الكود.</value></data>
+  <data name="TinkerReady.Text" xml:space="preserve"><value>استخدم return لعرض قيمة. Ctrl+Enter يشغّل الكود، أو الأسطر المحددة فقط.</value></data>
   <data name="TinkerCancelButton.Content" xml:space="preserve"><value>إلغاء</value></data>
   <data name="TinkerRunButton.Text" xml:space="preserve"><value>تشغيل</value></data>
   <data name="TinkerOutputTitle.Text" xml:space="preserve"><value>المخرجات</value></data>
@@ -1245,7 +1244,7 @@
   <data name="JumpListSites" xml:space="preserve"><value>المواقع</value></data>
   <data name="JumpListSitesDescription" xml:space="preserve"><value>عرض صفحة المواقع</value></data>
   <data name="JumpListTinker" xml:space="preserve"><value>مجرّب Tinker</value></data>
-  <data name="JumpListTinkerDescription" xml:space="preserve"><value>عرض صفحة Tinker</value></data>
+  <data name="JumpListTinkerDescription" xml:space="preserve"><value>فتح Tinker في صفحة المواقع</value></data>
   <data name="JumpListSitesCategory" xml:space="preserve"><value>المواقع</value></data>
   <data name="GeneralWindowsIntegrationSectionTitle.Text" xml:space="preserve"><value>التكامل مع ويندوز</value></data>
   <data name="GeneralWindowsIntegrationDescription.Text" xml:space="preserve"><value>اختياري. كل مفتاح يكتب إدخالاً واحداً باسم HerdMe لحسابك في ويندوز فقط، ويُحذف عند إيقافه أو عند إلغاء تثبيت HerdMe.</value></data>
@@ -1786,4 +1785,73 @@
   <data name="NotificationOperationFailedMessage" xml:space="preserve"><value>فشلت {0}.</value></data>
   <data name="NotificationOperationFailedWithError" xml:space="preserve"><value>فشلت {0}: {1}</value></data>
   <data name="SitesTintBrush" xml:space="preserve"><value>لون الموقع</value></data>
+  <data name="UpdatesFailureDetail" xml:space="preserve"><value>تعذر فحص {0}: {1}</value></data>
+  <data name="UpdatesFeedNotPublished" xml:space="preserve"><value>لم يُعثر على ملف التحديثات على الإنترنت لهذا الإصدار، فقُرئت قائمة الإصدارات المضمّنة فقط</value></data>
+  <data name="UpdatesFailureHttp" xml:space="preserve"><value>ردّ الخادم برمز HTTP {0}</value></data>
+  <data name="UpdatesFailureOffline" xml:space="preserve"><value>تعذّر الوصول إلى الخادم (تحقق من الاتصال بالإنترنت)</value></data>
+  <data name="UpdatesFailureTimeout" xml:space="preserve"><value>استغرق الخادم وقتًا طويلًا للرد</value></data>
+  <data name="UpdatesFailureRateLimited" xml:space="preserve"><value>يحدّ GitHub من الطلبات حاليًا؛ حاول مرة أخرى بعد ساعة</value></data>
+  <data name="SitesTabTinker.Text" xml:space="preserve"><value>تينكر</value></data>
+  <data name="SitesContextOpenTinker.Text" xml:space="preserve"><value>افتح في Tinker</value></data>
+  <data name="SitesWarningPhpNotInstalled" xml:space="preserve"><value>PHP {0} غير مثبت</value></data>
+  <data name="SitesWarningEnvironmentMissing" xml:space="preserve"><value>ملف .env غير موجود</value></data>
+  <data name="SitesWarningAppKeyMissing" xml:space="preserve"><value>APP_KEY فارغ في .env</value></data>
+  <data name="SitesWarningDependenciesMissing" xml:space="preserve"><value>حزم Composer غير مثبتة (لا يوجد مجلد vendor)</value></data>
+  <data name="SitesWarningFixInstallPhp" xml:space="preserve"><value>تثبيت PHP {0}</value></data>
+  <data name="SitesWarningFixEnvironment" xml:space="preserve"><value>إنشاء .env من .env.example</value></data>
+  <data name="SitesWarningFixAppKey" xml:space="preserve"><value>توليد APP_KEY</value></data>
+  <data name="SitesWarningFixDependencies" xml:space="preserve"><value>تشغيل composer install</value></data>
+  <data name="SitesWarningOpenDoctor" xml:space="preserve"><value>فتح طبيب الموقع</value></data>
+  <data name="SitesWarningInstallingPhp" xml:space="preserve"><value>جارٍ تثبيت PHP {0}</value></data>
+  <data name="TraySitesRecentHeader" xml:space="preserve"><value>الأخيرة</value></data>
+  <data name="TrayPanelOpenRecentSite" xml:space="preserve"><value>فتح {0} في المتصفح (مستخدم مؤخرًا)</value></data>
+  <data name="JumpListRecentCategory" xml:space="preserve"><value>الأخيرة</value></data>
+  <data name="TinkerSnippetLabel.Text" xml:space="preserve"><value>المقتطفات المحفوظة</value></data>
+  <data name="TinkerSnippetDescription.Text" xml:space="preserve"><value>كود محفوظ باسم لهذا الموقع. Ctrl+S يحفظ المحرر.</value></data>
+  <data name="TinkerSnippetBox.PlaceholderText" xml:space="preserve"><value>لا توجد مقتطفات محفوظة</value></data>
+  <data name="TinkerSaveSnippetButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>حفظ كمقتطف</value></data>
+  <data name="TinkerDeleteSnippetButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>حذف المقتطف</value></data>
+  <data name="TinkerSaveSnippetTooltip" xml:space="preserve"><value>حفظ كمقتطف (Ctrl+S)</value></data>
+  <data name="TinkerDeleteSnippetTooltip" xml:space="preserve"><value>حذف المقتطف المحدد</value></data>
+  <data name="TinkerSnippetNameHeader" xml:space="preserve"><value>الاسم</value></data>
+  <data name="TinkerSaveSnippetTitle" xml:space="preserve"><value>حفظ مقتطف لـ {0}</value></data>
+  <data name="TinkerSaveSnippetConfirm" xml:space="preserve"><value>حفظ</value></data>
+  <data name="TinkerSaveSnippetCancel" xml:space="preserve"><value>إلغاء</value></data>
+  <data name="TinkerSnippetSaved" xml:space="preserve"><value>تم حفظ المقتطف "{0}".</value></data>
+  <data name="TinkerSnippetDeleted" xml:space="preserve"><value>تم حذف المقتطف "{0}".</value></data>
+  <data name="TinkerSnippetNameEmpty" xml:space="preserve"><value>أدخل اسمًا للمقتطف.</value></data>
+  <data name="TinkerSnippetNameTooLong" xml:space="preserve"><value>أسماء المقتطفات محدودة بـ 60 حرفًا.</value></data>
+  <data name="TinkerRunningSelection" xml:space="preserve"><value>جارٍ تشغيل الكود المحدد في {0}...</value></data>
+  <data name="TinkerOutputViewLabel.Text" xml:space="preserve"><value>العرض كـ</value></data>
+  <data name="TinkerOutputViewDump.Content" xml:space="preserve"><value>تفريغ</value></data>
+  <data name="TinkerOutputViewJson.Content" xml:space="preserve"><value>تنسيق JSON</value></data>
+  <data name="TinkerOutputViewTable.Content" xml:space="preserve"><value>جدول</value></data>
+  <data name="TinkerOutputViewRunAgain" xml:space="preserve"><value>شغّل الكود مرة أخرى لعرضه بهذا الشكل.</value></data>
+  <data name="TinkerTableMoreRows" xml:space="preserve"><value>(لم يتم عرض {0} صفوف أخرى)</value></data>
+  <data name="GeneralMailNotificationsTitle.Text" xml:space="preserve"><value>بريد جديد</value></data>
+  <data name="GeneralMailNotificationsDescription.Text" xml:space="preserve"><value>إشعار بالمرسل والموضوع وزر فتح عند التقاط رسالة وصفحة البريد غير مفتوحة.</value></data>
+  <data name="MailNotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إشعارات البريد الجديد</value></data>
+  <data name="NotificationMailNoSubject" xml:space="preserve"><value>(بدون موضوع)</value></data>
+  <data name="NotificationMailTitle" xml:space="preserve"><value>بريد جديد</value></data>
+  <data name="NotificationMailFrom" xml:space="preserve"><value>بريد جديد من {0}</value></data>
+  <data name="NotificationMailMore" xml:space="preserve"><value>{0} ({1} غير مقروءة)</value></data>
+  <data name="NotificationActionOpenMail" xml:space="preserve"><value>فتح</value></data>
+  <data name="SitesDatabaseBrowseButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>استعراض الجداول</value></data>
+  <data name="SitesDatabaseBrowseLabel.Text" xml:space="preserve"><value>استعراض الجداول (قراءة فقط)</value></data>
+  <data name="SitesDatabasePeekTitle" xml:space="preserve"><value>الجداول في {0}</value></data>
+  <data name="SitesDatabasePeekTableField" xml:space="preserve"><value>الجدول</value></data>
+  <data name="SitesDatabasePeekLoadingTables" xml:space="preserve"><value>جارٍ تحميل الجداول...</value></data>
+  <data name="SitesDatabasePeekPickTable" xml:space="preserve"><value>اختر جدولاً</value></data>
+  <data name="SitesDatabasePeekTables" xml:space="preserve"><value>{0} جدول. قراءة فقط: لا شيء هنا يغيّر بياناتك.</value></data>
+  <data name="SitesDatabasePeekTablesLimited" xml:space="preserve"><value>يعرض أول {0} جدول. قراءة فقط.</value></data>
+  <data name="SitesDatabasePeekNoTables" xml:space="preserve"><value>لا توجد جداول في قاعدة البيانات بعد. شغّل الـ migrations أولاً.</value></data>
+  <data name="SitesDatabasePeekLoadingRows" xml:space="preserve"><value>جارٍ قراءة {0}...</value></data>
+  <data name="SitesDatabasePeekRows" xml:space="preserve"><value>{0} صف من {1}.</value></data>
+  <data name="SitesDatabasePeekRowsLimited" xml:space="preserve"><value>أول {0} صف من {1}.</value></data>
+  <data name="SitesDatabasePeekEmpty" xml:space="preserve"><value>{0} فارغ.</value></data>
+  <data name="SitesDatabasePeekTimedOut" xml:space="preserve"><value>لم تستجب قاعدة البيانات في الوقت المحدد.</value></data>
+  <data name="SitesDatabasePeekRowsName" xml:space="preserve"><value>صفوف الجدول</value></data>
+  <data name="SitesDatabasePeekCopy" xml:space="preserve"><value>نسخ</value></data>
+  <data name="SitesDatabasePeekInvalidTable" xml:space="preserve"><value>لا يمكن قراءة اسم الجدول هذا.</value></data>
+  <data name="SitesDatabasePeekFailed" xml:space="preserve"><value>تعذّرت قراءة قاعدة البيانات.</value></data>
 </root>

@@ -179,7 +179,7 @@
                                 </ToolTipService.ToolTip>
                                 <FontIcon Glyph="&#xE70D;" FontSize="14" />
                             </Button>
-                            <ToggleButton x:Name="FollowTailToggle" x:Uid="LogsFollowTailToggle" IsChecked="True" Click="FollowTail_Click" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Follow the end of the log" AutomationProperties.AutomationId="LogsFollowTailToggle">
+                            <ToggleButton x:Name="FollowTailToggle" x:Uid="LogsFollowTailToggle" IsChecked="True" Click="FollowTail_Click" Style="{StaticResource ToolbarIconToggleButtonStyle}" AutomationProperties.Name="Follow the end of the log" AutomationProperties.AutomationId="LogsFollowTailToggle">
                                 <ToggleButton.KeyboardAccelerators>
                                     <KeyboardAccelerator Modifiers="Control" Key="End" />
                                 </ToggleButton.KeyboardAccelerators>

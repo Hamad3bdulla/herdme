@@ -1,13 +1,13 @@
 {
   "releases": [
     {
-      "version": "0.1.28",
+      "version": "0.1.29",
       "build": 1,
       "channel": "stable",
-      "notes": "Adds richer Sites workflows, Artisan command history and autocomplete, environment editing and review, project templates, service snippets, onboarding, tray and taskbar actions, expanded Arabic localization, and accessibility fixes. Windows-only unsigned preview.",
+      "notes": "Moves Tinker into Sites, adds site warnings, recent sites, snippets, mail notifications and read-only database previews, and fixes Logs/Mail toggle crashes and update-check errors. Windows-only unsigned preview.",
       "downloadURLs": {
-        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.28/HerdMe-0.1.28-macOS.zip",
-        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.28/HerdMe-0.1.28-win-x64-setup.exe"
+        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.29/HerdMe-0.1.29-macOS.zip",
+        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.29/HerdMe-0.1.29-win-x64-setup.exe"
       }
     },
     {

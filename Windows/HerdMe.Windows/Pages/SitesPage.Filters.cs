@@ -169,7 +169,8 @@ public sealed partial class SitesPage
         {
             var path = site.Path;
             var opened = await Task.Run(() => EditorLauncher.OpenFolder(path));
-            if (!opened) await ShowErrorAsync(AppLocalization.Get("SitesEditorMissing"));
+            if (opened) App.MainWindow.RememberRecentSite(path);
+            else await ShowErrorAsync(AppLocalization.Get("SitesEditorMissing"));
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -179,12 +180,19 @@ public sealed partial class SitesPage
 
     private void SiteDetailTabs_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
     {
-        if (OverviewPanel is null || DatabasePanel is null || ToolsPanel is null || DetailsPanel is null) return;
+        if (OverviewPanel is null || DatabasePanel is null || ToolsPanel is null || DetailsPanel is null
+            || TinkerPanel is null) return;
         var tab = sender.SelectedItem?.Tag as string ?? "overview";
         OverviewPanel.Visibility = tab == "overview" ? Visibility.Visible : Visibility.Collapsed;
         DatabasePanel.Visibility = tab == "database" ? Visibility.Visible : Visibility.Collapsed;
         ToolsPanel.Visibility = tab == "tools" ? Visibility.Visible : Visibility.Collapsed;
         DetailsPanel.Visibility = tab == "details" ? Visibility.Visible : Visibility.Collapsed;
+        TinkerPanel.Visibility = tab == "tinker" ? Visibility.Visible : Visibility.Collapsed;
+        if (tab == "tinker")
+        {
+            EnsureTinker().ShowSite(selectedSite);
+            if (selectedSite is { } site) App.MainWindow.RememberRecentSite(site.Path);
+        }
         SiteDetailScroll.ChangeView(null, 0, null, true);
     }
 

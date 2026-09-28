@@ -33,6 +33,35 @@ public static class TrayPresentation
             .Take(SiteMenuLimit)
             .ToList();
 
+    public const int RecentLimit = 3;
+
+    // The known sites the user opened last, newest first. Paths that are no longer sites
+    // (removed or unlinked) are skipped.
+    public static IReadOnlyList<SiteRecord> RecentSites(IEnumerable<SiteRecord> sites, IEnumerable<string> recentPaths)
+    {
+        var known = sites
+            .GroupBy(site => site.Path, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        return recentPaths
+            .Where(known.ContainsKey)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(path => known[path])
+            .Take(RecentLimit)
+            .ToList();
+    }
+
+    // The rest of the menu after the recent sites, so the menu stays SiteMenuLimit long.
+    public static IReadOnlyList<SiteRecord> MenuSites(IEnumerable<SiteRecord> sites, IReadOnlyList<SiteRecord> recent)
+    {
+        var shown = recent.Select(site => site.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return sites
+            .Where(site => !shown.Contains(site.Path))
+            .OrderByDescending(site => site.IsFavorite)
+            .ThenBy(site => site.Domain, StringComparer.OrdinalIgnoreCase)
+            .Take(Math.Max(0, SiteMenuLimit - recent.Count))
+            .ToList();
+    }
+
     // Win32 popup menus treat a single ampersand as a mnemonic marker.
     public static string MenuText(string text) => text.Replace("&", "&&", StringComparison.Ordinal);
 }

@@ -321,8 +321,10 @@ public sealed partial class MainWindow : Window
 
     private static string NormalizePageTag(string tag)
     {
+        // Tinker moved into the Sites details pane; old links and saved pages land on Sites.
+        if (tag == "tinker") return "sites";
         return tag is "dashboard" or "general" or "sites" or "php" or "node" or "services"
-            or "updates" or "mail" or "dumps" or "logs" or "debugger" or "tinker" or "about"
+            or "updates" or "mail" or "dumps" or "logs" or "debugger" or "about"
             ? tag
             : "general";
     }
@@ -445,14 +447,6 @@ public sealed partial class MainWindow : Window
                     services.SiteSettings,
                     services.Environment
                 );
-            case "tinker":
-                return new TinkerPage(
-                    services.Core,
-                    services.SiteSettings,
-                    services.PhpInstaller,
-                    services.RuntimePolicy,
-                    services.ComposerTools
-                );
             case "about":
                 return new AboutPage(services.SiteSettings, services.Updates);
             default:
@@ -502,9 +496,28 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    // Opens Sites with the Tinker tab, for the given site or the one already selected.
+    public void NavigateToTinker(string? sitePath)
+    {
+        if (shuttingDown) return;
+        if (!cachedPages.TryGetValue("sites", out var page))
+        {
+            page = CreatePage("sites");
+            cachedPages["sites"] = page;
+        }
+        if (page is SitesPage sitesPage) sitesPage.RequestTinker(sitePath);
+        NavigateToPage("sites");
+        if (Navigation.SelectedItem is NavigationViewItem { Tag: "sites" }) ShowPage("sites");
+    }
+
     public void NavigateToPage(string tag)
     {
         if (shuttingDown) return;
+        if (tag == "tinker")
+        {
+            NavigateToTinker(null);
+            return;
+        }
         var item = Navigation.MenuItems
             .Concat(Navigation.FooterMenuItems)
             .OfType<NavigationViewItem>()

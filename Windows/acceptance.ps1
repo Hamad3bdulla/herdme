@@ -544,7 +544,6 @@ function Assert-WinUiNavigation(
     Assert-NavigationFlowDirection $window $navigation
     $pageControls = @{
         "DebuggerPageRoot" = @("DebuggerProfilerToggle", "DebuggerProfilesList")
-        "TinkerPageRoot" = @("TinkerSiteBox", "TinkerCodeBox", "TinkerRunButton", "TinkerOutputBox")
     }
     $pages = @(
         @{ Navigation = "NavDashboard"; Page = "DashboardPageRoot" },
@@ -557,7 +556,6 @@ function Assert-WinUiNavigation(
         @{ Navigation = "NavMail"; Page = "MailPageRoot" },
         @{ Navigation = "NavDumps"; Page = "DumpsPageRoot" },
         @{ Navigation = "NavDebugger"; Page = "DebuggerPageRoot" },
-        @{ Navigation = "NavTinker"; Page = "TinkerPageRoot" },
         @{ Navigation = "NavLogs"; Page = "LogsPageRoot" },
         @{ Navigation = "NavAbout"; Page = "AboutPageRoot" }
     )
@@ -586,6 +584,7 @@ function Assert-WinUiNavigation(
             Assert-ServiceDownloadControls $window
         }
     }
+    Assert-SitesTinkerTab $window $navigation
 
     if ($CaptureScreenshots) {
         $originalBounds = $window.Current.BoundingRectangle
@@ -623,6 +622,46 @@ function Assert-WinUiNavigation(
         }
         finally { $transform.Resize($originalBounds.Width, $originalBounds.Height) }
     }
+}
+
+# Tinker lives in the Sites details as a tab. It needs a site, so a profile without sites
+# only checks that the Tinker page is gone from the navigation.
+function Assert-SitesTinkerTab(
+    [System.Windows.Automation.AutomationElement]$Window,
+    [System.Windows.Automation.AutomationElement]$Navigation
+) {
+    $tinkerNavigation = $Navigation.FindFirst(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+            "NavTinker"
+        )
+    )
+    if ($null -ne $tinkerNavigation) {
+        throw "Tinker must be a Sites tab, not a navigation page."
+    }
+    $sitesNavigation = Wait-AutomationElementById $Navigation "NavSites"
+    Select-AutomationElement $sitesNavigation "NavSites"
+    $null = Wait-AutomationElementById $Window "SitesPageRoot"
+    $list = Wait-AutomationElementById $Window "SitesList"
+    $row = $list.FindFirst(
+        [System.Windows.Automation.TreeScope]::Children,
+        [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+            [System.Windows.Automation.ControlType]::ListItem
+        )
+    )
+    if ($null -eq $row) {
+        Write-Host "Skipped the Sites Tinker tab check: this profile has no sites."
+        return
+    }
+    Select-AutomationElement $row "SitesList row"
+    $tab = Wait-AutomationElementById $Window "SitesTinkerTab"
+    Select-AutomationElement $tab "SitesTinkerTab"
+    foreach ($controlId in @("TinkerCodeBox", "TinkerRunButton", "TinkerOutputBox")) {
+        $null = Wait-AutomationElementById $Window $controlId
+    }
+    Write-Host "Verified the Sites Tinker tab."
 }
 
 function Assert-ServiceDownloadControls(

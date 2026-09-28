@@ -5,16 +5,16 @@
     AutomationProperties.AutomationId="TinkerPageRoot"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
-    <ScrollViewer>
-        <StackPanel Style="{StaticResource PageContentStyle}">
-            <StackPanel Spacing="2" Margin="0,0,0,4">
+    <ScrollViewer x:Name="RootScroll">
+        <StackPanel x:Name="ContentPanel" Style="{StaticResource PageContentStyle}">
+            <StackPanel x:Name="HeaderPanel" Spacing="2" Margin="0,0,0,4">
                 <TextBlock x:Uid="TinkerPageTitle" AutomationProperties.AutomationId="TinkerPageRoot" Text="Tinker" Style="{StaticResource PageTitleStyle}" />
                 <TextBlock x:Uid="TinkerPageSubtitle" Text="Run PHP code inside a site, with Composer and Laravel already loaded." Style="{StaticResource PageSubtitleStyle}" TextWrapping="Wrap" />
             </StackPanel>
 
             <Border Style="{StaticResource SettingsGroupStyle}">
                 <StackPanel>
-                    <Grid Style="{StaticResource SettingsRowStyle}">
+                    <Grid x:Name="SiteRow" Style="{StaticResource SettingsRowStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -36,7 +36,7 @@
                             DisplayMemberPath="Domain"
                             SelectionChanged="SiteBox_SelectionChanged" />
                     </Grid>
-                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Rectangle x:Name="SiteRowDivider" Style="{StaticResource CardDividerStyle}" />
                     <Grid Style="{StaticResource SettingsRowStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -55,6 +55,37 @@
                                 DisplayMemberPath="Preview"
                                 SelectionChanged="HistoryBox_SelectionChanged" />
                             <Button x:Name="ClearHistoryButton" x:Uid="TinkerClearHistoryButton" Click="ClearHistory_Click" AutomationProperties.Name="Clear recent code" Style="{StaticResource DangerToolbarIconButtonStyle}">
+                                <SymbolIcon Symbol="Delete" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                    <Rectangle Style="{StaticResource CardDividerStyle}" />
+                    <Grid Style="{StaticResource SettingsRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE734;" Style="{StaticResource SettingsRowIconStyle}" />
+                        <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                            <TextBlock x:Name="SnippetLabel" x:Uid="TinkerSnippetLabel" Text="Saved snippets" Style="{StaticResource SettingsRowTitleStyle}" />
+                            <TextBlock x:Uid="TinkerSnippetDescription" Text="Named code saved for this site. Ctrl+S saves the editor." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Style="{StaticResource SettingsRowControlStyle}">
+                            <ComboBox
+                                x:Name="SnippetBox"
+                                x:Uid="TinkerSnippetBox"
+                                Width="240"
+                                PlaceholderText="No saved snippets"
+                                AutomationProperties.AutomationId="TinkerSnippetBox"
+                                AutomationProperties.LabeledBy="{Binding ElementName=SnippetLabel}"
+                                ItemsSource="{x:Bind Snippets}"
+                                DisplayMemberPath="Name"
+                                SelectionChanged="SnippetBox_SelectionChanged" />
+                            <Button x:Name="SaveSnippetButton" x:Uid="TinkerSaveSnippetButton" Click="SaveSnippet_Click" AutomationProperties.AutomationId="TinkerSaveSnippetButton" AutomationProperties.Name="Save as snippet" Style="{StaticResource ToolbarIconButtonStyle}">
+                                <SymbolIcon Symbol="Save" />
+                            </Button>
+                            <Button x:Name="DeleteSnippetButton" x:Uid="TinkerDeleteSnippetButton" Click="DeleteSnippet_Click" IsEnabled="False" AutomationProperties.AutomationId="TinkerDeleteSnippetButton" AutomationProperties.Name="Delete snippet" Style="{StaticResource DangerToolbarIconButtonStyle}">
                                 <SymbolIcon Symbol="Delete" />
                             </Button>
                         </StackPanel>
@@ -80,6 +111,7 @@
                 ScrollViewer.HorizontalScrollBarVisibility="Auto">
                 <TextBox.KeyboardAccelerators>
                     <KeyboardAccelerator Key="Enter" Modifiers="Control" Invoked="RunAccelerator_Invoked" />
+                    <KeyboardAccelerator Key="S" Modifiers="Control" Invoked="SaveSnippetAccelerator_Invoked" />
                 </TextBox.KeyboardAccelerators>
             </TextBox>
             <Grid ColumnSpacing="12">
@@ -89,7 +121,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <ProgressRing x:Name="RunProgress" Width="18" Height="18" />
-                    <TextBlock x:Name="StatusText" x:Uid="TinkerReady" Text="Use return to show a value. Ctrl+Enter runs the code." FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.AutomationId="TinkerStatusText" AutomationProperties.LiveSetting="Polite" />
+                    <TextBlock x:Name="StatusText" x:Uid="TinkerReady" Text="Use return to show a value. Ctrl+Enter runs the code, or only the selected lines." FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.AutomationId="TinkerStatusText" AutomationProperties.LiveSetting="Polite" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                     <Button x:Name="CancelButton" x:Uid="TinkerCancelButton" Content="Cancel" Click="Cancel_Click" IsEnabled="False" AutomationProperties.AutomationId="TinkerCancelButton" />
@@ -102,7 +134,28 @@
                 </StackPanel>
             </Grid>
 
-            <TextBlock x:Uid="TinkerOutputTitle" Text="Output" Style="{StaticResource SectionHeaderStyle}" />
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Uid="TinkerOutputTitle" Text="Output" Style="{StaticResource SectionHeaderStyle}" />
+                <TextBlock x:Name="OutputViewLabel" x:Uid="TinkerOutputViewLabel" Grid.Column="1" Text="Show as" VerticalAlignment="Center" />
+                <ComboBox
+                    x:Name="OutputViewBox"
+                    Grid.Column="2"
+                    MinWidth="140"
+                    VerticalAlignment="Center"
+                    SelectedIndex="0"
+                    AutomationProperties.AutomationId="TinkerOutputViewBox"
+                    AutomationProperties.LabeledBy="{Binding ElementName=OutputViewLabel}"
+                    SelectionChanged="OutputViewBox_SelectionChanged">
+                    <ComboBoxItem x:Uid="TinkerOutputViewDump" Content="Dump" Tag="dump" />
+                    <ComboBoxItem x:Uid="TinkerOutputViewJson" Content="JSON" Tag="json" />
+                    <ComboBoxItem x:Uid="TinkerOutputViewTable" Content="Table" Tag="table" />
+                </ComboBox>
+            </Grid>
             <TextBox
                 x:Name="OutputBox"
                 x:Uid="TinkerOutputBox"

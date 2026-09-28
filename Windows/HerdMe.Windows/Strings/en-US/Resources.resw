@@ -1207,7 +1207,6 @@ Recovery backup: {1}</value></data>
   <data name="DebuggerMilliseconds" xml:space="preserve"><value>{0} ms</value></data>
   <data name="DebuggerMegabytes" xml:space="preserve"><value>{0} MB</value></data>
   <data name="DebuggerKilobytes" xml:space="preserve"><value>{0} KB</value></data>
-  <data name="NavTinker.Content" xml:space="preserve"><value>Tinker</value></data>
   <data name="TinkerPageTitle.Text" xml:space="preserve"><value>Tinker</value></data>
   <data name="TinkerPageSubtitle.Text" xml:space="preserve"><value>Run PHP code inside a site, with Composer and Laravel already loaded.</value></data>
   <data name="TinkerSiteLabel.Text" xml:space="preserve"><value>Site</value></data>
@@ -1215,7 +1214,7 @@ Recovery backup: {1}</value></data>
   <data name="TinkerClearHistoryButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Clear recent code</value></data>
   <data name="TinkerCodeTitle.Text" xml:space="preserve"><value>Code</value></data>
   <data name="TinkerCodeBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>PHP code</value></data>
-  <data name="TinkerReady.Text" xml:space="preserve"><value>Use return to show a value. Ctrl+Enter runs the code.</value></data>
+  <data name="TinkerReady.Text" xml:space="preserve"><value>Use return to show a value. Ctrl+Enter runs the code, or only the selected lines.</value></data>
   <data name="TinkerCancelButton.Content" xml:space="preserve"><value>Cancel</value></data>
   <data name="TinkerRunButton.Text" xml:space="preserve"><value>Run</value></data>
   <data name="TinkerOutputTitle.Text" xml:space="preserve"><value>Output</value></data>
@@ -1245,7 +1244,7 @@ Recovery backup: {1}</value></data>
   <data name="JumpListSites" xml:space="preserve"><value>Sites</value></data>
   <data name="JumpListSitesDescription" xml:space="preserve"><value>Show the Sites page</value></data>
   <data name="JumpListTinker" xml:space="preserve"><value>Tinker</value></data>
-  <data name="JumpListTinkerDescription" xml:space="preserve"><value>Show the Tinker page</value></data>
+  <data name="JumpListTinkerDescription" xml:space="preserve"><value>Open Tinker in the Sites page</value></data>
   <data name="JumpListSitesCategory" xml:space="preserve"><value>Sites</value></data>
   <data name="GeneralWindowsIntegrationSectionTitle.Text" xml:space="preserve"><value>Windows integration</value></data>
   <data name="GeneralWindowsIntegrationDescription.Text" xml:space="preserve"><value>Optional. Each switch writes one HerdMe entry for your Windows account only and removes it when turned off or when HerdMe is uninstalled.</value></data>
@@ -1786,4 +1785,73 @@ Recovery backup: {1}</value></data>
   <data name="NotificationOperationFailedMessage" xml:space="preserve"><value>{0} failed.</value></data>
   <data name="NotificationOperationFailedWithError" xml:space="preserve"><value>{0} failed: {1}</value></data>
   <data name="SitesTintBrush" xml:space="preserve"><value>Site color</value></data>
+  <data name="UpdatesFailureDetail" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="UpdatesFeedNotPublished" xml:space="preserve"><value>the online update feed for this release was not found, so only the bundled version list was read</value></data>
+  <data name="UpdatesFailureHttp" xml:space="preserve"><value>the server answered HTTP {0}</value></data>
+  <data name="UpdatesFailureOffline" xml:space="preserve"><value>could not reach the server (check the internet connection)</value></data>
+  <data name="UpdatesFailureTimeout" xml:space="preserve"><value>the server took too long to answer</value></data>
+  <data name="UpdatesFailureRateLimited" xml:space="preserve"><value>GitHub is limiting requests right now; try again in an hour</value></data>
+  <data name="SitesTabTinker.Text" xml:space="preserve"><value>Tinker</value></data>
+  <data name="SitesContextOpenTinker.Text" xml:space="preserve"><value>Open in Tinker</value></data>
+  <data name="SitesWarningPhpNotInstalled" xml:space="preserve"><value>PHP {0} is not installed</value></data>
+  <data name="SitesWarningEnvironmentMissing" xml:space="preserve"><value>.env file is missing</value></data>
+  <data name="SitesWarningAppKeyMissing" xml:space="preserve"><value>APP_KEY is empty in .env</value></data>
+  <data name="SitesWarningDependenciesMissing" xml:space="preserve"><value>Composer dependencies are not installed (no vendor folder)</value></data>
+  <data name="SitesWarningFixInstallPhp" xml:space="preserve"><value>Install PHP {0}</value></data>
+  <data name="SitesWarningFixEnvironment" xml:space="preserve"><value>Create .env from .env.example</value></data>
+  <data name="SitesWarningFixAppKey" xml:space="preserve"><value>Generate APP_KEY</value></data>
+  <data name="SitesWarningFixDependencies" xml:space="preserve"><value>Run composer install</value></data>
+  <data name="SitesWarningOpenDoctor" xml:space="preserve"><value>Open Site Doctor</value></data>
+  <data name="SitesWarningInstallingPhp" xml:space="preserve"><value>Installing PHP {0}</value></data>
+  <data name="TraySitesRecentHeader" xml:space="preserve"><value>Recent</value></data>
+  <data name="TrayPanelOpenRecentSite" xml:space="preserve"><value>Open {0} in the browser (recently used)</value></data>
+  <data name="JumpListRecentCategory" xml:space="preserve"><value>Recent</value></data>
+  <data name="TinkerSnippetLabel.Text" xml:space="preserve"><value>Saved snippets</value></data>
+  <data name="TinkerSnippetDescription.Text" xml:space="preserve"><value>Named code saved for this site. Ctrl+S saves the editor.</value></data>
+  <data name="TinkerSnippetBox.PlaceholderText" xml:space="preserve"><value>No saved snippets</value></data>
+  <data name="TinkerSaveSnippetButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Save as snippet</value></data>
+  <data name="TinkerDeleteSnippetButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Delete snippet</value></data>
+  <data name="TinkerSaveSnippetTooltip" xml:space="preserve"><value>Save as snippet (Ctrl+S)</value></data>
+  <data name="TinkerDeleteSnippetTooltip" xml:space="preserve"><value>Delete the selected snippet</value></data>
+  <data name="TinkerSnippetNameHeader" xml:space="preserve"><value>Name</value></data>
+  <data name="TinkerSaveSnippetTitle" xml:space="preserve"><value>Save snippet for {0}</value></data>
+  <data name="TinkerSaveSnippetConfirm" xml:space="preserve"><value>Save</value></data>
+  <data name="TinkerSaveSnippetCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="TinkerSnippetSaved" xml:space="preserve"><value>Saved snippet "{0}".</value></data>
+  <data name="TinkerSnippetDeleted" xml:space="preserve"><value>Deleted snippet "{0}".</value></data>
+  <data name="TinkerSnippetNameEmpty" xml:space="preserve"><value>Enter a name for the snippet.</value></data>
+  <data name="TinkerSnippetNameTooLong" xml:space="preserve"><value>Snippet names are limited to 60 characters.</value></data>
+  <data name="TinkerRunningSelection" xml:space="preserve"><value>Running the selected code in {0}...</value></data>
+  <data name="TinkerOutputViewLabel.Text" xml:space="preserve"><value>Show as</value></data>
+  <data name="TinkerOutputViewDump.Content" xml:space="preserve"><value>Dump</value></data>
+  <data name="TinkerOutputViewJson.Content" xml:space="preserve"><value>JSON</value></data>
+  <data name="TinkerOutputViewTable.Content" xml:space="preserve"><value>Table</value></data>
+  <data name="TinkerOutputViewRunAgain" xml:space="preserve"><value>Run the code again to show it in this view.</value></data>
+  <data name="TinkerTableMoreRows" xml:space="preserve"><value>({0} more rows not shown)</value></data>
+  <data name="GeneralMailNotificationsTitle.Text" xml:space="preserve"><value>New mail</value></data>
+  <data name="GeneralMailNotificationsDescription.Text" xml:space="preserve"><value>Notify with the sender, subject and an Open button when a mail is captured while the Mail page is not open.</value></data>
+  <data name="MailNotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>New mail notifications</value></data>
+  <data name="NotificationMailNoSubject" xml:space="preserve"><value>(no subject)</value></data>
+  <data name="NotificationMailTitle" xml:space="preserve"><value>New mail</value></data>
+  <data name="NotificationMailFrom" xml:space="preserve"><value>New mail from {0}</value></data>
+  <data name="NotificationMailMore" xml:space="preserve"><value>{0} ({1} unread)</value></data>
+  <data name="NotificationActionOpenMail" xml:space="preserve"><value>Open</value></data>
+  <data name="SitesDatabaseBrowseButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Browse tables</value></data>
+  <data name="SitesDatabaseBrowseLabel.Text" xml:space="preserve"><value>Browse tables (read-only)</value></data>
+  <data name="SitesDatabasePeekTitle" xml:space="preserve"><value>Tables in {0}</value></data>
+  <data name="SitesDatabasePeekTableField" xml:space="preserve"><value>Table</value></data>
+  <data name="SitesDatabasePeekLoadingTables" xml:space="preserve"><value>Loading tables...</value></data>
+  <data name="SitesDatabasePeekPickTable" xml:space="preserve"><value>Choose a table</value></data>
+  <data name="SitesDatabasePeekTables" xml:space="preserve"><value>{0} tables. Read-only: nothing here can change your data.</value></data>
+  <data name="SitesDatabasePeekTablesLimited" xml:space="preserve"><value>Showing the first {0} tables. Read-only.</value></data>
+  <data name="SitesDatabasePeekNoTables" xml:space="preserve"><value>This database has no tables yet. Run the migrations first.</value></data>
+  <data name="SitesDatabasePeekLoadingRows" xml:space="preserve"><value>Reading {0}...</value></data>
+  <data name="SitesDatabasePeekRows" xml:space="preserve"><value>{0} rows from {1}.</value></data>
+  <data name="SitesDatabasePeekRowsLimited" xml:space="preserve"><value>First {0} rows from {1}.</value></data>
+  <data name="SitesDatabasePeekEmpty" xml:space="preserve"><value>{0} is empty.</value></data>
+  <data name="SitesDatabasePeekTimedOut" xml:space="preserve"><value>The database did not answer in time.</value></data>
+  <data name="SitesDatabasePeekRowsName" xml:space="preserve"><value>Table rows</value></data>
+  <data name="SitesDatabasePeekCopy" xml:space="preserve"><value>Copy</value></data>
+  <data name="SitesDatabasePeekInvalidTable" xml:space="preserve"><value>That table name cannot be read.</value></data>
+  <data name="SitesDatabasePeekFailed" xml:space="preserve"><value>The database could not be read.</value></data>
 </root>

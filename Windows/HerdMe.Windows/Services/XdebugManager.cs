@@ -16,6 +16,10 @@ public sealed record XdebugWindowsRelease(
     Uri DownloadUri
 );
 
+// The latest Xdebug release has no Windows build for this PHP line yet. For update checks this
+// means "nothing newer to install", not a failed check.
+public sealed class XdebugBuildUnavailableException(string message) : InvalidOperationException(message);
+
 public sealed class XdebugManager
 {
     private static readonly HttpClient HttpClient = ManagedDownloadClient.Create();
@@ -201,7 +205,7 @@ public sealed class XdebugManager
                 uri
             );
         }
-        throw new InvalidOperationException(
+        throw new XdebugBuildUnavailableException(
             $"No verified Xdebug {version} build matches PHP {phpCycle} "
             + $"{threadSafety} {architecture}."
         );

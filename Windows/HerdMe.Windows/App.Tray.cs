@@ -183,12 +183,15 @@ public partial class App
         {
             return;
         }
-        var sites = TrayPresentation.MenuSites(KnownSites);
+        var known = KnownSites;
+        var recent = TrayPresentation.RecentSites(known, RecentSitePaths);
+        var sites = TrayPresentation.MenuSites(known, recent);
         var shares = services.Shares.Active.Count;
         var unseenMail = MainWindow.UnseenMail;
         var signature = string.Join(
             "\n",
-            sites.Select(site => site.Path + "|" + site.Domain)
+            recent.Select(site => "recent:" + site.Path + "|" + site.Domain)
+                .Concat(sites.Select(site => site.Path + "|" + site.Domain))
                 .Append("php:" + trayPhpDefault + ":" + string.Join(",", trayPhpCycles))
                 .Append("mail:" + unseenMail)
                 .Append("shares:" + shares)
@@ -197,26 +200,22 @@ public partial class App
         trayMenuSignature = signature;
 
         traySitesItem.Items.Clear();
-        foreach (var site in sites)
+        if (recent.Count > 0)
         {
-            var path = site.Path;
-            var siteItem = new MenuFlyoutSubItem { Text = TrayPresentation.MenuText(site.Domain) };
-            siteItem.Items.Add(new MenuFlyoutItem
+            traySitesItem.Items.Add(new MenuFlyoutItem
             {
-                Text = AppLocalization.Get("TraySiteOpenBrowser"),
-                Command = TrayCommand(() => OpenSiteFromTray(path))
+                Text = AppLocalization.Get("TraySitesRecentHeader"),
+                IsEnabled = false
             });
-            siteItem.Items.Add(new MenuFlyoutItem
-            {
-                Text = AppLocalization.Get("TraySiteShowInHerdMe"),
-                Command = TrayCommand(() => ShowSiteFromTray(path))
-            });
-            traySitesItem.Items.Add(siteItem);
+            foreach (var site in recent) traySitesItem.Items.Add(TraySiteItem(site));
+            if (sites.Count > 0) traySitesItem.Items.Add(new MenuFlyoutSeparator());
         }
-        if (sites.Count > 0) traySitesItem.Items.Add(new MenuFlyoutSeparator());
+        foreach (var site in sites) traySitesItem.Items.Add(TraySiteItem(site));
+        var anySites = recent.Count > 0 || sites.Count > 0;
+        if (anySites) traySitesItem.Items.Add(new MenuFlyoutSeparator());
         traySitesItem.Items.Add(new MenuFlyoutItem
         {
-            Text = AppLocalization.Get(sites.Count > 0 ? "TraySitesShowAll" : "TraySitesEmpty"),
+            Text = AppLocalization.Get(anySites ? "TraySitesShowAll" : "TraySitesEmpty"),
             Command = TrayCommand(() => ShowPageFromTray("sites"))
         });
 
@@ -252,6 +251,23 @@ public partial class App
         {
             trayMenu.Items.RemoveAt(sharingIndex);
         }
+    }
+
+    private MenuFlyoutSubItem TraySiteItem(SiteRecord site)
+    {
+        var path = site.Path;
+        var siteItem = new MenuFlyoutSubItem { Text = TrayPresentation.MenuText(site.Domain) };
+        siteItem.Items.Add(new MenuFlyoutItem
+        {
+            Text = AppLocalization.Get("TraySiteOpenBrowser"),
+            Command = TrayCommand(() => OpenSiteFromTray(path))
+        });
+        siteItem.Items.Add(new MenuFlyoutItem
+        {
+            Text = AppLocalization.Get("TraySiteShowInHerdMe"),
+            Command = TrayCommand(() => ShowSiteFromTray(path))
+        });
+        return siteItem;
     }
 
     private XamlUICommand TrayCommand(Action action)

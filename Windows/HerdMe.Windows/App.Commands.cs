@@ -110,7 +110,7 @@ public partial class App
                 cancellationToken
             ),
             "logs" => await ShowLogsAsync(argument, cancellationToken),
-            "tinker" => await ShowPageAsync("tinker"),
+            "tinker" => await ShowTinkerAsync(argument, cancellationToken),
             "start" => await StartAllFromCommandAsync(cancellationToken),
             "stop" => await StopAllFromCommandAsync(),
             "link" => await LinkFolderAsync(argument!, request.Interactive, cancellationToken),
@@ -157,13 +157,24 @@ public partial class App
                 StartupSnapshot?.SaveSites(next);
                 var executable = Environment.ProcessPath
                     ?? Path.Combine(AppContext.BaseDirectory, "HerdMe.Windows.exe");
-                JumpListManager.Apply(executable, next);
+                JumpListManager.Apply(executable, next, RecentSitePaths);
             }
             finally
             {
                 JumpListGate.Release();
             }
         });
+    }
+
+    // Remembers a site the user just opened and moves it to the top of the tray and the Jump
+    // List. Called on the UI thread; the file write is a few hundred bytes.
+    internal static void RecordRecentSite(string sitePath)
+    {
+        if (RecentSites is not { } store || string.IsNullOrWhiteSpace(sitePath)) return;
+        var before = store.Paths;
+        store.Record(sitePath, DateTimeOffset.Now);
+        if (before.Count > 0 && string.Equals(before[0], sitePath, StringComparison.OrdinalIgnoreCase)) return;
+        if (KnownSites.Count > 0) RequestJumpListRefresh(KnownSites);
     }
 
     private async Task RefreshJumpListAsync(CancellationToken cancellationToken)
@@ -312,6 +323,22 @@ public partial class App
             MainWindow.NavigateToLogs(site.Path);
         });
         return AppCommandResponse.Success($"Showing logs for {site.Name}.");
+    }
+
+    private async Task<AppCommandResponse> ShowTinkerAsync(string? name, CancellationToken cancellationToken)
+    {
+        SiteRecord? site = null;
+        if (name is not null)
+        {
+            site = FindSite(await ScanSitesAsync(cancellationToken), name);
+            if (site is null) return AppCommandResponse.Failure($"No site named '{name}'. Run 'herdme sites'.");
+        }
+        await RunOnUiAsync(() =>
+        {
+            ShowMainWindow();
+            MainWindow.NavigateToTinker(site?.Path);
+        });
+        return AppCommandResponse.Success(site is null ? "Showing Tinker." : $"Showing Tinker for {site.Name}.");
     }
 
     private async Task<AppCommandResponse> StartAllFromCommandAsync(CancellationToken cancellationToken)

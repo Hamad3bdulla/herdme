@@ -23,7 +23,8 @@ internal sealed record TrayPanelContent(
     bool Degraded,
     IReadOnlyList<SiteRecord> Sites,
     int UnseenMail,
-    int Shares
+    int Shares,
+    IReadOnlyList<string> RecentPaths
 );
 
 /// <summary>
@@ -242,14 +243,18 @@ internal sealed class TrayPanelWindow : Window
         stopSharingButton.Visibility = content.Shares > 0 ? Visibility.Visible : Visibility.Collapsed;
         if (content.Shares > 0) SetLabel(stopSharingButton, AppLocalization.Format("TrayStopSharingLabel", content.Shares));
 
-        var sites = TrayPresentation.MenuSites(content.Sites);
-        var next = string.Join("\n", sites.Select(site => site.Path + "|" + site.Domain + "|" + site.IsFavorite))
+        // Recent sites first (clock icon), then favorites and the rest.
+        var recent = TrayPresentation.RecentSites(content.Sites, content.RecentPaths);
+        var sites = TrayPresentation.MenuSites(content.Sites, recent);
+        var next = string.Join("\n", recent.Select(site => "recent:" + site.Path + "|" + site.Domain)
+                .Concat(sites.Select(site => site.Path + "|" + site.Domain + "|" + site.IsFavorite)))
             + "|" + content.Running;
         if (string.Equals(next, signature, StringComparison.Ordinal)) return;
         signature = next;
         siteList.Children.Clear();
-        foreach (var site in sites) siteList.Children.Add(SiteRow(site, content.Running));
-        sitesEmpty.Visibility = sites.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var site in recent) siteList.Children.Add(SiteRow(site, content.Running, recent: true));
+        foreach (var site in sites) siteList.Children.Add(SiteRow(site, content.Running, recent: false));
+        sitesEmpty.Visibility = recent.Count + sites.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     public void HidePanel()
@@ -272,14 +277,15 @@ internal sealed class TrayPanelWindow : Window
         Close();
     }
 
-    private Grid SiteRow(SiteRecord site, bool running)
+    private Grid SiteRow(SiteRecord site, bool running, bool recent)
     {
         var path = site.Path;
         var row = new Grid { ColumnSpacing = 4 };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var label = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        label.Children.Add(new FontIcon { Glyph = site.IsFavorite ? "\uE735" : "\uE774", FontSize = 14 });
+        var glyph = recent ? "\uE81C" : site.IsFavorite ? "\uE735" : "\uE774";
+        label.Children.Add(new FontIcon { Glyph = glyph, FontSize = 14 });
         label.Children.Add(new TextBlock { Text = site.Domain, TextTrimming = TextTrimming.CharacterEllipsis });
         var open = new Button
         {
@@ -290,7 +296,7 @@ internal sealed class TrayPanelWindow : Window
             BorderThickness = new Thickness(0),
             IsEnabled = running
         };
-        var openName = AppLocalization.Format("TrayPanelOpenSite", site.Domain);
+        var openName = AppLocalization.Format(recent ? "TrayPanelOpenRecentSite" : "TrayPanelOpenSite", site.Domain);
         AutomationProperties.SetName(open, openName);
         ToolTipService.SetToolTip(open, running ? openName : AppLocalization.Get("TrayPanelStartFirst"));
         open.Click += (_, _) => Run(() => owner.OpenSiteFromTray(path));

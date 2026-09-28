@@ -58,6 +58,24 @@ public partial class App
         Notify(AppNotifications.UpdateAvailable(release.Version));
     }
 
+    // A mail was captured while the Mail page was not in front (MainWindow.Activity.cs).
+    internal void NotifyMailCaptured(string? subject, string? sender, int unseen)
+    {
+        bool wanted;
+        try
+        {
+            wanted = services.SiteSettings.Load().MailNotifications;
+        }
+        catch (Exception error) when (error is IOException
+            or UnauthorizedAccessException
+            or InvalidOperationException
+            or System.Text.Json.JsonException)
+        {
+            wanted = true;
+        }
+        if (wanted) Notify(AppNotifications.MailCaptured(subject, sender, unseen));
+    }
+
     // A long operation ended while the window was not in front (MainWindow.FinishAlert.cs).
     internal void NotifyOperationFinished(AppNotification notification) => Notify(notification);
 

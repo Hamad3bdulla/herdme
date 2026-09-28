@@ -727,6 +727,7 @@ public sealed partial class SitesPage : Page
                 uninspected.Add(site);
             }
         }
+        InspectSiteWarnings(sites);
         return uninspected;
     }
 
@@ -809,11 +810,14 @@ public sealed partial class SitesPage : Page
                 var current = IndexOfVisibleSite(site.Path, position);
                 if (current < 0)
                 {
-                    VisibleSites.Insert(position, new SitesListItem(site));
+                    var row = new SitesListItem(site);
+                    row.SetWarnings(WarningsFor(site.Path));
+                    VisibleSites.Insert(position, row);
                 }
                 else
                 {
                     VisibleSites[current].Update(site);
+                    VisibleSites[current].SetWarnings(WarningsFor(site.Path));
                     if (current != position) VisibleSites.Move(current, position);
                 }
                 position++;
@@ -891,6 +895,7 @@ public sealed partial class SitesPage : Page
     private void ShowSite(SiteRecord? site)
     {
         selectedSite = site;
+        ShowTinkerFor(site);
         NoSelectionState.Visibility = site is null ? Visibility.Visible : Visibility.Collapsed;
         SiteDetail.Visibility = site is null ? Visibility.Collapsed : Visibility.Visible;
         StartLaravelButton.IsEnabled = false;

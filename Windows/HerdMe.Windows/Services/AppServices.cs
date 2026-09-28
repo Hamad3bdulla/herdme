@@ -71,6 +71,7 @@ public sealed class AppServices : IAsyncDisposable
         SiteRuntimes = new SiteRuntimeStore();
         CommandFavorites = new SiteCommandFavoritesStore(SiteSettings.SupportRoot);
         NotificationHistory = new NotificationHistory(SiteSettings.SupportRoot);
+        RecentSites = new RecentSitesStore(SiteSettings.SupportRoot);
         StartupSnapshot = new StartupSnapshotStore(SiteSettings.SupportRoot);
         SiteProcesses = new SiteProcessManager();
         InitialSetup = new InitialSetupManager(
@@ -138,6 +139,9 @@ public sealed class AppServices : IAsyncDisposable
 
     // The title bar bell (App.Notifications.cs, MainWindow.Bell.cs).
     public NotificationHistory NotificationHistory { get; }
+
+    // Sites opened last, shown first in the tray and the Jump List.
+    public RecentSitesStore RecentSites { get; }
 
     // Last session's sites and counts, painted before the first scan finishes.
     public StartupSnapshotStore StartupSnapshot { get; }

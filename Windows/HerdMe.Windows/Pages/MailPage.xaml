@@ -160,7 +160,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="SubjectText" x:Uid="MailSelectMessageInitial" Text="Select a message" Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
-                            <ToggleButton x:Name="MobileWidthToggle" x:Uid="MailMobileWidthToggle" IsEnabled="False" Click="MobileWidth_Click" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.Name="Preview at phone width" AutomationProperties.AutomationId="MailMobileWidthToggle">
+                            <ToggleButton x:Name="MobileWidthToggle" x:Uid="MailMobileWidthToggle" IsEnabled="False" Click="MobileWidth_Click" Style="{StaticResource ToolbarIconToggleButtonStyle}" AutomationProperties.Name="Preview at phone width" AutomationProperties.AutomationId="MailMobileWidthToggle">
                                 <ToolTipService.ToolTip>
                                     <ToolTip><TextBlock x:Uid="MailMobileWidthTooltip" Text="Preview at phone width (375 px)" /></ToolTip>
                                 </ToolTipService.ToolTip>

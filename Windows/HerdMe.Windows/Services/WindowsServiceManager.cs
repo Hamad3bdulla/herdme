@@ -1012,6 +1012,32 @@ public sealed class WindowsServiceManager : IAsyncDisposable
         cancellationToken
     );
 
+    public Task<IReadOnlyList<DatabasePeekTable>> PeekSiteDatabaseTablesAsync(
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning,
+        CancellationToken cancellationToken = default
+    ) => DatabasePeek.ListTablesAsync(
+        instance,
+        installer.ExecutablePath(instance.DefinitionId),
+        DataDirectory(instance.Id),
+        provisioning,
+        cancellationToken
+    );
+
+    public Task<DatabasePeekRows> PeekSiteDatabaseRowsAsync(
+        ManagedServiceInstance instance,
+        SiteDatabaseProvisioning provisioning,
+        DatabasePeekTable table,
+        CancellationToken cancellationToken = default
+    ) => DatabasePeek.ReadRowsAsync(
+        instance,
+        installer.ExecutablePath(instance.DefinitionId),
+        DataDirectory(instance.Id),
+        provisioning,
+        table,
+        cancellationToken
+    );
+
     public async Task ResetSiteDatabasePasswordAsync(
         ManagedServiceInstance instance,
         SiteDatabaseProvisioning provisioning,

@@ -1167,7 +1167,6 @@ internal static partial class ContractChecks
             (Tag: "mail", NavigationId: "NavMail", Page: "MailPage.xaml", PageId: "MailPageRoot"),
             (Tag: "dumps", NavigationId: "NavDumps", Page: "DumpsPage.xaml", PageId: "DumpsPageRoot"),
             (Tag: "debugger", NavigationId: "NavDebugger", Page: "DebuggerPage.xaml", PageId: "DebuggerPageRoot"),
-            (Tag: "tinker", NavigationId: "NavTinker", Page: "TinkerPage.xaml", PageId: "TinkerPageRoot"),
             (Tag: "logs", NavigationId: "NavLogs", Page: "LogsPage.xaml", PageId: "LogsPageRoot"),
             (Tag: "about", NavigationId: "NavAbout", Page: "AboutPage.xaml", PageId: "AboutPageRoot")
         };

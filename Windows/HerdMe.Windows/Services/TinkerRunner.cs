@@ -12,6 +12,12 @@ public sealed record TinkerResult(int ExitCode, string Output, TimeSpan Elapsed)
 /// so a top-level "return" becomes the printed result, and its line numbers match the editor.
 /// Leading "use" imports are hoisted in front of the closure on the same first line.
 /// </summary>
+public enum TinkerOutputMode
+{
+    Dump,
+    Json
+}
+
 public static partial class TinkerScript
 {
     public const int MaximumCodeCharacters = 16 * 1_024;
@@ -82,7 +88,13 @@ public static partial class TinkerScript
     }
 
     /// <summary>Boots the project (Composer autoload, Laravel when present), then runs the code file.</summary>
-    public static string BuildRunner(string projectDirectory, string codeFile)
+    /// <remarks>Json prints the returned value with json_encode so the page can indent it or
+    /// show it as a table; Dump keeps Laravel's dump() (or var_export) output.</remarks>
+    public static string BuildRunner(
+        string projectDirectory,
+        string codeFile,
+        TinkerOutputMode outputMode = TinkerOutputMode.Dump
+    )
     {
         return "<?php\n"
             + "$__herdmeRoot = " + PhpString(Path.GetFullPath(projectDirectory)) + ";\n"
@@ -102,12 +114,7 @@ public static partial class TinkerScript
                     return require $__herdmeFile;
                 })($__herdmeCode, $app);
                 if ($__herdmeResult !== null) {
-                    if (function_exists('dump')) {
-                        dump($__herdmeResult);
-                    } else {
-                        var_export($__herdmeResult);
-                        echo PHP_EOL;
-                    }
+                    __HERDME_PRINT__
                 }
             } catch (\Throwable $__herdmeError) {
                 $__herdmeLine = $__herdmeError->getFile() === $__herdmeCode
@@ -117,8 +124,21 @@ public static partial class TinkerScript
                 exit(1);
             }
 
-            """;
+            """.Replace("__HERDME_PRINT__", PrintStatement(outputMode), StringComparison.Ordinal);
     }
+
+    private static string PrintStatement(TinkerOutputMode outputMode) => outputMode == TinkerOutputMode.Json
+        ? """
+        echo json_encode($__herdmeResult, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE), PHP_EOL;
+        """
+        : """
+        if (function_exists('dump')) {
+            dump($__herdmeResult);
+        } else {
+            var_export($__herdmeResult);
+            echo PHP_EOL;
+        }
+        """;
 
     internal static string PhpString(string value)
     {
@@ -160,6 +180,7 @@ public sealed class TinkerRunner
         IReadOnlyDictionary<string, string> environment,
         TimeSpan timeout,
         IProgress<string>? outputProgress = null,
+        TinkerOutputMode outputMode = TinkerOutputMode.Dump,
         CancellationToken cancellationToken = default
     )
     {
@@ -189,7 +210,7 @@ public sealed class TinkerRunner
             await File.WriteAllTextAsync(codePath, codeFile, utf8, cancellationToken);
             await File.WriteAllTextAsync(
                 runnerPath,
-                TinkerScript.BuildRunner(projectPath, codePath),
+                TinkerScript.BuildRunner(projectPath, codePath, outputMode),
                 utf8,
                 cancellationToken
             );

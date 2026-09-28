@@ -191,9 +191,6 @@
             <NavigationViewItem x:Uid="NavDebugger" AutomationProperties.AutomationId="NavDebugger" Content="Debugger" Tag="debugger">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Repair" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItem x:Uid="NavTinker" AutomationProperties.AutomationId="NavTinker" Content="Tinker" Tag="tinker">
-                <NavigationViewItem.Icon><FontIcon Glyph="&#xE756;" /></NavigationViewItem.Icon>
-            </NavigationViewItem>
             <NavigationViewItem x:Uid="NavLogs" AutomationProperties.AutomationId="NavLogs" Content="Logs" Tag="logs">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Document" /></NavigationViewItem.Icon>
                 <NavigationViewItem.InfoBadge><InfoBadge x:Name="LogsBadge" Visibility="Collapsed" /></NavigationViewItem.InfoBadge>
