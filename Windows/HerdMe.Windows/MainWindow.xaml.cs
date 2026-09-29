@@ -217,6 +217,7 @@ public sealed partial class MainWindow : Window
         {
             TitleBarStatusButton.Visibility = Visibility.Collapsed;
             TitleBarSearchBox.Visibility = Visibility.Collapsed;
+            TitleBarSearchButton.Visibility = Visibility.Collapsed;
             TitleBarBellButton.Visibility = Visibility.Collapsed;
             UpdateTitleBarPassthrough();
             return;
@@ -247,7 +248,7 @@ public sealed partial class MainWindow : Window
         AutomationProperties.SetName(TitleBarStatusButton, TitleBarStatusText.Text);
         ToolTipService.SetToolTip(TitleBarStatusButton, AppLocalization.Get("TitleBarStatusTooltip"));
         TitleBarStatusButton.Visibility = Visibility.Visible;
-        TitleBarSearchBox.Visibility = Visibility.Visible;
+        if (TitleBarSearchBox.Visibility != Visibility.Visible) TitleBarSearchButton.Visibility = Visibility.Visible;
         UpdateTitleBarPassthrough();
     }
 

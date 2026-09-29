@@ -17,7 +17,7 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="2">
                         <TextBlock x:Uid="UpdatesTitle" Text="Updates" Style="{StaticResource PageTitleStyle}" />
-                        <TextBlock x:Name="LastCheckedText" Style="{StaticResource PageSubtitleStyle}" />
+                        <TextBlock x:Name="LastCheckedText" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Button x:Name="RefreshButton" Click="Refresh_Click">

@@ -42,6 +42,8 @@
     <Compile Include="ShellIntegrationContractChecks.cs" />
     <Compile Include="NotificationContractChecks.cs" />
     <Compile Include="UxContractChecks.cs" />
+    <Compile Include="Round10UxContractChecks.cs" />
+    <Compile Include="Round11UxContractChecks.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteListFilter.cs" Link="Services/SiteListFilter.cs" />
     <Compile Include="../HerdMe.Windows/Services/TrayPresentation.cs" Link="Services/TrayPresentation.cs" />
     <Compile Include="../HerdMe.Windows/Services/TaskbarOverlay.cs" Link="Services/TaskbarOverlay.cs" />
@@ -140,6 +142,8 @@
     <Compile Include="../HerdMe.Windows/Services/InputValidation.cs" Link="Services/InputValidation.cs" />
     <Compile Include="../HerdMe.Windows/Services/PhpIniEditor.cs" Link="Services/PhpIniEditor.cs" />
     <Compile Include="../HerdMe.Windows/Services/ServiceLogTail.cs" Link="Services/ServiceLogTail.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ServiceDirectory.cs" Link="Services/ServiceDirectory.cs" />
+    <Compile Include="../HerdMe.Windows/Services/DefenderExclusion.cs" Link="Services/DefenderExclusion.cs" />
     <Compile Include="../HerdMe.Windows/Services/TitleBarSearch.cs" Link="Services/TitleBarSearch.cs" />
     <Compile Include="../HerdMe.Windows/Services/NotificationActions.cs" Link="Services/NotificationActions.cs" />
     <Compile Include="../HerdMe.Windows/Services/StatusBarPresentation.cs" Link="Services/StatusBarPresentation.cs" />

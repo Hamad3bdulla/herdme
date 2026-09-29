@@ -201,6 +201,12 @@ public sealed class SiteConfigurationStore
         Update(settings => settings.MailNotifications = enabled);
     }
 
+    public void UpdateDefenderExclusion(string path)
+    {
+        var value = DefenderExclusion.IsAllowedExclusionPath(path) ? path.TrimEnd('\\', '/') : string.Empty;
+        Update(settings => settings.DefenderExclusionPath = value);
+    }
+
     public void UpdateSitesListWidth(double width)
     {
         var clamped = ClampSitesListWidth(width);
@@ -249,6 +255,11 @@ public sealed class SiteConfigurationStore
         Update(settings => settings.ReduceMotion = reduceMotion);
     }
 
+    public void UpdateShowStatusBar(bool showStatusBar)
+    {
+        Update(settings => settings.ShowStatusBar = showStatusBar);
+    }
+
     public void UpdateLastSeenVersion(string version)
     {
         Update(settings => settings.LastSeenVersion = version.Trim());
@@ -282,6 +293,16 @@ public sealed class SiteConfigurationStore
     {
         Update(settings => settings.GettingStartedDismissed = dismissed);
     }
+
+    public static string NormalizeTld(string? tld) =>
+        (tld ?? string.Empty).Trim().Trim('.').ToLowerInvariant();
+
+    /// <summary>One DNS label: 1-63 ASCII letters, digits or inner hyphens.</summary>
+    public static bool IsValidTld(string tld) =>
+        tld.Length is >= 1 and <= 63
+            && tld[0] != '-'
+            && tld[^1] != '-'
+            && tld.All(character => char.IsAsciiLetterOrDigit(character) || character == '-');
 
     public void UpdateTld(string tld)
     {
@@ -424,14 +445,8 @@ public sealed class SiteConfigurationStore
             }
         }
 
-        var tld = settings.Tld.Trim().Trim('.').ToLowerInvariant();
-        if (tld.Length is < 1 or > 63
-            || tld[0] == '-'
-            || tld[^1] == '-'
-            || tld.Any(character => !char.IsAsciiLetterOrDigit(character) && character != '-'))
-        {
-            tld = "test";
-        }
+        var tld = NormalizeTld(settings.Tld);
+        if (!IsValidTld(tld)) tld = "test";
         return new WindowsSiteSettings
         {
             SchemaVersion = CurrentSchemaVersion,
@@ -446,9 +461,13 @@ public sealed class SiteConfigurationStore
             ShowNotifications = settings.ShowNotifications,
             ActionNotifications = settings.ActionNotifications,
             MailNotifications = settings.MailNotifications,
+            DefenderExclusionPath = DefenderExclusion.IsAllowedExclusionPath(settings.DefenderExclusionPath)
+                ? settings.DefenderExclusionPath.TrimEnd('\\', '/')
+                : string.Empty,
             SitesListWidth = ClampSitesListWidth(settings.SitesListWidth),
             UiLanguage = UiLanguageSettings.Normalize(settings.UiLanguage),
             ReduceMotion = settings.ReduceMotion,
+            ShowStatusBar = settings.ShowStatusBar,
             AutomaticUpdates = settings.AutomaticUpdates,
             UpdateChannel = settings.UpdateChannel.Equals("Beta", StringComparison.OrdinalIgnoreCase)
                 ? "Beta"

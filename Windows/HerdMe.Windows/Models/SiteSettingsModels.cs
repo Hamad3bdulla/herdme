@@ -28,6 +28,10 @@ public sealed class WindowsSiteSettings
     // Mail page is not in front. Uses the same switch and throttle as the other notifications.
     public bool MailNotifications { get; set; } = true;
 
+    // Opt-in "Speed up PHP": the folder HerdMe asked Windows Defender not to scan (empty when
+    // off). Standard users cannot read Defender exclusions, so this records what HerdMe added.
+    public string DefenderExclusionPath { get; set; } = string.Empty;
+
     // Width of the Sites list pane, set by dragging the splitter.
     public double SitesListWidth { get; set; } = SitesListWidthDefault;
 
@@ -42,6 +46,10 @@ public sealed class WindowsSiteSettings
 
     // Turns off page transitions and fades even when Windows animations are on.
     public bool ReduceMotion { get; set; }
+
+    // The bottom status bar (environment, ports, downloads). Off by default for a calmer
+    // window; the title bar pill and the operations bar still show the same state.
+    public bool ShowStatusBar { get; set; }
 
     public bool AutomaticUpdates { get; set; } = true;
 

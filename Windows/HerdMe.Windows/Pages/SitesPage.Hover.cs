@@ -92,7 +92,7 @@ public sealed partial class SitesPage
             CornerRadius = new CornerRadius(6),
             BorderThickness = new Thickness(1),
             BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
-            Background = (Brush)Application.Current.Resources["SitesTintBrush"]
+            Background = (Brush)Application.Current.Resources["SubtleSurfaceBrush"]
         };
         var path = SiteQuickProbe.ThumbnailPath(settingsStore.SupportRoot, site.Path);
         if (File.Exists(path))
@@ -124,7 +124,7 @@ public sealed partial class SitesPage
                 FontSize = 36,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Foreground = (Brush)Application.Current.Resources["BrandBrush"]
+                Foreground = (Brush)Application.Current.Resources["NeutralInkBrush"]
             };
         return frame;
     }

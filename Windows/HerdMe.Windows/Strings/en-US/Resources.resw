@@ -201,9 +201,9 @@
   <data name="NodeInstalled" xml:space="preserve"><value>Installed</value></data>
   <data name="ServicesPageTitle.Text" xml:space="preserve"><value>Services</value></data>
   <data name="ServicesRefreshTooltip.Text" xml:space="preserve"><value>Refresh service status</value></data>
-  <data name="ServicesTypeField.Header" xml:space="preserve"><value>Service</value></data>
-  <data name="ServicesNameField.Header" xml:space="preserve"><value>Name</value></data>
-  <data name="ServicesPortField.Header" xml:space="preserve"><value>Port</value></data>
+  <data name="ServicesTypeField.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Service</value></data>
+  <data name="ServicesNameField.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Name</value></data>
+  <data name="ServicesPortField.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Port</value></data>
   <data name="ServicesAddButton.Text" xml:space="preserve"><value>Add</value></data>
   <data name="ServicesAutomaticStartMenu.Text" xml:space="preserve"><value>Start automatically</value></data>
   <data name="ServicesMoreTooltip.Text" xml:space="preserve"><value>More service actions</value></data>
@@ -267,10 +267,10 @@
   <data name="SitesCopyLinkMenu.Text" xml:space="preserve"><value>Copy link</value></data>
   <data name="SitesCopyPathMenu.Text" xml:space="preserve"><value>Copy path</value></data>
   <data name="SitesOpenBrowserCommand.Label" xml:space="preserve"><value>Open in browser</value></data>
-  <data name="SitesCopyCommand.Label" xml:space="preserve"><value>Copy site link or path</value></data>
-  <data name="SitesOpenFolderCommand.Label" xml:space="preserve"><value>Open project folder</value></data>
-  <data name="SitesOpenTerminalCommand.Label" xml:space="preserve"><value>Open terminal</value></data>
-  <data name="SitesEditEnvironmentCommand.Label" xml:space="preserve"><value>Edit .env</value></data>
+  <data name="SitesCopyCommand.Text" xml:space="preserve"><value>Copy site link or path</value></data>
+  <data name="SitesOpenFolderCommand.Text" xml:space="preserve"><value>Open project folder</value></data>
+  <data name="SitesOpenTerminalCommand.Text" xml:space="preserve"><value>Open terminal</value></data>
+  <data name="SitesEditEnvironmentCommand.Text" xml:space="preserve"><value>Edit .env</value></data>
   <data name="SitesConfigureRuntimesCommand.Text" xml:space="preserve"><value>Configure PHP and Node.js</value></data>
   <data name="SitesUnlinkCommand.Text" xml:space="preserve"><value>Unlink project</value></data>
   <data name="SitesMoveToRecycleBinCommand.Text" xml:space="preserve"><value>Move project to Recycle Bin</value></data>
@@ -794,7 +794,7 @@
   <data name="PhpExtensionToggleTooltip" xml:space="preserve"><value>Enable or disable this extension for the selected PHP version</value></data>
   <data name="PhpExtensionBuiltInTooltip" xml:space="preserve"><value>This extension is built into PHP and cannot be toggled</value></data>
   <data name="GeneralCompactModeTitle.Text" xml:space="preserve"><value>Compact interface</value></data>
-  <data name="GeneralCompactModeDescription.Text" xml:space="preserve"><value>Use tighter spacing on every page. Lists and forms switch fully the next time HerdMe starts.</value></data>
+  <data name="GeneralCompactModeDescription.Text" xml:space="preserve"><value>Use tighter spacing. Pages you open next switch right away; everything switches the next time HerdMe starts.</value></data>
   <data name="DashboardRepairAction" xml:space="preserve"><value>Repair</value></data>
   <data name="DashboardRepairTooltip" xml:space="preserve"><value>Repair this health issue</value></data>
   <data name="DashboardRepairAllButtonText.Text" xml:space="preserve"><value>Repair all</value></data>
@@ -925,8 +925,6 @@ Recovery backup: {1}</value></data>
   <data name="SitesDatabaseApplyingConfiguration" xml:space="preserve"><value>Applying Laravel configuration...</value></data>
   <data name="SitesDatabaseOpeningTablePlus" xml:space="preserve"><value>Opening TablePlus...</value></data>
   <data name="SitesDatabaseNoAvailablePort" xml:space="preserve"><value>No local port is available for the database service.</value></data>
-  <data name="NavEnvironmentGroup.Content" xml:space="preserve"><value>Environment</value></data>
-  <data name="NavToolsGroup.Content" xml:space="preserve"><value>Tools</value></data>
   <data name="CaptureLoadFailed" xml:space="preserve"><value>Captured data could not be loaded</value></data>
   <data name="CaptureOperationFailed" xml:space="preserve"><value>Captured data could not be deleted</value></data>
   <data name="MailCaptureRetryButton.Content" xml:space="preserve"><value>Reload</value></data>
@@ -957,7 +955,7 @@ Recovery backup: {1}</value></data>
   <data name="GeneralPageSubtitle.Text" xml:space="preserve"><value>Startup, local domains, updates, and runtime health.</value></data>
   <data name="GeneralStartupSectionTitle.Text" xml:space="preserve"><value>Startup and appearance</value></data>
   <data name="GeneralDomainsSectionTitle.Text" xml:space="preserve"><value>Local domains and HTTPS</value></data>
-  <data name="GeneralDomainSuffixDescription.Text" xml:space="preserve"><value>Sites open at https://name.suffix/. Changes apply when the field loses focus.</value></data>
+  <data name="GeneralDomainSuffixDescription.Text" xml:space="preserve"><value>Sites open at https://name.suffix/. Press Enter or leave the field to apply.</value></data>
   <data name="GeneralDomainSuffixInput.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Domain suffix</value></data>
   <data name="GeneralUpdateChannelBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Update channel</value></data>
   <data name="GeneralOpenDataButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open application data folder</value></data>
@@ -1342,11 +1340,11 @@ Recovery backup: {1}</value></data>
   <data name="SitesEmptyCreateLaravelButton.Text" xml:space="preserve"><value>Create a Laravel app</value></data>
   <data name="SitesEmptyClearFilterButton.Text" xml:space="preserve"><value>Clear search and filter</value></data>
   <data name="SitesOpenEditorCommand.Label" xml:space="preserve"><value>Open in VS Code</value></data>
-  <data name="SitesOpenLogsButton.Label" xml:space="preserve"><value>Open site logs</value></data>
-  <data name="SitesTabOverview.Text" xml:space="preserve"><value>Overview</value></data>
+  <data name="SitesOpenLogsButton.Text" xml:space="preserve"><value>Open site logs</value></data>
+  <data name="SitesTabOverview.Text" xml:space="preserve"><value>General</value></data>
   <data name="SitesTabDatabase.Text" xml:space="preserve"><value>Database</value></data>
   <data name="SitesTabTools.Text" xml:space="preserve"><value>Tools</value></data>
-  <data name="SitesTabDetails.Text" xml:space="preserve"><value>Details</value></data>
+  <data name="SitesTabDetails.Text" xml:space="preserve"><value>Information</value></data>
   <data name="SitesDatabaseCreateButton.Text" xml:space="preserve"><value>Create database</value></data>
   <data name="SitesDatabaseOpenTablePlusButton.Text" xml:space="preserve"><value>Open in TablePlus</value></data>
   <data name="SitesDatabaseManage.Text" xml:space="preserve"><value>Manage database</value></data>
@@ -1854,4 +1852,106 @@ Recovery backup: {1}</value></data>
   <data name="SitesDatabasePeekCopy" xml:space="preserve"><value>Copy</value></data>
   <data name="SitesDatabasePeekInvalidTable" xml:space="preserve"><value>That table name cannot be read.</value></data>
   <data name="SitesDatabasePeekFailed" xml:space="preserve"><value>The database could not be read.</value></data>
+  <data name="ServicesAddServiceHeaderButton.Text" xml:space="preserve"><value>Add Service</value></data>
+  <data name="ServicesList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Services</value></data>
+  <data name="ServicesGroupDatabase" xml:space="preserve"><value>Database</value></data>
+  <data name="ServicesGroupCacheAndQueue" xml:space="preserve"><value>Cache &amp; Queue</value></data>
+  <data name="ServicesGroupSearch" xml:space="preserve"><value>Search</value></data>
+  <data name="ServicesGroupStorage" xml:space="preserve"><value>Storage</value></data>
+  <data name="ServicesGroupOther" xml:space="preserve"><value>Other</value></data>
+  <data name="ServicesRowSummary" xml:space="preserve"><value>{0}  ·  {1}</value></data>
+  <data name="ServicesDetailSummary" xml:space="preserve"><value>{0} · {1}</value></data>
+  <data name="ServicesDetailDocumentationTitle.Text" xml:space="preserve"><value>Documentation</value></data>
+  <data name="ServicesDetailOpenDocumentation.Content" xml:space="preserve"><value>Open</value></data>
+  <data name="ServicesDetailOpenDocumentation.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open documentation</value></data>
+  <data name="ServicesDetailEnvironmentTitle.Text" xml:space="preserve"><value>Environment Variables</value></data>
+  <data name="ServicesDetailLogsTitle.Text" xml:space="preserve"><value>Logs</value></data>
+  <data name="ServicesDetailOpenLog.Content" xml:space="preserve"><value>Open</value></data>
+  <data name="ServicesDetailOpenLog.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open the service log</value></data>
+  <data name="ServicesDetailPlaceholder.Text" xml:space="preserve"><value>Select a service to see its documentation, environment variables and logs.</value></data>
+  <data name="ServicesDetailNoDocumentation" xml:space="preserve"><value>No documentation link for this service</value></data>
+  <data name="ServicesDetailCopyEnvironment" xml:space="preserve"><value>Copy the environment variables of {0}</value></data>
+  <data name="ServicesDetailNoEnvironment" xml:space="preserve"><value>This service has no Laravel environment variables.</value></data>
+  <data name="ServicesDetailNoLog" xml:space="preserve"><value>Nothing logged yet.</value></data>
+  <data name="ServicesDetailLogMissing" xml:space="preserve"><value>{0} has not written a log yet. Start it first.</value></data>
+  <data name="MailCopySettingsButton.Text" xml:space="preserve"><value>Copy mail settings</value></data>
+  <data name="MailSettingsCopied" xml:space="preserve"><value>Mail settings copied (port {0}). Paste them into your .env.</value></data>
+  <data name="MailSettingsCopiedStopped" xml:space="preserve"><value>Mail settings copied (port {0}). Start mail capture so HerdMe receives the mail.</value></data>
+  <data name="MailSettingsCopyFailedTitle" xml:space="preserve"><value>Could not copy the mail settings</value></data>
+  <data name="GeneralDefenderExclusionTitle.Text" xml:space="preserve"><value>Speed up PHP (Windows Defender exclusion)</value></data>
+  <data name="GeneralDefenderExclusionDescription.Text" xml:space="preserve"><value>Asks Microsoft Defender not to scan the HerdMe folder, where PHP, Composer, Node.js and services live. PHP and Composer start noticeably faster. Needs administrator approval and applies to this PC. Your site folders are still scanned.</value></data>
+  <data name="DefenderExclusionToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Speed up PHP (Windows Defender exclusion)</value></data>
+  <data name="GeneralDefenderExclusionWaiting" xml:space="preserve"><value>Waiting for administrator approval...</value></data>
+  <data name="GeneralDefenderExclusionFailedTitle" xml:space="preserve"><value>Could not change the Defender setting</value></data>
+  <data name="GeneralDefenderExclusionConfirmTitle" xml:space="preserve"><value>Exclude the HerdMe folder from Defender scans?</value></data>
+  <data name="GeneralDefenderExclusionConfirmBody" xml:space="preserve"><value>HerdMe will ask Microsoft Defender to stop scanning this folder, which holds the PHP, Composer, Node.js and service files HerdMe downloaded and checked:</value></data>
+  <data name="GeneralDefenderExclusionConfirmRisk" xml:space="preserve"><value>Anything placed in this folder will not be scanned. Windows will ask for administrator approval. You can turn this off at any time, and uninstalling HerdMe removes it.</value></data>
+  <data name="GeneralDefenderExclusionConfirmButton" xml:space="preserve"><value>Exclude folder</value></data>
+  <data name="DefenderExclusionUnsupported" xml:space="preserve"><value>Windows Defender exclusions are only available on Windows.</value></data>
+  <data name="DefenderExclusionBadPath" xml:space="preserve"><value>Only the HerdMe folder in your local app data can be excluded.</value></data>
+  <data name="DefenderExclusionNoExecutable" xml:space="preserve"><value>The HerdMe executable path is unavailable.</value></data>
+  <data name="DefenderExclusionAdded" xml:space="preserve"><value>Windows Defender no longer scans the HerdMe folder.</value></data>
+  <data name="DefenderExclusionRemoved" xml:space="preserve"><value>Windows Defender scans the HerdMe folder again.</value></data>
+  <data name="DefenderExclusionDefenderFailed" xml:space="preserve"><value>Windows Defender did not accept the change. Another antivirus may be in charge, or Tamper Protection or an organisation policy may block exclusions.</value></data>
+  <data name="DefenderExclusionPowerShellMissing" xml:space="preserve"><value>Windows PowerShell is not available, so the Defender setting could not be changed.</value></data>
+  <data name="DefenderExclusionExitCode" xml:space="preserve"><value>The Defender helper stopped with code {0}.</value></data>
+  <data name="DefenderExclusionDeclined" xml:space="preserve"><value>Administrator approval was not given, so nothing changed.</value></data>
+  <data name="DashboardTabActivity.Text" xml:space="preserve"><value>Activity</value></data>
+  <data name="DashboardActiveServicesTitle.Text" xml:space="preserve"><value>Active services</value></data>
+  <data name="DashboardActiveServicesEmpty.Text" xml:space="preserve"><value>Nothing is running. Start all to serve your sites.</value></data>
+  <data name="DashboardOpenSectionTitle.Text" xml:space="preserve"><value>Open</value></data>
+  <data name="DashboardHomeOpenMail.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open Mail</value></data>
+  <data name="DashboardHomeOpenMailText.Text" xml:space="preserve"><value>Open Mail</value></data>
+  <data name="DashboardHomeOpenDumps.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open Dumps</value></data>
+  <data name="DashboardHomeOpenDumpsText.Text" xml:space="preserve"><value>Open Dumps</value></data>
+  <data name="DashboardHomeOpenLogs.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open Logs</value></data>
+  <data name="DashboardHomeOpenLogsText.Text" xml:space="preserve"><value>Open Logs</value></data>
+  <data name="DashboardGlobalPhpTitle.Text" xml:space="preserve"><value>Global PHP version</value></data>
+  <data name="DashboardGlobalPhpBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Global PHP version</value></data>
+  <data name="DashboardActiveWebServer" xml:space="preserve"><value>Web server</value></data>
+  <data name="DashboardActiveWebPorts" xml:space="preserve"><value>HTTP {0}, HTTPS {1}</value></data>
+  <data name="DashboardActivePhp" xml:space="preserve"><value>PHP {0}</value></data>
+  <data name="DashboardActivePhpDetail" xml:space="preserve"><value>Default version</value></data>
+  <data name="DashboardActiveMail" xml:space="preserve"><value>Mail</value></data>
+  <data name="DashboardActiveDumps" xml:space="preserve"><value>Dumps</value></data>
+  <data name="DashboardActivePort" xml:space="preserve"><value>Port {0}</value></data>
+  <data name="DashboardActiveOpen" xml:space="preserve"><value>Open {0}</value></data>
+  <data name="DashboardGlobalPhpItem" xml:space="preserve"><value>PHP {0}</value></data>
+  <data name="DashboardGlobalPhpNone" xml:space="preserve"><value>Install a PHP version from the PHP page.</value></data>
+  <data name="TitleBarSearchButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Search (Ctrl+K)</value></data>
+  <data name="GeneralShowStatusBarTitle.Text" xml:space="preserve"><value>Show status bar</value></data>
+  <data name="GeneralShowStatusBarDescription.Text" xml:space="preserve"><value>A thin bar at the bottom of the window with the environment, ports and downloads.</value></data>
+  <data name="ShowStatusBarToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Show status bar</value></data>
+  <data name="TitleBarSearchButtonTooltip" xml:space="preserve"><value>Search pages and sites (Ctrl+K)</value></data>
+  <data name="SitesHeaderSecureIcon.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Secured with HTTPS</value></data>
+  <data name="SitesGeneralTerminalLabel.Text" xml:space="preserve"><value>Terminal</value></data>
+  <data name="SitesGeneralTerminalValue.Text" xml:space="preserve"><value>Windows Terminal in the project folder</value></data>
+  <data name="SitesGeneralEditorLabel.Text" xml:space="preserve"><value>Editor</value></data>
+  <data name="SitesGeneralEditorValue.Text" xml:space="preserve"><value>Visual Studio Code</value></data>
+  <data name="SitesGeneralTinkerLabel.Text" xml:space="preserve"><value>Tinker</value></data>
+  <data name="SitesGeneralTinkerValue.Text" xml:space="preserve"><value>Run PHP in this project</value></data>
+  <data name="SitesGeneralDatabaseLabel.Text" xml:space="preserve"><value>Database</value></data>
+  <data name="SitesGeneralDatabaseValue.Text" xml:space="preserve"><value>Open in TablePlus</value></data>
+  <data name="SitesGeneralOpenUrl.Content" xml:space="preserve"><value>Open</value></data>
+  <data name="SitesGeneralOpenUrl.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open URL</value></data>
+  <data name="SitesGeneralOpenPath.Content" xml:space="preserve"><value>Open</value></data>
+  <data name="SitesGeneralOpenPath.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open folder</value></data>
+  <data name="SitesGeneralOpenTerminal.Content" xml:space="preserve"><value>Open</value></data>
+  <data name="SitesGeneralOpenTerminal.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open terminal</value></data>
+  <data name="SitesGeneralOpenEditor.Content" xml:space="preserve"><value>Open</value></data>
+  <data name="SitesGeneralOpenEditor.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open in editor</value></data>
+  <data name="SitesGeneralOpenTinker.Content" xml:space="preserve"><value>Open</value></data>
+  <data name="SitesGeneralOpenTinker.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open Tinker</value></data>
+  <data name="SitesGeneralOpenDatabase.Content" xml:space="preserve"><value>Open</value></data>
+  <data name="SitesGeneralOpenDatabase.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open database</value></data>
+  <data name="SitesGeneralOpenRuntime.Content" xml:space="preserve"><value>Change</value></data>
+  <data name="SitesGeneralOpenRuntime.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Configure PHP and Node.js</value></data>
+  <data name="ServicesFormServiceLabel.Text" xml:space="preserve"><value>Service</value></data>
+  <data name="ServicesFormNameLabel.Text" xml:space="preserve"><value>Name</value></data>
+  <data name="ServicesFormPortLabel.Text" xml:space="preserve"><value>Port</value></data>
+  <data name="ServicesFormVersionLabel.Text" xml:space="preserve"><value>Version</value></data>
+  <data name="ServicesAddCancelButton.Content" xml:space="preserve"><value>Cancel</value></data>
+  <data name="GeneralDomainSuffixInvalid" xml:space="preserve"><value>Use letters, digits or hyphens only, like test or local. The suffix was not changed.</value></data>
+  <data name="GeneralDomainSuffixChanged" xml:space="preserve"><value>Sites now open at https://name.{0}/</value></data>
+  <data name="GeneralDomainSuffixChangedHosts" xml:space="preserve"><value>Sites now open at https://name.{0}/. Press Update under Local domains so Windows finds the new names.</value></data>
 </root>

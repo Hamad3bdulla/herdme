@@ -7,6 +7,9 @@
     AutomationProperties.AutomationId="ServicesPageRoot"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
+    <Page.Resources>
+        <CollectionViewSource x:Name="ServiceGroupsSource" Source="{x:Bind Groups}" IsSourceGrouped="True" />
+    </Page.Resources>
     <Grid x:Name="ServicesLayout" Padding="{StaticResource PagePadding}" RowSpacing="16" SizeChanged="ServicesLayout_SizeChanged">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -33,6 +36,12 @@
                         <TextBlock x:Uid="ServicesCancelButton" Text="Cancel" />
                     </StackPanel>
                 </Button>
+                <Button x:Name="AddServiceToggleButton" Click="ToggleAddService_Click" AutomationProperties.AutomationId="AddServiceToggle" Style="{StaticResource AccentButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <SymbolIcon Symbol="Add" />
+                        <TextBlock x:Uid="ServicesAddServiceHeaderButton" Text="Add Service" />
+                    </StackPanel>
+                </Button>
                 <Button x:Uid="ServicesRefreshButton" Click="Refresh_Click" AutomationProperties.Name="Refresh service status" Style="{StaticResource ToolbarIconButtonStyle}">
                     <Button.KeyboardAccelerators>
                         <KeyboardAccelerator Key="F5" />
@@ -45,7 +54,7 @@
             </StackPanel>
         </Grid>
 
-        <Border Grid.Row="1" Style="{StaticResource CardStyle}">
+        <Border x:Name="AddServiceCard" Grid.Row="1" Style="{StaticResource CardStyle}" Visibility="Collapsed" AutomationProperties.AutomationId="AddServiceCard">
             <StackPanel Spacing="12">
                 <StackPanel Orientation="Horizontal" Spacing="12">
                     <Border Style="{StaticResource IconTileStyle}" Width="32" Height="32" Background="{ThemeResource ServicesTintBrush}" VerticalAlignment="Center">
@@ -53,8 +62,11 @@
                     </Border>
                     <TextBlock x:Uid="ServicesAddSectionTitle" Text="Add a service" Style="{StaticResource SectionTitleStyle}" />
                 </StackPanel>
-                <Grid x:Name="ServiceForm" ColumnSpacing="10" RowSpacing="10">
+                <!-- Herd-style form: labels on the start column, fields on the other. -->
+                <Grid x:Name="ServiceForm" Style="{StaticResource FormGridStyle}" MaxWidth="640" HorizontalAlignment="Left">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -62,42 +74,46 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition x:Name="ServiceTypeColumn" Width="180" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition x:Name="ServicePortColumn" Width="130" />
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition x:Name="ServiceTypeColumn" Width="140" />
+                        <ColumnDefinition x:Name="ServicePortColumn" Width="*" />
                     </Grid.ColumnDefinitions>
+                    <TextBlock x:Uid="ServicesFormServiceLabel" x:Name="ServiceTypeLabel" Text="Service" Style="{StaticResource FormLabelStyle}" />
                     <ComboBox
                         x:Uid="ServicesTypeField"
                         x:Name="ServiceTypeBox"
-                        Header="Service"
+                        Grid.Column="1"
+                        HorizontalAlignment="Stretch"
                         ItemsSource="{x:Bind Definitions}"
                         DisplayMemberPath="Name"
                         SelectionChanged="ServiceType_SelectionChanged" />
-                    <TextBox x:Uid="ServicesNameField" x:Name="ServiceNameBox" Grid.Column="1" Header="Name" TextWrapping="Wrap" TextChanged="ServiceInput_Changed" />
-                    <NumberBox x:Uid="ServicesPortField" x:Name="ServicePortBox" Grid.Column="2" Header="Port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Compact" ValueChanged="ServicePort_ValueChanged" />
-                    <Button
-                        x:Name="AddServiceButton"
-                        Style="{StaticResource AccentButtonStyle}"
-                        Grid.Column="3"
-                        VerticalAlignment="Bottom"
-                        Click="Add_Click">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <SymbolIcon Symbol="Add" />
-                            <TextBlock x:Uid="ServicesAddButton" Text="Add" />
-                        </StackPanel>
-                    </Button>
+                    <TextBlock x:Uid="ServicesFormNameLabel" x:Name="ServiceNameLabel" Grid.Row="1" Text="Name" Style="{StaticResource FormLabelStyle}" />
+                    <TextBox x:Uid="ServicesNameField" x:Name="ServiceNameBox" Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" TextChanged="ServiceInput_Changed" />
+                    <TextBlock x:Uid="ServicesFormPortLabel" x:Name="ServicePortLabel" Grid.Row="2" Text="Port" Style="{StaticResource FormLabelStyle}" />
+                    <NumberBox x:Uid="ServicesPortField" x:Name="ServicePortBox" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Left" MinWidth="160" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Compact" ValueChanged="ServicePort_ValueChanged" />
+                    <TextBlock x:Uid="ServicesFormVersionLabel" x:Name="ServiceVersionLabel" Grid.Row="3" Text="Version" Style="{StaticResource FormLabelStyle}" />
+                    <ComboBox x:Name="ServiceVersionBox" x:Uid="ServicesVersionBox" Grid.Row="3" Grid.Column="1" HorizontalAlignment="Stretch" AutomationProperties.Name="Service version" />
                     <TextBlock
                         x:Name="ServiceAvailabilityText"
-                        Grid.Row="3"
-                        Grid.ColumnSpan="4"
+                        Grid.Row="4"
+                        Grid.Column="1"
                         Foreground="{ThemeResource SystemFillColorCautionBrush}"
                         TextWrapping="Wrap"
                         Visibility="Collapsed" />
-                    <ComboBox x:Name="ServiceVersionBox" x:Uid="ServicesVersionBox" Grid.Row="2" Grid.ColumnSpan="4" HorizontalAlignment="Stretch" AutomationProperties.Name="Service version" />
-                    <StackPanel Grid.Row="4" Grid.ColumnSpan="4" Spacing="2">
+                    <StackPanel Grid.Row="5" Grid.Column="1" Spacing="2">
                         <TextBlock x:Name="ServiceNameMessage" AutomationProperties.AutomationId="ServiceNameMessage" Visibility="Collapsed" />
                         <TextBlock x:Name="ServicePortMessage" AutomationProperties.AutomationId="ServicePortMessage" Visibility="Collapsed" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Button x:Uid="ServicesAddCancelButton" Click="CancelAddService_Click" AutomationProperties.AutomationId="AddServiceCancel" Content="Cancel" />
+                        <Button
+                            x:Name="AddServiceButton"
+                            Style="{StaticResource AccentButtonStyle}"
+                            Click="Add_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <SymbolIcon Symbol="Add" />
+                                <TextBlock x:Uid="ServicesAddButton" Text="Add" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Grid>
             </StackPanel>
@@ -141,49 +157,77 @@
             </ItemsControl>
         </ScrollViewer>
 
-        <Border Grid.Row="3" Style="{StaticResource SettingsGroupStyle}">
-            <Grid>
-                <GridView x:Name="ServiceList" ItemsSource="{x:Bind Rows}" SelectionMode="None" IsItemClickEnabled="False" Padding="12,12,12,12" AutomationProperties.AutomationId="ServiceCards">
-                    <GridView.ItemContainerStyle>
-                        <Style TargetType="GridViewItem" BasedOn="{StaticResource DefaultGridViewItemStyle}">
-                            <Setter Property="Margin" Value="0,0,12,12" />
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            <Setter Property="VerticalContentAlignment" Value="Stretch" />
-                        </Style>
-                    </GridView.ItemContainerStyle>
-                    <GridView.ItemTemplate>
-                        <DataTemplate x:DataType="models:ManagedServiceRow">
-                            <Border Width="312" MinHeight="176" Padding="14,12" CornerRadius="{StaticResource OverlayCornerRadius}"
-                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                AutomationProperties.Name="{x:Bind CardName}">
-                                <Grid RowSpacing="8">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="*" />
-                                    </Grid.RowDefinitions>
-                                    <Grid ColumnSpacing="10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <Grid Width="10" Height="10" VerticalAlignment="Center">
-                                            <Ellipse Fill="{ThemeResource SystemFillColorSuccessBrush}" Visibility="{x:Bind IsRunning}" />
-                                            <Ellipse Fill="{ThemeResource ControlStrongFillColorDisabledBrush}" Visibility="{x:Bind IsNotRunning}" />
-                                        </Grid>
-                                        <StackPanel Grid.Column="1" MinWidth="0">
-                                            <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Name}" />
-                                            <TextBlock Text="{x:Bind Status}" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
-                                        <Button Grid.Column="2" VerticalAlignment="Top" x:Uid="ServicesMoreButton" IsEnabled="{x:Bind CanManage}" AutomationProperties.Name="More service actions" Style="{StaticResource ToolbarIconButtonStyle}">
+        <Grid x:Name="ServicesContent" Grid.Row="3" ColumnSpacing="16" RowSpacing="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="ServiceDetailColumn" Width="400" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition x:Name="ServiceDetailRow" Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border Style="{StaticResource SettingsGroupStyle}">
+                <Grid>
+                    <ListView
+                        x:Name="ServiceList"
+                        x:Uid="ServicesList"
+                        ItemsSource="{x:Bind ServiceGroupsSource.View}"
+                        SelectionMode="Single"
+                        SelectionChanged="ServiceList_SelectionChanged"
+                        Padding="4,8,4,8"
+                        AutomationProperties.Name="Services"
+                        AutomationProperties.AutomationId="ServiceCards">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="12,0,8,0" />
+                                <Setter Property="Margin" Value="4,1,4,1" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.HeaderTemplate>
+                                    <DataTemplate x:DataType="pages:ServiceGroup">
+                                        <TextBlock Text="{x:Bind Title}" Style="{StaticResource CaptionTextStyle}" FontWeight="SemiBold"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            AutomationProperties.HeadingLevel="Level2" />
+                                    </DataTemplate>
+                                </GroupStyle.HeaderTemplate>
+                            </GroupStyle>
+                        </ListView.GroupStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:ManagedServiceRow">
+                                <Grid Padding="0,10,0,10" ColumnSpacing="12" AutomationProperties.Name="{x:Bind CardName}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Width="10" Height="10" VerticalAlignment="Center">
+                                        <Ellipse Fill="{ThemeResource SystemFillColorSuccessBrush}" Visibility="{x:Bind IsRunning}" />
+                                        <Ellipse Fill="{ThemeResource ControlStrongFillColorDisabledBrush}" Visibility="{x:Bind IsNotRunning}" />
+                                    </Grid>
+                                    <StackPanel Grid.Column="1" MinWidth="0" VerticalAlignment="Center" Spacing="1">
+                                        <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Name}" />
+                                        <TextBlock Text="{x:Bind Summary}" Style="{StaticResource CaptionTextStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <Button Style="{StaticResource ToolbarIconButtonStyle}"
+                                            Tag="{x:Bind Id}"
+                                            Click="Install_Click"
+                                            AutomationProperties.Name="{x:Bind InstallLabel}"
+                                            Visibility="{x:Bind CanInstallOrUpdate}">
+                                            <ToolTipService.ToolTip>
+                                                <ToolTip><TextBlock x:Uid="ServicesInstallTooltip" Text="Install or update runtime" /></ToolTip>
+                                            </ToolTipService.ToolTip>
+                                            <SymbolIcon Symbol="Download" />
+                                        </Button>
+                                        <Button x:Uid="ServicesMoreButton" IsEnabled="{x:Bind CanManage}" AutomationProperties.Name="More service actions" Style="{StaticResource ToolbarIconButtonStyle}">
                                             <ToolTipService.ToolTip>
                                                 <ToolTip><TextBlock x:Uid="ServicesMoreTooltip" Text="More service actions" /></ToolTip>
                                             </ToolTipService.ToolTip>
-                                            <SymbolIcon Symbol="More" />
+                                            <FontIcon Glyph="&#xE713;" FontSize="16" />
                                             <Button.Flyout>
                                                 <MenuFlyout>
                                                     <MenuFlyoutItem x:Uid="ServicesBackupsAction" Text="Data backups" Tag="{x:Bind Id}" Click="Backups_Click" />
@@ -254,58 +298,105 @@
                                                 </MenuFlyout>
                                             </Button.Flyout>
                                         </Button>
-                                    </Grid>
-                                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
-                                        <TextBlock Text="{x:Bind PortText}" Style="{StaticResource CaptionTextStyle}" FlowDirection="LeftToRight" />
-                                        <TextBlock Text="{x:Bind Version}" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" FlowDirection="LeftToRight" />
-                                        <TextBlock Text="{x:Bind DefinitionId}" Style="{StaticResource CaptionTextStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                                    </StackPanel>
-                                    <Grid Grid.Row="2" ColumnSpacing="6" Visibility="{x:Bind CanCopyAddress}">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{x:Bind Address}" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" FontSize="12" IsTextSelectionEnabled="True" TextTrimming="CharacterEllipsis" FlowDirection="LeftToRight" ToolTipService.ToolTip="{x:Bind Address}" />
-                                        <Button Grid.Column="1" Tag="{x:Bind Id}" Click="CopyAddress_Click" Style="{StaticResource ToolbarIconButtonStyle}"
-                                            AutomationProperties.Name="{x:Bind CopyAddressLabel}" ToolTipService.ToolTip="{x:Bind CopyAddressLabel}">
-                                            <SymbolIcon Symbol="Copy" />
-                                        </Button>
-                                    </Grid>
-                                    <Border Grid.Row="3" Padding="8,4" CornerRadius="4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" Visibility="{x:Bind HasLastLogLine, Mode=OneWay}">
-                                        <TextBlock Text="{x:Bind LastLogLine, Mode=OneWay}" FontFamily="Cascadia Mono, Consolas" FontSize="11" TextTrimming="CharacterEllipsis" FlowDirection="LeftToRight"
-                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" ToolTipService.ToolTip="{x:Bind LastLogLine, Mode=OneWay}"
-                                            AutomationProperties.LiveSetting="Off" />
-                                    </Border>
-                                    <StackPanel Grid.Row="4" VerticalAlignment="Bottom" Orientation="Horizontal" Spacing="6">
-                                        <Button Tag="{x:Bind Id}" Click="Toggle_Click" IsEnabled="{x:Bind CanToggle}">
+                                        <Button Tag="{x:Bind Id}" Click="Toggle_Click" IsEnabled="{x:Bind CanToggle}" MinWidth="72">
                                             <TextBlock Text="{x:Bind ToggleLabel}" />
-                                        </Button>
-                                        <Button Style="{StaticResource ToolbarIconButtonStyle}"
-                                            Tag="{x:Bind Id}"
-                                            Click="Install_Click"
-                                            AutomationProperties.Name="{x:Bind InstallLabel}"
-                                            Visibility="{x:Bind CanInstallOrUpdate}">
-                                            <ToolTipService.ToolTip>
-                                                <ToolTip><TextBlock x:Uid="ServicesInstallTooltip" Text="Install or update runtime" /></ToolTip>
-                                            </ToolTipService.ToolTip>
-                                            <SymbolIcon Symbol="Download" />
                                         </Button>
                                     </StackPanel>
                                 </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </GridView.ItemTemplate>
-                </GridView>
-                <StackPanel
-                    x:Name="EmptyState"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Spacing="8"
-                    Visibility="Collapsed">
-                    <FontIcon Glyph="&#xE8F1;" Style="{StaticResource EmptyStateGlyphStyle}" />
-                    <TextBlock x:Uid="ServicesEmptyState" Text="No services added" HorizontalAlignment="Center" Style="{StaticResource SectionTitleStyle}" />
-                </StackPanel>
-            </Grid>
-        </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <StackPanel
+                        x:Name="EmptyState"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="8"
+                        Visibility="Collapsed">
+                        <FontIcon Glyph="&#xE8F1;" Style="{StaticResource EmptyStateGlyphStyle}" />
+                        <TextBlock x:Uid="ServicesEmptyState" Text="No services added" HorizontalAlignment="Center" Style="{StaticResource SectionTitleStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border x:Name="ServiceDetailPane" Grid.Column="1" Style="{StaticResource SettingsGroupStyle}" AutomationProperties.AutomationId="ServiceDetails">
+                <Grid>
+                    <ScrollViewer x:Name="ServiceDetailContent" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                        <StackPanel Padding="20,18,20,20" Spacing="22">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <Grid Width="10" Height="10" VerticalAlignment="Center">
+                                        <Ellipse x:Name="DetailRunningDot" Fill="{ThemeResource SystemFillColorSuccessBrush}" />
+                                        <Ellipse x:Name="DetailStoppedDot" Fill="{ThemeResource ControlStrongFillColorDisabledBrush}" Visibility="Collapsed" />
+                                    </Grid>
+                                    <TextBlock x:Name="DetailNameText" Style="{StaticResource SubtitleTextBlockStyle}" TextTrimming="CharacterEllipsis" AutomationProperties.HeadingLevel="Level2" />
+                                </StackPanel>
+                                <TextBlock x:Name="DetailSummaryText" Style="{StaticResource CaptionTextStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                <Grid x:Name="DetailAddressRow" ColumnSpacing="6" Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="DetailAddressText" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" FontSize="12" IsTextSelectionEnabled="True" TextTrimming="CharacterEllipsis" FlowDirection="LeftToRight" />
+                                    <Button x:Name="DetailCopyAddressButton" Grid.Column="1" Click="CopyAddress_Click" Style="{StaticResource ToolbarIconButtonStyle}">
+                                        <SymbolIcon Symbol="Copy" />
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock x:Uid="ServicesDetailDocumentationTitle" Text="Documentation" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level3" />
+                                    <TextBlock x:Name="DetailDocumentationText" Style="{StaticResource CaptionTextStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FlowDirection="LeftToRight" HorizontalAlignment="Left" />
+                                </StackPanel>
+                                <Button x:Name="DetailDocumentationButton" x:Uid="ServicesDetailOpenDocumentation" Grid.Column="1" Content="Open" Click="OpenDocumentation_Click" AutomationProperties.AutomationId="ServiceDocumentationButton" />
+                            </Grid>
+
+                            <StackPanel Spacing="8">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Uid="ServicesDetailEnvironmentTitle" Text="Environment Variables" FontWeight="SemiBold" VerticalAlignment="Center" AutomationProperties.HeadingLevel="Level3" />
+                                    <Button x:Name="DetailCopyEnvironmentButton" Grid.Column="1" Click="CopyEnvironment_Click" Style="{StaticResource ToolbarIconButtonStyle}" AutomationProperties.AutomationId="ServiceCopyEnvironmentButton">
+                                        <SymbolIcon Symbol="Copy" />
+                                    </Button>
+                                </Grid>
+                                <Border Padding="12,10" CornerRadius="6" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                    <ScrollViewer HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Auto" VerticalScrollBarVisibility="Disabled" VerticalScrollMode="Disabled">
+                                        <TextBlock x:Name="DetailEnvironmentText" FontFamily="Cascadia Mono, Consolas" FontSize="12" IsTextSelectionEnabled="True" FlowDirection="LeftToRight" TextWrapping="NoWrap" AutomationProperties.AutomationId="ServiceEnvironmentBlock" />
+                                    </ScrollViewer>
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel Spacing="8">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Uid="ServicesDetailLogsTitle" Text="Logs" FontWeight="SemiBold" VerticalAlignment="Center" AutomationProperties.HeadingLevel="Level3" />
+                                    <Button x:Name="DetailOpenLogButton" x:Uid="ServicesDetailOpenLog" Grid.Column="1" Content="Open" Click="OpenLog_Click" AutomationProperties.AutomationId="ServiceOpenLogButton" />
+                                </Grid>
+                                <Border Padding="12,10" CornerRadius="6" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                    <ScrollViewer x:Name="DetailLogScroller" MaxHeight="300" HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Auto" VerticalScrollBarVisibility="Auto">
+                                        <TextBlock x:Name="DetailLogText" FontFamily="Cascadia Mono, Consolas" FontSize="11" IsTextSelectionEnabled="True" FlowDirection="LeftToRight" TextWrapping="NoWrap"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.LiveSetting="Off" AutomationProperties.AutomationId="ServiceLogBlock" />
+                                    </ScrollViewer>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                    <StackPanel x:Name="DetailPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" Padding="24">
+                        <FontIcon Glyph="&#xE8A5;" Style="{StaticResource EmptyStateGlyphStyle}" />
+                        <TextBlock x:Uid="ServicesDetailPlaceholder" Text="Select a service to see its documentation, environment variables and logs." TextWrapping="Wrap" TextAlignment="Center" MaxWidth="260" Style="{StaticResource SettingsRowDescriptionStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </Page>

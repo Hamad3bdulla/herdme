@@ -78,6 +78,7 @@ public sealed partial class GeneralPage : Page
         loadingStartup = false;
         LoadShellIntegration();
         var settings = settingsStore.Load();
+        LoadDefenderExclusion(settings);
         loadingCompactMode = true;
         CompactModeToggle.IsOn = settings.CompactMode;
         loadingCompactMode = false;
@@ -110,6 +111,8 @@ public sealed partial class GeneralPage : Page
     {
         if (loadingCompactMode) return;
         settingsStore.UpdateCompactMode(CompactModeToggle.IsOn);
+        App.MainWindow.ApplyCompactPreference(CompactModeToggle.IsOn);
+        App.MainWindow.ShowToast(AppLocalization.Get("CommonSavedToast"));
     }
 
     private void NotificationsToggle_Toggled(object sender, RoutedEventArgs e)
@@ -408,10 +411,49 @@ public sealed partial class GeneralPage : Page
         };
     }
 
-    private void TldTextBox_LostFocus(object sender, RoutedEventArgs e)
+    private void TldTextBox_LostFocus(object sender, RoutedEventArgs e) => CommitDomainSuffix();
+
+    private void TldTextBox_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
     {
-        settingsStore.UpdateTld(TldTextBox.Text);
-        TldTextBox.Text = settingsStore.Load().Tld;
+        if (e.Key != global::Windows.System.VirtualKey.Enter) return;
+        e.Handled = true;
+        CommitDomainSuffix();
+    }
+
+    // A bad value keeps the current suffix (instead of silently falling back to "test"); a new
+    // one rescans the sites and moves the running web server over right away.
+    private async void CommitDomainSuffix()
+    {
+        var previous = settingsStore.Load().Tld;
+        var typed = SiteConfigurationStore.NormalizeTld(TldTextBox.Text);
+        if (typed == previous)
+        {
+            TldTextBox.Text = previous;
+            return;
+        }
+        if (!SiteConfigurationStore.IsValidTld(typed))
+        {
+            TldTextBox.Text = previous;
+            App.MainWindow.ShowToast(AppLocalization.Get("GeneralDomainSuffixInvalid"));
+            return;
+        }
+        settingsStore.UpdateTld(typed);
+        var saved = settingsStore.Load().Tld;
+        TldTextBox.Text = saved;
+        if (saved == previous) return;
+        ((App)Application.Current).ApplyDomainSuffixChange();
+        var hostsConfigured = false;
+        try
+        {
+            hostsConfigured = await hostsManager.HasManagedMappingsAsync();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+        }
+        App.MainWindow.ShowToast(AppLocalization.Format(
+            hostsConfigured ? "GeneralDomainSuffixChangedHosts" : "GeneralDomainSuffixChanged",
+            saved
+        ));
     }
 
     private async void InstallDomains_Click(object sender, RoutedEventArgs e)

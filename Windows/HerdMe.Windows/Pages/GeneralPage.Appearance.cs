@@ -34,6 +34,7 @@ public sealed partial class GeneralPage
         var index = UiLanguageSettings.Supported.ToList().IndexOf(startupLanguage);
         LanguageBox.SelectedIndex = Math.Max(0, index);
         ReduceMotionToggle.IsOn = settings.ReduceMotion;
+        ShowStatusBarToggle.IsOn = settings.ShowStatusBar;
         loadingAppearance = false;
     }
 
@@ -52,5 +53,12 @@ public sealed partial class GeneralPage
         if (loadingAppearance) return;
         settingsStore.UpdateReduceMotion(ReduceMotionToggle.IsOn);
         App.MainWindow.ApplyMotionPreference();
+    }
+
+    private void ShowStatusBarToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (loadingAppearance) return;
+        settingsStore.UpdateShowStatusBar(ShowStatusBarToggle.IsOn);
+        App.MainWindow.ApplyStatusBarPreference(ShowStatusBarToggle.IsOn);
     }
 }

@@ -11,6 +11,15 @@ public sealed partial class MainWindow
     private bool statusBarSubscribed;
     private string? displayedStatusBarSignature;
     private DownloadSummary displayedDownloads = StatusBarPresentation.Idle;
+    private bool? showStatusBarSetting;
+
+    // General > "Show status bar" (off by default). Read once, then updated by the switch.
+    internal void ApplyStatusBarPreference(bool show)
+    {
+        showStatusBarSetting = show;
+        displayedStatusBarSignature = null;
+        UpdateStatusBar();
+    }
 
     private void InitializeStatusBar()
     {
@@ -42,8 +51,10 @@ public sealed partial class MainWindow
     private void UpdateStatusBar()
     {
         if (shuttingDown) return;
-        StatusBar.Visibility = RequiresOnboarding ? Visibility.Collapsed : Visibility.Visible;
-        if (RequiresOnboarding) return;
+        showStatusBarSetting ??= services.SiteSettings.Load().ShowStatusBar;
+        var visible = !RequiresOnboarding && showStatusBarSetting == true;
+        StatusBar.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        if (!visible) return;
         var environment = services.Environment;
         var running = environment.IsRunning;
         var degraded = environment.IsDegraded;

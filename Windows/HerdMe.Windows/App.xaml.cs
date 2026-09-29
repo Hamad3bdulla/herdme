@@ -50,6 +50,16 @@ public partial class App : Application
             Environment.Exit(helperExitCode);
             return;
         }
+        if (DefenderExclusion.TryRunElevatedHelper(Environment.GetCommandLineArgs(), out var defenderExitCode))
+        {
+            Environment.Exit(defenderExitCode);
+            return;
+        }
+        if (DefenderExclusion.TryRunUninstallCleanup(Environment.GetCommandLineArgs()))
+        {
+            Environment.Exit(0);
+            return;
+        }
         if (TryRunUnregisterNotifications(Environment.GetCommandLineArgs()))
         {
             Environment.Exit(0);

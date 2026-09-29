@@ -5,13 +5,15 @@ using Windows.ApplicationModel.DataTransfer;
 
 namespace HerdMe.Windows.Pages;
 
-// Service cards: each card shows the newest line of its log (refreshed every few seconds
-// while the page is open) and, for a running service, its address with a copy button.
+// Service log tail and address: the details pane shows the newest lines of the selected
+// service's log (refreshed every few seconds while the page is open) and, for a running
+// service, its address with a copy button.
 public sealed partial class ServicesPage
 {
     private readonly DispatcherTimer logTailTimer = new() { Interval = TimeSpan.FromSeconds(3) };
     private bool logTailSubscribed;
     private bool readingLogTails;
+    private bool logTailRequestedAgain;
 
     private void StartLogTails()
     {
@@ -27,24 +29,34 @@ public sealed partial class ServicesPage
 
     private void LogTailTimer_Tick(object? sender, object e) => RequestLogTails();
 
+    // Only the selected service's log is read: its newest lines fill the details pane (and its
+    // row keeps the newest line). A selection change during a read triggers one more read.
     private async void RequestLogTails()
     {
-        if (!loaded || readingLogTails || Rows.Count == 0) return;
+        if (!loaded || SelectedRow() is not { } row) return;
+        if (readingLogTails)
+        {
+            logTailRequestedAgain = true;
+            return;
+        }
         readingLogTails = true;
         try
         {
-            var targets = Rows.Select(row => (Row: row, Path: manager.LogPath(row.Id))).ToArray();
-            var lines = await Task.Run(() => targets.Select(target => ServiceLogTail.LastLine(target.Path)).ToArray());
+            var path = manager.LogPath(row.Id);
+            var text = await Task.Run(() => ServiceLogTail.LastLines(path));
             if (!loaded) return;
-            for (var index = 0; index < targets.Length; index++)
-            {
-                // A row replaced during the read is filled on the next tick.
-                if (Rows.Contains(targets[index].Row)) targets[index].Row.LastLogLine = lines[index];
-            }
+            // A row replaced or deselected during the read is filled on the next tick.
+            if (Rows.Contains(row)) row.LastLogLine = ServiceLogTail.FromText(text);
+            if (SelectedRow()?.Id == row.Id) ShowDetailLog(text);
         }
         finally
         {
             readingLogTails = false;
+        }
+        if (logTailRequestedAgain)
+        {
+            logTailRequestedAgain = false;
+            RequestLogTails();
         }
     }
 
