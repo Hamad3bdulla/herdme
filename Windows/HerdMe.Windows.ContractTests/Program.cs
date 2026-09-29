@@ -161,6 +161,8 @@ try
     VerifyRound8UxContracts(repositoryRoot, supportRoot);
     VerifyReportedIssueContracts(repositoryRoot);
     VerifyRound9UxContracts(repositoryRoot, supportRoot);
+    VerifyRound10UxContracts(repositoryRoot, supportRoot);
+    VerifyRound11UxContracts(repositoryRoot);
     await VerifyLaravelToolsContractsAsync(repositoryRoot, supportRoot);
     VerifyPlatformToolingContracts(repositoryRoot);
 }

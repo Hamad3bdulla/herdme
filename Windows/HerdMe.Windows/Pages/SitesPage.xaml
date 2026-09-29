@@ -336,7 +336,7 @@
                                                     VerticalAlignment="Center"
                                                     Style="{x:Bind MonogramStyle, Mode=OneWay}"
                                                     Visibility="{x:Bind MonogramVisibility, Mode=OneWay}" />
-                                                <FontIcon Glyph="&#xE774;" FontSize="16" Foreground="{ThemeResource BrandBrush}" Visibility="{x:Bind GlobeVisibility, Mode=OneWay}" />
+                                                <FontIcon Glyph="&#xE774;" FontSize="16" Foreground="{ThemeResource NeutralInkBrush}" Visibility="{x:Bind GlobeVisibility, Mode=OneWay}" />
                                             </Grid>
                                         </Border>
                                         <Ellipse
@@ -377,7 +377,7 @@
                                                     AutomationProperties.LiveSetting="Polite" />
                                             </StackPanel>
                                             <FontIcon Grid.Column="1" Glyph="&#xE72D;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource SystemFillColorCautionBrush}" Visibility="{x:Bind SharedVisibility, Mode=OneWay}" />
-                                            <FontIcon Grid.Column="2" Glyph="&#xE735;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource BrandBrush}" Visibility="{x:Bind FavoriteVisibility, Mode=OneWay}" />
+                                            <FontIcon Grid.Column="2" Glyph="&#xE735;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource NeutralInkBrush}" Visibility="{x:Bind FavoriteVisibility, Mode=OneWay}" />
                                         </Grid>
                                         <Grid ColumnSpacing="8">
                                             <Grid.ColumnDefinitions>
@@ -557,24 +557,37 @@
                                 </ToolTipService.ToolTip>
                                 <FontIcon Glyph="&#xE72B;" FontSize="14" />
                             </Button>
-                            <Border x:Name="SiteHeaderTile" Grid.Column="1" Width="40" Height="40" CornerRadius="10" VerticalAlignment="Center" Background="{ThemeResource SitesTintBrush}">
+                            <Border x:Name="SiteHeaderTile" Grid.Column="1" Width="40" Height="40" CornerRadius="10" VerticalAlignment="Center" Background="{ThemeResource FrameworkPhpTintBrush}">
                                 <Grid>
                                     <TextBlock x:Name="SiteHeaderMonogram" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
-                                    <FontIcon x:Name="SiteHeaderGlobe" Glyph="&#xE774;" FontSize="18" Foreground="{ThemeResource BrandBrush}" />
+                                    <FontIcon x:Name="SiteHeaderGlobe" Glyph="&#xE774;" FontSize="18" Foreground="{ThemeResource NeutralInkBrush}" />
                                 </Grid>
                             </Border>
                             <StackPanel Grid.Column="2" Spacing="1" VerticalAlignment="Center">
                                 <TextBlock
                                     x:Name="SiteNameText"
                                     Style="{StaticResource SectionTitleStyle}"
+                                    FontSize="20"
                                     TextWrapping="Wrap"
                                     MaxLines="2"
                                     TextTrimming="CharacterEllipsis" />
-                                <TextBlock
-                                    x:Name="DomainText"
-                                    Style="{StaticResource SettingsRowDescriptionStyle}"
-                                    TextWrapping="NoWrap"
-                                    TextTrimming="CharacterEllipsis" />
+                                <!-- Every site is served over HTTPS (https://name.test/), shown Herd-style with a lock. -->
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon
+                                        x:Uid="SitesHeaderSecureIcon"
+                                        x:Name="SiteHeaderLock"
+                                        Glyph="&#xE72E;"
+                                        FontSize="12"
+                                        VerticalAlignment="Center"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        AutomationProperties.Name="Secured with HTTPS"
+                                        AutomationProperties.AutomationId="SitesHeaderSecure" />
+                                    <TextBlock
+                                        x:Name="DomainText"
+                                        Style="{StaticResource SettingsRowDescriptionStyle}"
+                                        TextWrapping="NoWrap"
+                                        TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
                             </StackPanel>
                             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                 <TextBlock x:Uid="SitesLivePreviewLabel" Text="Live preview" VerticalAlignment="Center" Style="{StaticResource SettingsRowDescriptionStyle}" />
@@ -582,14 +595,17 @@
                             </StackPanel>
                         </Grid>
 
-                        <!-- Everyday actions stay one click away; destructive ones live under More. -->
+                        <!-- Calm header: browser, editor and share stay one click away; everything else
+                             (copy, folder, terminal, logs, .env, runtimes, herdme.yml, unlink, delete)
+                             lives in one "..." menu. The General tab has Open buttons for the rest. -->
                         <CommandBar
                             Grid.Row="1"
                             Margin="12,0,12,0"
                             HorizontalAlignment="Left"
                             Background="Transparent"
                             DefaultLabelPosition="Collapsed"
-                            IsDynamicOverflowEnabled="True">
+                            OverflowButtonVisibility="Collapsed"
+                            IsDynamicOverflowEnabled="False">
                             <CommandBar.PrimaryCommands>
                                 <AppBarButton x:Uid="SitesOpenBrowserCommand" Label="Open in browser" Click="OpenSite_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Globe" /></AppBarButton.Icon>
@@ -597,36 +613,31 @@
                                 <AppBarButton x:Uid="SitesOpenEditorCommand" Label="Open in VS Code" Click="OpenEditor_Click">
                                     <AppBarButton.Icon><FontIcon Glyph="&#xE943;" /></AppBarButton.Icon>
                                 </AppBarButton>
-                                <AppBarButton x:Uid="SitesCopyCommand" Label="Copy site link or path">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Copy" /></AppBarButton.Icon>
-                                    <AppBarButton.Flyout>
-                                        <MenuFlyout>
-                                            <MenuFlyoutItem x:Uid="SitesCopyLinkMenu" Text="Copy link" Click="CopySelectedSiteLink_Click" />
-                                            <MenuFlyoutItem x:Uid="SitesCopyPathMenu" Text="Copy path" Click="CopySelectedSitePath_Click" />
-                                        </MenuFlyout>
-                                    </AppBarButton.Flyout>
-                                </AppBarButton>
                                 <AppBarButton x:Uid="SitesShareCommand" x:Name="ShareButton" Label="Share publicly" Click="ShareSite_Click">
                                     <AppBarButton.Icon><SymbolIcon Symbol="Share" /></AppBarButton.Icon>
                                 </AppBarButton>
-                                <AppBarButton x:Uid="SitesOpenFolderCommand" Label="Open project folder" Click="OpenFolder_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Folder" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesOpenTerminalCommand" Label="Open terminal" Click="OpenTerminal_Click">
-                                    <AppBarButton.Icon><FontIcon Glyph="&#xE756;" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesOpenLogsButton" Label="Open site logs" Click="OpenLogs_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Document" /></AppBarButton.Icon>
-                                </AppBarButton>
-                                <AppBarButton x:Uid="SitesEditEnvironmentCommand" Label="Edit .env" Click="EditEnvironment_Click">
-                                    <AppBarButton.Icon><SymbolIcon Symbol="Edit" /></AppBarButton.Icon>
-                                </AppBarButton>
-                            </CommandBar.PrimaryCommands>
-                            <CommandBar.SecondaryCommands>
-                                <AppBarButton x:Uid="SitesMoreActionsCommand" Label="More site actions">
+                                <AppBarButton x:Uid="SitesMoreActionsCommand" Label="More site actions" AutomationProperties.AutomationId="SitesMoreActions">
                                     <AppBarButton.Icon><SymbolIcon Symbol="More" /></AppBarButton.Icon>
                                     <AppBarButton.Flyout>
                                         <MenuFlyout>
+                                            <MenuFlyoutSubItem x:Uid="SitesCopyCommand" Text="Copy site link or path">
+                                                <MenuFlyoutSubItem.Icon><SymbolIcon Symbol="Copy" /></MenuFlyoutSubItem.Icon>
+                                                <MenuFlyoutItem x:Uid="SitesCopyLinkMenu" Text="Copy link" Click="CopySelectedSiteLink_Click" />
+                                                <MenuFlyoutItem x:Uid="SitesCopyPathMenu" Text="Copy path" Click="CopySelectedSitePath_Click" />
+                                            </MenuFlyoutSubItem>
+                                            <MenuFlyoutItem x:Uid="SitesOpenFolderCommand" Text="Open project folder" Click="OpenFolder_Click">
+                                                <MenuFlyoutItem.Icon><SymbolIcon Symbol="Folder" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem x:Uid="SitesOpenTerminalCommand" Text="Open terminal" Click="OpenTerminal_Click">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE756;" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem x:Uid="SitesOpenLogsButton" Text="Open site logs" Click="OpenLogs_Click">
+                                                <MenuFlyoutItem.Icon><SymbolIcon Symbol="Document" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem x:Uid="SitesEditEnvironmentCommand" Text="Edit .env" Click="EditEnvironment_Click">
+                                                <MenuFlyoutItem.Icon><SymbolIcon Symbol="Edit" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutSeparator />
                                             <MenuFlyoutItem x:Uid="SitesConfigureRuntimesCommand" Text="Configure PHP and Node.js" Click="EditRuntimes_Click" />
                                             <MenuFlyoutItem x:Uid="SitesPhpExtensionsCommand" Text="PHP extensions" Click="PhpExtensions_Click" />
                                             <MenuFlyoutSubItem x:Uid="SitesManifestCommand" Text="Project settings (herdme.yml)">
@@ -644,7 +655,7 @@
                                         </MenuFlyout>
                                     </AppBarButton.Flyout>
                                 </AppBarButton>
-                            </CommandBar.SecondaryCommands>
+                            </CommandBar.PrimaryCommands>
                         </CommandBar>
 
                         <!-- Status that must stay visible whichever tab is open. -->
@@ -717,19 +728,17 @@
                             <Grid Margin="0,8,0,0">
                                 <!-- Overview -->
                                 <StackPanel x:Name="OverviewPanel" Spacing="14">
-                                    <Border Style="{StaticResource SettingsGroupStyle}">
-                                        <Grid Style="{StaticResource SettingsRowStyle}">
+                                    <!-- Herd-style General tab: alternating key / value rows, each with an Open button. -->
+                                    <StackPanel x:Name="SiteGeneralRows" Spacing="0" AutomationProperties.AutomationId="SitesGeneralRows">
+                                        <Grid Style="{StaticResource DetailRowAltStyle}">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="160" />
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <FontIcon Glyph="&#xE756;" Style="{StaticResource SettingsRowIconStyle}" />
-                                            <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
-                                                <TextBlock x:Uid="SitesDevelopmentTitle" Text="Development processes" Style="{StaticResource SettingsRowTitleStyle}" />
-                                                <TextBlock x:Name="BackgroundProcessesText" Style="{StaticResource SettingsRowDescriptionStyle}" />
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="2" Style="{StaticResource SettingsRowControlStyle}">
+                                            <TextBlock x:Uid="SitesDevelopmentTitle" Text="Development processes" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Name="BackgroundProcessesText" Grid.Column="1" Style="{StaticResource DetailRowValueStyle}" />
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                                 <Button x:Uid="SitesBackgroundOutputButton" Click="BackgroundOutput_Click" VerticalAlignment="Stretch" />
                                                 <Button
                                                     x:Name="StartLaravelButton"
@@ -744,14 +753,111 @@
                                                 </Button>
                                             </StackPanel>
                                         </Grid>
-                                    </Border>
+                                        <Grid Style="{StaticResource DetailRowStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesUrlLabel" Text="URL" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <HyperlinkButton x:Name="UrlButton" Grid.Column="1" Padding="0" VerticalAlignment="Center" Click="OpenSite_Click" />
+                                            <Button x:Uid="SitesGeneralOpenUrl" Grid.Column="2" Content="Open" Click="OpenSite_Click" AutomationProperties.AutomationId="SitesGeneralOpenUrl" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowAltStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesPathLabel" Text="Path" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Name="PathText" Grid.Column="1" Style="{StaticResource DetailRowValueStyle}" FlowDirection="LeftToRight" />
+                                            <Button x:Uid="SitesGeneralOpenPath" Grid.Column="2" Content="Open" Click="OpenFolder_Click" AutomationProperties.AutomationId="SitesGeneralOpenPath" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesGeneralTerminalLabel" Text="Terminal" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Uid="SitesGeneralTerminalValue" Grid.Column="1" Text="Windows Terminal in the project folder" Style="{StaticResource DetailRowValueStyle}" />
+                                            <Button x:Uid="SitesGeneralOpenTerminal" Grid.Column="2" Content="Open" Click="OpenTerminal_Click" AutomationProperties.AutomationId="SitesGeneralOpenTerminal" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowAltStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesGeneralEditorLabel" Text="Editor" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Uid="SitesGeneralEditorValue" Grid.Column="1" Text="Visual Studio Code" Style="{StaticResource DetailRowValueStyle}" />
+                                            <Button x:Uid="SitesGeneralOpenEditor" Grid.Column="2" Content="Open" Click="OpenEditor_Click" AutomationProperties.AutomationId="SitesGeneralOpenEditor" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesGeneralTinkerLabel" Text="Tinker" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Uid="SitesGeneralTinkerValue" Grid.Column="1" Text="Run PHP in this project" Style="{StaticResource DetailRowValueStyle}" />
+                                            <Button x:Uid="SitesGeneralOpenTinker" Grid.Column="2" Content="Open" Click="GeneralOpenTinker_Click" AutomationProperties.AutomationId="SitesGeneralOpenTinker" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowAltStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesGeneralDatabaseLabel" Text="Database" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Uid="SitesGeneralDatabaseValue" Grid.Column="1" Text="Open in TablePlus" Style="{StaticResource DetailRowValueStyle}" />
+                                            <Button x:Uid="SitesGeneralOpenDatabase" Grid.Column="2" Content="Open" Click="OpenDatabase_Click" AutomationProperties.AutomationId="SitesGeneralOpenDatabase" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesRuntimeLabel" Text="Runtime" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Name="RuntimeText" Grid.Column="1" Style="{StaticResource DetailRowValueStyle}" />
+                                            <Button x:Uid="SitesGeneralOpenRuntime" Grid.Column="2" Content="Open" Click="EditRuntimes_Click" AutomationProperties.AutomationId="SitesGeneralOpenRuntime" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowAltStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesFrameworkLabel" Text="Framework" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Name="FrameworkText" Grid.Column="1" Style="{StaticResource DetailRowValueStyle}" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesGitLabel" Text="Git" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Name="GitText" Grid.Column="1" Style="{StaticResource DetailRowValueStyle}" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowAltStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesHealthDetailsLabel" Text="Site health" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Name="HealthDetailsText" Grid.Column="1" Style="{StaticResource DetailRowValueStyle}" />
+                                        </Grid>
+                                    </StackPanel>
                                     <Border
                                         x:Name="PreviewBorder"
                                         Height="280"
                                         SizeChanged="PreviewBorder_SizeChanged"
                                         Background="{ThemeResource SubtleSurfaceBrush}"
                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                        BorderThickness="1"
+                                        BorderThickness="0"
                                         CornerRadius="{StaticResource CardCornerRadius}">
                                         <Grid>
                                             <WebView2
@@ -777,34 +883,6 @@
                                                     <SymbolIcon Symbol="Refresh" />
                                                 </Button>
                                             </StackPanel>
-                                        </Grid>
-                                    </Border>
-                                    <Border Style="{StaticResource SettingsGroupStyle}" Padding="16,6,16,6">
-                                        <Grid ColumnSpacing="16">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="2*" MinWidth="96" MaxWidth="220" />
-                                                <ColumnDefinition Width="5*" />
-                                            </Grid.ColumnDefinitions>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="Auto" />
-                                            </Grid.RowDefinitions>
-                                            <TextBlock x:Uid="SitesFrameworkLabel" Text="Framework" Style="{StaticResource SitesDetailLabelStyle}" />
-                                            <TextBlock x:Name="FrameworkText" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                            <TextBlock x:Uid="SitesRuntimeLabel" Grid.Row="1" Text="Runtime" Style="{StaticResource SitesDetailLabelStyle}" />
-                                            <TextBlock x:Name="RuntimeText" Grid.Row="1" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                            <TextBlock x:Uid="SitesUrlLabel" Grid.Row="2" Text="URL" Style="{StaticResource SitesDetailLabelStyle}" />
-                                            <HyperlinkButton x:Name="UrlButton" Grid.Row="2" Grid.Column="1" Padding="0" Margin="0,6,0,6" VerticalAlignment="Center" Click="OpenSite_Click" />
-                                            <TextBlock x:Uid="SitesPathLabel" Grid.Row="3" Text="Path" Style="{StaticResource SitesDetailLabelStyle}" />
-                                            <TextBlock x:Name="PathText" Grid.Row="3" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" FlowDirection="LeftToRight" />
-                                            <TextBlock x:Uid="SitesGitLabel" Grid.Row="4" Text="Git" Style="{StaticResource SitesDetailLabelStyle}" />
-                                            <TextBlock x:Name="GitText" Grid.Row="4" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                            <TextBlock x:Uid="SitesHealthDetailsLabel" Grid.Row="5" Text="Site health" Style="{StaticResource SitesDetailLabelStyle}" />
-                                            <TextBlock x:Name="HealthDetailsText" Grid.Row="5" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
                                         </Grid>
                                     </Border>
                                 </StackPanel>
@@ -938,36 +1016,66 @@
                                 </Grid>
 
                                 <!-- Details -->
-                                <Border x:Name="DetailsPanel" Style="{StaticResource SettingsGroupStyle}" Padding="16,6,16,6" Visibility="Collapsed">
-                                    <Grid ColumnSpacing="16">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="2*" MinWidth="96" MaxWidth="220" />
-                                            <ColumnDefinition Width="5*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                        </Grid.RowDefinitions>
-                                        <TextBlock x:Uid="SitesRegistrationLabel" Text="Registration" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="RegistrationText" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesEnvironmentFileLabel" Grid.Row="1" Text="Environment file" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="EnvironmentFileText" Grid.Row="1" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesLogsLabel" Grid.Row="2" Text="Logs" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="LogsText" Grid.Row="2" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesRoutesLabel" Grid.Row="3" Text="Laravel routes" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="RoutesText" Grid.Row="3" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesAssociatedServicesLabel" Grid.Row="4" Text="Associated services" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="AssociatedServicesText" Grid.Row="4" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesProcessesDetailsLabel" Grid.Row="5" Text="Background processes" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="ProcessesDetailsText" Grid.Row="5" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                        <TextBlock x:Uid="SitesPerformanceDetailsLabel" Grid.Row="6" Text="Performance" Style="{StaticResource SitesDetailLabelStyle}" />
-                                        <TextBlock x:Name="PerformanceDetailsText" Grid.Row="6" Grid.Column="1" Style="{StaticResource SitesDetailValueStyle}" />
-                                    </Grid>
+                                <!-- Information: the same alternating key / value rows as General. -->
+                                <Border x:Name="DetailsPanel" Visibility="Collapsed">
+                                    <StackPanel Spacing="0">
+                                        <Grid Style="{StaticResource DetailRowAltStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesRegistrationLabel" Text="Registration" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Name="RegistrationText" Grid.Column="1" Style="{StaticResource DetailRowValueStyle}" TextWrapping="Wrap" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesEnvironmentFileLabel" Text="Environment file" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Name="EnvironmentFileText" Grid.Column="1" Style="{StaticResource DetailRowValueStyle}" TextWrapping="Wrap" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowAltStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesLogsLabel" Text="Logs" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Name="LogsText" Grid.Column="1" Style="{StaticResource DetailRowValueStyle}" TextWrapping="Wrap" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesRoutesLabel" Text="Laravel routes" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Name="RoutesText" Grid.Column="1" Style="{StaticResource DetailRowValueStyle}" TextWrapping="Wrap" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowAltStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesAssociatedServicesLabel" Text="Associated services" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Name="AssociatedServicesText" Grid.Column="1" Style="{StaticResource DetailRowValueStyle}" TextWrapping="Wrap" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesProcessesDetailsLabel" Text="Background processes" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Name="ProcessesDetailsText" Grid.Column="1" Style="{StaticResource DetailRowValueStyle}" TextWrapping="Wrap" />
+                                        </Grid>
+                                        <Grid Style="{StaticResource DetailRowAltStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Uid="SitesPerformanceDetailsLabel" Text="Performance" Style="{StaticResource DetailRowLabelStyle}" />
+                                            <TextBlock x:Name="PerformanceDetailsText" Grid.Column="1" Style="{StaticResource DetailRowValueStyle}" TextWrapping="Wrap" />
+                                        </Grid>
+                                    </StackPanel>
                                 </Border>
                                 <!-- Tinker for the selected site; the page is created on first use. -->
                                 <Border x:Name="TinkerPanel" Visibility="Collapsed" AutomationProperties.AutomationId="SitesTinkerPanel" />

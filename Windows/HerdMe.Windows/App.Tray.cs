@@ -328,6 +328,17 @@ public partial class App
         _ = backgroundTasks.RunAsync(cancellationToken => SwitchPhpAsync(cycle, cancellationToken));
     }
 
+    // Dashboard "Global PHP version": the same switch as the tray, even when the tray still
+    // shows that cycle (the PHP page may have changed the default without touching the tray).
+    internal void SwitchDefaultPhp(string cycle)
+    {
+        if (string.IsNullOrWhiteSpace(cycle)) return;
+        trayPhpDefault = cycle;
+        trayMenuSignature = null;
+        RefreshTrayMenu();
+        _ = backgroundTasks.RunAsync(cancellationToken => SwitchPhpAsync(cycle, cancellationToken));
+    }
+
     private async Task SwitchPhpAsync(string cycle, CancellationToken cancellationToken)
     {
         try

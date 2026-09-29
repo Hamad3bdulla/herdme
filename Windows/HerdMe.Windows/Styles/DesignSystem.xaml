@@ -4,7 +4,7 @@
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Light">
             <SolidColorBrush x:Key="WorkspaceBackgroundBrush" Color="#FFFFFF" />
-            <SolidColorBrush x:Key="ShellBackgroundBrush" Color="#F4F5F7" />
+            <SolidColorBrush x:Key="ShellBackgroundBrush" Color="#F3F4F6" />
             <SolidColorBrush x:Key="SubtleSurfaceBrush" Color="#F7F8FA" />
             <SolidColorBrush x:Key="BrandBrush" Color="#C92B3D" />
             <SolidColorBrush x:Key="AccentButtonBackground" Color="#C92B3D" />
@@ -13,58 +13,67 @@
             <SolidColorBrush x:Key="AccentButtonForeground" Color="#FFFFFF" />
             <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#FFFFFF" />
             <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#FFFFFF" />
-            <SolidColorBrush x:Key="SitesTintBrush" Color="#FCEDEF" />
-            <SolidColorBrush x:Key="ServicesTintBrush" Color="#E7F5F0" />
-            <SolidColorBrush x:Key="MailTintBrush" Color="#EAF1FC" />
-            <SolidColorBrush x:Key="DumpsTintBrush" Color="#FFF3DB" />
-            <SolidColorBrush x:Key="ServicesInkBrush" Color="#13765D" />
-            <SolidColorBrush x:Key="MailInkBrush" Color="#315EAD" />
-            <SolidColorBrush x:Key="DumpsInkBrush" Color="#956300" />
-            <SolidColorBrush x:Key="FrameworkLaravelTintBrush" Color="#FDE8E6" />
-            <SolidColorBrush x:Key="FrameworkLaravelInkBrush" Color="#C7291C" />
-            <SolidColorBrush x:Key="FrameworkWordPressTintBrush" Color="#E3EFF7" />
-            <SolidColorBrush x:Key="FrameworkWordPressInkBrush" Color="#1D5F8A" />
-            <SolidColorBrush x:Key="FrameworkPhpTintBrush" Color="#ECEAF7" />
-            <SolidColorBrush x:Key="FrameworkPhpInkBrush" Color="#4F4B93" />
-            <SolidColorBrush x:Key="FrameworkNodeTintBrush" Color="#E6F4E4" />
-            <SolidColorBrush x:Key="FrameworkNodeInkBrush" Color="#2F7A2A" />
+            <SolidColorBrush x:Key="SitesTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="ServicesTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="MailTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="DumpsTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="ServicesInkBrush" Color="#3A3F47" />
+            <SolidColorBrush x:Key="MailInkBrush" Color="#3A3F47" />
+            <SolidColorBrush x:Key="DumpsInkBrush" Color="#3A3F47" />
+            <SolidColorBrush x:Key="FrameworkLaravelTintBrush" Color="#EEF0F3" />
+            <SolidColorBrush x:Key="FrameworkLaravelInkBrush" Color="#3A3F47" />
+            <SolidColorBrush x:Key="FrameworkWordPressTintBrush" Color="#EEF0F3" />
+            <SolidColorBrush x:Key="FrameworkWordPressInkBrush" Color="#3A3F47" />
+            <SolidColorBrush x:Key="FrameworkPhpTintBrush" Color="#EEF0F3" />
+            <SolidColorBrush x:Key="FrameworkPhpInkBrush" Color="#3A3F47" />
+            <SolidColorBrush x:Key="FrameworkNodeTintBrush" Color="#EEF0F3" />
+            <SolidColorBrush x:Key="FrameworkNodeInkBrush" Color="#3A3F47" />
             <SolidColorBrush x:Key="SkeletonBrush" Color="#E8EAED" />
             <SolidColorBrush x:Key="DangerFillBrush" Color="#C42B1C" />
             <SolidColorBrush x:Key="DangerOnFillBrush" Color="#FFFFFF" />
             <SolidColorBrush x:Key="DangerInkBrush" Color="#C42B1C" />
             <SolidColorBrush x:Key="DangerBorderBrush" Color="Transparent" />
+            <!-- Round 11 calm palette: one ink colour for icons, a sidebar shade, thin dividers. -->
+            <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#F3F4F6" />
+            <SolidColorBrush x:Key="NeutralInkBrush" Color="#3A3F47" />
+            <SolidColorBrush x:Key="SurfaceDividerBrush" Color="#E3E5E9" />
+            <SolidColorBrush x:Key="RowAlternateBrush" Color="#F7F8FA" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Default">
-            <SolidColorBrush x:Key="WorkspaceBackgroundBrush" Color="#202124" />
-            <SolidColorBrush x:Key="ShellBackgroundBrush" Color="#191A1D" />
-            <SolidColorBrush x:Key="SubtleSurfaceBrush" Color="#282A2E" />
+            <SolidColorBrush x:Key="WorkspaceBackgroundBrush" Color="#1F2229" />
+            <SolidColorBrush x:Key="ShellBackgroundBrush" Color="#181A20" />
+            <SolidColorBrush x:Key="SubtleSurfaceBrush" Color="#262A32" />
             <SolidColorBrush x:Key="BrandBrush" Color="#FF8794" />
             <SolidColorBrush x:Key="AccentButtonBackground" Color="#FF8794" />
             <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#FF9DA7" />
             <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="#E87887" />
-            <SolidColorBrush x:Key="AccentButtonForeground" Color="#202124" />
-            <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#202124" />
-            <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#202124" />
-            <SolidColorBrush x:Key="SitesTintBrush" Color="#42292F" />
-            <SolidColorBrush x:Key="ServicesTintBrush" Color="#203C34" />
-            <SolidColorBrush x:Key="MailTintBrush" Color="#27364C" />
-            <SolidColorBrush x:Key="DumpsTintBrush" Color="#403824" />
-            <SolidColorBrush x:Key="ServicesInkBrush" Color="#78D9B3" />
-            <SolidColorBrush x:Key="MailInkBrush" Color="#97BEFF" />
-            <SolidColorBrush x:Key="DumpsInkBrush" Color="#F3CE7C" />
-            <SolidColorBrush x:Key="FrameworkLaravelTintBrush" Color="#4A2522" />
-            <SolidColorBrush x:Key="FrameworkLaravelInkBrush" Color="#FF8A80" />
-            <SolidColorBrush x:Key="FrameworkWordPressTintBrush" Color="#1F3445" />
-            <SolidColorBrush x:Key="FrameworkWordPressInkBrush" Color="#8CC4EC" />
-            <SolidColorBrush x:Key="FrameworkPhpTintBrush" Color="#2E2C47" />
-            <SolidColorBrush x:Key="FrameworkPhpInkBrush" Color="#B3AEF2" />
-            <SolidColorBrush x:Key="FrameworkNodeTintBrush" Color="#233A22" />
-            <SolidColorBrush x:Key="FrameworkNodeInkBrush" Color="#93D98C" />
-            <SolidColorBrush x:Key="SkeletonBrush" Color="#33363B" />
+            <SolidColorBrush x:Key="AccentButtonForeground" Color="#1F2229" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#1F2229" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#1F2229" />
+            <SolidColorBrush x:Key="SitesTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="ServicesTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="MailTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="DumpsTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="ServicesInkBrush" Color="#D5D9E0" />
+            <SolidColorBrush x:Key="MailInkBrush" Color="#D5D9E0" />
+            <SolidColorBrush x:Key="DumpsInkBrush" Color="#D5D9E0" />
+            <SolidColorBrush x:Key="FrameworkLaravelTintBrush" Color="#2B2F38" />
+            <SolidColorBrush x:Key="FrameworkLaravelInkBrush" Color="#D5D9E0" />
+            <SolidColorBrush x:Key="FrameworkWordPressTintBrush" Color="#2B2F38" />
+            <SolidColorBrush x:Key="FrameworkWordPressInkBrush" Color="#D5D9E0" />
+            <SolidColorBrush x:Key="FrameworkPhpTintBrush" Color="#2B2F38" />
+            <SolidColorBrush x:Key="FrameworkPhpInkBrush" Color="#D5D9E0" />
+            <SolidColorBrush x:Key="FrameworkNodeTintBrush" Color="#2B2F38" />
+            <SolidColorBrush x:Key="FrameworkNodeInkBrush" Color="#D5D9E0" />
+            <SolidColorBrush x:Key="SkeletonBrush" Color="#30343D" />
             <SolidColorBrush x:Key="DangerFillBrush" Color="#FF99A4" />
             <SolidColorBrush x:Key="DangerOnFillBrush" Color="#1A1A1A" />
             <SolidColorBrush x:Key="DangerInkBrush" Color="#FF99A4" />
             <SolidColorBrush x:Key="DangerBorderBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#181A20" />
+            <SolidColorBrush x:Key="NeutralInkBrush" Color="#D5D9E0" />
+            <SolidColorBrush x:Key="SurfaceDividerBrush" Color="#2F333C" />
+            <SolidColorBrush x:Key="RowAlternateBrush" Color="#242830" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
             <SolidColorBrush x:Key="WorkspaceBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
@@ -97,6 +106,10 @@
             <SolidColorBrush x:Key="DangerOnFillBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
             <SolidColorBrush x:Key="DangerInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="DangerBorderBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="NeutralInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SurfaceDividerBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="RowAlternateBrush" Color="{ThemeResource SystemColorWindowColor}" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
@@ -104,16 +117,19 @@
     <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
     <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
 
-    <Thickness x:Key="CardPadding">18,16,18,16</Thickness>
+    <Thickness x:Key="CardPadding">0,14,0,14</Thickness>
     <CornerRadius x:Key="CardCornerRadius">8</CornerRadius>
 
+    <!-- Round 11 (calm design): smaller page titles, no subtitles, flat sections. -->
     <Style x:Key="PageTitleStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="28" />
+        <Setter Property="FontSize" Value="22" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
+    <!-- Subtitles under page titles are hidden; dynamic header text uses CaptionTextStyle. -->
     <Style x:Key="PageSubtitleStyle" TargetType="TextBlock">
+        <Setter Property="Visibility" Value="Collapsed" />
         <Setter Property="FontSize" Value="14" />
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
@@ -140,18 +156,19 @@
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
     </Style>
 
+    <!-- Flat section: no fill and no box, only a thin divider above and spacing. -->
     <Style x:Key="CardStyle" TargetType="Border">
-        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
-        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SurfaceDividerBrush}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="CornerRadius" Value="0" />
         <Setter Property="Padding" Value="{StaticResource CardPadding}" />
     </Style>
-    <!-- Every page section is a card; the name is kept for existing pages. -->
+    <!-- Every page section uses the flat section style; the name is kept for existing pages. -->
     <Style x:Key="SectionDividerStyle" TargetType="Border" BasedOn="{StaticResource CardStyle}" />
     <Style x:Key="CardDividerStyle" TargetType="Rectangle">
         <Setter Property="Height" Value="1" />
-        <Setter Property="Fill" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
+        <Setter Property="Fill" Value="{ThemeResource SurfaceDividerBrush}" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
     </Style>
     <Style x:Key="IconTileStyle" TargetType="Border">
@@ -161,10 +178,10 @@
         <Setter Property="VerticalAlignment" Value="Top" />
     </Style>
     <Style x:Key="ToolPaneStyle" TargetType="Border">
-        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
-        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SurfaceDividerBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="0" />
     </Style>
 
     <!--
@@ -246,7 +263,7 @@
         <Setter Property="Padding" Value="0" />
     </Style>
     <Style x:Key="SettingsRowStyle" TargetType="Grid">
-        <Setter Property="Padding" Value="16,12,16,12" />
+        <Setter Property="Padding" Value="4,12,4,12" />
         <Setter Property="MinHeight" Value="64" />
         <Setter Property="ColumnSpacing" Value="16" />
     </Style>
@@ -282,9 +299,13 @@
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         <Setter Property="IsTextSelectionEnabled" Value="True" />
     </Style>
+    <!-- Fixed-looking page header: title and actions over one thin line. -->
     <Style x:Key="PageHeaderStyle" TargetType="Grid">
         <Setter Property="ColumnSpacing" Value="16" />
         <Setter Property="Margin" Value="0,0,0,4" />
+        <Setter Property="Padding" Value="0,0,0,14" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SurfaceDividerBrush}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
     <Style x:Key="PageContentStyle" TargetType="StackPanel">
         <Setter Property="Padding" Value="{StaticResource PagePadding}" />
@@ -304,11 +325,11 @@
     </Style>
     <!-- Card-looking Grid for rows that code builds and diffs in place (downloads, updates). -->
     <Style x:Key="ListCardStyle" TargetType="Grid">
-        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
-        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}" />
-        <Setter Property="Padding" Value="16,12,16,12" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SurfaceDividerBrush}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="4,12,4,12" />
         <Setter Property="MinHeight" Value="64" />
         <Setter Property="ColumnSpacing" Value="16" />
     </Style>
@@ -338,10 +359,10 @@
         <Setter Property="Foreground" Value="{ThemeResource FrameworkNodeInkBrush}" />
     </Style>
     <Style x:Key="SiteTileSiteStyle" TargetType="Border">
-        <Setter Property="Background" Value="{ThemeResource SitesTintBrush}" />
+        <Setter Property="Background" Value="{ThemeResource FrameworkPhpTintBrush}" />
     </Style>
     <Style x:Key="SiteMonogramSiteStyle" TargetType="TextBlock">
-        <Setter Property="Foreground" Value="{ThemeResource BrandBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource NeutralInkBrush}" />
     </Style>
     <!-- Placeholder blocks shown while a page loads for the first time. -->
     <Style x:Key="SkeletonBlockStyle" TargetType="Border">
@@ -384,6 +405,48 @@
         <Setter Property="FontSize" Value="32" />
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorTertiaryBrush}" />
+    </Style>
+
+    <!--
+        Herd-style key/value rows (Sites > General, Dashboard): label | value | Open button,
+        with every other row on a faint band. DetailRowAltStyle is the banded one.
+    -->
+    <Style x:Key="DetailRowStyle" TargetType="Grid">
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="Padding" Value="12,6,8,6" />
+        <Setter Property="ColumnSpacing" Value="12" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style x:Key="DetailRowAltStyle" TargetType="Grid" BasedOn="{StaticResource DetailRowStyle}">
+        <Setter Property="Background" Value="{ThemeResource RowAlternateBrush}" />
+    </Style>
+    <Style x:Key="DetailRowLabelStyle" TargetType="TextBlock">
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style x:Key="DetailRowValueStyle" TargetType="TextBlock">
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="IsTextSelectionEnabled" Value="True" />
+    </Style>
+    <!-- Small section label above a group of rows ("Active services", "General"). -->
+    <Style x:Key="QuietSectionLabelStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="Margin" Value="4,0,4,2" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <!-- Dialog forms: a label column and a field column. -->
+    <Style x:Key="FormGridStyle" TargetType="Grid">
+        <Setter Property="ColumnSpacing" Value="16" />
+        <Setter Property="RowSpacing" Value="12" />
+    </Style>
+    <Style x:Key="FormLabelStyle" TargetType="TextBlock">
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
     <!-- Borderless button for secondary actions inside cards and the title bar. -->

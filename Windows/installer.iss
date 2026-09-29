@@ -89,6 +89,9 @@ Filename: "{app}\HerdMe.Windows.exe"; Description: "Launch HerdMe"; Flags: nowai
 ; Removes the opt-in Windows notification registration (General > Buttons on notifications).
 ; It does nothing when that switch was never turned on.
 Filename: "{app}\HerdMe.Windows.exe"; Parameters: "--unregister-notifications"; Flags: runhidden waituntilterminated; RunOnceId: "HerdMeUnregisterNotifications"
+; Removes the opt-in Windows Defender exclusion (General > Speed up PHP). It asks for
+; administrator approval only when that switch was turned on; otherwise it does nothing.
+Filename: "{app}\HerdMe.Windows.exe"; Parameters: "--remove-defender-exclusion"; Flags: runhidden waituntilterminated; RunOnceId: "HerdMeRemoveDefenderExclusion"
 
 [Code]
 function PrepareToInstall(var NeedsRestart: Boolean): String;

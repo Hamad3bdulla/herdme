@@ -1386,6 +1386,12 @@ internal static partial class ContractChecks
             "NavPhp.Content",
             "NavNode.Content",
             "OnboardingSetupSummaryText",
+            // Punctuation-only layouts of already translated parts ("version  -  Port: N").
+            "ServicesRowSummary",
+            "ServicesDetailSummary",
+            // "PHP {0}": a product name plus a version number, the same in Arabic.
+            "DashboardActivePhp",
+            "DashboardGlobalPhpItem",
             "PhpPageTitle.Text",
             "NodePageTitle.Text",
             "PhpComposerVersion",

@@ -3,6 +3,23 @@
 All notable changes to HerdMe are documented in this file. The project follows
 Semantic Versioning for public releases.
 
+## [0.1.30] - 2026-09-29
+
+### Added
+
+- Windows: updated dashboard home and activity views, grouped services with details,
+  mail settings copy, Defender exclusion controls, improved site details, notifications,
+  diagnostics, and expanded Arabic localization.
+
+### Changed
+
+- Windows: refreshed navigation, appearance, status bar, title bar, and interaction
+  patterns across the main pages.
+
+### Fixed
+
+- Windows: completed the latest contract coverage and release packaging checks.
+
 ## [0.1.29] - 2026-09-28
 
 ### Added
@@ -38,6 +55,26 @@ Semantic Versioning for public releases.
 
 ### Added
 
+- Windows: the Services page lists services grouped as Database, Cache & Queue, Search
+  and Storage, with a details pane for the selected one: official documentation, its
+  Laravel environment variables (secrets masked, copy gives the real values) and the end
+  of its log. Add Service is a header button.
+- Windows: Copy mail settings on the Mail page copies the MAIL_* lines for any project.
+- Windows: an opt-in "Speed up PHP" switch asks Microsoft Defender not to scan the HerdMe
+  folder (administrator approval; uninstalling removes it).
+- Windows: a calmer, Herd-like look. Flat surfaces, red only for the main button and the
+  selection, a bluish-grey dark theme, 22 px page titles and a navigation without group
+  headers. Search sits behind a title bar icon (or Ctrl+K) and the status bar is off by
+  default (General > Appearance turns it back on).
+- Windows: the Dashboard home shows the running services with a way to jump to each,
+  Open Mail / Dumps / Logs and a global PHP version picker; counts, environment and
+  recent items moved to a new Activity tab.
+- Windows: the site detail has an HTTPS lock in the header, General and Information tabs
+  with key/value rows and Open buttons, and the less common actions in one More menu.
+- Windows: Add Service is a label/field form with Cancel and Add.
+- Windows: General settings: Compact mode applies right away; the domain suffix is checked
+  (letters, digits and hyphens), applies on Enter or when leaving the field, and moves the
+  running sites to the new name without a restart.
 - Windows: a Health tab on the dashboard, quick actions, and a "This session"
   timeline; fix-it cards name the program holding port 443 or 80.
 - Windows: an in-app language setting (Windows, English, Arabic), compact

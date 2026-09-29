@@ -22,12 +22,20 @@
                 <TextBlock x:Uid="MailPageTitle" AutomationProperties.AutomationId="MailPageRoot" Text="Mail" Style="{StaticResource PageTitleStyle}" />
                 <TextBlock x:Uid="MailPageSubtitle" Text="Catch outgoing email from your local sites and preview it here." Style="{StaticResource PageSubtitleStyle}" />
             </StackPanel>
-            <Button Grid.Column="1" VerticalAlignment="Center" Click="AddToEnvironment_Click">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <SymbolIcon Symbol="Edit" />
-                    <TextBlock x:Uid="MailEnvironmentButton" Text="Add to .env..." />
-                </StackPanel>
-            </Button>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button x:Name="CopyMailSettingsButton" Click="CopyMailSettings_Click" AutomationProperties.AutomationId="CopyMailSettingsButton">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <SymbolIcon Symbol="Copy" />
+                        <TextBlock x:Uid="MailCopySettingsButton" Text="Copy mail settings" />
+                    </StackPanel>
+                </Button>
+                <Button VerticalAlignment="Center" Click="AddToEnvironment_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <SymbolIcon Symbol="Edit" />
+                        <TextBlock x:Uid="MailEnvironmentButton" Text="Add to .env..." />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
         </Grid>
 
         <Border Grid.Row="1" Style="{StaticResource SettingsGroupStyle}">

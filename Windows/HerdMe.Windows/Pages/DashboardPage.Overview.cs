@@ -26,7 +26,12 @@ public sealed partial class DashboardPage
 
     private void ShowTab(string tag)
     {
-        var item = tag == "health" ? HealthTab : OverviewTab;
+        var item = tag switch
+        {
+            "health" => HealthTab,
+            "activity" => ActivityTab,
+            _ => OverviewTab
+        };
         if (!ReferenceEquals(DashboardTabs.SelectedItem, item)) DashboardTabs.SelectedItem = item;
         ApplyTab(tag);
     }
@@ -34,8 +39,10 @@ public sealed partial class DashboardPage
     private void ApplyTab(string tag)
     {
         var health = tag == "health";
+        var activity = tag == "activity";
         HealthPanel.Visibility = health ? Visibility.Visible : Visibility.Collapsed;
-        OverviewPanel.Visibility = health ? Visibility.Collapsed : Visibility.Visible;
+        ActivityPanel.Visibility = activity ? Visibility.Visible : Visibility.Collapsed;
+        OverviewPanel.Visibility = health || activity ? Visibility.Collapsed : Visibility.Visible;
         DashboardScroll.ChangeView(null, 0, null, disableAnimation: true);
     }
 

@@ -201,9 +201,9 @@
   <data name="NodeInstalled" xml:space="preserve"><value>مثبّت</value></data>
   <data name="ServicesPageTitle.Text" xml:space="preserve"><value>الخدمات</value></data>
   <data name="ServicesRefreshTooltip.Text" xml:space="preserve"><value>تحديث حالة الخدمات</value></data>
-  <data name="ServicesTypeField.Header" xml:space="preserve"><value>الخدمة</value></data>
-  <data name="ServicesNameField.Header" xml:space="preserve"><value>الاسم</value></data>
-  <data name="ServicesPortField.Header" xml:space="preserve"><value>المنفذ</value></data>
+  <data name="ServicesTypeField.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>الخدمة</value></data>
+  <data name="ServicesNameField.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>الاسم</value></data>
+  <data name="ServicesPortField.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>المنفذ</value></data>
   <data name="ServicesAddButton.Text" xml:space="preserve"><value>إضافة</value></data>
   <data name="ServicesAutomaticStartMenu.Text" xml:space="preserve"><value>تشغيل تلقائي</value></data>
   <data name="ServicesMoreTooltip.Text" xml:space="preserve"><value>المزيد من إجراءات الخدمة</value></data>
@@ -267,10 +267,10 @@
   <data name="SitesCopyLinkMenu.Text" xml:space="preserve"><value>نسخ الرابط</value></data>
   <data name="SitesCopyPathMenu.Text" xml:space="preserve"><value>نسخ المسار</value></data>
   <data name="SitesOpenBrowserCommand.Label" xml:space="preserve"><value>فتح في المتصفح</value></data>
-  <data name="SitesCopyCommand.Label" xml:space="preserve"><value>نسخ رابط الموقع أو مساره</value></data>
-  <data name="SitesOpenFolderCommand.Label" xml:space="preserve"><value>فتح مجلد المشروع</value></data>
-  <data name="SitesOpenTerminalCommand.Label" xml:space="preserve"><value>فتح الطرفية</value></data>
-  <data name="SitesEditEnvironmentCommand.Label" xml:space="preserve"><value>تعديل .env</value></data>
+  <data name="SitesCopyCommand.Text" xml:space="preserve"><value>نسخ رابط الموقع أو مساره</value></data>
+  <data name="SitesOpenFolderCommand.Text" xml:space="preserve"><value>فتح مجلد المشروع</value></data>
+  <data name="SitesOpenTerminalCommand.Text" xml:space="preserve"><value>فتح الطرفية</value></data>
+  <data name="SitesEditEnvironmentCommand.Text" xml:space="preserve"><value>تعديل .env</value></data>
   <data name="SitesConfigureRuntimesCommand.Text" xml:space="preserve"><value>ضبط PHP وNode.js</value></data>
   <data name="SitesUnlinkCommand.Text" xml:space="preserve"><value>إلغاء ربط المشروع</value></data>
   <data name="SitesMoveToRecycleBinCommand.Text" xml:space="preserve"><value>نقل المشروع إلى سلة المحذوفات</value></data>
@@ -791,7 +791,7 @@
   <data name="PhpExtensionToggleTooltip" xml:space="preserve"><value>تفعيل أو تعطيل هذه الإضافة لنسخة PHP المحددة</value></data>
   <data name="PhpExtensionBuiltInTooltip" xml:space="preserve"><value>هذه الإضافة مدمجة في PHP ولا يمكن تبديلها</value></data>
   <data name="GeneralCompactModeTitle.Text" xml:space="preserve"><value>واجهة مضغوطة</value></data>
-  <data name="GeneralCompactModeDescription.Text" xml:space="preserve"><value>استخدام مسافات أصغر في كل الصفحات. تتحول القوائم والنماذج بالكامل عند تشغيل HerdMe في المرة القادمة.</value></data>
+  <data name="GeneralCompactModeDescription.Text" xml:space="preserve"><value>استخدام مسافات أصغر. الصفحات التي تفتحها بعد ذلك تتحول فورًا، وكل شيء يتحول عند تشغيل HerdMe في المرة القادمة.</value></data>
   <data name="DashboardRepairAction" xml:space="preserve"><value>إصلاح</value></data>
   <data name="DashboardRepairTooltip" xml:space="preserve"><value>إصلاح مشكلة الصحة هذه</value></data>
   <data name="DashboardRepairAllButtonText.Text" xml:space="preserve"><value>إصلاح الكل</value></data>
@@ -922,8 +922,6 @@
   <data name="SitesDatabaseApplyingConfiguration" xml:space="preserve"><value>جارٍ تطبيق إعدادات Laravel...</value></data>
   <data name="SitesDatabaseOpeningTablePlus" xml:space="preserve"><value>جارٍ فتح TablePlus...</value></data>
   <data name="SitesDatabaseNoAvailablePort" xml:space="preserve"><value>لا يوجد منفذ محلي متاح لخدمة قاعدة البيانات.</value></data>
-  <data name="NavEnvironmentGroup.Content" xml:space="preserve"><value>البيئة</value></data>
-  <data name="NavToolsGroup.Content" xml:space="preserve"><value>الأدوات</value></data>
   <data name="LogsReadProgress.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>جارٍ تحميل السجلات</value></data>
   <data name="LogsEmpty.Text" xml:space="preserve"><value>لا توجد ملفات سجلات هنا بعد.</value></data>
   <data name="LogsTailNotice.Text" xml:space="preserve"><value>يُعرض آخر 4 ميغابايت من السجل فقط. يقتصر البحث على هذا الجزء.</value></data>
@@ -957,7 +955,7 @@
   <data name="GeneralPageSubtitle.Text" xml:space="preserve"><value>بدء التشغيل والنطاقات المحلية والتحديثات وحالة بيئات التشغيل.</value></data>
   <data name="GeneralStartupSectionTitle.Text" xml:space="preserve"><value>بدء التشغيل والمظهر</value></data>
   <data name="GeneralDomainsSectionTitle.Text" xml:space="preserve"><value>النطاقات المحلية وHTTPS</value></data>
-  <data name="GeneralDomainSuffixDescription.Text" xml:space="preserve"><value>تُفتح المواقع على https://name.suffix/. تُطبَّق التغييرات عند مغادرة الحقل.</value></data>
+  <data name="GeneralDomainSuffixDescription.Text" xml:space="preserve"><value>تُفتح المواقع على https://name.suffix/. اضغط Enter أو غادر الحقل للتطبيق.</value></data>
   <data name="GeneralDomainSuffixInput.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>لاحقة النطاق</value></data>
   <data name="GeneralUpdateChannelBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>قناة التحديث</value></data>
   <data name="GeneralOpenDataButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح مجلد بيانات التطبيق</value></data>
@@ -1342,11 +1340,11 @@
   <data name="SitesEmptyCreateLaravelButton.Text" xml:space="preserve"><value>إنشاء تطبيق Laravel</value></data>
   <data name="SitesEmptyClearFilterButton.Text" xml:space="preserve"><value>مسح البحث والتصفية</value></data>
   <data name="SitesOpenEditorCommand.Label" xml:space="preserve"><value>فتح في VS Code</value></data>
-  <data name="SitesOpenLogsButton.Label" xml:space="preserve"><value>فتح سجلات الموقع</value></data>
-  <data name="SitesTabOverview.Text" xml:space="preserve"><value>نظرة عامة</value></data>
+  <data name="SitesOpenLogsButton.Text" xml:space="preserve"><value>فتح سجلات الموقع</value></data>
+  <data name="SitesTabOverview.Text" xml:space="preserve"><value>عام</value></data>
   <data name="SitesTabDatabase.Text" xml:space="preserve"><value>قاعدة البيانات</value></data>
   <data name="SitesTabTools.Text" xml:space="preserve"><value>الأدوات</value></data>
-  <data name="SitesTabDetails.Text" xml:space="preserve"><value>التفاصيل</value></data>
+  <data name="SitesTabDetails.Text" xml:space="preserve"><value>المعلومات</value></data>
   <data name="SitesDatabaseCreateButton.Text" xml:space="preserve"><value>إنشاء قاعدة بيانات</value></data>
   <data name="SitesDatabaseOpenTablePlusButton.Text" xml:space="preserve"><value>فتح في TablePlus</value></data>
   <data name="SitesDatabaseManage.Text" xml:space="preserve"><value>إدارة قاعدة البيانات</value></data>
@@ -1854,4 +1852,106 @@
   <data name="SitesDatabasePeekCopy" xml:space="preserve"><value>نسخ</value></data>
   <data name="SitesDatabasePeekInvalidTable" xml:space="preserve"><value>لا يمكن قراءة اسم الجدول هذا.</value></data>
   <data name="SitesDatabasePeekFailed" xml:space="preserve"><value>تعذّرت قراءة قاعدة البيانات.</value></data>
+  <data name="ServicesAddServiceHeaderButton.Text" xml:space="preserve"><value>إضافة خدمة</value></data>
+  <data name="ServicesList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>الخدمات</value></data>
+  <data name="ServicesGroupDatabase" xml:space="preserve"><value>قواعد البيانات</value></data>
+  <data name="ServicesGroupCacheAndQueue" xml:space="preserve"><value>التخزين المؤقت والطوابير</value></data>
+  <data name="ServicesGroupSearch" xml:space="preserve"><value>البحث</value></data>
+  <data name="ServicesGroupStorage" xml:space="preserve"><value>التخزين</value></data>
+  <data name="ServicesGroupOther" xml:space="preserve"><value>أخرى</value></data>
+  <data name="ServicesRowSummary" xml:space="preserve"><value>{0}  ·  {1}</value></data>
+  <data name="ServicesDetailSummary" xml:space="preserve"><value>{0} · {1}</value></data>
+  <data name="ServicesDetailDocumentationTitle.Text" xml:space="preserve"><value>التوثيق</value></data>
+  <data name="ServicesDetailOpenDocumentation.Content" xml:space="preserve"><value>فتح</value></data>
+  <data name="ServicesDetailOpenDocumentation.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح التوثيق</value></data>
+  <data name="ServicesDetailEnvironmentTitle.Text" xml:space="preserve"><value>متغيرات البيئة</value></data>
+  <data name="ServicesDetailLogsTitle.Text" xml:space="preserve"><value>السجلات</value></data>
+  <data name="ServicesDetailOpenLog.Content" xml:space="preserve"><value>فتح</value></data>
+  <data name="ServicesDetailOpenLog.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح سجل الخدمة</value></data>
+  <data name="ServicesDetailPlaceholder.Text" xml:space="preserve"><value>اختر خدمة لعرض توثيقها ومتغيرات البيئة وسجلاتها.</value></data>
+  <data name="ServicesDetailNoDocumentation" xml:space="preserve"><value>لا يوجد رابط توثيق لهذه الخدمة</value></data>
+  <data name="ServicesDetailCopyEnvironment" xml:space="preserve"><value>نسخ متغيرات البيئة الخاصة بـ {0}</value></data>
+  <data name="ServicesDetailNoEnvironment" xml:space="preserve"><value>هذه الخدمة ليس لها متغيرات بيئة في Laravel.</value></data>
+  <data name="ServicesDetailNoLog" xml:space="preserve"><value>لا يوجد شيء في السجل بعد.</value></data>
+  <data name="ServicesDetailLogMissing" xml:space="preserve"><value>لم تكتب {0} أي سجل بعد. شغّلها أولًا.</value></data>
+  <data name="MailCopySettingsButton.Text" xml:space="preserve"><value>نسخ إعدادات البريد</value></data>
+  <data name="MailSettingsCopied" xml:space="preserve"><value>تم نسخ إعدادات البريد (المنفذ {0}). الصقها في ملف ‎.env.</value></data>
+  <data name="MailSettingsCopiedStopped" xml:space="preserve"><value>تم نسخ إعدادات البريد (المنفذ {0}). شغّل التقاط البريد حتى يستقبل HerdMe الرسائل.</value></data>
+  <data name="MailSettingsCopyFailedTitle" xml:space="preserve"><value>تعذّر نسخ إعدادات البريد</value></data>
+  <data name="GeneralDefenderExclusionTitle.Text" xml:space="preserve"><value>تسريع PHP (استثناء من Windows Defender)</value></data>
+  <data name="GeneralDefenderExclusionDescription.Text" xml:space="preserve"><value>يطلب من Microsoft Defender عدم فحص مجلد HerdMe الذي يحتوي PHP وComposer وNode.js والخدمات، فيصبح تشغيل PHP وComposer أسرع بشكل واضح. يحتاج موافقة المسؤول ويطبَّق على هذا الجهاز. مجلدات مواقعك تبقى تحت الفحص.</value></data>
+  <data name="DefenderExclusionToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تسريع PHP (استثناء من Windows Defender)</value></data>
+  <data name="GeneralDefenderExclusionWaiting" xml:space="preserve"><value>بانتظار موافقة المسؤول...</value></data>
+  <data name="GeneralDefenderExclusionFailedTitle" xml:space="preserve"><value>تعذّر تغيير إعداد Defender</value></data>
+  <data name="GeneralDefenderExclusionConfirmTitle" xml:space="preserve"><value>استثناء مجلد HerdMe من فحص Defender؟</value></data>
+  <data name="GeneralDefenderExclusionConfirmBody" xml:space="preserve"><value>سيطلب HerdMe من Microsoft Defender إيقاف فحص هذا المجلد، وهو يحتوي ملفات PHP وComposer وNode.js والخدمات التي نزّلها HerdMe وتحقق منها:</value></data>
+  <data name="GeneralDefenderExclusionConfirmRisk" xml:space="preserve"><value>أي ملف يوضع في هذا المجلد لن يُفحص. سيطلب Windows موافقة المسؤول. يمكنك إيقاف هذا في أي وقت، وإلغاء تثبيت HerdMe يزيله.</value></data>
+  <data name="GeneralDefenderExclusionConfirmButton" xml:space="preserve"><value>استثناء المجلد</value></data>
+  <data name="DefenderExclusionUnsupported" xml:space="preserve"><value>استثناءات Windows Defender متاحة على Windows فقط.</value></data>
+  <data name="DefenderExclusionBadPath" xml:space="preserve"><value>يمكن استثناء مجلد HerdMe داخل بيانات التطبيقات المحلية فقط.</value></data>
+  <data name="DefenderExclusionNoExecutable" xml:space="preserve"><value>مسار ملف تشغيل HerdMe غير متاح.</value></data>
+  <data name="DefenderExclusionAdded" xml:space="preserve"><value>لم يعد Windows Defender يفحص مجلد HerdMe.</value></data>
+  <data name="DefenderExclusionRemoved" xml:space="preserve"><value>عاد Windows Defender لفحص مجلد HerdMe.</value></data>
+  <data name="DefenderExclusionDefenderFailed" xml:space="preserve"><value>لم يقبل Windows Defender التغيير. قد يكون هناك برنامج مكافحة فيروسات آخر هو المسؤول، أو أن الحماية من العبث أو سياسة المؤسسة تمنع الاستثناءات.</value></data>
+  <data name="DefenderExclusionPowerShellMissing" xml:space="preserve"><value>Windows PowerShell غير متاح، لذلك تعذّر تغيير إعداد Defender.</value></data>
+  <data name="DefenderExclusionExitCode" xml:space="preserve"><value>توقف مساعد Defender بالرمز {0}.</value></data>
+  <data name="DefenderExclusionDeclined" xml:space="preserve"><value>لم تتم موافقة المسؤول، لذلك لم يتغير شيء.</value></data>
+  <data name="DashboardTabActivity.Text" xml:space="preserve"><value>النشاط</value></data>
+  <data name="DashboardActiveServicesTitle.Text" xml:space="preserve"><value>الخدمات النشطة</value></data>
+  <data name="DashboardActiveServicesEmpty.Text" xml:space="preserve"><value>لا شيء يعمل الآن. شغّل الكل لتقديم مواقعك.</value></data>
+  <data name="DashboardOpenSectionTitle.Text" xml:space="preserve"><value>فتح</value></data>
+  <data name="DashboardHomeOpenMail.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح البريد</value></data>
+  <data name="DashboardHomeOpenMailText.Text" xml:space="preserve"><value>فتح البريد</value></data>
+  <data name="DashboardHomeOpenDumps.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح المخرجات</value></data>
+  <data name="DashboardHomeOpenDumpsText.Text" xml:space="preserve"><value>فتح المخرجات</value></data>
+  <data name="DashboardHomeOpenLogs.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح السجلات</value></data>
+  <data name="DashboardHomeOpenLogsText.Text" xml:space="preserve"><value>فتح السجلات</value></data>
+  <data name="DashboardGlobalPhpTitle.Text" xml:space="preserve"><value>إصدار PHP العام</value></data>
+  <data name="DashboardGlobalPhpBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إصدار PHP العام</value></data>
+  <data name="DashboardActiveWebServer" xml:space="preserve"><value>خادم الويب</value></data>
+  <data name="DashboardActiveWebPorts" xml:space="preserve"><value>HTTP {0}، HTTPS {1}</value></data>
+  <data name="DashboardActivePhp" xml:space="preserve"><value>PHP {0}</value></data>
+  <data name="DashboardActivePhpDetail" xml:space="preserve"><value>الإصدار الافتراضي</value></data>
+  <data name="DashboardActiveMail" xml:space="preserve"><value>البريد</value></data>
+  <data name="DashboardActiveDumps" xml:space="preserve"><value>المخرجات</value></data>
+  <data name="DashboardActivePort" xml:space="preserve"><value>المنفذ {0}</value></data>
+  <data name="DashboardActiveOpen" xml:space="preserve"><value>فتح {0}</value></data>
+  <data name="DashboardGlobalPhpItem" xml:space="preserve"><value>PHP {0}</value></data>
+  <data name="DashboardGlobalPhpNone" xml:space="preserve"><value>ثبّت إصدار PHP من صفحة PHP.</value></data>
+  <data name="TitleBarSearchButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>بحث (Ctrl+K)</value></data>
+  <data name="GeneralShowStatusBarTitle.Text" xml:space="preserve"><value>إظهار شريط الحالة</value></data>
+  <data name="GeneralShowStatusBarDescription.Text" xml:space="preserve"><value>شريط رفيع أسفل النافذة يعرض حالة البيئة والمنافذ والتنزيلات.</value></data>
+  <data name="ShowStatusBarToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إظهار شريط الحالة</value></data>
+  <data name="TitleBarSearchButtonTooltip" xml:space="preserve"><value>ابحث في الصفحات والمواقع (Ctrl+K)</value></data>
+  <data name="SitesHeaderSecureIcon.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>محمي بـ HTTPS</value></data>
+  <data name="SitesGeneralTerminalLabel.Text" xml:space="preserve"><value>الطرفية</value></data>
+  <data name="SitesGeneralTerminalValue.Text" xml:space="preserve"><value>Windows Terminal في مجلد المشروع</value></data>
+  <data name="SitesGeneralEditorLabel.Text" xml:space="preserve"><value>المحرر</value></data>
+  <data name="SitesGeneralEditorValue.Text" xml:space="preserve"><value>Visual Studio Code (محرر الأكواد)</value></data>
+  <data name="SitesGeneralTinkerLabel.Text" xml:space="preserve"><value>Tinker (تجربة الأكواد)</value></data>
+  <data name="SitesGeneralTinkerValue.Text" xml:space="preserve"><value>تشغيل PHP داخل هذا المشروع</value></data>
+  <data name="SitesGeneralDatabaseLabel.Text" xml:space="preserve"><value>قاعدة البيانات</value></data>
+  <data name="SitesGeneralDatabaseValue.Text" xml:space="preserve"><value>فتح في TablePlus</value></data>
+  <data name="SitesGeneralOpenUrl.Content" xml:space="preserve"><value>فتح</value></data>
+  <data name="SitesGeneralOpenUrl.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح الرابط</value></data>
+  <data name="SitesGeneralOpenPath.Content" xml:space="preserve"><value>فتح</value></data>
+  <data name="SitesGeneralOpenPath.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح المجلد</value></data>
+  <data name="SitesGeneralOpenTerminal.Content" xml:space="preserve"><value>فتح</value></data>
+  <data name="SitesGeneralOpenTerminal.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح الطرفية</value></data>
+  <data name="SitesGeneralOpenEditor.Content" xml:space="preserve"><value>فتح</value></data>
+  <data name="SitesGeneralOpenEditor.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح في المحرر</value></data>
+  <data name="SitesGeneralOpenTinker.Content" xml:space="preserve"><value>فتح</value></data>
+  <data name="SitesGeneralOpenTinker.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح Tinker</value></data>
+  <data name="SitesGeneralOpenDatabase.Content" xml:space="preserve"><value>فتح</value></data>
+  <data name="SitesGeneralOpenDatabase.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>فتح قاعدة البيانات</value></data>
+  <data name="SitesGeneralOpenRuntime.Content" xml:space="preserve"><value>تغيير</value></data>
+  <data name="SitesGeneralOpenRuntime.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>إعداد PHP وNode.js</value></data>
+  <data name="ServicesFormServiceLabel.Text" xml:space="preserve"><value>الخدمة</value></data>
+  <data name="ServicesFormNameLabel.Text" xml:space="preserve"><value>الاسم</value></data>
+  <data name="ServicesFormPortLabel.Text" xml:space="preserve"><value>المنفذ</value></data>
+  <data name="ServicesFormVersionLabel.Text" xml:space="preserve"><value>الإصدار</value></data>
+  <data name="ServicesAddCancelButton.Content" xml:space="preserve"><value>إلغاء</value></data>
+  <data name="GeneralDomainSuffixInvalid" xml:space="preserve"><value>استخدم حروفًا إنجليزية أو أرقامًا أو شرطات فقط، مثل test أو local. لم يتغير اللاحق.</value></data>
+  <data name="GeneralDomainSuffixChanged" xml:space="preserve"><value>المواقع تُفتح الآن على https://name.{0}/</value></data>
+  <data name="GeneralDomainSuffixChangedHosts" xml:space="preserve"><value>المواقع تُفتح الآن على https://name.{0}/. اضغط تحديث في النطاقات المحلية حتى يتعرف Windows على الأسماء الجديدة.</value></data>
 </root>

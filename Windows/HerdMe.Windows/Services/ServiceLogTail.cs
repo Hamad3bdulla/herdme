@@ -44,6 +44,63 @@ public static partial class ServiceLogTail
         }
     }
 
+    public const int DefaultDetailLines = 40;
+    public const int DetailTailBytes = 32 * 1024;
+    public const int MaximumDetailLineLength = 2000;
+
+    // The end of the log for the service details pane: the newest lines, oldest first, with
+    // colour codes removed. Long lines are kept (the pane scrolls sideways) but bounded.
+    public static string LastLines(string path, int count = DefaultDetailLines, int tailBytes = DetailTailBytes)
+    {
+        try
+        {
+            if (!File.Exists(path)) return string.Empty;
+            using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete
+            );
+            var length = stream.Length;
+            if (length == 0) return string.Empty;
+            var size = (int)Math.Min(length, Math.Max(256, tailBytes));
+            stream.Seek(-size, SeekOrigin.End);
+            var buffer = new byte[size];
+            var read = 0;
+            while (read < size)
+            {
+                var chunk = stream.Read(buffer, read, size - read);
+                if (chunk == 0) break;
+                read += chunk;
+            }
+            var text = Encoding.UTF8.GetString(buffer, 0, read);
+            // A partial first line is dropped when the file is longer than what was read.
+            if (length > read)
+            {
+                var firstBreak = text.IndexOf('\n');
+                text = firstBreak < 0 ? string.Empty : text[(firstBreak + 1)..];
+            }
+            return LinesFromText(text, count);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return string.Empty;
+        }
+    }
+
+    public static string LinesFromText(string text, int count = DefaultDetailLines)
+    {
+        if (count <= 0) return string.Empty;
+        var lines = text.Split('\n')
+            .Select(Clean)
+            .Where(line => line.Length > 0)
+            .Select(line => line.Length <= MaximumDetailLineLength
+                ? line
+                : line[..(MaximumDetailLineLength - 1)] + "\u2026")
+            .ToList();
+        return string.Join('\n', lines.Skip(Math.Max(0, lines.Count - count)));
+    }
+
     public static string FromText(string text)
     {
         var lines = text.Split('\n');

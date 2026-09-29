@@ -193,6 +193,7 @@ public sealed partial class DashboardPage : Page
         PositionEnvironmentRow(CertificateStatusPill, compact);
 
         PositionQuickActions(compact);
+        ApplyHomeLayout(compact);
         RecentActivityGrid.RowSpacing = compact ? 12 : 0;
         Grid.SetRow(RecentDumpsPanel, compact ? 1 : 0);
         Grid.SetColumn(RecentDumpsPanel, compact ? 0 : 1);
@@ -321,6 +322,8 @@ public sealed partial class DashboardPage : Page
             UpdateQuickActions(sites, settings);
             UpdateGettingStarted(settings, sites, messages.Count, dumps.Count);
             var defaultPhpCycle = (await Task.Run(runtimePolicy.Load, cancellation.Token)).PhpCycle;
+            RenderActiveServices(instances, defaultPhpCycle);
+            await RenderGlobalPhpAsync(defaultPhpCycle, cancellation.Token);
             var certificateExpiryTask = Task.Run(
                 certificateManager.ServerCertificateExpiresAt,
                 cancellation.Token
@@ -1759,4 +1762,7 @@ public sealed partial class DashboardPage : Page
 
     private void OpenDumps_Click(object sender, RoutedEventArgs e) =>
         App.MainWindow.NavigateToPage("dumps");
+
+    private void OpenLogs_Click(object sender, RoutedEventArgs e) =>
+        App.MainWindow.NavigateToPage("logs");
 }

@@ -42,5 +42,8 @@ public sealed partial class SitesPage
         if (SelectSiteFromMenu(sender) is not null) ShowTinkerTab();
     }
 
+    // General tab "Tinker  -  Open".
+    private void GeneralOpenTinker_Click(object sender, RoutedEventArgs e) => ShowTinkerTab();
+
     private void ShowTinkerFor(SiteRecord? site) => tinker?.ShowSite(site);
 }

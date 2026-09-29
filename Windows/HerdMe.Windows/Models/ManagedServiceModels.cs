@@ -88,6 +88,10 @@ public sealed class ManagedServiceRow : INotifyPropertyChanged
 
     public string PortText { get; set; } = string.Empty;
 
+    // Second line of a row in the Services list: "version, Port N" (or the state when
+    // the runtime is not installed yet).
+    public string Summary { get; set; } = string.Empty;
+
     public string CardName { get; set; } = string.Empty;
 
     public string CopyAddressLabel { get; set; } = string.Empty;

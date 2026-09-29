@@ -22,13 +22,43 @@ public sealed partial class MainWindow
         };
         focusSearch.Invoked += (_, args) =>
         {
-            if (TitleBarSearchBox.Visibility != Visibility.Visible) return;
+            if (TitleBarSearchBox.Visibility != Visibility.Visible
+                && TitleBarSearchButton.Visibility != Visibility.Visible) return;
             args.Handled = true;
-            TitleBarSearchBox.Focus(FocusState.Keyboard);
+            OpenTitleBarSearch();
         };
         RootLayout.KeyboardAccelerators.Add(focusSearch);
+        ToolTipService.SetToolTip(TitleBarSearchButton, AppLocalization.Get("TitleBarSearchButtonTooltip"));
         // Ctrl+K is announced with the box, not as a tooltip on every control.
         RootLayout.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
+    }
+
+    // The search box is hidden behind an icon until it is needed (click or Ctrl+K) and folds
+    // back when it loses focus while empty or after a result is picked.
+    private void OpenTitleBarSearch()
+    {
+        TitleBarSearchButton.Visibility = Visibility.Collapsed;
+        TitleBarSearchBox.Visibility = Visibility.Visible;
+        UpdateTitleBarPassthrough();
+        TitleBarSearchBox.Focus(FocusState.Keyboard);
+    }
+
+    private void CloseTitleBarSearch()
+    {
+        if (TitleBarSearchBox.Visibility != Visibility.Visible) return;
+        TitleBarSearchBox.Text = string.Empty;
+        TitleBarSearchBox.ItemsSource = null;
+        TitleBarSearchBox.Visibility = Visibility.Collapsed;
+        if (!RequiresOnboarding) TitleBarSearchButton.Visibility = Visibility.Visible;
+        UpdateTitleBarPassthrough();
+    }
+
+    private void TitleBarSearchButton_Click(object sender, RoutedEventArgs e) => OpenTitleBarSearch();
+
+    private void TitleBarSearch_LostFocus(object sender, RoutedEventArgs e)
+    {
+        // The suggestion list takes focus while it is open; only fold an empty box.
+        if (TitleBarSearchBox.Text.Trim().Length == 0) CloseTitleBarSearch();
     }
 
     private void TitleBarInteractive_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateTitleBarPassthrough();
@@ -39,8 +69,8 @@ public sealed partial class MainWindow
         if (shuttingDown || AppTitleBar.XamlRoot is not { } xamlRoot) return;
         var scale = xamlRoot.RasterizationScale;
         if (scale <= 0) return;
-        var rects = new List<RectInt32>(3);
-        foreach (var element in new FrameworkElement[] { TitleBarSearchBox, TitleBarStatusButton, TitleBarBellButton })
+        var rects = new List<RectInt32>(4);
+        foreach (var element in new FrameworkElement[] { TitleBarSearchBox, TitleBarSearchButton, TitleBarStatusButton, TitleBarBellButton })
         {
             if (element.Visibility != Visibility.Visible || element.ActualWidth <= 0 || element.ActualHeight <= 0) continue;
             var bounds = element.TransformToVisual(null)
@@ -120,8 +150,7 @@ public sealed partial class MainWindow
         var item = args.ChosenSuggestion as TitleBarSearchItem
             ?? TitleBarSearch.Suggest(args.QueryText, SearchPages(), SearchSites(), SearchActions(), 1).FirstOrDefault();
         if (item is null || item.Key.Length == 0) return;
-        sender.Text = string.Empty;
-        sender.ItemsSource = null;
+        CloseTitleBarSearch();
         switch (item.Kind)
         {
             case TitleBarSearchKind.Page:

@@ -96,12 +96,10 @@ public sealed partial class ServicesPage : Page
     private void ServicesLayout_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         var compact = e.NewSize.Width < 720;
-        ServiceTypeColumn.Width = compact ? new GridLength(1, GridUnitType.Star) : new GridLength(180);
-        ServicePortColumn.Width = compact ? new GridLength(1, GridUnitType.Star) : new GridLength(130);
-        Grid.SetColumnSpan(ServiceTypeBox, compact ? 2 : 1);
-        Grid.SetRow(ServiceNameBox, compact ? 1 : 0);
-        Grid.SetColumn(ServiceNameBox, compact ? 0 : 1);
-        Grid.SetColumnSpan(ServiceNameBox, compact ? 4 : 1);
+        // Narrow windows give the labels less room; the fields keep the rest.
+        ServiceTypeColumn.Width = new GridLength(compact ? 96 : 140);
+        ServicePortColumn.Width = new GridLength(1, GridUnitType.Star);
+        ApplyDetailLayout(e.NewSize.Width < 960);
     }
 
     private void Manager_Changed(object? sender, EventArgs e)
@@ -214,6 +212,9 @@ public sealed partial class ServicesPage : Page
         var installLatest = ServiceVersionBox.SelectedIndex == ServiceVersionBox.Items.Count - 1;
         instances.Add(instance);
         manager.SaveInstances(instances);
+        // The new service becomes the selected row and the form folds away again.
+        selectedServiceId = instance.Id;
+        ShowAddService(false);
         using var cancellation = BeginOperation(
             AppLocalization.Format("ServicesInstalling", instance.Name), instance.DefinitionId
         );
@@ -725,6 +726,13 @@ public sealed partial class ServicesPage : Page
                 rows.Add(new ManagedServiceRow
                 {
                     PortText = AppLocalization.Format("ServicesCardPort", instance.Port),
+                    Summary = AppLocalization.Format(
+                        "ServicesRowSummary",
+                        state == ManagedServiceState.NotInstalled || string.IsNullOrWhiteSpace(installedVersion)
+                            ? StateLabel(state)
+                            : installedVersion,
+                        AppLocalization.Format("ServicesCardPort", instance.Port)
+                    ),
                     CardName = AppLocalization.Format("ServicesCardName", instance.Name, StateLabel(state)),
                     CopyAddressLabel = AppLocalization.Format("ServicesCardCopyAddress", instance.Name),
                     LastLogLine = previousLogLines.GetValueOrDefault(instance.Id) ?? string.Empty,
@@ -764,9 +772,12 @@ public sealed partial class ServicesPage : Page
                 Rows.Clear();
                 foreach (var row in rows) Rows.Add(row);
             }
+            SyncGroups();
             RequestLogTails();
             ServiceList.Visibility = Rows.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
             EmptyState.Visibility = Rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            // With nothing added yet the Add Service card opens by itself.
+            if (Rows.Count == 0) ShowAddService(true);
             if (!working)
             {
                 var installing = instances.FirstOrDefault(instance =>

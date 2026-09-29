@@ -28,6 +28,10 @@ public partial class App
         }
     }
 
+    // General > Domain suffix changed: rescan with the new suffix, move the running web server
+    // and proxy sites over, refresh the Jump List and the Sites page.
+    internal void ApplyDomainSuffixChange() => _ = backgroundTasks.RunAsync(OnSiteRootsChangedAsync);
+
     private async Task OnSiteRootsChangedAsync(CancellationToken cancellationToken)
     {
         if (exitRequested || MainWindow is null || MainWindow.RequiresOnboarding) return;

@@ -14,9 +14,10 @@
             <Setter Property="VerticalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="VerticalContentAlignment" Value="Stretch" />
-            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
-            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
+            <!-- Flat: a faint band instead of a bordered card. -->
+            <Setter Property="Background" Value="{ThemeResource RowAlternateBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}" />
         </Style>
         <Style x:Key="DashboardSummaryCountStyle" TargetType="TextBlock">
@@ -48,7 +49,7 @@
             <Setter Property="Height" Value="36" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="VerticalAlignment" Value="Top" />
-            <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+            <Setter Property="Background" Value="Transparent" />
         </Style>
         <Style x:Key="DashboardRowLabelStyle" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -90,7 +91,8 @@
             </StackPanel>
         </Grid>
 
-        <!-- Overview keeps the at-a-glance cards; Health holds the issue list and every repair. -->
+        <!-- Overview is the calm Herd-style home (active services, open buttons, global PHP);
+             Activity keeps the counts, environment and recent items; Health holds every repair. -->
         <SelectorBar
             x:Name="DashboardTabs"
             Grid.Row="1"
@@ -98,6 +100,7 @@
             AutomationProperties.AutomationId="DashboardTabs"
             SelectionChanged="DashboardTabs_SelectionChanged">
             <SelectorBarItem x:Uid="DashboardTabOverview" x:Name="OverviewTab" Tag="overview" Text="Overview" IsSelected="True" />
+            <SelectorBarItem x:Uid="DashboardTabActivity" x:Name="ActivityTab" Tag="activity" Text="Activity" AutomationProperties.AutomationId="DashboardActivityTab" />
             <SelectorBarItem x:Uid="DashboardTabHealth" x:Name="HealthTab" Tag="health" Text="Health" />
         </SelectorBar>
         <TeachingTip
@@ -253,9 +256,9 @@
                     Click="HealthStrip_Click"
                     HorizontalAlignment="Stretch"
                     HorizontalContentAlignment="Stretch"
-                    Padding="16,12,16,12"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    Padding="14,10,14,10"
+                    Background="{ThemeResource RowAlternateBrush}"
+                    BorderThickness="0"
                     CornerRadius="{StaticResource CardCornerRadius}">
                     <Grid ColumnSpacing="14">
                         <Grid.ColumnDefinitions>
@@ -340,73 +343,138 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Quick actions: the four things people come to the dashboard to do. -->
-                <Grid x:Name="QuickActionsGrid" ColumnSpacing="8" RowSpacing="8">
+                <!-- Herd-style home: what is running (with Stop all), then Open buttons and the
+                     global PHP version. The columns stack on narrow windows (ApplyHomeLayout). -->
+                <Grid x:Name="DashboardHomeGrid" ColumnSpacing="32" RowSpacing="24">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition x:Name="QuickColumn0" Width="*" />
-                        <ColumnDefinition x:Name="QuickColumn1" Width="*" />
-                        <ColumnDefinition x:Name="QuickColumn2" Width="*" />
-                        <ColumnDefinition x:Name="QuickColumn3" Width="*" />
+                        <ColumnDefinition x:Name="HomeMainColumn" Width="*" />
+                        <ColumnDefinition x:Name="HomeSideColumn" Width="260" />
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <Button
-                        x:Uid="DashboardQuickCreateButton"
-                        x:Name="QuickCreateButton"
-                        AutomationProperties.AutomationId="DashboardQuickCreate"
-                        AutomationProperties.Name="New Laravel site"
-                        Click="QuickCreate_Click"
-                        HorizontalAlignment="Stretch"
-                        Style="{StaticResource AccentButtonStyle}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <SymbolIcon Symbol="Add" />
-                            <TextBlock x:Uid="DashboardQuickCreateText" Text="New Laravel site" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </Button>
-                    <Button
-                        x:Uid="DashboardQuickParkButton"
-                        x:Name="QuickParkButton"
-                        Grid.Column="1"
-                        AutomationProperties.AutomationId="DashboardQuickPark"
-                        AutomationProperties.Name="Park a folder"
-                        Click="QuickPark_Click"
-                        HorizontalAlignment="Stretch">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <SymbolIcon Symbol="NewFolder" />
-                            <TextBlock x:Uid="DashboardQuickParkText" Text="Park a folder" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </Button>
-                    <Button
-                        x:Uid="DashboardQuickLastSiteButton"
-                        x:Name="QuickLastSiteButton"
-                        Grid.Column="2"
-                        AutomationProperties.AutomationId="DashboardQuickLastSite"
-                        AutomationProperties.Name="Open last site"
-                        Click="QuickLastSite_Click"
-                        HorizontalAlignment="Stretch"
-                        IsEnabled="False">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <SymbolIcon Symbol="World" />
-                            <TextBlock x:Name="QuickLastSiteText" x:Uid="DashboardQuickLastSiteText" Text="Open last site" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </Button>
-                    <Button
-                        x:Uid="DashboardQuickPowerButton"
-                        x:Name="QuickPowerButton"
-                        Grid.Column="3"
-                        AutomationProperties.AutomationId="DashboardQuickPower"
-                        AutomationProperties.Name="Stop all"
-                        Click="QuickPower_Click"
-                        HorizontalAlignment="Stretch">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <SymbolIcon x:Name="QuickPowerIcon" Symbol="Stop" />
-                            <TextBlock x:Name="QuickPowerText" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </Button>
+                    <StackPanel x:Name="ActiveServicesSection" Spacing="8">
+                        <TextBlock x:Uid="DashboardActiveServicesTitle" Text="Active services" Style="{StaticResource QuietSectionLabelStyle}" AutomationProperties.HeadingLevel="Level2" />
+                        <StackPanel x:Name="ActiveServicesList" Spacing="2" AutomationProperties.AutomationId="DashboardActiveServices" />
+                        <TextBlock
+                            x:Uid="DashboardActiveServicesEmpty"
+                            x:Name="ActiveServicesEmptyText"
+                            Margin="4,0,4,0"
+                            Text="Nothing is running. Start all to serve your sites."
+                            Style="{StaticResource SecondaryTextStyle}"
+                            Visibility="Collapsed" />
+                        <!-- Quick actions: the four things people come to the dashboard to do. -->
+                        <Grid x:Name="QuickActionsGrid" ColumnSpacing="8" RowSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition x:Name="QuickColumn0" Width="*" />
+                                <ColumnDefinition x:Name="QuickColumn1" Width="*" />
+                                <ColumnDefinition x:Name="QuickColumn2" Width="*" />
+                                <ColumnDefinition x:Name="QuickColumn3" Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Button
+                                x:Uid="DashboardQuickCreateButton"
+                                x:Name="QuickCreateButton"
+                                AutomationProperties.AutomationId="DashboardQuickCreate"
+                                AutomationProperties.Name="New Laravel site"
+                                Click="QuickCreate_Click"
+                                HorizontalAlignment="Stretch"
+                                Style="{StaticResource AccentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <SymbolIcon Symbol="Add" />
+                                    <TextBlock x:Uid="DashboardQuickCreateText" Text="New Laravel site" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Button>
+                            <Button
+                                x:Uid="DashboardQuickParkButton"
+                                x:Name="QuickParkButton"
+                                Grid.Column="1"
+                                AutomationProperties.AutomationId="DashboardQuickPark"
+                                AutomationProperties.Name="Park a folder"
+                                Click="QuickPark_Click"
+                                HorizontalAlignment="Stretch">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <SymbolIcon Symbol="NewFolder" />
+                                    <TextBlock x:Uid="DashboardQuickParkText" Text="Park a folder" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Button>
+                            <Button
+                                x:Uid="DashboardQuickLastSiteButton"
+                                x:Name="QuickLastSiteButton"
+                                Grid.Column="2"
+                                AutomationProperties.AutomationId="DashboardQuickLastSite"
+                                AutomationProperties.Name="Open last site"
+                                Click="QuickLastSite_Click"
+                                HorizontalAlignment="Stretch"
+                                IsEnabled="False">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <SymbolIcon Symbol="World" />
+                                    <TextBlock x:Name="QuickLastSiteText" x:Uid="DashboardQuickLastSiteText" Text="Open last site" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Button>
+                            <Button
+                                x:Uid="DashboardQuickPowerButton"
+                                x:Name="QuickPowerButton"
+                                Grid.Column="3"
+                                AutomationProperties.AutomationId="DashboardQuickPower"
+                                AutomationProperties.Name="Stop all"
+                                Click="QuickPower_Click"
+                                HorizontalAlignment="Stretch">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <SymbolIcon x:Name="QuickPowerIcon" Symbol="Stop" />
+                                    <TextBlock x:Name="QuickPowerText" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                    <StackPanel x:Name="HomeSidePanel" Grid.Column="1" Spacing="8">
+                        <TextBlock x:Uid="DashboardOpenSectionTitle" Text="Open" Style="{StaticResource QuietSectionLabelStyle}" AutomationProperties.HeadingLevel="Level2" />
+                        <Button x:Uid="DashboardHomeOpenMail" x:Name="HomeOpenMailButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" AutomationProperties.AutomationId="DashboardOpenMail" AutomationProperties.Name="Open Mail" Click="OpenMail_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE715;" FontSize="14" Foreground="{ThemeResource NeutralInkBrush}" />
+                                <TextBlock x:Uid="DashboardHomeOpenMailText" Text="Open Mail" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Uid="DashboardHomeOpenDumps" x:Name="HomeOpenDumpsButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" AutomationProperties.AutomationId="DashboardOpenDumps" AutomationProperties.Name="Open Dumps" Click="OpenDumps_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE9D9;" FontSize="14" Foreground="{ThemeResource NeutralInkBrush}" />
+                                <TextBlock x:Uid="DashboardHomeOpenDumpsText" Text="Open Dumps" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Uid="DashboardHomeOpenLogs" x:Name="HomeOpenLogsButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" AutomationProperties.AutomationId="DashboardOpenLogs" AutomationProperties.Name="Open Logs" Click="OpenLogs_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE9F9;" FontSize="14" Foreground="{ThemeResource NeutralInkBrush}" />
+                                <TextBlock x:Uid="DashboardHomeOpenLogsText" Text="Open Logs" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Button>
+                        <TextBlock x:Uid="DashboardGlobalPhpTitle" Margin="4,16,4,2" Text="Global PHP version" Style="{StaticResource QuietSectionLabelStyle}" AutomationProperties.HeadingLevel="Level2" />
+                        <ComboBox
+                            x:Uid="DashboardGlobalPhpBox"
+                            x:Name="GlobalPhpBox"
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="DashboardGlobalPhp"
+                            AutomationProperties.Name="Global PHP version"
+                            SelectionChanged="GlobalPhpBox_SelectionChanged" />
+                        <TextBlock
+                            x:Name="GlobalPhpHint"
+                            Margin="4,0,4,0"
+                            Style="{StaticResource CaptionTextStyle}"
+                            TextWrapping="Wrap"
+                            Visibility="Collapsed" />
+                    </StackPanel>
                 </Grid>
+            </StackPanel>
 
+            <StackPanel
+                x:Name="ActivityPanel"
+                AutomationProperties.AutomationId="DashboardActivityPanel"
+                Spacing="16"
+                Padding="0,0,0,8"
+                Visibility="Collapsed">
                 <Grid x:Name="SummaryCardsGrid" ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition x:Name="SummaryColumn0" Width="*" />
@@ -432,7 +500,7 @@
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
                             <Border Style="{StaticResource IconTileStyle}" Width="36" Height="36" HorizontalAlignment="Left" Background="{ThemeResource SitesTintBrush}">
-                                <SymbolIcon Symbol="Folder" Foreground="{ThemeResource BrandBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <SymbolIcon Symbol="Folder" Foreground="{ThemeResource NeutralInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <FontIcon Style="{StaticResource DashboardCardChevronStyle}" />
                             <TextBlock x:Name="SitesCountText" Grid.Row="1" Margin="0,12,0,0" Text="0" Visibility="Collapsed" Style="{StaticResource DashboardSummaryCountStyle}" />

@@ -136,6 +136,20 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE75B;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralShowStatusBarTitle" Text="Show status bar" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Uid="GeneralShowStatusBarDescription" Text="A thin bar at the bottom of the window with the environment, ports and downloads." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="ShowStatusBarToggle" x:Uid="ShowStatusBarToggle" Grid.Column="2" MinWidth="0" AutomationProperties.Name="Show status bar" AutomationProperties.AutomationId="GeneralShowStatusBar" Toggled="ShowStatusBarToggle_Toggled" />
+                            </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
                                 <FontIcon Glyph="&#xEA8F;" Style="{StaticResource SettingsRowIconStyle}" />
                                 <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
                                     <TextBlock x:Uid="GeneralNotificationsTitle" Text="Notifications" Style="{StaticResource SettingsRowTitleStyle}" />
@@ -225,6 +239,21 @@
                                 </StackPanel>
                                 <ToggleSwitch x:Name="TerminalProfileToggle" x:Uid="TerminalProfileToggle" Grid.Column="2" MinWidth="0" Toggled="ShellIntegrationToggle_Toggled" />
                             </Grid>
+                            <Rectangle Style="{StaticResource CardDividerStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}" AutomationProperties.AutomationId="DefenderExclusionRow">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE945;" Style="{StaticResource SettingsRowIconStyle}" />
+                                <StackPanel Grid.Column="1" Style="{StaticResource SettingsRowTextStyle}">
+                                    <TextBlock x:Uid="GeneralDefenderExclusionTitle" Text="Speed up PHP (Windows Defender exclusion)" Style="{StaticResource SettingsRowTitleStyle}" />
+                                    <TextBlock x:Uid="GeneralDefenderExclusionDescription" Text="Asks Microsoft Defender not to scan the HerdMe folder, where PHP, Composer, Node.js and services live. PHP and Composer start noticeably faster. Needs administrator approval and applies to this PC. Your site folders are still scanned." Style="{StaticResource SettingsRowDescriptionStyle}" />
+                                    <TextBlock x:Name="DefenderExclusionStatusText" Style="{StaticResource SettingsRowDescriptionStyle}" Visibility="Collapsed" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="DefenderExclusionToggle" x:Uid="DefenderExclusionToggle" Grid.Column="2" MinWidth="0" AutomationProperties.AutomationId="DefenderExclusionToggle" AutomationProperties.Name="Speed up PHP (Windows Defender exclusion)" Toggled="DefenderExclusionToggle_Toggled" />
+                            </Grid>
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -272,6 +301,7 @@
                                     Width="180"
                                     VerticalAlignment="Center"
                                     AutomationProperties.Name="Domain suffix"
+                                    KeyDown="TldTextBox_KeyDown"
                                     LostFocus="TldTextBox_LostFocus" />
                             </Grid>
                             <Rectangle Style="{StaticResource CardDividerStyle}" />

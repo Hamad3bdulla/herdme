@@ -23,9 +23,11 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <Image Source="ms-appx:///Assets/HerdMe.png" Width="20" Height="20" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Text="HerdMe" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <!-- Herd-style brand corner: the logo and name sit above the sidebar. -->
+            <Image Source="ms-appx:///Assets/HerdMe.png" Width="24" Height="24" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="HerdMe" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
             <AutoSuggestBox
                 x:Name="TitleBarSearchBox"
                 x:Uid="TitleBarSearchBox"
@@ -41,6 +43,7 @@
                 AutomationProperties.AutomationId="TitleBarSearch"
                 TextChanged="TitleBarSearch_TextChanged"
                 QuerySubmitted="TitleBarSearch_QuerySubmitted"
+                LostFocus="TitleBarSearch_LostFocus"
                 SizeChanged="TitleBarInteractive_SizeChanged">
                 <AutoSuggestBox.ItemTemplate>
                     <DataTemplate x:DataType="services:TitleBarSearchItem">
@@ -58,9 +61,27 @@
                     </DataTemplate>
                 </AutoSuggestBox.ItemTemplate>
             </AutoSuggestBox>
+            <!-- Search stays out of the way: an icon that opens the box (or Ctrl+K). -->
+            <Button
+                x:Name="TitleBarSearchButton"
+                x:Uid="TitleBarSearchButton"
+                Grid.Column="3"
+                Width="36"
+                Height="32"
+                Padding="0"
+                VerticalAlignment="Center"
+                Background="Transparent"
+                BorderThickness="0"
+                Visibility="Collapsed"
+                AutomationProperties.Name="Search (Ctrl+K)"
+                AutomationProperties.AutomationId="TitleBarSearchButton"
+                Click="TitleBarSearchButton_Click"
+                SizeChanged="TitleBarInteractive_SizeChanged">
+                <FontIcon Glyph="&#xE721;" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Button>
             <Button
                 x:Name="TitleBarStatusButton"
-                Grid.Column="3"
+                Grid.Column="4"
                 Padding="0"
                 MinWidth="0"
                 VerticalAlignment="Center"
@@ -93,7 +114,7 @@
             </Button>
             <Button
                 x:Name="TitleBarBellButton"
-                Grid.Column="4"
+                Grid.Column="5"
                 Width="36"
                 Height="32"
                 Padding="0"
@@ -169,7 +190,6 @@
             <NavigationViewItem x:Uid="NavSites" AutomationProperties.AutomationId="NavSites" Content="Sites" Tag="sites">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Folder" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItemHeader x:Uid="NavEnvironmentGroup" Content="Environment" />
             <NavigationViewItem x:Uid="NavPhp" AutomationProperties.AutomationId="NavPhp" Content="PHP" Tag="php">
                 <NavigationViewItem.Icon><FontIcon Glyph="&#xE943;" /></NavigationViewItem.Icon>
             </NavigationViewItem>
@@ -179,7 +199,6 @@
             <NavigationViewItem x:Uid="NavServices" AutomationProperties.AutomationId="NavServices" Content="Services" Tag="services">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItemHeader x:Uid="NavToolsGroup" Content="Tools" />
             <NavigationViewItem x:Uid="NavMail" AutomationProperties.AutomationId="NavMail" Content="Mail" Tag="mail">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Mail" /></NavigationViewItem.Icon>
                 <NavigationViewItem.InfoBadge><InfoBadge x:Name="MailBadge" Visibility="Collapsed" /></NavigationViewItem.InfoBadge>
