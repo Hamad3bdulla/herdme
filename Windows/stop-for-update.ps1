@@ -35,6 +35,17 @@ try {
     # Older releases hide on WM_CLOSE; they require the fallback below.
 }
 
+# "Restart to update" in the app starts setup from HerdMe itself, so this script runs below it.
+# Never stop the chain that runs the update: an ancestor HerdMe is stopped without /T.
+$ancestors = @{}
+$cursor = $PID
+for ($depth = 0; $depth -lt 16 -and $cursor; $depth++) {
+    $ancestors[[int]$cursor] = $true
+    $parent = Get-CimInstance Win32_Process -Filter "ProcessId = $cursor"
+    if ($null -eq $parent) { break }
+    $cursor = $parent.ParentProcessId
+}
+
 # Stop the app first so its supervisor cannot respawn workers during the update.
 # /T also stops project-local npm/Python children outside the managed directories.
 $owned = @(Get-OwnedProcesses | Sort-Object @{Expression = {
@@ -44,7 +55,11 @@ foreach ($candidate in $owned) {
     $current = Get-CimInstance Win32_Process -Filter "ProcessId = $($candidate.ProcessId)"
     if ($null -eq $current -or $current.CreationDate -ne $candidate.CreationDate -or
         $current.ExecutablePath -ne $candidate.ExecutablePath) { continue }
-    & "$env:SystemRoot\System32\taskkill.exe" /PID $candidate.ProcessId /T /F | Out-Null
+    if ($ancestors.ContainsKey([int]$candidate.ProcessId)) {
+        & "$env:SystemRoot\System32\taskkill.exe" /PID $candidate.ProcessId /F | Out-Null
+    } else {
+        & "$env:SystemRoot\System32\taskkill.exe" /PID $candidate.ProcessId /T /F | Out-Null
+    }
 }
 
 $deadline = [DateTime]::UtcNow.AddSeconds(10)

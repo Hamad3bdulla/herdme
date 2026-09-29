@@ -3,6 +3,22 @@
 All notable changes to HerdMe are documented in this file. The project follows
 Semantic Versioning for public releases.
 
+## [0.1.31] - 2026-09-29
+
+### Added
+
+- Windows: added the redesigned update center, update history, preferences, rollback,
+  and self-update workflow for the application and managed components.
+
+### Changed
+
+- Windows: improved update prompts, notifications, runtime installers, service lifecycle,
+  diagnostics, and Arabic and English localization.
+
+### Fixed
+
+- Windows: expanded update contract coverage and release packaging validation.
+
 ## [0.1.30] - 2026-09-29
 
 ### Added
@@ -54,6 +70,26 @@ Semantic Versioning for public releases.
 ## [Unreleased]
 
 ### Added
+
+- Windows: a new Updates page. A summary card at the top (how many updates, download
+  size, free disk space, last check), available updates grouped by PHP, Node.js,
+  Services, Debugger and Tools with icons, installed-to-latest versions and Major /
+  Security badges, and a collapsible "Up to date" list. Progress, Cancel and a check mark
+  show inside each row; a failure shows its reason with Retry.
+- Windows: HerdMe updates itself in the app. The installer is downloaded and SHA-256
+  checked in the background, then "Restart to update" runs setup silently and starts
+  HerdMe again. Builds without an installer link open the download page instead.
+- Windows: per-update What's new links, Skip this version, Remind me in a week, Pin the
+  major line (services and tools) and Roll back to the previous version for 7 days.
+- Windows: History replaces the Downloads list (updated, failed, cancelled, rolled back).
+- Windows: optional automatic install when the computer is idle or when HerdMe exits;
+  it never crosses a major version. A toast says when a background update finished.
+- Windows: before an update that stops running services or sites, HerdMe says what will
+  stop and offers Update now or Later, and it stops only what that update needs.
+  Update all runs in a sensible order and starts each service again once.
+- Windows: at startup HerdMe no longer opens update dialogs. It checks quietly once a
+  day, shows a badge on Updates, a tray entry and a toast, and reuses the last check for
+  an hour when the page is opened.
 
 - Windows: the Services page lists services grouped as Database, Cache & Queue, Search
   and Storage, with a details pane for the selected one: official documentation, its

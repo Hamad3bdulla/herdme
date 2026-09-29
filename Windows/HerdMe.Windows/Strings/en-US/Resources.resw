@@ -170,8 +170,6 @@
   <data name="ServicesUseLatest" xml:space="preserve"><value>Latest supported version: {0}</value></data>
   <data name="SitesFavoriteAction.Text" xml:space="preserve"><value>Toggle favorite</value></data>
   <data name="ServicesBackingUp" xml:space="preserve"><value>Backing up service data</value></data>
-  <data name="DownloadsTitle.Text" xml:space="preserve"><value>Downloads</value></data>
-  <data name="DownloadsClear.Text" xml:space="preserve"><value>Clear completed history</value></data>
   <data name="ServicesTransfer" xml:space="preserve"><value>{0:0.0} MB / {1:0.0} MB, {2:0.0} MB/s</value></data>
   <data name="ServicesTransferUnknown" xml:space="preserve"><value>{0:0.0} MB, {1:0.0} MB/s</value></data>
   <data name="ServicesAttempt" xml:space="preserve"><value>Attempt {0}</value></data>
@@ -885,9 +883,6 @@ Recovery backup: {1}</value></data>
   <data name="UpdatesPageRoot.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Updates</value></data>
   <data name="UpdatesTitle.Text" xml:space="preserve"><value>Updates</value></data>
   <data name="UpdatesRefreshButtonText.Text" xml:space="preserve"><value>Check</value></data>
-  <data name="UpdatesUpdateAllButtonText.Text" xml:space="preserve"><value>Update all</value></data>
-  <data name="UpdatesDownloadButtonText.Text" xml:space="preserve"><value>Download</value></data>
-  <data name="UpdatesComponentsTitle.Text" xml:space="preserve"><value>Components and services</value></data>
   <data name="UpdatesNoComponents.Text" xml:space="preserve"><value>All installed components are up to date.</value></data>
   <data name="UpdatesChecking" xml:space="preserve"><value>Checking for updates…</value></data>
   <data name="UpdatesLastChecked" xml:space="preserve"><value>Last checked {0}</value></data>
@@ -969,7 +964,6 @@ Recovery backup: {1}</value></data>
   <data name="NodeInstallButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Install or update</value></data>
   <data name="NodeUseButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Use this version</value></data>
   <data name="NodeDeleteButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Delete this version</value></data>
-  <data name="DownloadsClearButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Clear completed history</value></data>
   <data name="AboutResourcesTitle.Text" xml:space="preserve"><value>Resources</value></data>
   <data name="AboutExitDescription.Text" xml:space="preserve"><value>Close HerdMe and stop its local services.</value></data>
   <data name="LogsPageSubtitle.Text" xml:space="preserve"><value>Read HerdMe, PHP, web server, and service logs in one place.</value></data>
@@ -1954,4 +1948,130 @@ Recovery backup: {1}</value></data>
   <data name="GeneralDomainSuffixInvalid" xml:space="preserve"><value>Use letters, digits or hyphens only, like test or local. The suffix was not changed.</value></data>
   <data name="GeneralDomainSuffixChanged" xml:space="preserve"><value>Sites now open at https://name.{0}/</value></data>
   <data name="GeneralDomainSuffixChangedHosts" xml:space="preserve"><value>Sites now open at https://name.{0}/. Press Update under Local domains so Windows finds the new names.</value></data>
+  <data name="NavUpdatesBadge" xml:space="preserve"><value>{0} updates available</value></data>
+  <data name="TrayUpdatesLabel" xml:space="preserve"><value>Updates</value></data>
+  <data name="TrayUpdatesCountLabel" xml:space="preserve"><value>Updates ({0})</value></data>
+  <data name="UpdatesFoundToast" xml:space="preserve"><value>{0} updates are available.</value></data>
+  <data name="UpdatesFoundToastOne" xml:space="preserve"><value>An update is available.</value></data>
+  <data name="UpdatesFoundToastView" xml:space="preserve"><value>View</value></data>
+  <data name="UpdateInstallInApp" xml:space="preserve"><value>Download and install</value></data>
+  <data name="NotificationUpdatesTitle" xml:space="preserve"><value>Updates available</value></data>
+  <data name="NotificationUpdatesOne" xml:space="preserve"><value>1 update is ready to install.</value></data>
+  <data name="NotificationUpdatesMany" xml:space="preserve"><value>{0} updates are ready to install.</value></data>
+  <data name="NotificationUpdatesInstalledTitle" xml:space="preserve"><value>Updates installed</value></data>
+  <data name="NotificationUpdatesInstalledMessage" xml:space="preserve"><value>{0} updated. Open Updates to see what changed.</value></data>
+  <data name="NotificationUpdatesFailedTitle" xml:space="preserve"><value>Some updates did not install</value></data>
+  <data name="NotificationUpdatesFailedMessage" xml:space="preserve"><value>{0} updated, {1} did not. Open Updates to retry.</value></data>
+  <data name="UpdatesSitesDidNotStart" xml:space="preserve"><value>The sites did not start with the new version.</value></data>
+  <data name="UpdatesRestoredMessage" xml:space="preserve"><value>{0} {1} did not start ({2}); {3} was put back.</value></data>
+  <data name="UpdatesRollbackUnavailable" xml:space="preserve"><value>The previous version is no longer kept.</value></data>
+  <data name="UpdatesNotEnoughSpace" xml:space="preserve"><value>Not enough free disk space: these updates need about {0} MB.</value></data>
+  <data name="AppSelfUpdateUnsupported" xml:space="preserve"><value>This update can only be downloaded in the browser.</value></data>
+  <data name="AppSelfUpdateChecksumFailed" xml:space="preserve"><value>The downloaded HerdMe setup did not match its official SHA-256 checksum.</value></data>
+  <data name="AppSelfUpdateMissing" xml:space="preserve"><value>The downloaded update is no longer available. Download it again.</value></data>
+  <data name="AppSelfUpdateStartFailed" xml:space="preserve"><value>HerdMe could not start the update.</value></data>
+  <data name="AppSelfUpdateNoChecksum" xml:space="preserve"><value>The HerdMe release has no SHA-256 checksum for this download, so it opens in the browser instead.</value></data>
+  <data name="AppSelfUpdateNotInstalled" xml:space="preserve"><value>Setup did not finish; HerdMe is still on the previous version.</value></data>
+  <data name="UpdatesAboutMegabytes" xml:space="preserve"><value>about {0} MB</value></data>
+  <data name="UpdatesAboutMinutes" xml:space="preserve"><value>about {0} min</value></data>
+  <data name="UpdatesAboutSeconds" xml:space="preserve"><value>about {0} s</value></data>
+  <data name="UpdatesSummaryOne" xml:space="preserve"><value>1 update available</value></data>
+  <data name="UpdatesSummaryMany" xml:space="preserve"><value>{0} updates available</value></data>
+  <data name="UpdatesSummaryMajorOne" xml:space="preserve"><value>1 new major version</value></data>
+  <data name="UpdatesSummaryMajorMany" xml:space="preserve"><value>{0} new major versions</value></data>
+  <data name="UpdatesSummarySecurity" xml:space="preserve"><value>includes security fixes</value></data>
+  <data name="UpdatesSummaryApplication" xml:space="preserve"><value>HerdMe itself</value></data>
+  <data name="UpdatesSummaryDiskWarning" xml:space="preserve"><value>Only {0} MB free on this drive; about {1} MB is needed.</value></data>
+  <data name="UpdatesUpdateAllCount" xml:space="preserve"><value>Update all ({0})</value></data>
+  <data name="UpdatesNotCheckedTitle" xml:space="preserve"><value>Not checked yet</value></data>
+  <data name="UpdatesNotCheckedDetail" xml:space="preserve"><value>Select Check to look for updates.</value></data>
+  <data name="UpdatesInstallingTitle" xml:space="preserve"><value>Installing updates</value></data>
+  <data name="UpdatesInstallingDetail" xml:space="preserve"><value>You can keep working; each row shows its own progress.</value></data>
+  <data name="UpdatesRunSummary" xml:space="preserve"><value>{0} updated, {1} failed, {2} cancelled.</value></data>
+  <data name="UpdatesRunFailedTitle" xml:space="preserve"><value>Some updates did not install</value></data>
+  <data name="UpdatesRunCancelledTitle" xml:space="preserve"><value>Updates cancelled</value></data>
+  <data name="UpdatesConfirmOne" xml:space="preserve"><value>Update {0}?</value></data>
+  <data name="UpdatesConfirmMany" xml:space="preserve"><value>Install {0} updates?</value></data>
+  <data name="UpdatesIncludeMajorOne" xml:space="preserve"><value>Also update {0} to its new major version</value></data>
+  <data name="UpdatesIncludeMajors" xml:space="preserve"><value>Also install {0} new major versions</value></data>
+  <data name="UpdatesUpdateNow" xml:space="preserve"><value>Update now</value></data>
+  <data name="UpdatesLater" xml:space="preserve"><value>Later</value></data>
+  <data name="UpdatesImpactNothingSelected" xml:space="preserve"><value>Nothing is selected.</value></data>
+  <data name="UpdatesImpactServices" xml:space="preserve"><value>These services stop briefly and start again: {0}.</value></data>
+  <data name="UpdatesImpactSites" xml:space="preserve"><value>{0} sites on {1} pause for about {2} seconds.</value></data>
+  <data name="UpdatesImpactNothingStops" xml:space="preserve"><value>Nothing needs to stop.</value></data>
+  <data name="UpdatesImpactTime" xml:space="preserve"><value>Takes {0}, downloads {1}.</value></data>
+  <data name="UpdatesImpactMajor" xml:space="preserve"><value>{0} moves from {1}.x to {2}.x; check your projects still work.</value></data>
+  <data name="UpdatesGroupPhp" xml:space="preserve"><value>PHP and Laravel tools</value></data>
+  <data name="UpdatesGroupNode" xml:space="preserve"><value>Node.js</value></data>
+  <data name="UpdatesGroupServices" xml:space="preserve"><value>Services</value></data>
+  <data name="UpdatesGroupDebugger" xml:space="preserve"><value>Debugging</value></data>
+  <data name="UpdatesGroupTools" xml:space="preserve"><value>Tools</value></data>
+  <data name="UpdatesHiddenGroup" xml:space="preserve"><value>Skipped and postponed</value></data>
+  <data name="UpdatesHiddenPinned" xml:space="preserve"><value>Staying on {0}.x; {1} is available.</value></data>
+  <data name="UpdatesHiddenSkipped" xml:space="preserve"><value>Version {0} skipped.</value></data>
+  <data name="UpdatesHiddenSnoozed" xml:space="preserve"><value>Version {0}, reminder on {1}.</value></data>
+  <data name="UpdatesShowAgain" xml:space="preserve"><value>Show again</value></data>
+  <data name="UpdatesBadgeMajor" xml:space="preserve"><value>Major</value></data>
+  <data name="UpdatesBadgeSecurity" xml:space="preserve"><value>Security</value></data>
+  <data name="UpdatesBadgePinned" xml:space="preserve"><value>Stays on {0}.x</value></data>
+  <data name="UpdatesWhatsNew" xml:space="preserve"><value>What's new</value></data>
+  <data name="UpdatesMoreOptions" xml:space="preserve"><value>More options</value></data>
+  <data name="UpdatesSkipVersion" xml:space="preserve"><value>Skip this version</value></data>
+  <data name="UpdatesRemindLater" xml:space="preserve"><value>Remind me in a week</value></data>
+  <data name="UpdatesSkippedToast" xml:space="preserve"><value>{0} {1} skipped.</value></data>
+  <data name="UpdatesSnoozedToast" xml:space="preserve"><value>{0}: reminder in a week.</value></data>
+  <data name="UpdatesPin" xml:space="preserve"><value>Stay on {0}.x</value></data>
+  <data name="UpdatesUnpin" xml:space="preserve"><value>Allow versions after {0}.x</value></data>
+  <data name="UpdatesPinnedToast" xml:space="preserve"><value>Staying on {0}.x. New major versions wait until you allow them.</value></data>
+  <data name="UpdatesRollBack" xml:space="preserve"><value>Roll back</value></data>
+  <data name="UpdatesRetry" xml:space="preserve"><value>Retry</value></data>
+  <data name="UpdatesUpdatedTo" xml:space="preserve"><value>Updated to {0}</value></data>
+  <data name="UpdatesStagePreparing" xml:space="preserve"><value>Preparing...</value></data>
+  <data name="UpdatesStageQueued" xml:space="preserve"><value>Waiting its turn</value></data>
+  <data name="UpdatesStageCancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="UpdatesUpToDateHeader" xml:space="preserve"><value>Up to date ({0})</value></data>
+  <data name="UpdatesRollBackTitle" xml:space="preserve"><value>Roll back {0}?</value></data>
+  <data name="UpdatesRollBackMessage" xml:space="preserve"><value>{0} goes back from {2} to {1}. Services using it restart.</value></data>
+  <data name="UpdatesRollBackRestoreData" xml:space="preserve"><value>Also restore the data from before the update</value></data>
+  <data name="UpdatesRollingBack" xml:space="preserve"><value>Rolling back {0}...</value></data>
+  <data name="UpdatesRolledBackTitle" xml:space="preserve"><value>Rolled back</value></data>
+  <data name="UpdatesRolledBackMessage" xml:space="preserve"><value>{0} is back on {1}.</value></data>
+  <data name="UpdatesRollBackFailedTitle" xml:space="preserve"><value>Could not roll back</value></data>
+  <data name="UpdatesApplicationDownload" xml:space="preserve"><value>Download</value></data>
+  <data name="UpdatesApplicationOpenDownload" xml:space="preserve"><value>Open download</value></data>
+  <data name="UpdatesApplicationReady" xml:space="preserve"><value>Downloaded and verified. Restart HerdMe to finish.</value></data>
+  <data name="UpdatesApplicationReadyToast" xml:space="preserve"><value>HerdMe {0} is ready. Restart to update.</value></data>
+  <data name="UpdatesApplicationDownloadFailed" xml:space="preserve"><value>The download failed: {0}</value></data>
+  <data name="UpdatesRestartTitle" xml:space="preserve"><value>Restart to update to HerdMe {0}?</value></data>
+  <data name="UpdatesRestartMessage" xml:space="preserve"><value>HerdMe closes, installs the update and opens again. Sites and services stop for a moment.</value></data>
+  <data name="UpdatesRestartNow" xml:space="preserve"><value>Restart now</value></data>
+  <data name="UpdatesRestarting" xml:space="preserve"><value>Starting the update...</value></data>
+  <data name="UpdatesRestartFailed" xml:space="preserve"><value>The update could not start: {0}</value></data>
+  <data name="UpdatesOutcomeUpdated" xml:space="preserve"><value>Updated</value></data>
+  <data name="UpdatesOutcomeFailed" xml:space="preserve"><value>Failed</value></data>
+  <data name="UpdatesOutcomeCancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="UpdatesOutcomeRolledBack" xml:space="preserve"><value>Rolled back</value></data>
+  <data name="UpdatesOutcomeRestored" xml:space="preserve"><value>Put back automatically</value></data>
+  <data name="UpdatesHistoryShowAll" xml:space="preserve"><value>Show all ({0})</value></data>
+  <data name="UpdatesHistoryShowLess" xml:space="preserve"><value>Show less</value></data>
+  <data name="UpdatesHistoryClearTitle" xml:space="preserve"><value>Clear update history?</value></data>
+  <data name="UpdatesHistoryClearMessage" xml:space="preserve"><value>This only clears the list. Installed versions and rollback copies stay.</value></data>
+  <data name="UpdatesHistoryClearAction" xml:space="preserve"><value>Clear</value></data>
+  <data name="UpdatesAutoInstallOffToast" xml:space="preserve"><value>Component updates wait for you.</value></data>
+  <data name="UpdatesAutoInstallIdleToast" xml:space="preserve"><value>Component updates install when the PC is idle.</value></data>
+  <data name="UpdatesAutoInstallOnExitToast" xml:space="preserve"><value>Component updates install when HerdMe quits.</value></data>
+  <data name="UpdatesRestartToUpdate.Text" xml:space="preserve"><value>Restart to update</value></data>
+  <data name="UpdatesAvailableHeader.Text" xml:space="preserve"><value>Available updates</value></data>
+  <data name="UpdatesHistoryTitle.Text" xml:space="preserve"><value>History</value></data>
+  <data name="UpdatesHistoryClearButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Clear update history</value></data>
+  <data name="UpdatesHistoryClear.Text" xml:space="preserve"><value>Clear update history</value></data>
+  <data name="UpdatesHistoryEmpty.Text" xml:space="preserve"><value>Nothing has been updated yet.</value></data>
+  <data name="UpdatesAutomaticTitle.Text" xml:space="preserve"><value>Automatic updates</value></data>
+  <data name="UpdatesAutoInstallTitle.Text" xml:space="preserve"><value>Install component updates by themselves</value></data>
+  <data name="UpdatesAutoInstallDescription.Text" xml:space="preserve"><value>PHP, Node.js, services and tools only. New major versions and HerdMe itself always wait for you.</value></data>
+  <data name="UpdatesAutoInstallCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Install component updates by themselves</value></data>
+  <data name="UpdatesAutoInstallOff.Content" xml:space="preserve"><value>Never</value></data>
+  <data name="UpdatesAutoInstallIdle.Content" xml:space="preserve"><value>When the PC is idle</value></data>
+  <data name="UpdatesAutoInstallOnExit.Content" xml:space="preserve"><value>When HerdMe quits</value></data>
 </root>

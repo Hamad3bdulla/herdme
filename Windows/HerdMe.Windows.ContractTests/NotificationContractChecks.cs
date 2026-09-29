@@ -140,7 +140,9 @@ internal static partial class ContractChecks
         var notifications = File.ReadAllText(Path.Combine(app, "App.Notifications.cs"));
         Check(notifications.Contains("trayIcon.ShowNotification(", StringComparison.Ordinal), "notifications use the tray balloon, not a Windows registration");
         Check(notifications.Contains("ShowNotifications", StringComparison.Ordinal), "notifications respect the General switch");
-        Check(notifications.Contains("if (IsMainWindowVisible) return;", StringComparison.Ordinal), "update notifications only appear while HerdMe is in the tray");
+        var updates = File.ReadAllText(Path.Combine(app, "App.Updates.cs"));
+        Check(updates.Contains("if (IsMainWindowVisible)", StringComparison.Ordinal)
+            && updates.Contains("NotifyUpdatesAvailable", StringComparison.Ordinal), "update notifications use an in-app toast while visible and a tray notification while hidden");
         var main = File.ReadAllText(Path.Combine(app, "App.xaml.cs"));
         Check(main.Contains("suppressNotifications = acceptanceRun || onboardingAcceptance;", StringComparison.Ordinal), "acceptance runs never show notifications");
         Check(main.Contains("crashReporter?.TryWrite(args.Exception, writeDump: true);", StringComparison.Ordinal), "a fatal UI error saves a crash report");

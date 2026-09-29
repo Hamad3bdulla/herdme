@@ -698,13 +698,8 @@ internal static partial class ContractChecks
                     StringComparison.Ordinal
                 )
                 && appSource.Contains("services.Updates.CheckAsync(channel)", StringComparison.Ordinal)
-                && appSource.Contains("AppUpdatePrompt.ShowAsync", StringComparison.Ordinal)
                 && appSource.Contains(
                     "services.ComponentUpdates.CheckAsync()",
-                    StringComparison.Ordinal
-                )
-                && appSource.Contains(
-                    "ManagedComponentUpdatePrompt.ShowAsync",
                     StringComparison.Ordinal
                 )
                 && appSource.Contains(
@@ -712,7 +707,25 @@ internal static partial class ContractChecks
                     StringComparison.Ordinal
                 )
                 && appSource.Contains("result.UsedBundledFallback", StringComparison.Ordinal),
-            "Windows checks once in the background for application and component updates and prompts from live results"
+            "Windows checks once in the background for application and component updates from live results"
+        );
+        // The owner asked for no update dialogs at startup (updates round): a background check
+        // is announced with the Updates badge, the tray entry and one toast or notification.
+        var appUpdatesSource = File.ReadAllText(
+            Path.Combine(repositoryRoot, "Windows", "HerdMe.Windows", "App.Updates.cs")
+        );
+        var backgroundUpdateSource = appSource + appUpdatesSource;
+        Check(
+            !backgroundUpdateSource.Contains("AppUpdatePrompt.ShowAsync", StringComparison.Ordinal)
+                && !backgroundUpdateSource.Contains(
+                    "ManagedComponentUpdatePrompt.ShowAsync",
+                    StringComparison.Ordinal
+                )
+                && backgroundUpdateSource.Contains("PublishUpdates(cache, announce: true)", StringComparison.Ordinal)
+                && appUpdatesSource.Contains("MainWindow.SetUpdatesBadge(count)", StringComparison.Ordinal)
+                && appUpdatesSource.Contains("NotifyUpdatesAvailable(", StringComparison.Ordinal)
+                && appUpdatesSource.Contains("MainWindow.ShowToast(", StringComparison.Ordinal),
+            "background update checks announce with a badge, the tray and a toast instead of a startup dialog"
         );
         var managedUpdatePromptSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
@@ -751,25 +764,36 @@ internal static partial class ContractChecks
                 && updatesPageSource.Contains("await RefreshAsync();", StringComparison.Ordinal),
             "the Updates page checks on entry and renders application results before waiting for components"
         );
+        // The Updates page hands installs to ComponentUpdateRunner (shared with automatic
+        // installs), so the stop-and-restore guarantees are pinned there.
+        var componentUpdateRunnerSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "Windows",
+            "HerdMe.Windows",
+            "Services",
+            "ComponentUpdateRunner.cs"
+        ));
         Check(
-            updatesPageSource.Contains("WithStoppedEnvironmentAsync", StringComparison.Ordinal)
-                && updatesPageSource.Contains(
+            updatesPageSource.Contains("runner.RunAsync(", StringComparison.Ordinal)
+                && updatesPageSource.Contains("GroupBy(ComponentUpdateRunner.OperationKey", StringComparison.Ordinal)
+                && componentUpdateRunnerSource.Contains("WithStoppedEnvironmentAsync", StringComparison.Ordinal)
+                && componentUpdateRunnerSource.Contains(
                     "await environment.StopAsync()",
                     StringComparison.Ordinal
                 )
-                && updatesPageSource.Contains(
+                && componentUpdateRunnerSource.Contains(
                     "await environment.StartConfiguredAsync(settingsStore)",
                     StringComparison.Ordinal
                 )
-                && updatesPageSource.Contains(
+                && componentUpdateRunnerSource.Contains(
                     "foreach (var instance in running) await serviceManager.StopAsync(instance.Id)",
                     StringComparison.Ordinal
                 )
-                && updatesPageSource.Contains(
+                && componentUpdateRunnerSource.Contains(
                     "foreach (var instance in running) await serviceManager.StartAsync(instance.Id)",
                     StringComparison.Ordinal
                 )
-                && updatesPageSource.Contains(
+                && componentUpdateRunnerSource.Contains(
                     "GroupBy(OperationKey",
                     StringComparison.Ordinal
                 ),

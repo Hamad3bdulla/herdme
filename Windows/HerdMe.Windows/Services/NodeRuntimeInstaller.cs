@@ -188,6 +188,33 @@ public sealed class NodeRuntimeInstaller
         return result;
     }
 
+    // The newest Windows release of each installed major line, and whether any release after
+    // the installed one is marked as a security release on nodejs.org (the Updates page badge).
+    public async Task<IReadOnlyDictionary<string, (string Version, bool Security)>> ResolveLatestReleasesAsync(
+        IReadOnlyDictionary<string, string> installedByMajor,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var releases = await HttpClient.GetFromJsonAsync<List<NodeRelease>>(
+            "https://nodejs.org/dist/index.json",
+            cancellationToken
+        ) ?? throw new InvalidDataException("The Node.js release index was empty.");
+        var result = new Dictionary<string, (string Version, bool Security)>(StringComparer.Ordinal);
+        foreach (var (major, installed) in installedByMajor)
+        {
+            var line = releases
+                .Where(candidate => candidate.Version.StartsWith($"v{major}.", StringComparison.Ordinal))
+                .ToList();
+            var latest = line.FirstOrDefault(candidate => candidate.Files.Contains("win-x64-zip", StringComparer.Ordinal));
+            if (latest is null) continue;
+            var security = line.Any(candidate => candidate.Security
+                && RuntimeVersionComparison.IsNewer(candidate.Version, installed)
+                && !RuntimeVersionComparison.IsNewer(candidate.Version, latest.Version));
+            result[major] = (RuntimeVersionComparison.Normalize(latest.Version), security);
+        }
+        return result;
+    }
+
     public Task<NodeWindowsRelease> InstallAsync(string major, CancellationToken cancellationToken = default)
         => RuntimeOperations.Shared.RunAsync("node:" + major, "Node.js " + major,
             (token, progress) => InstallCoreAsync(major, token, progress), cancellationToken);

@@ -179,6 +179,13 @@ public sealed class WindowsServiceManager : IAsyncDisposable
 
     public bool IsInstalled(string definitionId) => installer.IsInstalled(definitionId);
 
+    // Keeps the replaced runtime for seven days so the Updates page can roll back.
+    public UpdateRollbackStore? Rollback
+    {
+        get => installer.Rollback;
+        set => installer.Rollback = value;
+    }
+
     public string InstalledVersion(string definitionId) => installer.InstalledVersion(definitionId) ?? "-";
 
     public bool IsInstalling(string definitionId)

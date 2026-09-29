@@ -23,6 +23,7 @@ public partial class App
     private MenuFlyoutSubItem? trayPhpItem;
     private MenuFlyoutItem? trayMailItem;
     private MenuFlyoutItem? trayStopSharingItem;
+    private MenuFlyoutItem? trayUpdatesItem;
     private TrayIconState? displayedTrayState;
     private string? displayedTrayTooltip;
     private string? trayMenuSignature;
@@ -57,6 +58,12 @@ public partial class App
         menu.Items.Insert(1, traySitesItem);
         menu.Items.Insert(2, trayPhpItem);
         menu.Items.Insert(3, trayMailItem);
+        // Shown only while updates are waiting (App.Updates.cs).
+        trayUpdatesItem = new MenuFlyoutItem
+        {
+            Text = AppLocalization.Get("TrayUpdatesLabel"),
+            Command = TrayCommand(() => ShowPageFromTray("updates"))
+        };
         RefreshTrayMenu();
     }
 
@@ -179,7 +186,8 @@ public partial class App
     private void RefreshTrayMenu()
     {
         if (exitRequested || trayMenu is null || traySitesItem is null || trayPhpItem is null
-            || trayMailItem is null || trayStopSharingItem is null || MainWindow is null)
+            || trayMailItem is null || trayStopSharingItem is null || trayUpdatesItem is null
+            || MainWindow is null)
         {
             return;
         }
@@ -188,6 +196,7 @@ public partial class App
         var sites = TrayPresentation.MenuSites(known, recent);
         var shares = services.Shares.Active.Count;
         var unseenMail = MainWindow.UnseenMail;
+        var pendingUpdates = MainWindow.PendingUpdates;
         var signature = string.Join(
             "\n",
             recent.Select(site => "recent:" + site.Path + "|" + site.Domain)
@@ -195,6 +204,7 @@ public partial class App
                 .Append("php:" + trayPhpDefault + ":" + string.Join(",", trayPhpCycles))
                 .Append("mail:" + unseenMail)
                 .Append("shares:" + shares)
+                .Append("updates:" + pendingUpdates)
         );
         if (string.Equals(signature, trayMenuSignature, StringComparison.Ordinal)) return;
         trayMenuSignature = signature;
@@ -250,6 +260,21 @@ public partial class App
         else if (sharingIndex >= 0)
         {
             trayMenu.Items.RemoveAt(sharingIndex);
+        }
+
+        var updatesIndex = trayMenu.Items.IndexOf(trayUpdatesItem);
+        if (pendingUpdates > 0)
+        {
+            trayUpdatesItem.Text = AppLocalization.Format("TrayUpdatesCountLabel", pendingUpdates);
+            if (updatesIndex < 0)
+            {
+                var anchor = trayMenu.Items.IndexOf(shares > 0 ? trayStopSharingItem : trayMailItem);
+                trayMenu.Items.Insert(anchor + 1, trayUpdatesItem);
+            }
+        }
+        else if (updatesIndex >= 0)
+        {
+            trayMenu.Items.RemoveAt(updatesIndex);
         }
     }
 

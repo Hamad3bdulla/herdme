@@ -84,6 +84,8 @@ Type: filesandordirs; Name: "{localappdata}\Microsoft\Windows Terminal\Fragments
 
 [Run]
 Filename: "{app}\HerdMe.Windows.exe"; Description: "Launch HerdMe"; Flags: nowait postinstall skipifsilent
+; "Restart to update" in the app runs setup silently with /RELAUNCH=1 and expects HerdMe back.
+Filename: "{app}\HerdMe.Windows.exe"; Flags: nowait skipifnotsilent; Check: RelaunchRequested
 
 [UninstallRun]
 ; Removes the opt-in Windows notification registration (General > Buttons on notifications).
@@ -94,6 +96,11 @@ Filename: "{app}\HerdMe.Windows.exe"; Parameters: "--unregister-notifications"; 
 Filename: "{app}\HerdMe.Windows.exe"; Parameters: "--remove-defender-exclusion"; Flags: runhidden waituntilterminated; RunOnceId: "HerdMeRemoveDefenderExclusion"
 
 [Code]
+function RelaunchRequested: Boolean;
+begin
+  Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;

@@ -68,6 +68,27 @@ public sealed class WindowsLocalEnvironment : IAsyncDisposable
         && (configuredSites.Count > 0 || proxiesConfigured)
         && !IsRunning;
 
+    // The PHP lines the running sites use. Updating any other line leaves the sites running.
+    public IReadOnlyList<string> PhpCyclesInUse()
+    {
+        if (!IsRunning && !IsDegraded) return [];
+        var fallback = runtimePolicy.Load().PhpCycle;
+        return configuredSites
+            .Select(site => site.PhpVersion ?? fallback)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public int RunningSiteCount => IsRunning || IsDegraded ? configuredSites.Count : 0;
+
+    // How many running sites use this PHP line (the Updates page names them before it stops them).
+    public int SitesUsingPhp(string cycle)
+    {
+        if (!IsRunning && !IsDegraded) return 0;
+        var fallback = runtimePolicy.Load().PhpCycle;
+        return configuredSites.Count(site => string.Equals(site.PhpVersion ?? fallback, cycle, StringComparison.Ordinal));
+    }
+
     /// <summary>Proxy sites currently routed by the HTTP and HTTPS listeners.</summary>
     public IReadOnlyList<ProxySite> ActiveProxySites => activeProxies;
 

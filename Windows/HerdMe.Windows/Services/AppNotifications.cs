@@ -68,6 +68,28 @@ public static class AppNotifications
         NotificationActions.OpenPage("updates", "NotificationActionOpenUpdates")
     );
 
+    // The quiet daily check: one notification for everything it found, never a dialog.
+    public static AppNotification UpdatesAvailable(int count) => new(
+        "updates-available",
+        ServiceText.Get("NotificationUpdatesTitle", "Updates available"),
+        count == 1
+            ? ServiceText.Get("NotificationUpdatesOne", "1 update is ready to install.")
+            : ServiceText.Format("NotificationUpdatesMany", "{0} updates are ready to install.", count),
+        NotificationActions.OpenPage("updates", "NotificationActionOpenUpdates")
+    );
+
+    // Automatic installation (on idle or on exit) finished.
+    public static AppNotification UpdatesInstalled(int updated, int failed) => new(
+        "updates-installed",
+        failed == 0
+            ? ServiceText.Get("NotificationUpdatesInstalledTitle", "Updates installed")
+            : ServiceText.Get("NotificationUpdatesFailedTitle", "Some updates did not install"),
+        failed == 0
+            ? ServiceText.Format("NotificationUpdatesInstalledMessage", "{0} updated. Open Updates to see what changed.", updated)
+            : ServiceText.Format("NotificationUpdatesFailedMessage", "{0} updated, {1} did not. Open Updates to retry.", updated, failed),
+        NotificationActions.OpenPage("updates", "NotificationActionOpenUpdates")
+    );
+
     public const int MailSnippetCharacters = 120;
 
     // Captured mail stays on this PC; the notification shows only sender and subject.

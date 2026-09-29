@@ -26,11 +26,26 @@ internal static class AppUpdatePrompt
                 ? ContentDialogButton.Primary
                 : ContentDialogButton.Close
         };
-        if (downloadAvailable)
+        // The official GitHub setup can be downloaded, checked and installed from the Updates
+        // page ("Restart to update"); the browser download stays as the second choice.
+        var installInApp = AppSelfUpdater.CanInstall(release);
+        if (installInApp)
+        {
+            dialog.PrimaryButtonText = AppLocalization.Get("UpdateInstallInApp");
+            dialog.SecondaryButtonText = AppLocalization.Get("UpdateDownload");
+        }
+        else if (downloadAvailable)
         {
             dialog.PrimaryButtonText = AppLocalization.Get("UpdateDownload");
         }
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary || downloadUri is null) return;
+        var choice = await dialog.ShowAsync();
+        if (installInApp && choice == ContentDialogResult.Primary)
+        {
+            App.MainWindow.NavigateToPage("updates");
+            return;
+        }
+        var browser = installInApp ? ContentDialogResult.Secondary : ContentDialogResult.Primary;
+        if (choice != browser || downloadUri is null) return;
         if (await Launcher.LaunchUriAsync(downloadUri)) return;
 
         await ShowMessageAsync(

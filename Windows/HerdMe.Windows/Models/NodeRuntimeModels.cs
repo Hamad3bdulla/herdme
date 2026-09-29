@@ -17,6 +17,10 @@ public sealed class NodeRelease
 
     [JsonPropertyName("files")]
     public List<string> Files { get; init; } = [];
+
+    // nodejs.org marks releases that fix a security issue.
+    [JsonPropertyName("security")]
+    public bool Security { get; init; }
 }
 
 public sealed record NodeWindowsRelease(

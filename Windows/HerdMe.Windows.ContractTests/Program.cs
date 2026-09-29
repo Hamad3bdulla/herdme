@@ -163,6 +163,7 @@ try
     VerifyRound9UxContracts(repositoryRoot, supportRoot);
     VerifyRound10UxContracts(repositoryRoot, supportRoot);
     VerifyRound11UxContracts(repositoryRoot);
+    VerifyUpdatesUxContracts(repositoryRoot);
     await VerifyLaravelToolsContractsAsync(repositoryRoot, supportRoot);
     VerifyPlatformToolingContracts(repositoryRoot);
 }

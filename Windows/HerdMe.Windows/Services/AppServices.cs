@@ -86,6 +86,28 @@ public sealed class AppServices : IAsyncDisposable
             GitInstaller,
             UserPath
         );
+        // The Updates page: skipped versions, history, the previous version kept for a week.
+        UpdatePreferences = new UpdatePreferencesStore(SiteSettings.SupportRoot);
+        UpdateHistory = new UpdateHistoryStore(SiteSettings.SupportRoot);
+        Rollbacks = new UpdateRollbackStore(SiteSettings.SupportRoot);
+        PhpInstaller.Rollback = Rollbacks;
+        Services.Rollback = Rollbacks;
+        ComponentUpdater = new ComponentUpdateRunner(
+            SiteSettings,
+            Environment,
+            PhpInstaller,
+            RuntimePolicy,
+            NodeInstaller,
+            ComposerTools,
+            GitInstaller,
+            Xdebug,
+            Services,
+            UserPath,
+            UpdatePreferences,
+            UpdateHistory,
+            Rollbacks
+        );
+        SelfUpdater = new AppSelfUpdater(SiteSettings.SupportRoot);
     }
 
     public CoreClient Core { get; }
@@ -130,6 +152,16 @@ public sealed class AppServices : IAsyncDisposable
     public XdebugManager Xdebug { get; }
 
     public ManagedComponentUpdateManager ComponentUpdates { get; }
+
+    public UpdatePreferencesStore UpdatePreferences { get; }
+
+    public UpdateHistoryStore UpdateHistory { get; }
+
+    public UpdateRollbackStore Rollbacks { get; }
+
+    public ComponentUpdateRunner ComponentUpdater { get; }
+
+    public AppSelfUpdater SelfUpdater { get; }
 
     public SiteRuntimeStore SiteRuntimes { get; }
 

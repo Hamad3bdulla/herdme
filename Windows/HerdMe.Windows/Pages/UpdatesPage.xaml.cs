@@ -6,158 +6,139 @@ using Windows.System;
 
 namespace HerdMe.Windows.Pages;
 
+// Updates: a summary card (how many, how big, how long, one button), the HerdMe row with an
+// in-app download and "Restart to update", component rows grouped by kind with in-row
+// progress, Cancel and Retry, skip / remind me / stay on a major line, rollback, what is up to
+// date, the update history and automatic installation. The installing itself happens in
+// ComponentUpdateRunner, so it also works while this page is closed. Opening the page shows the
+// last check (at most an hour old) instead of asking every server again; Check forces one.
 public sealed partial class UpdatesPage : Page
 {
+    private const long Megabyte = 1024 * 1024;
     private readonly SiteConfigurationStore settingsStore;
     private readonly AppUpdateManager appUpdates;
     private readonly ManagedComponentUpdateManager componentUpdates;
-    private readonly WindowsLocalEnvironment environment;
-    private readonly PhpRuntimeInstaller phpInstaller;
-    private readonly PhpRuntimePolicy runtimePolicy;
-    private readonly NodeRuntimeInstaller nodeInstaller;
-    private readonly ComposerToolManager composerTools;
-    private readonly GitRuntimeInstaller gitInstaller;
-    private readonly XdebugManager xdebugManager;
-    private readonly WindowsServiceManager serviceManager;
-    private readonly WindowsUserPathManager userPathManager;
+    private readonly ComponentUpdateRunner runner;
+    private readonly AppSelfUpdater selfUpdater;
+    private readonly UpdatePreferencesStore preferences;
+    private readonly UpdateHistoryStore history;
     private CancellationTokenSource? refreshCancellation;
-    private ManagedComponentUpdateCheck? latestComponents;
-    private AppUpdateCheck? latestApplication;
+    private AppUpdateRelease? applicationRelease;
+    private bool applicationUnavailable;
+    private List<ManagedComponentUpdate> updates = [];
+    // Rows updated while the page was open keep a check mark until the next Check.
+    private readonly List<ManagedComponentUpdate> finished = [];
+    private List<(string Component, string Reason)> checkFailures = [];
+    private DateTimeOffset? checkedAt;
+    private IReadOnlyList<InstalledComponent> installed = [];
     private bool loaded;
     private bool busy;
-    private readonly Dictionary<string, (Grid Grid, TextBlock Detail, TextBlock Error, ProgressBar Progress, Button Action)> downloadControls = [];
 
     public UpdatesPage(
         SiteConfigurationStore settingsStore,
         AppUpdateManager appUpdates,
         ManagedComponentUpdateManager componentUpdates,
-        WindowsLocalEnvironment environment,
-        PhpRuntimeInstaller phpInstaller,
-        PhpRuntimePolicy runtimePolicy,
-        NodeRuntimeInstaller nodeInstaller,
-        ComposerToolManager composerTools,
-        GitRuntimeInstaller gitInstaller,
-        XdebugManager xdebugManager,
-        WindowsServiceManager serviceManager,
-        WindowsUserPathManager userPathManager
+        ComponentUpdateRunner runner,
+        AppSelfUpdater selfUpdater
     )
     {
         this.settingsStore = settingsStore;
         this.appUpdates = appUpdates;
         this.componentUpdates = componentUpdates;
-        this.environment = environment;
-        this.phpInstaller = phpInstaller;
-        this.runtimePolicy = runtimePolicy;
-        this.nodeInstaller = nodeInstaller;
-        this.composerTools = composerTools;
-        this.gitInstaller = gitInstaller;
-        this.xdebugManager = xdebugManager;
-        this.serviceManager = serviceManager;
-        this.userPathManager = userPathManager;
+        this.runner = runner;
+        this.selfUpdater = selfUpdater;
+        preferences = runner.Preferences;
+        history = runner.History;
         InitializeComponent();
-        RenderApplication();
-        RenderComponents();
     }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         loaded = true;
         // The page is cached, so Loaded can run again; never subscribe twice.
-        RuntimeOperations.Shared.Changed -= Downloads_Changed;
-        RuntimeOperations.Shared.Changed += Downloads_Changed;
-        RenderDownloads();
+        Unsubscribe();
+        runner.StateChanged += Runner_StateChanged;
+        RuntimeOperations.Shared.Changed += Operations_Changed;
+        history.Changed += History_Changed;
+        preferences.Changed += Preferences_Changed;
+        selfUpdater.Changed += SelfUpdater_Changed;
+        LoadAutoInstall();
+        RenderHistory();
+        RenderAll();
         await RefreshAsync();
     }
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
         loaded = false;
-        RuntimeOperations.Shared.Changed -= Downloads_Changed;
+        Unsubscribe();
         Interlocked.Exchange(ref refreshCancellation, null)?.Cancel();
     }
 
-    private void Downloads_Changed(object? sender, EventArgs e)
-        => DispatcherQueue.TryEnqueue(() => { if (loaded) RenderDownloads(); });
-
-    private void ClearDownloads_Click(object sender, RoutedEventArgs e) => RuntimeOperations.Shared.ClearCompleted();
-
-    private void RenderDownloads()
+    private void Unsubscribe()
     {
-        var snapshot = RuntimeOperations.Shared.Snapshot();
-        foreach (var id in downloadControls.Keys.Except(snapshot.Select(item => item.Id)).ToArray())
-        {
-            DownloadRows.Children.Remove(downloadControls[id].Grid);
-            downloadControls.Remove(id);
-        }
-        foreach (var operation in snapshot)
-        {
-            var row = ServiceDownloadRow.From(operation.Progress, operation.Name);
-            if (downloadControls.TryGetValue(operation.Id, out var controls))
-            {
-                controls.Detail.Text = row.Detail;
-                controls.Error.Text = row.Error;
-                controls.Progress.Value = row.Percentage;
-                controls.Progress.IsIndeterminate = row.IsIndeterminate;
-                controls.Progress.Visibility = row.IsActive;
-                controls.Action.Visibility = operation.Progress.Stage == ServiceInstallationStage.Completed ? Visibility.Collapsed : Visibility.Visible;
-                controls.Action.Content = new SymbolIcon(operation.Progress.IsActive ? Symbol.Cancel : Symbol.Refresh);
-                ToolTipService.SetToolTip(controls.Action, operation.Progress.IsActive ? row.CancelLabel : row.RetryLabel);
-                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(controls.Action, operation.Progress.IsActive ? row.CancelLabel : row.RetryLabel);
-                continue;
-            }
-            var grid = new Grid { Style = (Style)Application.Current.Resources["ListCardStyle"] };
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
-            text.Children.Add(new TextBlock
-            {
-                Text = operation.Name,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                Style = (Style)Application.Current.Resources["SettingsRowTitleStyle"]
-            });
-            var detail = new TextBlock { Text = row.Detail, Style = (Style)Application.Current.Resources["SettingsRowDescriptionStyle"] };
-            var error = new TextBlock { Text = row.Error, Style = (Style)Application.Current.Resources["StatusCriticalTextStyle"] };
-            var progress = new ProgressBar { Value = row.Percentage, IsIndeterminate = row.IsIndeterminate, Visibility = row.IsActive };
-            text.Children.Add(detail);
-            text.Children.Add(progress);
-            text.Children.Add(error);
-            grid.Children.Add(text);
-            {
-                var button = new Button
-                {
-                    Style = (Style)Application.Current.Resources["ToolbarIconButtonStyle"],
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Content = new SymbolIcon(operation.Progress.IsActive ? Symbol.Cancel : Symbol.Refresh),
-                    Visibility = operation.Progress.Stage == ServiceInstallationStage.Completed ? Visibility.Collapsed : Visibility.Visible
-                };
-                ToolTipService.SetToolTip(button, operation.Progress.IsActive ? row.CancelLabel : row.RetryLabel);
-                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, operation.Progress.IsActive ? row.CancelLabel : row.RetryLabel);
-                button.Click += async (_, _) =>
-                {
-                    if (RuntimeOperations.Shared.Snapshot().FirstOrDefault(item => item.Id == operation.Id)?.Progress.IsActive == true)
-                        RuntimeOperations.Shared.Cancel(operation.Id);
-                    else
-                    {
-                        try { await RuntimeOperations.Shared.RetryAsync(operation.Id); }
-                        catch (Exception) { RenderDownloads(); }
-                    }
-                };
-                Grid.SetColumn(button, 1);
-                grid.Children.Add(button);
-                downloadControls[operation.Id] = (grid, detail, error, progress, button);
-            }
-            DownloadRows.Children.Add(grid);
-        }
+        runner.StateChanged -= Runner_StateChanged;
+        RuntimeOperations.Shared.Changed -= Operations_Changed;
+        history.Changed -= History_Changed;
+        preferences.Changed -= Preferences_Changed;
+        selfUpdater.Changed -= SelfUpdater_Changed;
     }
+
+    // A row started, finished or left the queue (from any thread).
+    private void Runner_StateChanged(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() =>
+    {
+        if (!loaded) return;
+        RenderComponents();
+        RenderSummary();
+        RenderApplication();
+    });
+
+    // Download and install progress: only the rows change, nothing is rebuilt.
+    private void Operations_Changed(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() =>
+    {
+        if (loaded) RefreshRowStates();
+    });
+
+    private void History_Changed(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() =>
+    {
+        if (loaded) RenderHistory();
+    });
+
+    // Skip, remind me, pin, a finished update (it leaves the cache) or the daily check.
+    private void Preferences_Changed(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() =>
+    {
+        if (!loaded || busy) return;
+        if (preferences.LoadCache() is { } cache) ApplyCache(cache);
+        LoadAutoInstall();
+        RenderAll();
+    });
+
+    private void SelfUpdater_Changed(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() =>
+    {
+        if (!loaded) return;
+        RenderApplication();
+        RenderSummary();
+    });
 
     private async void Refresh_Click(object sender, RoutedEventArgs e)
     {
-        await RefreshAsync();
+        finished.Clear();
+        await RefreshAsync(force: true);
     }
 
-    private async Task RefreshAsync()
+    private async Task RefreshAsync(bool force = false)
     {
         if (busy) return;
+        if (!force
+            && preferences.LoadCache() is { } cache
+            && UpdatePreferencesStore.IsFresh(cache, DateTimeOffset.UtcNow))
+        {
+            ApplyCache(cache);
+            RenderAll();
+            ShowCheckStatus();
+            await LoadInstalledAsync();
+            return;
+        }
         var cancellation = new CancellationTokenSource();
         var previous = Interlocked.Exchange(ref refreshCancellation, cancellation);
         previous?.Cancel();
@@ -184,7 +165,8 @@ public sealed partial class UpdatesPage : Page
             cancellation.Token.ThrowIfCancellationRequested();
             if (!loaded) return;
 
-            latestApplication = application;
+            applicationRelease = application?.AvailableRelease;
+            applicationUnavailable = applicationError is not null || application?.UsedBundledFallback == true;
             RenderApplication(applicationError);
             BusyOverlay.Visibility = Visibility.Collapsed;
             ComponentCheckProgress.Visibility = Visibility.Visible;
@@ -194,13 +176,25 @@ public sealed partial class UpdatesPage : Page
             cancellation.Token.ThrowIfCancellationRequested();
             if (!loaded) return;
 
-            latestComponents = components;
-            RenderComponents();
-            LastCheckedText.Text = AppLocalization.Format(
-                "UpdatesLastChecked",
-                components.CheckedAt.ToLocalTime().ToString("g")
-            );
-            ShowCheckStatus(applicationError, components);
+            var failures = components.Failures
+                .Select(failure => (failure.Component, Reason: FailureReason(failure.Error)))
+                .ToList();
+            if (applicationError is not null)
+                failures.Insert(0, ("HerdMe", FailureReason(applicationError)));
+            else if (application?.UsedBundledFallback == true)
+                failures.Insert(0, ("HerdMe", AppLocalization.Get("UpdatesFeedNotPublished")));
+            ReplaceUpdates(components.Updates);
+            checkFailures = failures;
+            checkedAt = components.CheckedAt;
+            // The badge, the tray and the next visit read this; the page itself is already current.
+            preferences.SaveCache(new UpdateCheckCache(
+                components.CheckedAt,
+                components.Updates,
+                failures.Select(item => new CachedUpdateFailure(item.Component, item.Reason)).ToList(),
+                applicationRelease,
+                applicationUnavailable
+            ));
+            ShowCheckStatus();
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
@@ -221,308 +215,347 @@ public sealed partial class UpdatesPage : Page
             ComponentCheckProgress.Visibility = Visibility.Collapsed;
             SetBusy(false, string.Empty);
         }
+        if (!loaded) return;
+        RenderAll();
+        await LoadInstalledAsync();
     }
 
-    private void RenderApplication(Exception? error = null)
+    private void ApplyCache(UpdateCheckCache cache)
     {
-        ApplicationVersionText.Text = AppLocalization.Format(
-            "UpdatesInstalledVersion",
-            appUpdates.CurrentVersion
-        );
-        DownloadApplicationButton.Visibility = Visibility.Collapsed;
-        if (latestApplication?.AvailableRelease is { } release)
+        applicationRelease = cache.ApplicationRelease;
+        applicationUnavailable = cache.ApplicationUnavailable;
+        ReplaceUpdates(cache.Updates);
+        checkFailures = cache.Failures.Select(item => (item.Component, item.Reason)).ToList();
+        if (applicationUnavailable
+            && !checkFailures.Any(item => item.Component.Equals("HerdMe", StringComparison.OrdinalIgnoreCase)))
         {
-            ApplicationStatusText.Text = AppLocalization.Format(
-                "UpdatesVersionAvailable",
-                release.Version
-            );
-            DownloadApplicationButton.Visibility = Visibility.Visible;
+            checkFailures.Insert(0, ("HerdMe", AppLocalization.Get("UpdatesApplicationCheckUnavailable")));
         }
-        else if (error is not null || latestApplication?.UsedBundledFallback == true)
-        {
-            ApplicationStatusText.Text = AppLocalization.Get("UpdatesApplicationCheckUnavailable");
-        }
-        else
-        {
-            ApplicationStatusText.Text = AppLocalization.Get("UpdatesCurrent");
-        }
+        checkedAt = cache.CheckedAt;
     }
 
-    private void RenderComponents()
+    // A row that left the list because it was just updated stays, with a check mark.
+    private void ReplaceUpdates(IReadOnlyList<ManagedComponentUpdate> next)
     {
-        ComponentRows.Children.Clear();
-        var updates = latestComponents?.Updates ?? [];
-        foreach (var update in updates)
+        foreach (var old in updates)
         {
-            ComponentRows.Children.Add(UpdateRow(update));
+            if (next.Any(update => SameId(update, old)) || IsFinished(old)) continue;
+            if (runner.LastResult(ComponentUpdateRunner.OperationKey(old))?.Outcome == UpdateOutcome.Updated)
+                finished.Add(old);
         }
-        EmptyState.Visibility = updates.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        UpdateAllButton.Visibility = updates.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+        finished.RemoveAll(item => next.Any(update => SameId(update, item)));
+        updates = next.ToList();
+    }
+
+    private void RenderAll()
+    {
+        LastCheckedText.Text = checkedAt is { } time
+            ? AppLocalization.Format("UpdatesLastChecked", time.ToLocalTime().ToString("g"))
+            : string.Empty;
+        RenderApplication();
+        RenderComponents();
+        RenderUpToDate();
+        RenderSummary();
+    }
+
+    private void RenderSummary()
+    {
+        SummaryWarning.Visibility = Visibility.Collapsed;
         UpdateAllButton.IsEnabled = !busy;
-    }
-
-    private UIElement UpdateRow(ManagedComponentUpdate update)
-    {
-        var grid = new Grid { Style = (Style)Application.Current.Resources["ListCardStyle"] };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition
+        if (runner.IsBusy)
         {
-            Width = new GridLength(1, GridUnitType.Star)
-        });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-        grid.Children.Add(new FontIcon
+            var active = updates.Concat(finished).FirstOrDefault(update => string.Equals(
+                ComponentUpdateRunner.OperationKey(update), runner.Active, StringComparison.OrdinalIgnoreCase));
+            SetGlyph(SummaryGlyph, "\uE895", "Neutral");
+            SummaryTitle.Text = active is null
+                ? AppLocalization.Get("UpdatesInstallingTitle")
+                : AppLocalization.Format("UpdatesInstallingComponent", active.Name);
+            SummaryDetail.Text = AppLocalization.Get("UpdatesInstallingDetail");
+            UpdateAllButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var now = DateTimeOffset.UtcNow;
+        var prefs = preferences.Load();
+        var offered = Offered(prefs, now);
+        var application = PendingApplication(prefs, now);
+        var count = offered.Select(ComponentUpdateRunner.OperationKey).Distinct(StringComparer.OrdinalIgnoreCase).Count()
+            + (application is null ? 0 : 1);
+        if (count == 0)
         {
-            Glyph = "\uE896",
-            Style = (Style)Application.Current.Resources["SettingsRowIconStyle"]
-        });
-
-        var details = new StackPanel { Style = (Style)Application.Current.Resources["SettingsRowTextStyle"] };
-        details.Children.Add(new TextBlock
+            SetGlyph(SummaryGlyph, "\uE930", "Success");
+            SummaryTitle.Text = AppLocalization.Get(checkedAt is null ? "UpdatesNotCheckedTitle" : "UpdatesCurrentTitle");
+            SummaryDetail.Text = AppLocalization.Get(checkedAt is null ? "UpdatesNotCheckedDetail" : "ManagedUpdatesUpToDate");
+            UpdateAllButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var security = offered.Any(update => update.Security);
+        var majors = offered.Count(IsMajor);
+        SetGlyph(SummaryGlyph, "\uE896", security ? "Caution" : "Neutral");
+        SummaryTitle.Text = count == 1
+            ? AppLocalization.Get("UpdatesSummaryOne")
+            : AppLocalization.Format("UpdatesSummaryMany", count);
+        var parts = new List<string>();
+        var impact = offered.Count > 0 ? TryEstimate(offered) : null;
+        if (impact is not null)
         {
-            Text = update.Name,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            Style = (Style)Application.Current.Resources["SettingsRowTitleStyle"]
-        });
-        details.Children.Add(new TextBlock
+            parts.Add(MegabytesText(impact.DownloadBytes));
+            parts.Add(DurationText(impact.Duration));
+        }
+        if (majors > 0)
+            parts.Add(majors == 1
+                ? AppLocalization.Get("UpdatesSummaryMajorOne")
+                : AppLocalization.Format("UpdatesSummaryMajorMany", majors));
+        if (security) parts.Add(AppLocalization.Get("UpdatesSummarySecurity"));
+        if (application is not null) parts.Add(AppLocalization.Get("UpdatesSummaryApplication"));
+        SummaryDetail.Text = string.Join("  \u00B7  ", parts);
+        if (impact is not null && FreeBytes() is { } free && free < impact.RequiredBytes)
         {
-            Text = AppLocalization.Format(
-                "UpdatesVersionChange",
-                update.InstalledVersion,
-                update.LatestVersion
-            ),
-            Style = (Style)Application.Current.Resources["SettingsRowDescriptionStyle"]
-        });
-        details.Children.Add(new TextBlock
-        {
-            Text = ComponentCategory(update),
-            Style = (Style)Application.Current.Resources["SettingsRowDescriptionStyle"]
-        });
-        Grid.SetColumn(details, 1);
-        grid.Children.Add(details);
-
-        var button = new Button
-        {
-            Tag = update,
-            VerticalAlignment = VerticalAlignment.Center,
-            IsEnabled = !busy
-        };
-        button.Click += UpdateComponent_Click;
-        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        content.Children.Add(new SymbolIcon(Symbol.Download));
-        content.Children.Add(new TextBlock { Text = AppLocalization.Get("CommonUpdate") });
-        button.Content = content;
-        Grid.SetColumn(button, 2);
-        grid.Children.Add(button);
-        return grid;
-    }
-
-    private async void UpdateComponent_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { Tag: ManagedComponentUpdate update } || busy) return;
-        await RunUpdatesAsync([update]);
+            SummaryWarning.Text = AppLocalization.Format(
+                "UpdatesSummaryDiskWarning",
+                free / Megabyte,
+                impact.RequiredBytes / Megabyte
+            );
+            SummaryWarning.Visibility = Visibility.Visible;
+        }
+        // New major versions are left out of "Update all" unless ticked in the confirmation.
+        var minor = offered.Where(update => !IsMajor(update))
+            .Select(ComponentUpdateRunner.OperationKey)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        UpdateAllButton.Visibility = minor > 0 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateAllText.Text = AppLocalization.Format("UpdatesUpdateAllCount", minor);
     }
 
     private async void UpdateAll_Click(object sender, RoutedEventArgs e)
     {
-        if (busy || latestComponents is null) return;
-        var uniqueUpdates = latestComponents.Updates
-            .GroupBy(OperationKey, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
-            .ToArray();
-        await RunUpdatesAsync(uniqueUpdates);
+        if (busy) return;
+        var candidates = Offered(preferences.Load(), DateTimeOffset.UtcNow)
+            .Where(update => !IsRunningOrQueued(update))
+            .ToList();
+        // Composer and the Laravel installer are one operation; GroupBy(OperationKey) keeps them together.
+        var minor = candidates.Where(update => !IsMajor(update))
+            .GroupBy(ComponentUpdateRunner.OperationKey, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(group => group)
+            .ToList();
+        var majors = candidates.Where(IsMajor).ToList();
+        await RunUpdatesAsync(minor, majors);
     }
 
-    private async Task RunUpdatesAsync(IReadOnlyList<ManagedComponentUpdate> updates)
+    // Asks first when something has to stop or a major version changes, then hands the batch
+    // to the runner (which stops only what uses each component, right before it is swapped).
+    private async Task RunUpdatesAsync(
+        IReadOnlyList<ManagedComponentUpdate> selected,
+        IReadOnlyList<ManagedComponentUpdate>? optionalMajors = null
+    )
     {
-        SetBusy(true, AppLocalization.Format("UpdatesInstallingCount", updates.Count));
-        var completed = 0;
-        var failures = new List<string>();
-        foreach (var update in updates)
+        if (busy || selected.Count == 0 && (optionalMajors is null || optionalMajors.Count == 0)) return;
+        var chosen = await ConfirmImpactAsync(selected.ToList(), optionalMajors?.ToList() ?? []);
+        if (chosen is null || chosen.Count == 0) return;
+        StatusBar.IsOpen = false;
+        IReadOnlyList<ComponentUpdateResult> results;
+        try
         {
-            BusyText.Text = AppLocalization.Format("UpdatesInstallingComponent", update.Name);
-            try
-            {
-                await InstallAsync(update);
-                completed++;
-            }
-            catch (Exception error)
-            {
-                failures.Add($"{update.Name}: {error.Message}");
-            }
+            results = await runner.RunAsync(chosen, CancellationToken.None);
         }
-        SetBusy(false, string.Empty);
-        if (failures.Count == 0)
+        catch (Exception error) when (error is not OutOfMemoryException)
         {
+            if (loaded)
+                ShowStatus(InfoBarSeverity.Error, AppLocalization.Get("UpdatesFailedTitle"), error.Message);
+            return;
+        }
+        foreach (var result in results.Where(result => result.Outcome == UpdateOutcome.Updated))
+        {
+            if (!IsFinished(result.Update)) finished.Add(result.Update);
+        }
+        if (!loaded) return;
+        ShowRunSummary(results);
+        RenderAll();
+        await LoadInstalledAsync();
+    }
+
+    private void ShowRunSummary(IReadOnlyList<ComponentUpdateResult> results)
+    {
+        var updated = results.Count(result => result.Outcome == UpdateOutcome.Updated);
+        var failed = results.Count(result => result.Outcome is UpdateOutcome.Failed or UpdateOutcome.Restored);
+        var cancelled = results.Count(result => result.Outcome == UpdateOutcome.Cancelled);
+        if (failed == 0 && cancelled == 0)
+        {
+            if (updated == 0) return;
             ShowStatus(
                 InfoBarSeverity.Success,
                 AppLocalization.Get("UpdatesCompletedTitle"),
-                AppLocalization.Format("UpdatesCompletedMessage", completed)
-            );
-        }
-        else
-        {
-            ShowStatus(
-                InfoBarSeverity.Error,
-                AppLocalization.Get("UpdatesFailedTitle"),
-                string.Join(System.Environment.NewLine, failures)
-            );
-        }
-        await RefreshAsync();
-    }
-
-    private async Task InstallAsync(ManagedComponentUpdate update)
-    {
-        if (update.Id.StartsWith("php:", StringComparison.OrdinalIgnoreCase))
-        {
-            var cycle = update.Id[4..];
-            await WithStoppedEnvironmentAsync(async () =>
-            {
-                await phpInstaller.InstallAsync(cycle);
-                await phpInstaller.EnsureManagedConfigurationAsync(cycle);
-            });
-            SynchronizeUserPath();
-            return;
-        }
-        if (update.Id.StartsWith("node:", StringComparison.OrdinalIgnoreCase))
-        {
-            await nodeInstaller.InstallAsync(update.Id[5..]);
-            SynchronizeUserPath();
-            return;
-        }
-        if (update.Id is "composer" or "laravel-installer")
-        {
-            await composerTools.InstallOrUpdateAsync(runtimePolicy.Load().PhpCycle);
-            SynchronizeUserPath();
-            return;
-        }
-        if (update.Id.Equals("git", StringComparison.OrdinalIgnoreCase))
-        {
-            await gitInstaller.InstallOrUpdateAsync();
-            SynchronizeUserPath();
-            return;
-        }
-        if (update.Id.StartsWith("xdebug:", StringComparison.OrdinalIgnoreCase))
-        {
-            var cycle = update.Id[7..];
-            await WithStoppedEnvironmentAsync(() =>
-                xdebugManager.InstallAsync(phpInstaller.PhpExecutable(cycle))
+                AppLocalization.Format("UpdatesCompletedMessage", updated)
             );
             return;
         }
-        if (update.Id.StartsWith("service:", StringComparison.OrdinalIgnoreCase))
-        {
-            await UpdateServiceAsync(update.Id[8..]);
-            return;
-        }
-        throw new InvalidOperationException(
-            AppLocalization.Format("UpdatesUnsupportedComponent", update.Name)
-        );
-    }
-
-    private async Task WithStoppedEnvironmentAsync(Func<Task> update)
-    {
-        var restart = environment.IsRunning || environment.IsDegraded;
-        if (restart) await environment.StopAsync();
-        try
-        {
-            await update();
-        }
-        finally
-        {
-            if (restart) await environment.StartConfiguredAsync(settingsStore);
-        }
-    }
-
-    private async Task UpdateServiceAsync(string definitionId)
-    {
-        var instances = serviceManager.LoadInstances()
-            .Where(instance => instance.DefinitionId.Equals(
-                definitionId,
-                StringComparison.OrdinalIgnoreCase
-            ))
-            .ToArray();
-        var running = instances.Where(instance => serviceManager.State(
-            instance.Id,
-            instance.DefinitionId
-        ) == ManagedServiceState.Running).ToArray();
-        foreach (var instance in running) await serviceManager.StopAsync(instance.Id);
-        try
-        {
-            await serviceManager.InstallAsync(definitionId);
-        }
-        finally
-        {
-            foreach (var instance in running) await serviceManager.StartAsync(instance.Id);
-        }
-    }
-
-    private void SynchronizeUserPath()
-    {
-        userPathManager.Synchronize(
-            composerTools.CommandLineDirectories(runtimePolicy.Load().PhpCycle)
-        );
-    }
-
-    private async void DownloadApplication_Click(object sender, RoutedEventArgs e)
-    {
-        var url = latestApplication?.AvailableRelease?.PlatformDownloadUrl;
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
-            || uri.Scheme != Uri.UriSchemeHttps)
-        {
-            ShowStatus(
-                InfoBarSeverity.Error,
-                AppLocalization.Get("UpdatesDownloadFailedTitle"),
-                AppLocalization.Get("UpdatesDownloadUnavailable")
-            );
-            return;
-        }
-        if (await Launcher.LaunchUriAsync(uri)) return;
         ShowStatus(
-            InfoBarSeverity.Error,
-            AppLocalization.Get("UpdatesDownloadFailedTitle"),
-            AppLocalization.Format("UpdateOpenInBrowser", uri.AbsoluteUri)
+            failed > 0 ? InfoBarSeverity.Warning : InfoBarSeverity.Informational,
+            AppLocalization.Get(failed > 0 ? "UpdatesRunFailedTitle" : "UpdatesRunCancelledTitle"),
+            AppLocalization.Format("UpdatesRunSummary", updated, failed, cancelled)
         );
     }
 
-    private void ShowCheckStatus(
-        Exception? applicationError,
-        ManagedComponentUpdateCheck components
+    // null means "Later". Nothing to stop and no new major version: no question at all.
+    private async Task<List<ManagedComponentUpdate>?> ConfirmImpactAsync(
+        List<ManagedComponentUpdate> chosen,
+        List<ManagedComponentUpdate> optionalMajors
     )
     {
-        var unavailable = components.Failures
-            .Select(failure => (failure.Component, Reason: FailureReason(failure.Error)))
-            .ToList();
-        if (applicationError is not null)
-            unavailable.Insert(0, ("HerdMe", FailureReason(applicationError)));
-        else if (latestApplication?.UsedBundledFallback == true)
-            unavailable.Insert(0, ("HerdMe", AppLocalization.Get("UpdatesFeedNotPublished")));
-        if (unavailable.Count > 0)
+        var first = TryEstimate(chosen);
+        if (optionalMajors.Count == 0
+            && !chosen.Any(IsMajor)
+            && first is { StopsSomething: false })
         {
-            // Name each reason so a failed check can be acted on instead of guessed at.
-            var details = unavailable.Select(item =>
-                AppLocalization.Format("UpdatesFailureDetail", item.Component, item.Reason));
-            ShowStatus(
-                InfoBarSeverity.Warning,
-                AppLocalization.Get("UpdatesPartialTitle"),
-                AppLocalization.Format(
-                    "UpdatesPartialMessage",
-                    string.Join(", ", unavailable.Select(item => item.Component))
-                ) + "\n" + string.Join("\n", details)
-            );
+            return chosen;
         }
-        else if (latestApplication?.AvailableRelease is null && components.Updates.Count == 0)
+        var panel = new StackPanel { Spacing = 10, MinWidth = 360 };
+        var details = new StackPanel { Spacing = 8 };
+        panel.Children.Add(details);
+        CheckBox? includeMajors = null;
+        if (optionalMajors.Count > 0)
         {
-            ShowStatus(
-                InfoBarSeverity.Success,
-                AppLocalization.Get("UpdatesCurrentTitle"),
-                AppLocalization.Get("ManagedUpdatesUpToDate")
-            );
+            includeMajors = new CheckBox
+            {
+                Content = optionalMajors.Count == 1
+                    ? AppLocalization.Format("UpdatesIncludeMajorOne", optionalMajors[0].Name)
+                    : AppLocalization.Format("UpdatesIncludeMajors", optionalMajors.Count)
+            };
+            panel.Children.Add(includeMajors);
         }
-        else
+        List<ManagedComponentUpdate> Selection() => includeMajors?.IsChecked == true
+            ? chosen.Concat(optionalMajors).ToList()
+            : chosen;
+        void Fill()
+        {
+            details.Children.Clear();
+            var selection = Selection();
+            foreach (var line in ImpactLines(selection, TryEstimate(selection)))
+                details.Children.Add(line);
+        }
+        Fill();
+        if (includeMajors is not null)
+        {
+            includeMajors.Checked += (_, _) => Fill();
+            includeMajors.Unchecked += (_, _) => Fill();
+        }
+        var operations = chosen.Concat(optionalMajors)
+            .Select(ComponentUpdateRunner.OperationKey)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            FlowDirection = AppLocalization.LayoutDirection,
+            Title = operations == 1
+                ? AppLocalization.Format("UpdatesConfirmOne", chosen.Concat(optionalMajors).First().Name)
+                : AppLocalization.Format("UpdatesConfirmMany", operations),
+            Content = new ScrollViewer { Content = panel, MaxHeight = 420 },
+            PrimaryButtonText = AppLocalization.Get("UpdatesUpdateNow"),
+            CloseButtonText = AppLocalization.Get("UpdatesLater"),
+            DefaultButton = ContentDialogButton.Primary
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return null;
+        return Selection();
+    }
+
+    private IEnumerable<UIElement> ImpactLines(List<ManagedComponentUpdate> selection, UpdateImpact? impact)
+    {
+        TextBlock Line(string text, string style = "SecondaryTextStyle") => new()
+        {
+            Text = text,
+            TextWrapping = TextWrapping.Wrap,
+            Style = S(style)
+        };
+        if (selection.Count == 0)
+        {
+            yield return Line(AppLocalization.Get("UpdatesImpactNothingSelected"));
+            yield break;
+        }
+        if (impact is not null)
+        {
+            if (impact.StoppedServices.Count > 0)
+                yield return Line(AppLocalization.Format(
+                    "UpdatesImpactServices",
+                    string.Join(", ", impact.StoppedServices.Distinct(StringComparer.OrdinalIgnoreCase))
+                ));
+            if (impact.StoppedSites > 0)
+                yield return Line(AppLocalization.Format(
+                    "UpdatesImpactSites",
+                    impact.StoppedSites,
+                    string.Join(", ", impact.StoppedPhpLines.Select(line => "PHP " + line)),
+                    Math.Max(5, (int)Math.Ceiling(impact.SiteDowntime.TotalSeconds))
+                ));
+            if (!impact.StopsSomething) yield return Line(AppLocalization.Get("UpdatesImpactNothingStops"));
+            yield return Line(AppLocalization.Format(
+                "UpdatesImpactTime",
+                DurationText(impact.Duration),
+                MegabytesText(impact.DownloadBytes)
+            ));
+            if (FreeBytes() is { } free && free < impact.RequiredBytes)
+                yield return Line(AppLocalization.Format(
+                    "UpdatesSummaryDiskWarning",
+                    free / Megabyte,
+                    impact.RequiredBytes / Megabyte
+                ), "StatusCriticalTextStyle");
+        }
+        foreach (var major in selection.Where(IsMajor))
+        {
+            yield return Line(AppLocalization.Format(
+                "UpdatesImpactMajor",
+                major.Name,
+                UpdatePreferencesStore.MajorOf(major.InstalledVersion),
+                UpdatePreferencesStore.MajorOf(major.LatestVersion)
+            ), "StatusCriticalTextStyle");
+        }
+    }
+
+    private UpdateImpact? TryEstimate(IReadOnlyList<ManagedComponentUpdate> selection)
+    {
+        if (selection.Count == 0) return null;
+        try
+        {
+            return runner.EstimateImpact(selection);
+        }
+        catch (Exception error) when (error is IOException
+            or UnauthorizedAccessException
+            or InvalidOperationException
+            or System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
+    private long? FreeBytes()
+    {
+        try
+        {
+            var root = Path.GetPathRoot(settingsStore.SupportRoot);
+            return string.IsNullOrEmpty(root) ? null : new DriveInfo(root).AvailableFreeSpace;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private void ShowCheckStatus()
+    {
+        if (checkFailures.Count == 0)
         {
             StatusBar.IsOpen = false;
+            return;
         }
+        // Name each reason so a failed check can be acted on instead of guessed at.
+        var details = checkFailures.Select(item =>
+            AppLocalization.Format("UpdatesFailureDetail", item.Component, item.Reason));
+        ShowStatus(
+            InfoBarSeverity.Warning,
+            AppLocalization.Get("UpdatesPartialTitle"),
+            AppLocalization.Format(
+                "UpdatesPartialMessage",
+                string.Join(", ", checkFailures.Select(item => item.Component))
+            ) + "\n" + string.Join("\n", details)
+        );
     }
 
     private static string FailureReason(Exception error)
@@ -554,25 +587,67 @@ public sealed partial class UpdatesPage : Page
         BusyOverlay.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
         RefreshButton.IsEnabled = !value;
         UpdateAllButton.IsEnabled = !value;
-        RenderComponents();
+        if (loaded) RefreshRowStates();
     }
 
-    internal static string OperationKey(ManagedComponentUpdate update)
+    private static async Task OpenAsync(Uri? uri)
     {
-        return update.Id is "composer" or "laravel-installer"
-            ? "php-tools"
-            : update.Id;
+        if (uri is not null && uri.Scheme == Uri.UriSchemeHttps) await Launcher.LaunchUriAsync(uri);
     }
 
-    private static string ComponentCategory(ManagedComponentUpdate update)
+    private static void Toast(string message, string? id = null, UpdatePreferencesStore? undo = null)
     {
-        return AppLocalization.Get(update.PageTag switch
+        Func<Task>? action = null;
+        if (id is not null && undo is not null)
         {
-            "php" => "UpdatesCategoryPhp",
-            "node" => "UpdatesCategoryNode",
-            "services" => "UpdatesCategoryService",
-            "debugger" => "UpdatesCategoryDebugger",
-            _ => "UpdatesCategoryTool"
-        });
+            action = () =>
+            {
+                undo.Unhide(id);
+                return Task.CompletedTask;
+            };
+        }
+        App.MainWindow?.ShowToast(message, action is null ? null : AppLocalization.Get("CommonUndo"), action);
     }
+
+    private List<ManagedComponentUpdate> Offered(UpdatePreferences prefs, DateTimeOffset now) => updates
+        .Where(update => UpdatePreferencesStore.IsOffered(update, prefs, now) && !IsFinished(update))
+        .ToList();
+
+    private bool IsFinished(ManagedComponentUpdate update) => finished.Any(item => SameId(item, update));
+
+    private bool IsRunningOrQueued(ManagedComponentUpdate update)
+    {
+        var key = ComponentUpdateRunner.OperationKey(update);
+        return string.Equals(runner.Active, key, StringComparison.OrdinalIgnoreCase) || runner.IsQueued(key);
+    }
+
+    private static bool IsMajor(ManagedComponentUpdate update) =>
+        UpdatePreferencesStore.IsMajorChange(update.InstalledVersion, update.LatestVersion);
+
+    private static bool SameId(ManagedComponentUpdate left, ManagedComponentUpdate right) =>
+        left.Id.Equals(right.Id, StringComparison.OrdinalIgnoreCase);
+
+    private static string DurationText(TimeSpan duration) => duration < TimeSpan.FromMinutes(1)
+        ? AppLocalization.Format("UpdatesAboutSeconds", Math.Max(5, (int)Math.Ceiling(duration.TotalSeconds)))
+        : AppLocalization.Format("UpdatesAboutMinutes", (int)Math.Ceiling(duration.TotalMinutes));
+
+    private static string MegabytesText(long bytes) =>
+        AppLocalization.Format("UpdatesAboutMegabytes", Math.Max(1, (long)Math.Ceiling(bytes / (double)Megabyte)));
+
+    private static Style S(string key) => (Style)Application.Current.Resources[key];
+
+    private static void SetGlyph(FontIcon icon, string glyph, string kind)
+    {
+        icon.Glyph = glyph;
+        icon.Style = S("StatusGlyph" + kind + "Style");
+    }
+
+    private static Border Pill(string text, string kind) => new()
+    {
+        Style = S("StatusPill" + kind + "Style"),
+        Padding = new Thickness(8, 1, 8, 2),
+        Child = new TextBlock { Text = text, FontSize = 12, Style = S("StatusTextPrimaryStyle") }
+    };
+
+    private static Microsoft.UI.Xaml.Shapes.Rectangle Divider() => new() { Style = S("CardDividerStyle") };
 }

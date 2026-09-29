@@ -1,13 +1,13 @@
 {
   "releases": [
     {
-      "version": "0.1.30",
+      "version": "0.1.31",
       "build": 1,
       "channel": "stable",
-      "notes": "Windows preview with the latest dashboard, services, sites, appearance, notifications, diagnostics, and Arabic localization improvements.",
+      "notes": "Windows preview with the latest dashboard, services, sites, appearance, notifications, diagnostics, Arabic localization, and self updating improvements.",
       "downloadURLs": {
-        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.30/HerdMe-0.1.30-macOS.zip",
-        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.30/HerdMe-0.1.30-win-x64-setup.exe"
+        "macOS": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.31/HerdMe-0.1.31-macOS.zip",
+        "windowsX64": "https://github.com/Hamad3bdulla/herdme/releases/download/windows-v0.1.31/HerdMe-0.1.31-win-x64-setup.exe"
       }
     },
     {

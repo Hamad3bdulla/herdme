@@ -44,6 +44,7 @@
     <Compile Include="UxContractChecks.cs" />
     <Compile Include="Round10UxContractChecks.cs" />
     <Compile Include="Round11UxContractChecks.cs" />
+    <Compile Include="UpdatesUxContractChecks.cs" />
     <Compile Include="../HerdMe.Windows/Services/SiteListFilter.cs" Link="Services/SiteListFilter.cs" />
     <Compile Include="../HerdMe.Windows/Services/TrayPresentation.cs" Link="Services/TrayPresentation.cs" />
     <Compile Include="../HerdMe.Windows/Services/TaskbarOverlay.cs" Link="Services/TaskbarOverlay.cs" />
@@ -68,6 +69,11 @@
     <Compile Include="../HerdMe.Windows/Models/RuntimeCatalog.cs" Link="Models/RuntimeCatalog.cs" />
     <Compile Include="../HerdMe.Windows/Models/SiteSettingsModels.cs" Link="Models/SiteSettingsModels.cs" />
     <Compile Include="../HerdMe.Windows/Services/AppServices.cs" Link="Services/AppServices.cs" />
+    <Compile Include="../HerdMe.Windows/Services/UpdatePreferences.cs" Link="Services/UpdatePreferences.cs" />
+    <Compile Include="../HerdMe.Windows/Services/UpdateHistory.cs" Link="Services/UpdateHistory.cs" />
+    <Compile Include="../HerdMe.Windows/Services/UpdateRollback.cs" Link="Services/UpdateRollback.cs" />
+    <Compile Include="../HerdMe.Windows/Services/AppSelfUpdater.cs" Link="Services/AppSelfUpdater.cs" />
+    <Compile Include="../HerdMe.Windows/Services/ComponentUpdateRunner.cs" Link="Services/ComponentUpdateRunner.cs" />
     <Compile Include="../HerdMe.Windows/Services/ArtisanCommandRunner.cs" Link="Services/ArtisanCommandRunner.cs" />
     <Compile Include="../HerdMe.Windows/Services/ArtisanCommandIndex.cs" Link="Services/ArtisanCommandIndex.cs" />
     <Compile Include="../HerdMe.Windows/Services/TinkerRunner.cs" Link="Services/TinkerRunner.cs" />

@@ -414,15 +414,8 @@ public sealed partial class MainWindow : Window
                     services.SiteSettings,
                     services.Updates,
                     services.ComponentUpdates,
-                    services.Environment,
-                    services.PhpInstaller,
-                    services.RuntimePolicy,
-                    services.NodeInstaller,
-                    services.ComposerTools,
-                    services.GitInstaller,
-                    services.Xdebug,
-                    services.Services,
-                    services.UserPath
+                    services.ComponentUpdater,
+                    services.SelfUpdater
                 );
             case "mail":
                 return new MailPage(

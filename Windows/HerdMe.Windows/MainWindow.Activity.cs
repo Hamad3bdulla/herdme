@@ -224,6 +224,18 @@ public sealed partial class MainWindow
         AutomationProperties.SetName(badge, count > 0 ? AppLocalization.Format(nameKey, count) : string.Empty);
     }
 
+    // Updates waiting on the Updates page (skipped and snoozed ones are not counted). This is
+    // how a check found at startup shows up instead of a dialog (App.Updates.cs).
+    public int PendingUpdates { get; private set; }
+
+    public void SetUpdatesBadge(int count)
+    {
+        if (shuttingDown) return;
+        PendingUpdates = Math.Max(0, count);
+        SetBadge(UpdatesBadge, PendingUpdates, "NavUpdatesBadge");
+        ActivityChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     // Settings changed elsewhere (for example the PHP version from the tray): a page that is
     // not on screen is rebuilt on its next visit instead of showing stale values.
     public void DiscardCachedPage(string tag)

@@ -381,14 +381,24 @@ public sealed class PhpRuntimeInstaller
         return result;
     }
 
+    // Keeps the replaced version for seven days so the Updates page can roll back.
+    public UpdateRollbackStore? Rollback { get; set; }
+
     public Task<PhpWindowsRelease> InstallAsync(string cycle, CancellationToken cancellationToken = default)
         => RuntimeOperations.Shared.RunAsync("php:" + cycle, "PHP " + cycle,
-            (token, progress) => InstallCoreAsync(cycle, token, progress), cancellationToken);
+            (token, progress) => InstallCoreAsync(cycle, token, progress, null), cancellationToken);
+
+    // The Updates page downloads and checks the new build while sites keep running, and only
+    // stops what uses this PHP line right before the files are swapped (beforePromote).
+    public Task<PhpWindowsRelease> InstallAsync(string cycle, CancellationToken cancellationToken, Func<Task>? beforePromote)
+        => RuntimeOperations.Shared.RunAsync("php:" + cycle, "PHP " + cycle,
+            (token, progress) => InstallCoreAsync(cycle, token, progress, beforePromote), cancellationToken);
 
     private async Task<PhpWindowsRelease> InstallCoreAsync(
         string cycle,
         CancellationToken cancellationToken,
-        IProgress<ServiceInstallationProgress> progress
+        IProgress<ServiceInstallationProgress> progress,
+        Func<Task>? beforePromote
     )
     {
         InstallationPreflight.EnsureStorage(RuntimeRoot);
@@ -453,8 +463,21 @@ public sealed class PhpRuntimeInstaller
                 cancellationToken
             );
 
+            var previousVersion = InstalledVersion(cycle);
+            if (beforePromote is not null)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                progress.Report(new("php:" + cycle, ServiceInstallationStage.Installing));
+                await beforePromote();
+            }
             await PromoteRuntimeAsync(stagingPath, destination, backupPath, cancellationToken);
             PhpModuleProbeCache.Invalidate(destination);
+            if (Rollback is { } rollback
+                && previousVersion is not null
+                && !previousVersion.Equals(release.Version, StringComparison.OrdinalIgnoreCase))
+            {
+                rollback.Keep("php:" + cycle, "PHP " + cycle, previousVersion, release.Version, backupPath, destination, DateTimeOffset.UtcNow);
+            }
             TryCleanup(() => Directory.Delete(backupPath, true));
         }
         finally

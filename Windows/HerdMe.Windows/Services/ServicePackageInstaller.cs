@@ -134,7 +134,22 @@ public sealed class ServicePackageInstaller
 
             cancellationToken.ThrowIfCancellationRequested();
             progress?.Report(new(definitionId, ServiceInstallationStage.Installing));
-            PromoteRuntime(stagingRuntime, destination, backup);
+            var previousVersion = InstalledVersion(definitionId);
+            Action<string>? keepReplaced = null;
+            if (Rollback is { } rollback
+                && previousVersion is not null and not "Installed"
+                && !previousVersion.Equals(release.Version, StringComparison.OrdinalIgnoreCase))
+            {
+                keepReplaced = replaced => rollback.Keep(
+                    "service:" + definitionId,
+                    ManagedServiceCatalog.Get(definitionId).Name,
+                    previousVersion,
+                    release.Version,
+                    replaced,
+                    destination,
+                    DateTimeOffset.UtcNow);
+            }
+            PromoteRuntime(stagingRuntime, destination, backup, keepReplaced);
             return release;
         }
         finally
@@ -149,7 +164,15 @@ public sealed class ServicePackageInstaller
         }
     }
 
-    internal static void PromoteRuntime(string stagingRuntime, string destination, string backup)
+    // Keeps the replaced version for seven days so the Updates page can roll back.
+    public UpdateRollbackStore? Rollback { get; set; }
+
+    internal static void PromoteRuntime(
+        string stagingRuntime,
+        string destination,
+        string backup,
+        Action<string>? keepReplaced = null
+    )
     {
         if (Directory.Exists(destination)) Directory.Move(destination, backup);
         try
@@ -162,6 +185,7 @@ public sealed class ServicePackageInstaller
                 Directory.Move(backup, destination);
             throw;
         }
+        if (keepReplaced is not null && Directory.Exists(backup)) keepReplaced(backup);
         TryRemoveDirectory(backup);
     }
 

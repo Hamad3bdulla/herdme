@@ -32,7 +32,6 @@ public partial class App : Application
     private volatile bool exitRequested;
     private int backgroundServicesStarted;
     private int automaticUpdateCheckStarted;
-    private int automaticUpdatePromptStarted;
     private int reportingUnhandledError;
     private int shutdownStarted;
     private bool suppressAutomaticUpdateCheck;
@@ -192,7 +191,6 @@ public partial class App : Application
     {
         _ = StartBackgroundServicesOnceAsync();
         StartAutomaticUpdateCheckOnce();
-        StartAutomaticUpdatePromptOnce();
     }
 
     private void System_PowerModeChanged(object sender, PowerModeChangedEventArgs args)
@@ -206,23 +204,26 @@ public partial class App : Application
         if (args.WindowActivationState == WindowActivationState.Deactivated) return;
         RefreshMainWindowVisibility();
         StartAutomaticUpdateCheckOnce();
-        StartAutomaticUpdatePromptOnce();
     }
 
+    // No dialogs at startup: what a check finds becomes the Updates badge, a tray entry and at
+    // most one notification (App.Updates.cs). A check from the last day is reused; after that
+    // the quiet daily check runs in the background.
     private void StartAutomaticUpdateCheckOnce()
     {
         if (suppressAutomaticUpdateCheck || MainWindow.RequiresOnboarding || exitRequested) return;
+        StartUpdateScheduler();
         var settings = services.SiteSettings.Load();
         if (!settings.AutomaticUpdates) return;
         if (Interlocked.Exchange(ref automaticUpdateCheckStarted, 1) != 0) return;
+        if (!UpdatePreferencesStore.BackgroundCheckDue(services.UpdatePreferences.Load(), DateTimeOffset.UtcNow)
+            && services.UpdatePreferences.LoadCache() is { } cache)
+        {
+            PublishUpdates(cache, announce: false);
+            return;
+        }
         automaticUpdateCheck = CheckForUpdatesInBackgroundAsync(settings.UpdateChannel);
-    }
-
-    private void StartAutomaticUpdatePromptOnce()
-    {
-        if (automaticUpdateCheck is null || exitRequested) return;
-        if (Interlocked.Exchange(ref automaticUpdatePromptStarted, 1) != 0) return;
-        _ = ShowAutomaticUpdatePromptsAsync(automaticUpdateCheck);
+        _ = PublishAutomaticUpdateCheckAsync(automaticUpdateCheck);
     }
 
     private async Task<AutomaticUpdateCheck> CheckForUpdatesInBackgroundAsync(string channel)
@@ -230,23 +231,25 @@ public partial class App : Application
         var applicationTask = CheckForApplicationUpdateAsync(channel);
         var componentsTask = CheckForManagedComponentUpdatesAsync();
         await Task.WhenAll(applicationTask, componentsTask);
+        var application = await applicationTask;
         return new AutomaticUpdateCheck(
-            await applicationTask,
+            application.Release,
+            application.Unavailable,
             await componentsTask
         );
     }
 
-    private async Task<AppUpdateRelease?> CheckForApplicationUpdateAsync(string channel)
+    private async Task<(AppUpdateRelease? Release, bool Unavailable)> CheckForApplicationUpdateAsync(string channel)
     {
         try
         {
             var result = await services.Updates.CheckAsync(channel);
-            return result.UsedBundledFallback ? null : result.AvailableRelease;
+            return result.UsedBundledFallback ? (null, true) : (result.AvailableRelease, false);
         }
         catch (Exception error)
         {
             await ApplicationDiagnostics.WriteAutomaticUpdateCheckFailureAsync(error);
-            return null;
+            return (null, true);
         }
     }
 
@@ -271,28 +274,9 @@ public partial class App : Application
         }
     }
 
-    private async Task ShowAutomaticUpdatePromptsAsync(Task<AutomaticUpdateCheck> checkTask)
-    {
-        var result = await checkTask;
-        if (exitRequested) return;
-        var xamlRoot = await WaitForMainWindowXamlRootAsync();
-        if (xamlRoot is null || exitRequested) return;
-
-        if (result.ApplicationRelease is { } release)
-        {
-            NotifyUpdateAvailable(release);
-            await AppUpdatePrompt.ShowAsync(xamlRoot, release);
-        }
-        if (exitRequested || result.Components.Updates.Count == 0) return;
-        var pageTag = await ManagedComponentUpdatePrompt.ShowAsync(
-            xamlRoot,
-            result.Components
-        );
-        if (pageTag is not null) MainWindow.NavigateToPage(pageTag);
-    }
-
     private sealed record AutomaticUpdateCheck(
         AppUpdateRelease? ApplicationRelease,
+        bool ApplicationUnavailable,
         ManagedComponentUpdateCheck Components
     );
 
@@ -484,6 +468,9 @@ public partial class App : Application
         trayIcon = null;
         await StopAndLogAsync("command pipe", StopCommandServerAsync);
         await StopAndLogAsync("background operations", backgroundTasks.StopAsync);
+        services.UpdatePreferences.Changed -= UpdatePreferences_Changed;
+        // "Install when HerdMe quits" (Updates page), while the services are still there.
+        await StopAndLogAsync("updates on exit", InstallUpdatesOnExitAsync);
         await StopAndLogAsync("site folder watcher", StopSiteRootWatcherAsync);
         await StopAndLogAsync("activation listener", () => activationListener);
         await StopAndLogAsync(

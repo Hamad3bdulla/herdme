@@ -11,17 +11,26 @@ public sealed record AppUpdateDownloadUrls(
     [property: JsonPropertyName("windowsX64")] string? WindowsX64
 );
 
+// Optional SHA-256 of each download, published in the signed feed next to downloadURLs.
+public sealed record AppUpdateDownloadHashes(
+    [property: JsonPropertyName("windowsX64")] string? WindowsX64
+);
+
 public sealed record AppUpdateRelease(
     [property: JsonPropertyName("version")] string Version,
     [property: JsonPropertyName("build")] int Build,
     [property: JsonPropertyName("channel")] string Channel,
     [property: JsonPropertyName("notes")] string Notes,
     [property: JsonPropertyName("downloadURL")] string? DownloadUrl,
-    [property: JsonPropertyName("downloadURLs")] AppUpdateDownloadUrls? DownloadUrls = null
+    [property: JsonPropertyName("downloadURLs")] AppUpdateDownloadUrls? DownloadUrls = null,
+    [property: JsonPropertyName("sha256")] AppUpdateDownloadHashes? Sha256 = null
 )
 {
     [JsonIgnore]
     public string? PlatformDownloadUrl => DownloadUrls?.WindowsX64 ?? DownloadUrl;
+
+    [JsonIgnore]
+    public string? PlatformSha256 => Sha256?.WindowsX64;
 }
 
 public sealed record AppUpdateCheck(

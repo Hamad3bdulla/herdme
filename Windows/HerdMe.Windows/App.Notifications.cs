@@ -51,11 +51,12 @@ public partial class App
         Notify(AppNotifications.ShareEnded(share.Domain));
     }
 
-    private void NotifyUpdateAvailable(AppUpdateRelease release)
+    // Updates found while HerdMe sits in the tray (App.Updates.cs); a visible window gets a toast.
+    private void NotifyUpdatesAvailable(int count, AppUpdateRelease? onlyApplication)
     {
-        // A visible window already shows the update dialog.
-        if (IsMainWindowVisible) return;
-        Notify(AppNotifications.UpdateAvailable(release.Version));
+        Notify(onlyApplication is { } release
+            ? AppNotifications.UpdateAvailable(release.Version)
+            : AppNotifications.UpdatesAvailable(count));
     }
 
     // A mail was captured while the Mail page was not in front (MainWindow.Activity.cs).

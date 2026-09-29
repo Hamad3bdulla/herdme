@@ -2,15 +2,21 @@ using HerdMe.Windows.Models;
 
 namespace HerdMe.Windows.Services;
 
+// Security: the upstream release index marks a release between the installed and the latest
+// version as a security fix (only where the index says so; today Node.js).
 public sealed record ManagedComponentUpdate(
     string Id,
     string Name,
     string InstalledVersion,
     string LatestVersion,
-    string PageTag
+    string PageTag,
+    bool Security = false
 );
 
 public sealed record ManagedComponentUpdateFailure(string Component, Exception Error);
+
+// One installed component, listed under "Up to date" on the Updates page.
+public sealed record InstalledComponent(string Id, string Name, string Version, string PageTag);
 
 public sealed record ManagedComponentUpdateCheck(
     IReadOnlyList<ManagedComponentUpdate> Updates,
@@ -115,6 +121,81 @@ public sealed class ManagedComponentUpdateManager
         );
     }
 
+    // Everything HerdMe manages that is installed, with the version on disk. Reads local files
+    // and asks the installed tools for their version; nothing goes to the network.
+    public async Task<IReadOnlyList<InstalledComponent>> InstalledComponentsAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        var components = new List<InstalledComponent>();
+        if (phpInstaller is null) return components;
+        var cycles = phpInstaller.InstalledCycles()
+            .Where(PhpRuntimeInstaller.IsSupportedCycle)
+            .ToArray();
+        foreach (var cycle in cycles)
+        {
+            if (phpInstaller.InstalledVersion(cycle) is { } version)
+                components.Add(new($"php:{cycle}", $"PHP {cycle}", version, "php"));
+        }
+        foreach (var version in nodeInstaller?.InstalledVersions() ?? [])
+        {
+            var major = version.Split('.', 2)[0];
+            if (components.Any(item => item.Id == $"node:{major}")) continue;
+            components.Add(new($"node:{major}", $"Node.js {major} / npm", version, "node"));
+        }
+        if (gitInstaller?.InstalledVersion() is { } git)
+            components.Add(new("git", "Git", git, "general"));
+        if (serviceManager is not null)
+        {
+            var configured = serviceManager.LoadInstances()
+                .Select(instance => instance.DefinitionId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var definition in ManagedServiceCatalog.All.Where(item => item.IsInstallable))
+            {
+                if (!configured.Contains(definition.Id) || !serviceManager.IsInstalled(definition.Id)) continue;
+                components.Add(new(
+                    $"service:{definition.Id}",
+                    definition.Name,
+                    serviceManager.InstalledVersion(definition.Id),
+                    "services"
+                ));
+            }
+        }
+        var defaultCycle = phpPolicy?.Load().PhpCycle;
+        if (defaultCycle is not null && phpInstaller.IsInstalled(defaultCycle))
+        {
+            await AddToolAsync("composer", "Composer", "php",
+                token => composerTools!.ComposerVersionAsync(defaultCycle, token));
+            await AddToolAsync("laravel-installer", "Laravel Installer", "php",
+                token => composerTools!.LaravelInstallerVersionAsync(defaultCycle, token));
+            await AddToolAsync($"xdebug:{defaultCycle}", $"Xdebug (PHP {defaultCycle})", "debugger",
+                async token => (await xdebugManager!.InstalledAsync(
+                    phpInstaller.PhpExecutable(defaultCycle), defaultCycle, token))?.Version);
+        }
+        return components
+            .OrderBy(item => PageOrder(item.PageTag))
+            .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        async Task AddToolAsync(string id, string name, string pageTag, Func<CancellationToken, Task<string?>> read)
+        {
+            if (composerTools is null || xdebugManager is null) return;
+            try
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(TimeSpan.FromSeconds(10));
+                if (await read(timeout.Token) is { Length: > 0 } version)
+                    components.Add(new(id, name, version, pageTag));
+            }
+            catch (Exception error) when (error is not OutOfMemoryException
+                && !cancellationToken.IsCancellationRequested)
+            {
+                // A tool that cannot report its version is left out of the list.
+                System.Diagnostics.Debug.WriteLine($"{name} version unavailable: {error.Message}");
+            }
+        }
+    }
+
     private async Task<ManagedComponentUpdateCheck> CheckCoreAsync()
     {
         var outcomes = await Task.WhenAll(probes.Select(RunProbeAsync));
@@ -182,23 +263,25 @@ public sealed class ManagedComponentUpdateManager
     )
     {
         var installer = nodeInstaller!;
-        var majors = installer.InstalledVersions()
+        var installed = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var major in installer.InstalledVersions()
             .Select(version => version.Split('.', 2)[0])
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        if (majors.Length == 0) return [];
+            .Distinct(StringComparer.Ordinal))
+        {
+            if (installer.InstalledVersion(major) is { } version) installed[major] = version;
+        }
+        if (installed.Count == 0) return [];
 
-        var latestVersions = await installer.ResolveLatestVersionsAsync(
-            majors,
-            cancellationToken
-        );
-        return majors.Select(major => CreateUpdate(
-                $"node:{major}",
-                $"Node.js {major} / npm",
-                installer.InstalledVersion(major),
-                latestVersions.GetValueOrDefault(major),
+        var latest = await installer.ResolveLatestReleasesAsync(installed, cancellationToken);
+        return installed.Select(item => CreateUpdate(
+                $"node:{item.Key}",
+                $"Node.js {item.Key} / npm",
+                item.Value,
+                latest.TryGetValue(item.Key, out var release) ? release.Version : null,
                 "node"
-            ))
+            ) is { } update
+                ? update with { Security = latest[item.Key].Security }
+                : null)
             .OfType<ManagedComponentUpdate>()
             .ToList();
     }

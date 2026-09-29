@@ -170,8 +170,6 @@
   <data name="ServicesUseLatest" xml:space="preserve"><value>أحدث إصدار مدعوم: {0}</value></data>
   <data name="SitesFavoriteAction.Text" xml:space="preserve"><value>إضافة أو إزالة من المفضلة</value></data>
   <data name="ServicesBackingUp" xml:space="preserve"><value>جارٍ نسخ بيانات الخدمة احتياطياً</value></data>
-  <data name="DownloadsTitle.Text" xml:space="preserve"><value>التنزيلات</value></data>
-  <data name="DownloadsClear.Text" xml:space="preserve"><value>مسح سجل العمليات المنتهية</value></data>
   <data name="ServicesTransfer" xml:space="preserve"><value>{0:0.0} م.ب / {1:0.0} م.ب، {2:0.0} م.ب/ث</value></data>
   <data name="ServicesTransferUnknown" xml:space="preserve"><value>{0:0.0} م.ب، {1:0.0} م.ب/ث</value></data>
   <data name="ServicesAttempt" xml:space="preserve"><value>المحاولة {0}</value></data>
@@ -882,9 +880,6 @@
   <data name="UpdatesPageRoot.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>التحديثات</value></data>
   <data name="UpdatesTitle.Text" xml:space="preserve"><value>التحديثات</value></data>
   <data name="UpdatesRefreshButtonText.Text" xml:space="preserve"><value>فحص</value></data>
-  <data name="UpdatesUpdateAllButtonText.Text" xml:space="preserve"><value>تحديث الكل</value></data>
-  <data name="UpdatesDownloadButtonText.Text" xml:space="preserve"><value>تنزيل</value></data>
-  <data name="UpdatesComponentsTitle.Text" xml:space="preserve"><value>المكونات والخدمات</value></data>
   <data name="UpdatesNoComponents.Text" xml:space="preserve"><value>جميع المكونات المثبتة محدّثة.</value></data>
   <data name="UpdatesChecking" xml:space="preserve"><value>جارٍ فحص التحديثات…</value></data>
   <data name="UpdatesLastChecked" xml:space="preserve"><value>آخر فحص {0}</value></data>
@@ -969,7 +964,6 @@
   <data name="NodeInstallButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تثبيت أو تحديث</value></data>
   <data name="NodeUseButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>استخدام هذا الإصدار</value></data>
   <data name="NodeDeleteButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>حذف هذا الإصدار</value></data>
-  <data name="DownloadsClearButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>مسح السجل المكتمل</value></data>
   <data name="AboutResourcesTitle.Text" xml:space="preserve"><value>المصادر</value></data>
   <data name="AboutExitDescription.Text" xml:space="preserve"><value>إغلاق HerdMe وإيقاف خدماته المحلية.</value></data>
   <data name="LogsPageSubtitle.Text" xml:space="preserve"><value>اقرأ سجلات HerdMe وPHP وخادم الويب والخدمات في مكان واحد.</value></data>
@@ -1954,4 +1948,130 @@
   <data name="GeneralDomainSuffixInvalid" xml:space="preserve"><value>استخدم حروفًا إنجليزية أو أرقامًا أو شرطات فقط، مثل test أو local. لم يتغير اللاحق.</value></data>
   <data name="GeneralDomainSuffixChanged" xml:space="preserve"><value>المواقع تُفتح الآن على https://name.{0}/</value></data>
   <data name="GeneralDomainSuffixChangedHosts" xml:space="preserve"><value>المواقع تُفتح الآن على https://name.{0}/. اضغط تحديث في النطاقات المحلية حتى يتعرف Windows على الأسماء الجديدة.</value></data>
+  <data name="NavUpdatesBadge" xml:space="preserve"><value>{0} تحديثات متوفرة</value></data>
+  <data name="TrayUpdatesLabel" xml:space="preserve"><value>التحديثات</value></data>
+  <data name="TrayUpdatesCountLabel" xml:space="preserve"><value>التحديثات ({0})</value></data>
+  <data name="UpdatesFoundToast" xml:space="preserve"><value>تتوفر {0} تحديثات.</value></data>
+  <data name="UpdatesFoundToastOne" xml:space="preserve"><value>يتوفر تحديث.</value></data>
+  <data name="UpdatesFoundToastView" xml:space="preserve"><value>عرض</value></data>
+  <data name="UpdateInstallInApp" xml:space="preserve"><value>تنزيل وتثبيت</value></data>
+  <data name="NotificationUpdatesTitle" xml:space="preserve"><value>تتوفر تحديثات</value></data>
+  <data name="NotificationUpdatesOne" xml:space="preserve"><value>تحديث واحد جاهز للتثبيت.</value></data>
+  <data name="NotificationUpdatesMany" xml:space="preserve"><value>{0} تحديثات جاهزة للتثبيت.</value></data>
+  <data name="NotificationUpdatesInstalledTitle" xml:space="preserve"><value>ثُبّتت التحديثات</value></data>
+  <data name="NotificationUpdatesInstalledMessage" xml:space="preserve"><value>حُدّث {0}. افتح التحديثات لمعرفة ما تغيّر.</value></data>
+  <data name="NotificationUpdatesFailedTitle" xml:space="preserve"><value>لم تُثبَّت بعض التحديثات</value></data>
+  <data name="NotificationUpdatesFailedMessage" xml:space="preserve"><value>حُدّث {0} ولم يُحدَّث {1}. افتح التحديثات لإعادة المحاولة.</value></data>
+  <data name="UpdatesSitesDidNotStart" xml:space="preserve"><value>لم تعمل المواقع مع الإصدار الجديد.</value></data>
+  <data name="UpdatesRestoredMessage" xml:space="preserve"><value>لم يعمل {0} {1} ({2})؛ أُعيد الإصدار {3}.</value></data>
+  <data name="UpdatesRollbackUnavailable" xml:space="preserve"><value>لم يعد الإصدار السابق محفوظًا.</value></data>
+  <data name="UpdatesNotEnoughSpace" xml:space="preserve"><value>لا توجد مساحة كافية على القرص: تحتاج هذه التحديثات إلى نحو {0} ميغابايت.</value></data>
+  <data name="AppSelfUpdateUnsupported" xml:space="preserve"><value>لا يمكن تنزيل هذا التحديث إلا من المتصفح.</value></data>
+  <data name="AppSelfUpdateChecksumFailed" xml:space="preserve"><value>ملف إعداد HerdMe الذي نُزّل لا يطابق بصمة SHA-256 الرسمية.</value></data>
+  <data name="AppSelfUpdateMissing" xml:space="preserve"><value>لم يعد التحديث الذي نُزّل موجودًا. نزّله مرة أخرى.</value></data>
+  <data name="AppSelfUpdateStartFailed" xml:space="preserve"><value>تعذّر على HerdMe بدء التحديث.</value></data>
+  <data name="AppSelfUpdateNoChecksum" xml:space="preserve"><value>لا يحتوي إصدار HerdMe على بصمة SHA-256 لهذا التنزيل، لذا سيُفتح في المتصفح بدلًا من ذلك.</value></data>
+  <data name="AppSelfUpdateNotInstalled" xml:space="preserve"><value>لم يكتمل الإعداد؛ ما زال HerdMe على الإصدار السابق.</value></data>
+  <data name="UpdatesAboutMegabytes" xml:space="preserve"><value>نحو {0} ميغابايت</value></data>
+  <data name="UpdatesAboutMinutes" xml:space="preserve"><value>نحو {0} دقيقة</value></data>
+  <data name="UpdatesAboutSeconds" xml:space="preserve"><value>نحو {0} ثانية</value></data>
+  <data name="UpdatesSummaryOne" xml:space="preserve"><value>يتوفر تحديث واحد</value></data>
+  <data name="UpdatesSummaryMany" xml:space="preserve"><value>تتوفر {0} تحديثات</value></data>
+  <data name="UpdatesSummaryMajorOne" xml:space="preserve"><value>إصدار رئيسي جديد واحد</value></data>
+  <data name="UpdatesSummaryMajorMany" xml:space="preserve"><value>{0} إصدارات رئيسية جديدة</value></data>
+  <data name="UpdatesSummarySecurity" xml:space="preserve"><value>يتضمن إصلاحات أمنية</value></data>
+  <data name="UpdatesSummaryApplication" xml:space="preserve"><value>HerdMe نفسه</value></data>
+  <data name="UpdatesSummaryDiskWarning" xml:space="preserve"><value>المساحة الحرة على هذا القرص {0} ميغابايت فقط؛ والمطلوب نحو {1} ميغابايت.</value></data>
+  <data name="UpdatesUpdateAllCount" xml:space="preserve"><value>تحديث الكل ({0})</value></data>
+  <data name="UpdatesNotCheckedTitle" xml:space="preserve"><value>لم يُتحقق بعد</value></data>
+  <data name="UpdatesNotCheckedDetail" xml:space="preserve"><value>اختر «تحقق» للبحث عن تحديثات.</value></data>
+  <data name="UpdatesInstallingTitle" xml:space="preserve"><value>جارٍ تثبيت التحديثات</value></data>
+  <data name="UpdatesInstallingDetail" xml:space="preserve"><value>يمكنك متابعة العمل؛ كل صف يعرض تقدّمه.</value></data>
+  <data name="UpdatesRunSummary" xml:space="preserve"><value>حُدّث {0}، وفشل {1}، وأُلغي {2}.</value></data>
+  <data name="UpdatesRunFailedTitle" xml:space="preserve"><value>لم تُثبَّت بعض التحديثات</value></data>
+  <data name="UpdatesRunCancelledTitle" xml:space="preserve"><value>أُلغيت التحديثات</value></data>
+  <data name="UpdatesConfirmOne" xml:space="preserve"><value>تحديث {0}؟</value></data>
+  <data name="UpdatesConfirmMany" xml:space="preserve"><value>تثبيت {0} تحديثات؟</value></data>
+  <data name="UpdatesIncludeMajorOne" xml:space="preserve"><value>حدّث {0} أيضًا إلى إصداره الرئيسي الجديد</value></data>
+  <data name="UpdatesIncludeMajors" xml:space="preserve"><value>ثبّت أيضًا {0} إصدارات رئيسية جديدة</value></data>
+  <data name="UpdatesUpdateNow" xml:space="preserve"><value>حدّث الآن</value></data>
+  <data name="UpdatesLater" xml:space="preserve"><value>لاحقًا</value></data>
+  <data name="UpdatesImpactNothingSelected" xml:space="preserve"><value>لم يُحدَّد أي شيء.</value></data>
+  <data name="UpdatesImpactServices" xml:space="preserve"><value>ستتوقف هذه الخدمات لحظات ثم تعمل من جديد: {0}.</value></data>
+  <data name="UpdatesImpactSites" xml:space="preserve"><value>ستتوقف {0} مواقع على {1} نحو {2} ثانية.</value></data>
+  <data name="UpdatesImpactNothingStops" xml:space="preserve"><value>لا يلزم إيقاف أي شيء.</value></data>
+  <data name="UpdatesImpactTime" xml:space="preserve"><value>يستغرق {0} ويُنزّل {1}.</value></data>
+  <data name="UpdatesImpactMajor" xml:space="preserve"><value>سينتقل {0} من {1}.x إلى {2}.x؛ تأكد أن مشاريعك ما زالت تعمل.</value></data>
+  <data name="UpdatesGroupPhp" xml:space="preserve"><value>PHP وأدوات Laravel</value></data>
+  <data name="UpdatesGroupNode" xml:space="preserve"><value>بيئة Node.js</value></data>
+  <data name="UpdatesGroupServices" xml:space="preserve"><value>الخدمات</value></data>
+  <data name="UpdatesGroupDebugger" xml:space="preserve"><value>التصحيح</value></data>
+  <data name="UpdatesGroupTools" xml:space="preserve"><value>الأدوات</value></data>
+  <data name="UpdatesHiddenGroup" xml:space="preserve"><value>المتخطاة والمؤجلة</value></data>
+  <data name="UpdatesHiddenPinned" xml:space="preserve"><value>باقٍ على {0}.x؛ يتوفر {1}.</value></data>
+  <data name="UpdatesHiddenSkipped" xml:space="preserve"><value>تم تخطي الإصدار {0}.</value></data>
+  <data name="UpdatesHiddenSnoozed" xml:space="preserve"><value>الإصدار {0}، التذكير في {1}.</value></data>
+  <data name="UpdatesShowAgain" xml:space="preserve"><value>إظهار مرة أخرى</value></data>
+  <data name="UpdatesBadgeMajor" xml:space="preserve"><value>رئيسي</value></data>
+  <data name="UpdatesBadgeSecurity" xml:space="preserve"><value>أمني</value></data>
+  <data name="UpdatesBadgePinned" xml:space="preserve"><value>يبقى على {0}.x</value></data>
+  <data name="UpdatesWhatsNew" xml:space="preserve"><value>ما الجديد</value></data>
+  <data name="UpdatesMoreOptions" xml:space="preserve"><value>خيارات أخرى</value></data>
+  <data name="UpdatesSkipVersion" xml:space="preserve"><value>تخطَّ هذا الإصدار</value></data>
+  <data name="UpdatesRemindLater" xml:space="preserve"><value>ذكّرني بعد أسبوع</value></data>
+  <data name="UpdatesSkippedToast" xml:space="preserve"><value>تم تخطي {0} {1}.</value></data>
+  <data name="UpdatesSnoozedToast" xml:space="preserve"><value>{0}: سنذكّرك بعد أسبوع.</value></data>
+  <data name="UpdatesPin" xml:space="preserve"><value>البقاء على {0}.x</value></data>
+  <data name="UpdatesUnpin" xml:space="preserve"><value>السماح بالإصدارات بعد {0}.x</value></data>
+  <data name="UpdatesPinnedToast" xml:space="preserve"><value>باقٍ على {0}.x. تنتظر الإصدارات الرئيسية الجديدة حتى تسمح بها.</value></data>
+  <data name="UpdatesRollBack" xml:space="preserve"><value>الرجوع للإصدار السابق</value></data>
+  <data name="UpdatesRetry" xml:space="preserve"><value>إعادة المحاولة</value></data>
+  <data name="UpdatesUpdatedTo" xml:space="preserve"><value>حُدّث إلى {0}</value></data>
+  <data name="UpdatesStagePreparing" xml:space="preserve"><value>جارٍ التحضير...</value></data>
+  <data name="UpdatesStageQueued" xml:space="preserve"><value>في انتظار دوره</value></data>
+  <data name="UpdatesStageCancelled" xml:space="preserve"><value>أُلغي</value></data>
+  <data name="UpdatesUpToDateHeader" xml:space="preserve"><value>محدّثة ({0})</value></data>
+  <data name="UpdatesRollBackTitle" xml:space="preserve"><value>إرجاع {0} للإصدار السابق؟</value></data>
+  <data name="UpdatesRollBackMessage" xml:space="preserve"><value>سيعود {0} من {2} إلى {1}. ستُعاد تشغيل الخدمات التي تستخدمه.</value></data>
+  <data name="UpdatesRollBackRestoreData" xml:space="preserve"><value>استعد أيضًا البيانات من قبل التحديث</value></data>
+  <data name="UpdatesRollingBack" xml:space="preserve"><value>جارٍ إرجاع {0}...</value></data>
+  <data name="UpdatesRolledBackTitle" xml:space="preserve"><value>تم الإرجاع</value></data>
+  <data name="UpdatesRolledBackMessage" xml:space="preserve"><value>عاد {0} إلى {1}.</value></data>
+  <data name="UpdatesRollBackFailedTitle" xml:space="preserve"><value>تعذّر الإرجاع</value></data>
+  <data name="UpdatesApplicationDownload" xml:space="preserve"><value>تنزيل</value></data>
+  <data name="UpdatesApplicationOpenDownload" xml:space="preserve"><value>فتح التنزيل</value></data>
+  <data name="UpdatesApplicationReady" xml:space="preserve"><value>نُزّل وتم التحقق منه. أعد تشغيل HerdMe للإكمال.</value></data>
+  <data name="UpdatesApplicationReadyToast" xml:space="preserve"><value>HerdMe {0} جاهز. أعد التشغيل للتحديث.</value></data>
+  <data name="UpdatesApplicationDownloadFailed" xml:space="preserve"><value>فشل التنزيل: {0}</value></data>
+  <data name="UpdatesRestartTitle" xml:space="preserve"><value>إعادة التشغيل للتحديث إلى HerdMe {0}؟</value></data>
+  <data name="UpdatesRestartMessage" xml:space="preserve"><value>سيُغلق HerdMe ويثبّت التحديث ثم يفتح من جديد. ستتوقف المواقع والخدمات لحظات.</value></data>
+  <data name="UpdatesRestartNow" xml:space="preserve"><value>أعد التشغيل الآن</value></data>
+  <data name="UpdatesRestarting" xml:space="preserve"><value>جارٍ بدء التحديث...</value></data>
+  <data name="UpdatesRestartFailed" xml:space="preserve"><value>تعذّر بدء التحديث: {0}</value></data>
+  <data name="UpdatesOutcomeUpdated" xml:space="preserve"><value>حُدّث</value></data>
+  <data name="UpdatesOutcomeFailed" xml:space="preserve"><value>فشل</value></data>
+  <data name="UpdatesOutcomeCancelled" xml:space="preserve"><value>أُلغي</value></data>
+  <data name="UpdatesOutcomeRolledBack" xml:space="preserve"><value>أُرجع</value></data>
+  <data name="UpdatesOutcomeRestored" xml:space="preserve"><value>أُعيد تلقائيًا</value></data>
+  <data name="UpdatesHistoryShowAll" xml:space="preserve"><value>عرض الكل ({0})</value></data>
+  <data name="UpdatesHistoryShowLess" xml:space="preserve"><value>عرض أقل</value></data>
+  <data name="UpdatesHistoryClearTitle" xml:space="preserve"><value>مسح سجل التحديثات؟</value></data>
+  <data name="UpdatesHistoryClearMessage" xml:space="preserve"><value>يمسح هذا القائمة فقط. تبقى الإصدارات المثبّتة ونسخ الإرجاع.</value></data>
+  <data name="UpdatesHistoryClearAction" xml:space="preserve"><value>مسح</value></data>
+  <data name="UpdatesAutoInstallOffToast" xml:space="preserve"><value>تنتظرك تحديثات المكونات.</value></data>
+  <data name="UpdatesAutoInstallIdleToast" xml:space="preserve"><value>تُثبَّت تحديثات المكونات عندما يكون الجهاز خاملًا.</value></data>
+  <data name="UpdatesAutoInstallOnExitToast" xml:space="preserve"><value>تُثبَّت تحديثات المكونات عند إغلاق HerdMe.</value></data>
+  <data name="UpdatesRestartToUpdate.Text" xml:space="preserve"><value>أعد التشغيل للتحديث</value></data>
+  <data name="UpdatesAvailableHeader.Text" xml:space="preserve"><value>التحديثات المتوفرة</value></data>
+  <data name="UpdatesHistoryTitle.Text" xml:space="preserve"><value>السجل</value></data>
+  <data name="UpdatesHistoryClearButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>مسح سجل التحديثات</value></data>
+  <data name="UpdatesHistoryClear.Text" xml:space="preserve"><value>مسح سجل التحديثات</value></data>
+  <data name="UpdatesHistoryEmpty.Text" xml:space="preserve"><value>لم يُحدَّث أي شيء بعد.</value></data>
+  <data name="UpdatesAutomaticTitle.Text" xml:space="preserve"><value>التحديثات التلقائية</value></data>
+  <data name="UpdatesAutoInstallTitle.Text" xml:space="preserve"><value>تثبيت تحديثات المكونات تلقائيًا</value></data>
+  <data name="UpdatesAutoInstallDescription.Text" xml:space="preserve"><value>PHP وNode.js والخدمات والأدوات فقط. الإصدارات الرئيسية الجديدة وHerdMe نفسه تنتظرك دائمًا.</value></data>
+  <data name="UpdatesAutoInstallCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>تثبيت تحديثات المكونات تلقائيًا</value></data>
+  <data name="UpdatesAutoInstallOff.Content" xml:space="preserve"><value>أبدًا</value></data>
+  <data name="UpdatesAutoInstallIdle.Content" xml:space="preserve"><value>عندما يكون الجهاز خاملًا</value></data>
+  <data name="UpdatesAutoInstallOnExit.Content" xml:space="preserve"><value>عند إغلاق HerdMe</value></data>
 </root>

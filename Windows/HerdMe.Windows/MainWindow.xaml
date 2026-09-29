@@ -221,6 +221,7 @@
             </NavigationViewItem>
             <NavigationViewItem x:Uid="NavUpdates" AutomationProperties.AutomationId="NavUpdates" Content="Updates" Tag="updates">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Download" /></NavigationViewItem.Icon>
+                <NavigationViewItem.InfoBadge><InfoBadge x:Name="UpdatesBadge" Visibility="Collapsed" /></NavigationViewItem.InfoBadge>
             </NavigationViewItem>
             <NavigationViewItem x:Uid="NavAbout" AutomationProperties.AutomationId="NavAbout" Content="About" Tag="about">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="Help" /></NavigationViewItem.Icon>
