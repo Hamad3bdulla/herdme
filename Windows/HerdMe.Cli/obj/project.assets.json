@@ -145,7 +145,7 @@
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
-    "version": "0.1.29",
+    "version": "0.1.30",
     "restore": {
       "projectUniqueName": "D:\\Data\\herdme\\Windows\\HerdMe.Cli\\HerdMe.Cli.csproj",
       "projectName": "herdme",

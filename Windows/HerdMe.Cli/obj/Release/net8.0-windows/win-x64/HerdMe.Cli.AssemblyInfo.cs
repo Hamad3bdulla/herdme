@@ -12,11 +12,11 @@ using System.Reflection;
 
 [assembly: System.Reflection.AssemblyCompanyAttribute("herdme")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
-[assembly: System.Reflection.AssemblyFileVersionAttribute("0.1.29.1")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.1.29+62d39677de196eb9fda714479b63b371357811eb")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("0.1.30.1")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.1.30+37c374d1639a3acf29e36d6adae3fdc881906756")]
 [assembly: System.Reflection.AssemblyProductAttribute("herdme")]
 [assembly: System.Reflection.AssemblyTitleAttribute("herdme")]
-[assembly: System.Reflection.AssemblyVersionAttribute("0.1.29.1")]
+[assembly: System.Reflection.AssemblyVersionAttribute("0.1.30.1")]
 [assembly: System.Runtime.Versioning.TargetPlatformAttribute("Windows7.0")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatformAttribute("Windows7.0")]
 
