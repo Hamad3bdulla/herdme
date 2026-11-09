@@ -82,7 +82,7 @@ jobs:
 
       - name: Upload Swift formatting corrections
         if: failure() && steps.lint.outcome == 'failure'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: HerdMe-${{ github.run_number }}-swift-format
           path: build/swift-format.patch
@@ -131,7 +131,7 @@ jobs:
 
       - name: Upload macOS coverage report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: HerdMe-${{ github.run_number }}-macOS-coverage
           path: build/macos-coverage.json
@@ -161,7 +161,7 @@ jobs:
 
       - name: Upload macOS UI test evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: HerdMe-${{ github.run_number }}-macOS-UI-tests
           path: |
@@ -196,7 +196,7 @@ jobs:
         run: ./scripts/package-macos.sh Release
 
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: HerdMe-${{ github.run_number }}-macOS
           path: |
@@ -290,7 +290,7 @@ jobs:
 
       - name: Upload sanitizer failure diagnostics
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: HerdMe-${{ github.run_number }}-macOS-sanitizer-diagnostics
           path: |
